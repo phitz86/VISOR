@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>12.0</LangVersion>
+    <RootNamespace>GRiD</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="iRacingSDK" Version="1.18.6" />
+    <PackageReference Include="IRSDKSharper" Version="1.1.4" />
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="9.0.7" />
+    <PackageReference Include="SVappsLAB.iRacingTelemetrySDK" Version="0.9.8.3" />
+    <PackageReference Include="System.Management" Version="9.0.7" />
+  </ItemGroup>
+
+</Project>
