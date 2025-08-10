@@ -1,4 +1,4 @@
-namespace GRiD.Interfaces
+namespace VISOR.Interfaces
 {
     public interface IracingTelemetryWrapper : IDisposable
     {

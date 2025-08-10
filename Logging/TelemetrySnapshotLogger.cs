@@ -2,9 +2,9 @@ using System;
 using System.IO;
 using System.Text.Json;
 using System.Collections.Generic;
-using GRiD.Interfaces;
+using VISOR.Interfaces;
 
-namespace GRiD.Logging
+namespace VISOR.Logging
 {
     public class TelemetrySnapshotLogger
     {
@@ -73,7 +73,7 @@ namespace GRiD.Logging
             {
                 try
                 {
-                    var logPath = Path.Combine(_outputDirectory, $"grid-{Sanitize(wrapperName)}.jsonl");
+                    var logPath = Path.Combine(_outputDirectory, $"VISOR-{Sanitize(wrapperName)}.jsonl");
 
                     // Scrub telemetry fields to avoid serialization issues
                     var safeFields = ScrubFields(snapshot.RawTelemetryData);
@@ -149,7 +149,7 @@ namespace GRiD.Logging
 
                     try
                     {
-                        var errorLogPath = Path.Combine(_outputDirectory, "grid-errors.log");
+                        var errorLogPath = Path.Combine(_outputDirectory, "VISOR-errors.log");
                         var errorEntry = $"{timestamp:o} - {wrapperName} - Logging error: {ex.Message}{Environment.NewLine}";
                         File.AppendAllText(errorLogPath, errorEntry);
                     }
@@ -163,7 +163,7 @@ namespace GRiD.Logging
         {
             try
             {
-                var sessionLogPath = Path.Combine(_outputDirectory, "grid-session.jsonl");
+                var sessionLogPath = Path.Combine(_outputDirectory, "VISOR-session.jsonl");
                 var sessionEntry = new
                 {
                     timestamp = startTime.ToString("o"),
@@ -195,7 +195,7 @@ namespace GRiD.Logging
         {
             try
             {
-                var sessionLogPath = Path.Combine(_outputDirectory, "grid-session.jsonl");
+                var sessionLogPath = Path.Combine(_outputDirectory, "VISOR-session.jsonl");
                 var sessionEntry = new
                 {
                     timestamp = endTime.ToString("o"),
@@ -220,7 +220,7 @@ namespace GRiD.Logging
                 Console.WriteLine($"[Logger] Session ended - Total logs written: {_logCounts.Values.Sum()}");
                 foreach (var kvp in _logCounts.OrderByDescending(x => x.Value))
                 {
-                    var logPath = Path.Combine(_outputDirectory, $"grid-{Sanitize(kvp.Key)}.jsonl");
+                    var logPath = Path.Combine(_outputDirectory, $"VISOR-{Sanitize(kvp.Key)}.jsonl");
                     var fileSize = File.Exists(logPath) ? new FileInfo(logPath).Length / (1024 * 1024) : 0; // MB
                     Console.WriteLine($"  {kvp.Key}: {kvp.Value} logs ({fileSize:F1} MB)");
                 }
@@ -235,7 +235,7 @@ namespace GRiD.Logging
         {
             try
             {
-                var errorLogPath = Path.Combine(_outputDirectory, "grid-errors.log");
+                var errorLogPath = Path.Combine(_outputDirectory, "VISOR-errors.log");
                 var errorEntry = $"{DateTime.UtcNow:o} - {wrapperName} - {errorMessage}";
 
                 if (exception != null)
@@ -260,7 +260,7 @@ namespace GRiD.Logging
         {
             try
             {
-                var reportPath = Path.Combine(_outputDirectory, $"grid-summary-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json");
+                var reportPath = Path.Combine(_outputDirectory, $"VISOR-summary-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json");
 
                 var report = new
                 {
@@ -273,10 +273,10 @@ namespace GRiD.Logging
                         name = kvp.Key,
                         logCount = kvp.Value,
                         lastLogTime = _lastLogTimes.GetValueOrDefault(kvp.Key, DateTime.MinValue).ToString("o"),
-                        logFile = $"grid-{Sanitize(kvp.Key)}.jsonl",
-                        fileSizeMB = GetFileSizeMB($"grid-{Sanitize(kvp.Key)}.jsonl")
+                        logFile = $"VISOR-{Sanitize(kvp.Key)}.jsonl",
+                        fileSizeMB = GetFileSizeMB($"VISOR-{Sanitize(kvp.Key)}.jsonl")
                     }).OrderByDescending(w => w.logCount).ToArray(),
-                    files = Directory.GetFiles(_outputDirectory, "grid-*.jsonl")
+                    files = Directory.GetFiles(_outputDirectory, "VISOR-*.jsonl")
                         .Select(f => new
                         {
                             name = Path.GetFileName(f),

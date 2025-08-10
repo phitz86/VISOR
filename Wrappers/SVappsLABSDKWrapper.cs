@@ -1,4 +1,4 @@
-using GRiD.Interfaces;
+using VISOR.Interfaces;
 using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK;
 using System;
@@ -7,7 +7,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace GRiD.Wrappers
+namespace VISOR.Wrappers
 {
     public class NullLogger<T> : ILogger<T>
     {

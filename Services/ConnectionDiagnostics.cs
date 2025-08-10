@@ -7,14 +7,14 @@ using System.Management;
 using System.Reflection;
 using Microsoft.Win32;
 
-namespace GRiD.Diagnostics
+namespace VISOR.Diagnostics
 {
     public static class ConnectionDiagnostics
     {
         public static void RunDiagnostics()
         {
             Console.WriteLine("=".PadRight(80, '='));
-            Console.WriteLine("GRiD CONNECTION DIAGNOSTICS");
+            Console.WriteLine("VISOR CONNECTION DIAGNOSTICS");
             Console.WriteLine("=".PadRight(80, '='));
 
             CheckIRacingInstallation();

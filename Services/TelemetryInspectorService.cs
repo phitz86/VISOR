@@ -1,15 +1,15 @@
-﻿using GRiD.Diagnostics;
-using GRiD.Interfaces;
-using GRiD.Logging;
-using GRiD.Services;
-using GRiD.Wrappers;
+﻿using VISOR.Diagnostics;
+using VISOR.Interfaces;
+using VISOR.Logging;
+using VISOR.Services;
+using VISOR.Wrappers;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace GRiD.Services
+namespace VISOR.Services
 {
     public class TelemetryInspectorService : IDisposable
     {
@@ -27,14 +27,14 @@ namespace GRiD.Services
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _pollInterval = interval ?? TimeSpan.FromMilliseconds(16); // ~60 FPS default
             _maxDuration = maxDuration;
-            _performanceMonitor = new WrapperPerformanceMonitor(@"C:\Users\cepha\Desktop\GRiD\Logs");
+            _performanceMonitor = new WrapperPerformanceMonitor(@"C:\Users\cepha\Desktop\VISOR\Logs");
             _cancellationTokenSource = new CancellationTokenSource();
         }
 
         public async Task Start()
         {
             _running = true;
-            Console.WriteLine("[GRiD] Starting telemetry inspector loop...");
+            Console.WriteLine("[VISOR] Starting telemetry inspector loop...");
 
             // Initialize wrappers with enhanced error handling
             var initializedWrappers = await InitializeWrappers();
@@ -45,8 +45,8 @@ namespace GRiD.Services
                 return;
             }
 
-            Console.WriteLine($"[GRiD] Successfully initialized {initializedWrappers.Count}/{_wrappers.Count} wrappers");
-            Console.WriteLine("[GRiD] Starting performance monitoring...");
+            Console.WriteLine($"[VISOR] Successfully initialized {initializedWrappers.Count}/{_wrappers.Count} wrappers");
+            Console.WriteLine("[VISOR] Starting performance monitoring...");
 
             // Wait for connections to stabilize
             await Task.Delay(2000, _cancellationTokenSource.Token);
@@ -60,7 +60,7 @@ namespace GRiD.Services
 
             foreach (var wrapper in _wrappers)
             {
-                Console.WriteLine($"[GRiD] Initializing wrapper: {wrapper.Name}");
+                Console.WriteLine($"[VISOR] Initializing wrapper: {wrapper.Name}");
 
                 try
                 {
@@ -69,7 +69,7 @@ namespace GRiD.Services
                     if (success)
                     {
                         initializedWrappers.Add(wrapper);
-                        Console.WriteLine($"[GRiD] ✓ Successfully initialized: {wrapper.Name}");
+                        Console.WriteLine($"[VISOR] ✓ Successfully initialized: {wrapper.Name}");
 
                         // Give each wrapper time to settle
                         await Task.Delay(1000, _cancellationTokenSource.Token);
@@ -129,12 +129,12 @@ namespace GRiD.Services
             int connectedWarningCounter = 0;
             if (pollCount == 300) // ~5 seconds into runtime
             {
-                Console.WriteLine("[GRiD] Running delayed diagnostics after initial data capture...");
+                Console.WriteLine("[VISOR] Running delayed diagnostics after initial data capture...");
                 FieldDiscoveryDiagnostic.AnalyzeFieldDiscovery(initializedWrappers);
                 DataConsistencyValidator.ValidateConsistency(initializedWrappers);
             }
 
-            Console.WriteLine("[GRiD] Entering main polling loop...");
+            Console.WriteLine("[VISOR] Entering main polling loop...");
 
             try
             {
@@ -146,7 +146,7 @@ namespace GRiD.Services
                     // Check for duration limit
                     if (_maxDuration.HasValue && DateTime.UtcNow - startTime > _maxDuration.Value)
                     {
-                        Console.WriteLine("[GRiD] Max duration reached. Stopping...");
+                        Console.WriteLine("[VISOR] Max duration reached. Stopping...");
                         Stop();
                         break;
                     }
@@ -223,7 +223,7 @@ namespace GRiD.Services
             }
             catch (OperationCanceledException)
             {
-                Console.WriteLine("[GRiD] Polling loop cancelled.");
+                Console.WriteLine("[VISOR] Polling loop cancelled.");
             }
             catch (Exception ex)
             {
@@ -232,7 +232,7 @@ namespace GRiD.Services
             }
             finally
             {
-                Console.WriteLine("[GRiD] Polling loop ended.");
+                Console.WriteLine("[VISOR] Polling loop ended.");
             }
         }
 
@@ -241,7 +241,7 @@ namespace GRiD.Services
             if (!_running) return;
 
             _running = false;
-            Console.WriteLine("[GRiD] Stopping telemetry inspector...");
+            Console.WriteLine("[VISOR] Stopping telemetry inspector...");
 
             try
             {
@@ -249,7 +249,7 @@ namespace GRiD.Services
                 _cancellationTokenSource?.Cancel();
 
                 // Generate final performance report
-                Console.WriteLine("[GRiD] Generating final performance report...");
+                Console.WriteLine("[VISOR] Generating final performance report...");
                 _performanceMonitor?.GenerateFinalReport();
 
                 // Shutdown all wrappers
@@ -257,7 +257,7 @@ namespace GRiD.Services
                 {
                     try
                     {
-                        Console.WriteLine($"[GRiD] Shutting down {wrapper.Name}...");
+                        Console.WriteLine($"[VISOR] Shutting down {wrapper.Name}...");
                         wrapper.Shutdown();
                     }
                     catch (Exception ex)
@@ -267,7 +267,7 @@ namespace GRiD.Services
                     }
                 }
 
-                Console.WriteLine("[GRiD] ✓ Inspector service stopped");
+                Console.WriteLine("[VISOR] ✓ Inspector service stopped");
             }
             catch (Exception ex)
             {

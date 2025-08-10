@@ -1,6 +1,6 @@
 using SVappsLAB.iRacingTelemetrySDK;
 
-namespace GRiD.Wrappers
+namespace VISOR.Wrappers
 {
     // Define the telemetry variables we want to track on a class
     // This will generate a TelemetryData struct via source generation

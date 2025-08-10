@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using GRiD.Interfaces;
+using VISOR.Interfaces;
 
-namespace GRiD.Wrappers
+namespace VISOR.Wrappers
 {
     public class SVappsLABSnapshot : TelemetrySnapshot
     {

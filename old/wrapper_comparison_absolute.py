@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 
 # Full path to the log directory
-log_dir = Path(r"C:\Users\cepha\Desktop\GRiD\bin\Debug\net8.0\logs")
-files = list(log_dir.glob("grid-*.jsonl"))
+log_dir = Path(r"C:\Users\cepha\Desktop\VISOR\bin\Debug\net8.0\logs")
+files = list(log_dir.glob("VISOR-*.jsonl"))
 
 if not files:
     raise FileNotFoundError(f"No .jsonl files found in {log_dir.resolve()}")
@@ -13,7 +13,7 @@ if not files:
 dfs = []
 
 for file in files:
-    wrapper_name = file.stem.replace("grid-", "")
+    wrapper_name = file.stem.replace("VISOR-", "")
     df = pd.read_json(file, lines=True)
     df["wrapper"] = wrapper_name
     dfs.append(df)

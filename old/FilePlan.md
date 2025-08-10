@@ -1,6 +1,6 @@
-GRiD 
+VISOR 
 ├── Program.cs
-└── GRiD-C.csproj 
+└── VISOR-C.csproj 
 └── IracingTelemetryWrapper.cs  
 │
 ├── Wrappers/

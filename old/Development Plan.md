@@ -1,7 +1,6 @@
-# GRiD: Generative Raider of iRacing Data
+# VISOR: Virtual Intelligence Simulation Overlay & Radar
 
-GRiD is a diagnostic telemetry tool designed to evaluate iRacing SDK wrappers head-to-head to improve the stability and performance of the IRODex overlay project.
-
+VISOR is a lightweight iRacing data overlay built by ChatGPT and Claude, designed to give you everything you need on your screen, and nothing you don't.
 ---
 
 ## 🎯 Project Goal
@@ -56,8 +55,8 @@ telemetry-inspector.js            // Node.js version
 └── (similar telemetry polling loop)
 
 logs/
-├── grid-irsdksharper.jsonl
-├── grid-iracingsdknet.jsonl
+├── VISOR-irsdksharper.jsonl
+├── VISOR-iracingsdknet.jsonl
 └── ...
 
 diffs/

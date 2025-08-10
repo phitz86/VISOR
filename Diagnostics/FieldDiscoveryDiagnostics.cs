@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GRiD.Interfaces;
+using VISOR.Interfaces;
 
-namespace GRiD.Diagnostics
+namespace VISOR.Diagnostics
 {
     public static class FieldDiscoveryDiagnostic
     {

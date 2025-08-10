@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using GRiD.Interfaces;
-using GRiD.Logging;
-using GRiD.Services;
-using GRiD.Wrappers;
-using GRiD.Diagnostics;
+using VISOR.Interfaces;
+using VISOR.Logging;
+using VISOR.Services;
+using VISOR.Wrappers;
+using VISOR.Diagnostics;
 
 class Program
 {
@@ -29,7 +29,7 @@ class Program
         // Run diagnostics if requested
         if (config.RunDiagnostics)
         {
-            Console.WriteLine("[GRiD] Running connection diagnostics...");
+            Console.WriteLine("[VISOR] Running connection diagnostics...");
             ConnectionDiagnostics.RunDiagnostics();
             if (config.DiagnosticsOnly)
             {
@@ -45,7 +45,7 @@ class Program
             config.Duration = GetDurationFromUser();
         }
 
-        Console.WriteLine("[GRiD] Initializing telemetry inspection service with performance monitoring...");
+        Console.WriteLine("[VISOR] Initializing telemetry inspection service with performance monitoring...");
 
         // Initialize logger
         logger = new TelemetrySnapshotLogger(config.OutputDirectory);
@@ -68,22 +68,22 @@ class Program
 
         try
         {
-            Console.WriteLine($"[GRiD] Starting inspection service with enhanced monitoring...");
+            Console.WriteLine($"[VISOR] Starting inspection service with enhanced monitoring...");
             if (config.Duration.HasValue)
             {
-                Console.WriteLine($"[GRiD] Run duration: {config.Duration.Value.TotalMinutes:F1} minutes");
+                Console.WriteLine($"[VISOR] Run duration: {config.Duration.Value.TotalMinutes:F1} minutes");
             }
             else
             {
-                Console.WriteLine("[GRiD] No duration limit. Press Ctrl+C to stop.");
+                Console.WriteLine("[VISOR] No duration limit. Press Ctrl+C to stop.");
             }
 
-            Console.WriteLine("[GRiD] Features enabled:");
+            Console.WriteLine("[VISOR] Features enabled:");
             Console.WriteLine("  • Real-time performance monitoring");
             Console.WriteLine("  • Enhanced connection diagnostics");
             Console.WriteLine("  • Automatic retry mechanisms");
             Console.WriteLine("  • Detailed error reporting");
-            Console.WriteLine("[GRiD] Press Ctrl+C at any time to stop gracefully...");
+            Console.WriteLine("[VISOR] Press Ctrl+C at any time to stop gracefully...");
             Console.WriteLine();
 
             await inspector.Start();
@@ -102,7 +102,7 @@ class Program
     private static void ShowBanner()
     {
         Console.WriteLine("=".PadRight(80, '='));
-        Console.WriteLine("GRiD - iRacing SDK Diagnostic Tool v2.0");
+        Console.WriteLine("VISOR - iRacing SDK Diagnostic Tool v2.0");
         Console.WriteLine("Enhanced with Performance Monitoring & Advanced Diagnostics");
         Console.WriteLine($"Build Date: {DateTime.Now:yyyy-MM-dd}");
         Console.WriteLine("=".PadRight(80, '='));
@@ -166,7 +166,7 @@ class Program
 
     private static void ShowHelp()
     {
-        Console.WriteLine("Usage: GRiD-C.exe [options]");
+        Console.WriteLine("Usage: VISOR-C.exe [options]");
         Console.WriteLine();
         Console.WriteLine("Options:");
         Console.WriteLine("  -o, --output <directory>    Output directory for logs (default: logs)");
@@ -176,9 +176,9 @@ class Program
         Console.WriteLine("  -h, --help                   Show this help message");
         Console.WriteLine();
         Console.WriteLine("Examples:");
-        Console.WriteLine("  GRiD-C.exe --duration 5 --output results");
-        Console.WriteLine("  GRiD-C.exe --diagnostics");
-        Console.WriteLine("  GRiD-C.exe --diag-only");
+        Console.WriteLine("  VISOR-C.exe --duration 5 --output results");
+        Console.WriteLine("  VISOR-C.exe --diagnostics");
+        Console.WriteLine("  VISOR-C.exe --diag-only");
         Console.WriteLine();
         Console.WriteLine("Enhanced Features v2.0:");
         Console.WriteLine("  • Real-time performance comparison");
@@ -201,12 +201,12 @@ class Program
 
         if (int.TryParse(input, out int minutes) && minutes > 0)
         {
-            Console.WriteLine($"[GRiD] Run duration set to {minutes} minute(s).");
+            Console.WriteLine($"[VISOR] Run duration set to {minutes} minute(s).");
             return TimeSpan.FromMinutes(minutes);
         }
         else
         {
-            Console.WriteLine("[GRiD] No duration limit set. Press Ctrl+C to stop.");
+            Console.WriteLine("[VISOR] No duration limit set. Press Ctrl+C to stop.");
             return null;
         }
     }
@@ -220,7 +220,7 @@ class Program
             if (!shutdownRequested)
             {
                 shutdownRequested = true;
-                Console.WriteLine("\n[GRiD] Process exit detected, shutting down gracefully...");
+                Console.WriteLine("\n[VISOR] Process exit detected, shutting down gracefully...");
                 await Cleanup();
             }
         };
@@ -231,7 +231,7 @@ class Program
             if (!shutdownRequested)
             {
                 shutdownRequested = true;
-                Console.WriteLine("\n[GRiD] Shutdown requested (Ctrl+C), stopping gracefully...");
+                Console.WriteLine("\n[VISOR] Shutdown requested (Ctrl+C), stopping gracefully...");
                 inspector?.Stop();
                 await Cleanup();
                 Environment.Exit(0);
@@ -241,7 +241,7 @@ class Program
 
     private static async Task Cleanup()
     {
-        Console.WriteLine("[GRiD] Performing cleanup...");
+        Console.WriteLine("[VISOR] Performing cleanup...");
 
         try
         {
@@ -261,11 +261,11 @@ class Program
                 logger.Flush();
             }
 
-            Console.WriteLine("[GRiD] ✓ Cleanup complete. Check output directory for detailed reports.");
+            Console.WriteLine("[VISOR] ✓ Cleanup complete. Check output directory for detailed reports.");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GRiD] Error during cleanup: {ex.Message}");
+            Console.WriteLine($"[VISOR] Error during cleanup: {ex.Message}");
         }
     }
 

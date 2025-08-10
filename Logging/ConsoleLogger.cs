@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Text;
 
-namespace GRiD.Logging
+namespace VISOR.Logging
 {
     public static class ConsoleLogger
     {
@@ -13,7 +13,7 @@ namespace GRiD.Logging
             try
             {
                 Directory.CreateDirectory(outputDir);
-                var logPath = Path.Combine(outputDir, $"grid-console-{DateTime.UtcNow:yyyyMMdd-HHmmss}.log");
+                var logPath = Path.Combine(outputDir, $"VISOR-console-{DateTime.UtcNow:yyyyMMdd-HHmmss}.log");
                 _logWriter = new StreamWriter(logPath, append: true)
                 {
                     AutoFlush = true
