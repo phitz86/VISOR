@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Text;
 
-namespace VISOR.Logging
+namespace VISOR.Diagnostics
 {
     public static class ConsoleLogger
     {

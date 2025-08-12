@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace VISOR.Models
+namespace VISOR.Diagnostics
 {
     public class TelemetrySnapshotJson
     {

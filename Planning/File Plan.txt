@@ -1,0 +1,19 @@
+VISOR/
+├── VISOR.csproj
+├── App.xaml/App.xaml.cs
+├── Telemetry/
+│   ├── SVappsLABSDKWrapper.cs
+│   ├── SVappsLABSnapshot.cs
+│   ├── TelemetrySnapshot.cs
+│   └── TelemetryService.cs
+├── Views/
+│   ├── MainWindow.xaml/cs
+│   └── ConfigWindow.xaml/cs
+├── ViewModels/
+│   └── MainViewModel.cs
+└── Resources/
+│   └── Styles.xaml
+│   └── Fonts/
+│      └── Digital 7.ttf
+└── Diagnostics
+│   └── TelemetrySnapshotJson.cs

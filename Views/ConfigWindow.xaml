@@ -1,0 +1,27 @@
+﻿<Window x:Class="VISOR.Views.ConfigWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="VISOR Configuration" Height="450" Width="350">
+    <Grid Margin="10">
+        <StackPanel>
+            <TextBlock Text="Select overlay elements to display:" FontWeight="Bold" Margin="0,0,0,10"/>
+
+            <CheckBox x:Name="PositionCheckBox" Content="Show Class Position" IsChecked="True"/>
+            <CheckBox x:Name="TimeRemainingCheckBox" Content="Show Time/Laps Remaining" IsChecked="True"/>
+            <CheckBox x:Name="FuelRemainingCheckBox" Content="Show Fuel Laps Remaining" IsChecked="True"/>
+            <CheckBox x:Name="DeltaCheckBox" Content="Show Lap Delta Bar" IsChecked="True"/>
+            <CheckBox x:Name="LapTimesCheckBox" Content="Show Last and Fastest Lap" IsChecked="True"/>
+            <CheckBox x:Name="RelativeCheckBox" Content="Show Relative Positioning" IsChecked="True"/>
+            <CheckBox x:Name="WarningsCheckBox" Content="Show Warnings (Latency/FPS)" IsChecked="True"/>
+            <CheckBox x:Name="GearCheckBox" Content="Show Gear Indicator" IsChecked="True"/>
+
+            <TextBlock TextWrapping="Wrap" Foreground="DarkRed" FontWeight="Bold" Margin="0,10,0,0">
+                NOTE: VISOR will only display over iRacing if the simulator is running in borderless windowed mode.
+            </TextBlock>
+
+            <Button Content="Dump Session YAML" Click="DumpYaml_Click" />
+
+            <Button Content="Launch" Click="LaunchButton_Click" HorizontalAlignment="Center" Margin="0,20,0,0" Width="80"/>
+        </StackPanel>
+    </Grid>
+</Window>

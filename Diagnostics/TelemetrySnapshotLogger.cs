@@ -1,10 +1,11 @@
 using System;
-using System.IO;
-using System.Text.Json;
 using System.Collections.Generic;
-using VISOR.Interfaces;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+using VISOR.Telemetry;
 
-namespace VISOR.Logging
+namespace VISOR.Diagnostics
 {
     public class TelemetrySnapshotLogger
     {
@@ -26,6 +27,7 @@ namespace VISOR.Logging
         }
 
         public string GetOutputDirectory() => _outputDirectory;
+
         private Dictionary<string, object> ScrubFields(Dictionary<string, object> raw)
         {
             var safe = new Dictionary<string, object>();
@@ -61,8 +63,8 @@ namespace VISOR.Logging
             return safe;
         }
 
-        public void LogSnapshot(string wrapperName, DateTime timestamp, TelemetrySnapshot snapshot,
-    TimeSpan duration, long memoryBytes, double cpuPercent)
+        public void LogSnapshot(string wrapperName, DateTime timestamp, SVappsLABSnapshot snapshot,
+            TimeSpan duration, long memoryBytes, double cpuPercent)
         {
             if (string.IsNullOrEmpty(wrapperName) || snapshot == null)
             {
@@ -133,7 +135,6 @@ namespace VISOR.Logging
 
                     File.AppendAllText(logPath, json + Environment.NewLine);
 
-
                     _logCounts[wrapperName] = _logCounts.GetValueOrDefault(wrapperName, 0) + 1;
                     _lastLogTimes[wrapperName] = timestamp;
 
@@ -157,7 +158,6 @@ namespace VISOR.Logging
                 }
             }
         }
-
 
         public void LogSessionStart(DateTime startTime, List<string> wrapperNames, TimeSpan? maxDuration)
         {
