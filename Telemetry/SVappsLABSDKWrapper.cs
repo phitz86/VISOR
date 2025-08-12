@@ -7,6 +7,24 @@ using System.Threading.Tasks;
 
 namespace VISOR.Telemetry
 {
+    // This attribute tells the SVappsLAB SDK source generator which telemetry variables to include
+    [RequiredTelemetryVars([
+        // Lap timing
+        "LapCurrentLapTime", "LapLastLapTime", "LapBestLapTime", "LapDeltaToBestLap",
+        "LapDeltaToOptimalLap", "LapDeltaToSessionBestLap", "Lap",
+        
+        // Fuel and car state
+        "FuelLevel", "FuelUsePerHour", "Gear", "Speed", "RPM",
+        
+        // Positioning arrays
+        "CarIdxLapDistPct", "CarIdxPosition", "CarIdxClassPosition", "CarIdxTrackSurface",
+        "CarIdxLap", "CarIdxLastLapTime",
+        
+        // Session info
+        "SessionState", "SessionTime", "SessionTimeRemain", "SessionLapsRemain",
+        "SessionLapsTotal", "SessionNum",
+    ])]
+
     // Null logger implementation for cases where logging is not required
     public class NullLogger<T> : ILogger<T>
     {
@@ -20,7 +38,7 @@ namespace VISOR.Telemetry
     {
         #region Private Fields
 
-        private ITelemetryClient<SVappsLAB.iRacingTelemetrySDK.TelemetryData> _client;
+        private ITelemetryClient<TelemetryData> _client;
         private readonly ILogger _logger;
         private readonly SessionDataParser _sessionParser;
 
@@ -70,7 +88,7 @@ namespace VISOR.Telemetry
             {
                 Console.WriteLine("[SVappsLAB] Starting initialization...");
 
-                _client = TelemetryClient<SVappsLAB.iRacingTelemetrySDK.TelemetryData>.Create(_logger);
+                _client = TelemetryClient<TelemetryData>.Create(_logger);
                 _client.OnSessionInfoUpdate += OnSessionInfoUpdate;
                 _client.OnTelemetryUpdate += OnTelemetryUpdate;
                 _client.OnConnectStateChanged += OnConnectStateChanged;
@@ -106,49 +124,37 @@ namespace VISOR.Telemetry
             }
         }
 
-        /// <summary>
         /// Start the telemetry monitoring
-        /// </summary>
         public async Task<bool> Start()
         {
             return await Initialize();
         }
 
-        /// <summary>
         /// Start the telemetry monitoring synchronously
-        /// </summary>
         public bool StartSync()
         {
-            return InitializeSync();
+            return Initialize().GetAwaiter().GetResult();
         }
 
-        /// <summary>
         /// Get all supported field names
-        /// </summary>
         public HashSet<string> GetSupportedFields()
         {
             return TelemetryFieldRegistry.GetAllSupportedFields();
         }
 
-        /// <summary>
         /// Get field type mappings for all supported fields
-        /// </summary>
         public Dictionary<string, Type> GetFieldTypes()
         {
             return new Dictionary<string, Type>(TelemetryFieldRegistry.FieldTypes);
         }
 
-        /// <summary>
         /// Check if a field is supported by this wrapper
-        /// </summary>
         public bool SupportsField(string fieldName)
         {
             return TelemetryFieldRegistry.IsFieldSupported(fieldName);
         }
 
-        /// <summary>
         /// Get a snapshot of current telemetry data
-        /// </summary>
         public SVappsLABSnapshot GetSnapshot()
         {
             Dictionary<string, object> dataSnapshot;
@@ -163,17 +169,13 @@ namespace VISOR.Telemetry
             return new SVappsLABSnapshot(dataSnapshot, sessionSnapshot, DateTime.UtcNow);
         }
 
-        /// <summary>
         /// Dump the latest YAML session data to a file
-        /// </summary>
         public string DumpLatestYaml()
         {
             return _sessionParser.DumpSessionData(_latestSessionInfo);
         }
 
-        /// <summary>
         /// Shutdown the SDK wrapper and clean up resources
-        /// </summary>
         public void Shutdown()
         {
             try
@@ -262,7 +264,7 @@ namespace VISOR.Telemetry
             }
         }
 
-        private void OnTelemetryUpdate(object sender, SVappsLAB.iRacingTelemetrySDK.TelemetryData telemetryData)
+        private void OnTelemetryUpdate(object sender, TelemetryData telemetryData)
         {
             try
             {
@@ -288,7 +290,7 @@ namespace VISOR.Telemetry
         #region Private Methods
 
         // Build telemetry dictionary using direct typed access to TelemetryData struct
-        private Dictionary<string, object> BuildTelemetryDictionary(SVappsLAB.iRacingTelemetrySDK.TelemetryData telemetryData)
+        private Dictionary<string, object> BuildTelemetryDictionary(TelemetryData telemetryData)
         {
             var dict = new Dictionary<string, object>();
 
@@ -327,12 +329,6 @@ namespace VISOR.Telemetry
                 dict["SessionLapsRemain"] = telemetryData.SessionLapsRemain;
                 dict["SessionLapsTotal"] = telemetryData.SessionLapsTotal;
                 dict["SessionNum"] = telemetryData.SessionNum;
-
-                // Environmental
-                dict["TrackTemp"] = telemetryData.TrackTemp;
-                dict["AirTemp"] = telemetryData.AirTemp;
-                dict["Skies"] = telemetryData.Skies;
-                dict["WindVel"] = telemetryData.WindVel;
 
                 // Add YAML-parsed data from our session parser
                 dict["CarIdxCarNumber"] = _sessionParser.CarNumbers;
