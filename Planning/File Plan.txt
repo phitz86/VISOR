@@ -1,19 +1,23 @@
 VISOR/
-├── VISOR.csproj
-├── App.xaml/App.xaml.cs
-├── Telemetry/
-│   ├── SVappsLABSDKWrapper.cs
-│   ├── SVappsLABSnapshot.cs
-│   ├── TelemetrySnapshot.cs
-│   └── TelemetryService.cs
 ├── Views/
-│   ├── MainWindow.xaml/cs
-│   └── ConfigWindow.xaml/cs
+│   ├── MainWindow.xaml
+│   ├── MainWindow.xaml.cs
+│   ├── ConfigWindow.xaml
+│   └── ConfigWindow.xaml.cs
 ├── ViewModels/
-│   └── MainViewModel.cs
-└── Resources/
-│   └── Styles.xaml
+│   └── (MainViewModel and other VMs)
+├── Resources/
+│   ├── Converters/
+│   │   └── BoolToVisibilityConverter.cs
 │   └── Fonts/
-│      └── Digital 7.ttf
-└── Diagnostics
-│   └── TelemetrySnapshotJson.cs
+│       └── Digital-7 (font files)
+├── Telemetry/
+│   ├── TelemetryFieldRegistry.cs          ← NEW (field definitions)
+│   ├── SessionDataParser.cs               ← NEW (YAML parsing)
+│   ├── SVappsLABSDKWrapper.cs             ← REFACTORED (main wrapper)
+│   └── SVappsLABSnapshot.cs               ← EXISTING (data snapshot)
+├── Diagnostics/
+│   └── (diagnostic classes)
+├── VISOR.csproj
+├── App.xaml
+└── App.xaml.cs

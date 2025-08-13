@@ -12,12 +12,14 @@ namespace VISOR.Views
     public partial class MainWindow : Window
     {
         private readonly MainViewModel _viewModel;
-        private SVappsLABSDKWrapper _sdk;
+        private readonly SVappsLABSDKWrapper _sdk;
 
-        public MainWindow()
+        // The constructor now accepts the shared SDK wrapper instance.
+        public MainWindow(SVappsLABSDKWrapper sdkWrapper)
         {
             InitializeComponent();
 
+            _sdk = sdkWrapper; // Use the passed-in instance.
             _viewModel = new MainViewModel();
             DataContext = _viewModel;
 
@@ -49,45 +51,47 @@ namespace VISOR.Views
         {
             try
             {
-                // If your XAML has x:Name="StatusText", this will show progress without needing a VM prop
                 if (StatusText != null)
                 {
                     StatusText.Text = "Connecting...";
                     StatusText.Visibility = Visibility.Visible;
                 }
 
-                _sdk = new SVappsLABSDKWrapper();
+                // The SDK is already started, so we just need to subscribe to its events.
+                _sdk.SnapshotAvailable += OnSnapshotAvailable;
+                _sdk.SessionYamlAvailable += OnSessionYamlAvailable;
 
-                // Telemetry snapshots → ViewModel
-                _sdk.SnapshotAvailable += snapshot =>
-                {
-                    // Keep UI updates on the dispatcher
-                    Dispatcher.Invoke(() => _viewModel.UpdateFromTelemetry(snapshot));
-                };
-
-                // Session YAML dump for baselines
-                _sdk.SessionYamlAvailable += yaml =>
-                {
-                    try
-                    {
-                        var dir = Path.Combine(AppContext.BaseDirectory, "telemetry_baselines", "SVapps");
-                        Directory.CreateDirectory(dir);
-                        File.WriteAllText(Path.Combine(dir, "session.yaml"), yaml);
-                    }
-                    catch
-                    {
-                        // Non-fatal during smoke test
-                    }
-                };
-
-                _sdk.Start();
                 await WaitForFirstSnapshotAsync();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"SDK failed to start: {ex.Message}");
+                MessageBox.Show($"An error occurred: {ex.Message}");
                 Close();
             }
+        }
+
+        private void OnSnapshotAvailable(SVappsLABSnapshot snapshot)
+        {
+            // Keep UI updates on the dispatcher thread for safety.
+            Dispatcher.Invoke(() => _viewModel.UpdateFromTelemetry(snapshot));
+        }
+
+        private void OnSessionYamlAvailable(string yaml)
+        {
+            // This can run in the background.
+            Task.Run(() =>
+            {
+                try
+                {
+                    var dir = Path.Combine(AppContext.BaseDirectory, "telemetry_baselines", "SVapps");
+                    Directory.CreateDirectory(dir);
+                    File.WriteAllText(Path.Combine(dir, "session.yaml"), yaml);
+                }
+                catch
+                {
+                    // Non-fatal, can be ignored for now.
+                }
+            });
         }
 
         private async Task WaitForFirstSnapshotAsync()
@@ -98,7 +102,7 @@ namespace VISOR.Views
             void Handler(SVappsLABSnapshot s) => gotData = true;
             _sdk.SnapshotAvailable += Handler;
 
-            while (!gotData && retries < 360)
+            while (!gotData && retries < 360) // Wait for up to 3 minutes
             {
                 if (StatusText != null)
                 {
@@ -119,7 +123,7 @@ namespace VISOR.Views
             {
                 if (StatusText != null)
                 {
-                    Dispatcher.Invoke(() => { StatusText.Text = "No telemetry connection."; });
+                    Dispatcher.Invoke(() => { StatusText.Text = "No telemetry connection found."; });
                 }
                 return;
             }

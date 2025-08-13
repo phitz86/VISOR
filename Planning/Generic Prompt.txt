@@ -1,0 +1,27 @@
+Thread: VISOR window behavior and initial data field wiring
+
+Context:
+Good morning Gemini,
+
+I'm building an overlay UI for iRacing called VISOR (Virtual Intelligence Simulator Overlay & Radar). I'm using this project to evaluate the coding and project management capabilities of various LLMs, primarily ChatGPT and Claude. I'd like to give you a turn to see how you handle the complexity.
+
+VISOR is a C# application, built in VS with .NET 8.0 and WPF. I've set AnyCPU for now, but can pivot if needed. We're targeting a MVVM architecture with discrete classes/files to handle individual tasks.
+
+Our SDK for ingesting the telemetry is the SVappsLAB iRacing SDK, installed via NuGet. The repo for the SDK is here: https://github.com/SVappsLAB/iRacingTelemetrySDK/tree/main
+
+Goals for this thread:
+
+Fix window launch behavior
+- Upon launch, the first thing the user should see is the Config Window. The "Dump Session YAML" button needs to activate the the ./Samples/DumpVariables_DumpSessionInfo utility that's included in the SDK, and the "Launch" button needs to close the Config Window and launch the Main window.
+
+Connect Telemetry outputs to Main Window fields
+ - Once Main Window is loaded, we need to wire up the appropriate outputs from the Telemetry files to the right fields in Main Window. 
+ 
+ Rules & Methods:
+ - Let's talk about what you see, understand, and want to do before we make any modifications to the code.
+ - If you need more context or have decisions you want more information to support, say so. 
+ - If you see something that makes you think you need to see another file, let me know and I'll upload it.
+ - Let me know if we're approaching limits of your context window.
+ 
+ Next Steps:
+ I'll upload several of the key files from the project, including a folder structure. Assess those along with the context above, and then let's talk about the way ahead.

@@ -16,14 +16,17 @@ namespace VISOR.Views
         private void DumpYaml_Click(object sender, RoutedEventArgs e)
         {
             var path = _telemetry.DumpLatestYaml();
-            MessageBox.Show(path == "NO_YAML" ? "No session YAML yet." : $"Saved: {path}");
+            MessageBox.Show(path == "NO_YAML" ? "No session YAML data is available yet. Make sure iRacing is running." : $"YAML data saved to: {path}");
         }
 
         private void LaunchButton_Click(object sender, RoutedEventArgs e)
         {
-            // TODO: Implement launch functionality
-            // This would typically create and show the main overlay window
-            // with the selected configuration options
+            // Create the MainWindow, passing the shared telemetry instance to it.
+            var mainWindow = new MainWindow(_telemetry);
+            mainWindow.Show();
+
+            // Close the configuration window.
+            this.Close();
         }
     }
 }
