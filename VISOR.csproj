@@ -16,6 +16,11 @@
     <PackageReference Include="System.Management" Version="9.0.7" />
   </ItemGroup>
 
+  <!-- ADDED THIS ITEM GROUP TO INCLUDE THE FONT AS A RESOURCE -->
+  <ItemGroup>
+    <Resource Include="Resources\Fonts\digital-7.ttf" />
+  </ItemGroup>
+
   <ItemGroup>
     <Folder Include="Raw outputs\" />
   </ItemGroup>

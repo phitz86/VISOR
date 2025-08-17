@@ -23,6 +23,9 @@ namespace VISOR.Telemetry
         // Session info
         "SessionState", "SessionTime", "SessionTimeRemain", "SessionLapsRemain",
         "SessionLapsTotal", "SessionNum",
+
+        // Player specific
+        "PlayerCarIdx" // <-- ADDED THIS CRITICAL FIELD
     ])]
 
     // Null logger implementation for cases where logging is not required
@@ -329,6 +332,9 @@ namespace VISOR.Telemetry
                 dict["SessionLapsRemain"] = telemetryData.SessionLapsRemain;
                 dict["SessionLapsTotal"] = telemetryData.SessionLapsTotal;
                 dict["SessionNum"] = telemetryData.SessionNum;
+
+                // Player specific
+                dict["PlayerCarIdx"] = telemetryData.PlayerCarIdx;
 
                 // Add YAML-parsed data from our session parser
                 dict["CarIdxCarNumber"] = _sessionParser.CarNumbers;

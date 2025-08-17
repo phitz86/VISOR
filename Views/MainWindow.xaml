@@ -39,12 +39,21 @@
         </Grid.ColumnDefinitions>
 
         <!-- Row 0: Class Position | Gear -->
-        <TextBlock Grid.Row="0" Grid.Column="0"
-           Text="{Binding ClassPosition}"
-           FontSize="60" FontFamily="pack://application:,,,/Resources/Fonts/#Digital-7"
-           Foreground="White"
-           Visibility="{Binding ShowPosition, Converter={StaticResource BoolToVisibilityConverter}}"
-           HorizontalAlignment="Center"/>
+        <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" 
+                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Visibility="{Binding ShowPosition, Converter={StaticResource BoolToVisibilityConverter}}">
+            <TextBlock Text="P"
+                       FontSize="60" 
+                       Foreground="White"
+                       VerticalAlignment="Bottom" 
+                       Margin="0,0,-5,1"/>
+            <TextBlock Text="{Binding ClassPositionNumber}"
+                       FontSize="60" 
+                       FontFamily="pack://application:,,,/Resources/Fonts/#Digital-7"
+                       Foreground="White"
+                       VerticalAlignment="Bottom"/>
+        </StackPanel>
+
         <StackPanel Grid.Row="0" Grid.Column="1"
                     Orientation="Horizontal"
             Visibility="{Binding ShowGear, Converter={StaticResource BoolToVisibilityConverter}}"
@@ -73,7 +82,7 @@
                 </TextBlock.Effect>
             </TextBlock>
 
-            <TextBlock Text="{Binding FuelDisplay}" FontSize="36" Foreground="White"/>
+            <TextBlock Text="{Binding FuelVM.FuelDisplay}" FontSize="36" Foreground="White"/>
         </StackPanel>
 
         <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding TimeRemainingDisplay}" 
@@ -116,9 +125,9 @@
         </StackPanel>
 
 
-        <!-- Row 4: Full-width Relative Block (Binding will be updated later) -->
+        <!-- Row 4: Full-width Relative Block -->
         <ItemsControl Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2"
-                      ItemsSource="{Binding RelativeRows}"
+                      ItemsSource="{Binding RelativeVM.RelativeRows}"
                       Visibility="{Binding ShowRelative, Converter={StaticResource BoolToVisibilityConverter}}"
                       Margin="0,10,0,0">
             <ItemsControl.ItemTemplate>
@@ -130,12 +139,12 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="60"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="{Binding ClassPos}" Grid.Column="0" FontSize="24" HorizontalAlignment="Center"/>
-                        <Border Grid.Column="1" Background="{Binding ClassBackground}" Padding="2">
-                            <TextBlock Text="{Binding CarNum}" FontSize="24" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{Binding ClassPos}" Grid.Column="0" FontSize="24" HorizontalAlignment="Center" Foreground="White"/>
+                        <Border Grid.Column="1" Background="{Binding ClassBackground}" Padding="2" CornerRadius="3">
+                            <TextBlock Text="{Binding CarNum}" FontSize="24" HorizontalAlignment="Center" FontWeight="Bold"/>
                         </Border>
-                        <TextBlock Text="{Binding Name}" Grid.Column="2" FontSize="24" Foreground="{Binding NameColor}"/>
-                        <TextBlock Text="{Binding Gap}" Grid.Column="3" FontSize="24" HorizontalAlignment="Right"/>
+                        <TextBlock Text="{Binding Name}" Grid.Column="2" FontSize="24" Foreground="{Binding NameColor}" FontStyle="{Binding FontStyle}" Margin="5,0"/>
+                        <TextBlock Text="{Binding Gap}" Grid.Column="3" FontSize="24" HorizontalAlignment="Right" Foreground="White"/>
                     </Grid>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>

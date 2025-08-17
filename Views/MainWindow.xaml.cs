@@ -13,17 +13,17 @@ namespace VISOR.Views
     {
         private readonly MainViewModel _viewModel;
         private readonly SVappsLABSDKWrapper _sdk;
+        private readonly SessionDataParser _sessionParser; // Add a field for the parser
 
-        // The constructor now accepts the shared SDK wrapper instance.
         public MainWindow(SVappsLABSDKWrapper sdkWrapper)
         {
             InitializeComponent();
 
-            _sdk = sdkWrapper; // Use the passed-in instance.
+            _sdk = sdkWrapper;
+            _sessionParser = new SessionDataParser(); // Instantiate the parser
             _viewModel = new MainViewModel();
             DataContext = _viewModel;
 
-            // Window chrome / translucency
             AllowsTransparency = true;
             WindowStyle = WindowStyle.None;
             Background = new SolidColorBrush(Color.FromArgb(160, 32, 32, 32));
@@ -57,7 +57,6 @@ namespace VISOR.Views
                     StatusText.Visibility = Visibility.Visible;
                 }
 
-                // The SDK is already started, so we just need to subscribe to its events.
                 _sdk.SnapshotAvailable += OnSnapshotAvailable;
                 _sdk.SessionYamlAvailable += OnSessionYamlAvailable;
 
@@ -72,12 +71,15 @@ namespace VISOR.Views
 
         private void OnSnapshotAvailable(SVappsLABSnapshot snapshot)
         {
-            // Keep UI updates on the dispatcher thread for safety.
-            Dispatcher.Invoke(() => _viewModel.UpdateFromTelemetry(snapshot));
+            // Now pass both the snapshot and the parser to the ViewModel
+            Dispatcher.Invoke(() => _viewModel.UpdateFromTelemetry(snapshot, _sessionParser));
         }
 
         private void OnSessionYamlAvailable(string yaml)
         {
+            // The parser needs to be updated with the latest session info
+            _sessionParser.ParseSessionData(yaml);
+
             // This can run in the background.
             Task.Run(() =>
             {

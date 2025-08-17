@@ -9,6 +9,7 @@ namespace VISOR.Telemetry
         // YAML-parsed session data cache
         private readonly int[] _cachedCarNumbers = new int[64]; // iRacing supports max 64 cars
         private readonly string[] _cachedCarClasses = new string[64]; // Car classes from YAML
+        private readonly string[] _cachedDriverNames = new string[64]; // Driver names from YAML
         private string _lastSessionDataHash = string.Empty;
         private readonly object _parseLock = new();
 
@@ -36,12 +37,25 @@ namespace VISOR.Telemetry
             }
         }
 
+        // Gets a copy of the cached driver names array
+        public string[] DriverNames
+        {
+            get
+            {
+                lock (_parseLock)
+                {
+                    return (string[])_cachedDriverNames.Clone();
+                }
+            }
+        }
+
         public SessionDataParser()
         {
-            // Initialize car classes array
-            for (int i = 0; i < _cachedCarClasses.Length; i++)
+            // Initialize arrays
+            for (int i = 0; i < 64; i++)
             {
                 _cachedCarClasses[i] = string.Empty;
+                _cachedDriverNames[i] = string.Empty;
             }
         }
 
@@ -63,9 +77,8 @@ namespace VISOR.Telemetry
                     // Reset the arrays
                     Array.Fill(_cachedCarNumbers, 0);
                     Array.Fill(_cachedCarClasses, string.Empty);
+                    Array.Fill(_cachedDriverNames, string.Empty);
 
-                    // Parse car data from YAML using simple string parsing
-                    // Look for patterns like: "- CarIdx: 0" followed by "CarNumber: "42"" and "CarClassShortName: "GT3""
                     var lines = sessionData.Split('\n');
                     int currentCarIdx = -1;
 
@@ -73,47 +86,50 @@ namespace VISOR.Telemetry
                     {
                         var line = lines[i].Trim();
 
-                        // Look for CarIdx entries
                         if (line.StartsWith("- CarIdx:"))
                         {
                             var parts = line.Split(':');
                             if (parts.Length >= 2 && int.TryParse(parts[1].Trim(), out currentCarIdx))
                             {
-                                // Valid CarIdx found, continue to next lines to find CarNumber and CarClass
                                 continue;
                             }
                         }
 
-                        // Look for CarNumber entries if we have a valid CarIdx
-                        if (currentCarIdx >= 0 && currentCarIdx < 64 && line.StartsWith("CarNumber:"))
+                        if (currentCarIdx >= 0 && currentCarIdx < 64)
                         {
-                            var parts = line.Split(':', 2);
-                            if (parts.Length >= 2)
+                            if (line.StartsWith("UserName:"))
                             {
-                                var carNumberStr = parts[1].Trim().Trim('"'); // Remove quotes
-                                if (int.TryParse(carNumberStr, out int carNumber))
+                                var parts = line.Split(':', 2);
+                                if (parts.Length >= 2)
                                 {
-                                    _cachedCarNumbers[currentCarIdx] = carNumber;
+                                    _cachedDriverNames[currentCarIdx] = parts[1].Trim().Trim('"');
                                 }
                             }
-                        }
-
-                        // Look for CarClassShortName entries if we have a valid CarIdx
-                        if (currentCarIdx >= 0 && currentCarIdx < 64 && line.StartsWith("CarClassShortName:"))
-                        {
-                            var parts = line.Split(':', 2);
-                            if (parts.Length >= 2)
+                            else if (line.StartsWith("CarNumber:"))
                             {
-                                var carClass = parts[1].Trim().Trim('"'); // Remove quotes
-                                _cachedCarClasses[currentCarIdx] = carClass;
+                                var parts = line.Split(':', 2);
+                                if (parts.Length >= 2)
+                                {
+                                    var carNumberStr = parts[1].Trim().Trim('"');
+                                    if (int.TryParse(carNumberStr, out int carNumber))
+                                    {
+                                        _cachedCarNumbers[currentCarIdx] = carNumber;
+                                    }
+                                }
                             }
-                            // Reset CarIdx after processing both CarNumber and CarClass
-                            currentCarIdx = -1;
+                            else if (line.StartsWith("CarClassShortName:"))
+                            {
+                                var parts = line.Split(':', 2);
+                                if (parts.Length >= 2)
+                                {
+                                    _cachedCarClasses[currentCarIdx] = parts[1].Trim().Trim('"');
+                                }
+                            }
                         }
                     }
 
                     _lastSessionDataHash = currentHash;
-                    Console.WriteLine($"[SessionDataParser] Parsed session data: Updated car numbers and classes");
+                    Console.WriteLine($"[SessionDataParser] Parsed session data: Updated car numbers, classes, and names.");
                     return true;
                 }
             }
@@ -157,22 +173,8 @@ namespace VISOR.Telemetry
             {
                 Array.Fill(_cachedCarNumbers, 0);
                 Array.Fill(_cachedCarClasses, string.Empty);
+                Array.Fill(_cachedDriverNames, string.Empty);
                 _lastSessionDataHash = string.Empty;
-            }
-        }
-
-        // Get the number of cars currently cached
-        public int GetCachedCarCount()
-        {
-            lock (_parseLock)
-            {
-                int count = 0;
-                for (int i = 0; i < _cachedCarNumbers.Length; i++)
-                {
-                    if (_cachedCarNumbers[i] > 0)
-                        count++;
-                }
-                return count;
             }
         }
     }
