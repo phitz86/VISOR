@@ -30,7 +30,6 @@
             <!-- Row 5: Warnings -->
             <RowDefinition Height="Auto"/>
             <!-- Row 6: StatusText -->
-
         </Grid.RowDefinitions>
 
         <!-- Columns used for all 2-column rows -->
@@ -57,7 +56,7 @@
                 </TextBlock.Effect>
             </TextBlock>
 
-            <TextBlock Text="{Binding GearVM.GearDisplay}"
+            <TextBlock Text="{Binding GearDisplay}"
                FontSize="60" FontWeight="Bold"
                FontFamily="pack://application:,,,/Resources/Fonts/#Digital-7"
                Foreground="White"
@@ -74,21 +73,21 @@
                 </TextBlock.Effect>
             </TextBlock>
 
-            <TextBlock Text="{Binding FuelVM.FuelDisplay}" FontSize="36" Foreground="White"/>
+            <TextBlock Text="{Binding FuelDisplay}" FontSize="36" Foreground="White"/>
         </StackPanel>
 
-        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding TimeRemainingVM.TimeRemainingDisplay}" 
+        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding TimeRemainingDisplay}" 
            FontSize="36" Foreground="White"
            Visibility="{Binding ShowTimeRemaining, Converter={StaticResource BoolToVisibilityConverter}}"
            HorizontalAlignment="Center"/>
 
 
-        <!-- Row 2: Full-width Lap Delta Bar -->
+        <!-- Row 2: Full-width Lap Delta Bar (Binding will be updated later) -->
         <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Height="10" Background="Gray"
                 Visibility="{Binding ShowLapDelta, Converter={StaticResource BoolToVisibilityConverter}}"
                 Margin="0,10,0,0">
-            <Rectangle Height="10" Fill="{Binding LapDeltaVM.BarColor}" 
-                       Width="{Binding LapDeltaVM.DeltaValue}" HorizontalAlignment="Left"/>
+            <!-- <Rectangle Height="10" Fill="{Binding LapDeltaVM.BarColor}" 
+                       Width="{Binding LapDeltaVM.DeltaValue}" HorizontalAlignment="Left"/> -->
         </Border>
 
         <!-- Row 3: Last Lap | Best Lap -->
@@ -117,9 +116,9 @@
         </StackPanel>
 
 
-        <!-- Row 4: Full-width Relative Block -->
+        <!-- Row 4: Full-width Relative Block (Binding will be updated later) -->
         <ItemsControl Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2"
-                      ItemsSource="{Binding RelativeVM.RelativeRows}"
+                      ItemsSource="{Binding RelativeRows}"
                       Visibility="{Binding ShowRelative, Converter={StaticResource BoolToVisibilityConverter}}"
                       Margin="0,10,0,0">
             <ItemsControl.ItemTemplate>
@@ -142,12 +141,12 @@
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <!-- Row 5: Latency | FPS Warning -->
+        <!-- Row 5: Latency | FPS Warning (Bindings will be updated later) -->
         <StackPanel Grid.Row="5" Grid.Column="0" Orientation="Horizontal"
             Visibility="{Binding ShowWarnings, Converter={StaticResource BoolToVisibilityConverter}}"
             HorizontalAlignment="Center">
-            <TextBlock Text="📶" FontSize="18" Margin="0,0,6,0"
-               Foreground="{Binding WarningsVM.LatencyBrush}">
+            <TextBlock Text="📶" FontSize="18" Margin="0,0,6,0">
+                <!-- Foreground="{Binding WarningsVM.LatencyBrush}" -->
                 <TextBlock.Effect>
                     <DropShadowEffect BlurRadius="0" ShadowDepth="0" Color="Black" Opacity="1"/>
                 </TextBlock.Effect>
@@ -157,8 +156,8 @@
         <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal"
             Visibility="{Binding ShowWarnings, Converter={StaticResource BoolToVisibilityConverter}}"
             HorizontalAlignment="Center">
-            <TextBlock Text="🖥️" FontSize="18" Margin="0,0,6,0"
-               Foreground="{Binding WarningsVM.FpsBrush}">
+            <TextBlock Text="🖥️" FontSize="18" Margin="0,0,6,0">
+                <!-- Foreground="{Binding WarningsVM.FpsBrush}" -->
                 <TextBlock.Effect>
                     <DropShadowEffect BlurRadius="0" ShadowDepth="0" Color="Black" Opacity="1"/>
                 </TextBlock.Effect>
