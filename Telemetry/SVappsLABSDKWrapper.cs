@@ -25,18 +25,13 @@ namespace VISOR.Telemetry
         "SessionLapsTotal", "SessionNum",
 
         // Player specific
-        "PlayerCarIdx" // <-- ADDED THIS CRITICAL FIELD
+        "PlayerCarIdx"
     ])]
 
-    // Null logger implementation for cases where logging is not required
-    public class NullLogger<T> : ILogger<T>
-    {
-        public IDisposable BeginScope<TState>(TState state) => null;
-        public bool IsEnabled(LogLevel logLevel) => false;
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter) { }
-    }
-
-    // Wrapper for SVappsLAB iRacing Telemetry SDK with clean separation of concerns
+    /// <summary>
+    /// Main wrapper for SVappsLAB iRacing Telemetry SDK.
+    /// Coordinates between telemetry client, session parser, and state management.
+    /// </summary>
     public class SVappsLABSDKWrapper : IDisposable
     {
         #region Private Fields
@@ -44,28 +39,37 @@ namespace VISOR.Telemetry
         private ITelemetryClient<TelemetryData> _client;
         private readonly ILogger _logger;
         private readonly SessionDataParser _sessionParser;
+        private readonly TelemetryStateManager _stateManager;
+        private readonly TelemetryDataBuilder _dataBuilder;
 
-        private Dictionary<string, object> _latestData = new();
-        private string _latestSessionInfo = string.Empty;
-        private readonly object _dataLock = new();
-
-        private bool _isConnected = false;
+        private SVappsLABSnapshot _latestSnapshot;
         private CancellationTokenSource _cancellationTokenSource;
         private Task _monitoringTask;
 
         #endregion
 
         #region Public Properties
+
         public string Name => "SVappsLAB iRacingTelemetrySDK";
-        public bool IsConnected => _isConnected;
+        public bool IsConnected => _stateManager?.IsConnected ?? false;
+        public bool IsTelemetryActive => _stateManager?.IsTelemetryActive ?? false;
+        public bool IsSessionDataReady => _sessionParser?.IsDataReady ?? false;
+        public bool IsPrimed => _stateManager?.IsPrimed ?? false;
+        public SessionDataParser SessionParser => _sessionParser;
+
         #endregion
 
         #region Events
+
+        // Core telemetry events
         public event Action<SVappsLABSnapshot> SnapshotAvailable;
         public event Action<string> SessionYamlAvailable;
 
-        // NEW EVENT to broadcast connection state changes.
+        // State change events
         public event Action<bool> ConnectionStateChanged;
+        public event Action<bool> PrimedStateChanged;
+        public event Action SessionDataUpdated;
+
         #endregion
 
         #region Constructor
@@ -74,19 +78,29 @@ namespace VISOR.Telemetry
         {
             _logger = new NullLogger<SVappsLABSDKWrapper>();
             _sessionParser = new SessionDataParser();
+            _dataBuilder = new TelemetryDataBuilder(_sessionParser);
+            _stateManager = new TelemetryStateManager(_sessionParser);
+
+            // Wire up state manager events
+            _stateManager.ConnectionStateChanged += (connected) => ConnectionStateChanged?.Invoke(connected);
+            _stateManager.PrimedStateChanged += OnPrimedStateChanged;
+            _stateManager.SessionDataUpdated += () => SessionDataUpdated?.Invoke();
         }
 
         #endregion
 
         #region Public Methods
 
-        // Initialize the SDK wrapper asynchronously
+        /// <summary>
+        /// Initialize and start the telemetry connection
+        /// </summary>
         public async Task<bool> Initialize()
         {
             try
             {
                 Console.WriteLine("[SVappsLAB] Starting initialization...");
 
+                // Create and configure the telemetry client
                 _client = TelemetryClient<TelemetryData>.Create(_logger);
                 _client.OnSessionInfoUpdate += OnSessionInfoUpdate;
                 _client.OnTelemetryUpdate += OnTelemetryUpdate;
@@ -94,6 +108,7 @@ namespace VISOR.Telemetry
 
                 _cancellationTokenSource = new CancellationTokenSource();
 
+                // Start the telemetry monitoring task
                 _monitoringTask = Task.Run(async () =>
                 {
                     try
@@ -110,6 +125,12 @@ namespace VISOR.Telemetry
                     }
                 });
 
+                // Start the state manager's session polling
+                await _stateManager.StartPolling(_client, _cancellationTokenSource.Token);
+
+                // Also start a manual session check task
+                _ = Task.Run(async () => await ManualSessionCheckLoop(_cancellationTokenSource.Token));
+
                 await Task.Delay(200);
 
                 Console.WriteLine($"[SVappsLAB] Initialization complete.");
@@ -123,66 +144,76 @@ namespace VISOR.Telemetry
             }
         }
 
-        /// Start the telemetry monitoring
-        public async Task<bool> Start()
+        /// <summary>
+        /// Manually check for session info since the event might not fire
+        /// </summary>
+        private async Task ManualSessionCheckLoop(CancellationToken cancellationToken)
         {
-            return await Initialize();
-        }
+            await Task.Delay(2000); // Wait for connection to establish
 
-        /// Start the telemetry monitoring synchronously
-        public bool StartSync()
-        {
-            return Initialize().GetAwaiter().GetResult();
-        }
-
-        /// Get all supported field names
-        public HashSet<string> GetSupportedFields()
-        {
-            return TelemetryFieldRegistry.GetAllSupportedFields();
-        }
-
-        /// Get field type mappings for all supported fields
-        public Dictionary<string, Type> GetFieldTypes()
-        {
-            return new Dictionary<string, Type>(TelemetryFieldRegistry.FieldTypes);
-        }
-
-        /// Check if a field is supported by this wrapper
-        public bool SupportsField(string fieldName)
-        {
-            return TelemetryFieldRegistry.IsFieldSupported(fieldName);
-        }
-
-        /// Get a snapshot of current telemetry data
-        public SVappsLABSnapshot GetSnapshot()
-        {
-            Dictionary<string, object> dataSnapshot;
-            string sessionSnapshot;
-
-            lock (_dataLock)
+            while (!cancellationToken.IsCancellationRequested)
             {
-                dataSnapshot = new Dictionary<string, object>(_latestData);
-                sessionSnapshot = _latestSessionInfo;
+                try
+                {
+                    if (_client != null && IsConnected && !IsSessionDataReady)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[SVappsLAB] Manual session check...");
+
+                        // Try to manually trigger session info update
+                        OnSessionInfoUpdate(_client, EventArgs.Empty);
+                    }
+
+                    // Check every 2 seconds until we have session data, then every 10 seconds
+                    int delay = IsSessionDataReady ? 10000 : 2000;
+                    await Task.Delay(delay, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Manual check error: {ex.Message}");
+                    await Task.Delay(5000, cancellationToken);
+                }
             }
-
-            return new SVappsLABSnapshot(dataSnapshot, sessionSnapshot, DateTime.UtcNow);
         }
 
-        /// Dump the latest YAML session data to a file
-        public string DumpLatestYaml()
-        {
-            return _sessionParser.DumpSessionData(_latestSessionInfo);
-        }
+        public async Task<bool> Start() => await Initialize();
+        public bool StartSync() => Initialize().GetAwaiter().GetResult();
 
+        /// <summary>
+        /// Get a snapshot of current telemetry data
+        /// </summary>
+        public SVappsLABSnapshot GetSnapshot() => _latestSnapshot;
+
+        /// <summary>
+        /// Get all supported field names
+        /// </summary>
+        public HashSet<string> GetSupportedFields() => TelemetryFieldRegistry.GetAllSupportedFields();
+
+        /// <summary>
+        /// Get field type mappings
+        /// </summary>
+        public Dictionary<string, Type> GetFieldTypes() => new Dictionary<string, Type>(TelemetryFieldRegistry.FieldTypes);
+
+        /// <summary>
+        /// Check if a field is supported
+        /// </summary>
+        public bool SupportsField(string fieldName) => TelemetryFieldRegistry.IsFieldSupported(fieldName);
+
+        /// <summary>
+        /// Dump the latest YAML session data
+        /// </summary>
+        public string DumpLatestYaml() => _sessionParser.DumpSessionData(_latestSnapshot?.RawSessionData ?? "");
+
+        /// <summary>
         /// Shutdown the SDK wrapper and clean up resources
+        /// </summary>
         public void Shutdown()
         {
             try
             {
                 Console.WriteLine("[SVappsLAB] Starting shutdown...");
-                _isConnected = false;
 
                 _cancellationTokenSource?.Cancel();
+                _stateManager?.StopPolling();
 
                 if (_monitoringTask != null && !_monitoringTask.Wait(TimeSpan.FromSeconds(2)))
                 {
@@ -212,15 +243,15 @@ namespace VISOR.Telemetry
         #endregion
 
         #region Event Handlers
+
         private void OnConnectStateChanged(object sender, EventArgs e)
         {
             bool newConnectionState = _client != null && _client.IsConnected();
-            if (newConnectionState != _isConnected)
+            _stateManager.UpdateConnectionState(newConnectionState);
+
+            if (!newConnectionState)
             {
-                _isConnected = newConnectionState;
-                Console.WriteLine($"[SVappsLAB] Connection state changed: {_isConnected}");
-                // Fire the new public event.
-                ConnectionStateChanged?.Invoke(_isConnected);
+                _sessionParser.ClearCache();
             }
         }
 
@@ -228,7 +259,79 @@ namespace VISOR.Telemetry
         {
             try
             {
-                string sessionInfo = string.Empty;
+                System.Diagnostics.Debug.WriteLine("[SVappsLAB] OnSessionInfoUpdate triggered!");
+
+                string sessionInfo = ExtractSessionInfo();
+
+                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Session info extracted, length: {sessionInfo?.Length ?? 0}");
+
+                if (!string.IsNullOrEmpty(sessionInfo))
+                {
+                    // Log first 200 chars to see what we got
+                    var preview = sessionInfo.Length > 200 ? sessionInfo.Substring(0, 200) : sessionInfo;
+                    System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Session preview: {preview}");
+
+                    ProcessSessionInfo(sessionInfo);
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("[SVappsLAB] Session info was empty or null");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Session info error: {ex.Message}");
+                Console.WriteLine($"[SVappsLAB] Session info error: {ex.Message}");
+            }
+        }
+
+        private void OnTelemetryUpdate(object sender, TelemetryData telemetryData)
+        {
+            try
+            {
+                // Build the telemetry dictionary
+                var telemetryDict = _dataBuilder.BuildTelemetryDictionary(telemetryData);
+
+                // Create snapshot
+                _latestSnapshot = new SVappsLABSnapshot(
+                    telemetryDict,
+                    _sessionParser.GetCachedSessionYaml(),
+                    DateTime.UtcNow
+                );
+
+                // Update state manager
+                _stateManager.UpdateTelemetryState(true);
+
+                // Always emit snapshots - session data is optional enhancement, not required
+                SnapshotAvailable?.Invoke(_latestSnapshot);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Telemetry update error: {ex.Message}");
+                Console.WriteLine($"[SVappsLAB] Telemetry update error: {ex.Message}");
+            }
+        }
+
+        private void OnPrimedStateChanged(bool isPrimed)
+        {
+            PrimedStateChanged?.Invoke(isPrimed);
+
+            // When we become primed, emit the latest snapshot
+            if (isPrimed && _latestSnapshot != null)
+            {
+                Console.WriteLine("[SVappsLAB] Emitting first primed snapshot");
+                SnapshotAvailable?.Invoke(_latestSnapshot);
+            }
+        }
+
+        #endregion
+
+        #region Private Methods
+
+        private string ExtractSessionInfo()
+        {
+            try
+            {
                 var clientType = _client?.GetType();
                 var sessionMethod = clientType?.GetMethod("GetSessionInfo") ??
                                   clientType?.GetMethod("SessionInfo") ??
@@ -240,109 +343,44 @@ namespace VISOR.Telemetry
                     if (sessionResult != null)
                     {
                         var rawProperty = sessionResult.GetType().GetProperty("Raw");
-                        sessionInfo = rawProperty?.GetValue(sessionResult)?.ToString() ?? sessionResult.ToString();
+                        var sessionInfo = rawProperty?.GetValue(sessionResult)?.ToString() ?? sessionResult.ToString();
+
+                        // Debug output
+                        if (!string.IsNullOrEmpty(sessionInfo))
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Extracted session info, length: {sessionInfo.Length}");
+                        }
+
+                        return sessionInfo;
                     }
                 }
-
-                if (!string.IsNullOrEmpty(sessionInfo))
-                {
-                    // Parse YAML data using our dedicated parser
-                    _sessionParser.ParseSessionData(sessionInfo);
-
-                    // Fire session YAML event
-                    SessionYamlAvailable?.Invoke(sessionInfo);
-                }
-
-                lock (_dataLock)
-                {
-                    _latestSessionInfo = sessionInfo;
-                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[SVappsLAB] Session info error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] ExtractSessionInfo error: {ex.Message}");
             }
+
+            return string.Empty;
         }
 
-        private void OnTelemetryUpdate(object sender, TelemetryData telemetryData)
+        private void ProcessSessionInfo(string sessionInfo)
         {
-            try
-            {
-                var snapshot = BuildTelemetryDictionary(telemetryData);
+            bool wasReady = _sessionParser.IsDataReady;
+            bool parseSuccess = _sessionParser.ParseSessionData(sessionInfo);
 
-                lock (_dataLock)
+            if (parseSuccess)
+            {
+                SessionYamlAvailable?.Invoke(sessionInfo);
+
+                // Let state manager handle the state transitions
+                _stateManager.NotifySessionDataParsed(wasReady);
+
+                // If session was updated (not first time), re-emit snapshot
+                if (wasReady && _latestSnapshot != null)
                 {
-                    _latestData = snapshot;
+                    SnapshotAvailable?.Invoke(_latestSnapshot);
                 }
-
-                // Fire snapshot available event
-                var snapshotObj = new SVappsLABSnapshot(snapshot, _latestSessionInfo, DateTime.UtcNow);
-                SnapshotAvailable?.Invoke(snapshotObj);
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[SVappsLAB] Telemetry update error: {ex.Message}");
-            }
-        }
-
-        #endregion
-
-        #region Private Methods
-
-        // Build telemetry dictionary using direct typed access to TelemetryData struct
-        private Dictionary<string, object> BuildTelemetryDictionary(TelemetryData telemetryData)
-        {
-            var dict = new Dictionary<string, object>();
-
-            try
-            {
-                // Direct access to telemetry fields - no reflection needed
-
-                // Lap timing
-                dict["LapCurrentLapTime"] = telemetryData.LapCurrentLapTime;
-                dict["LapLastLapTime"] = telemetryData.LapLastLapTime;
-                dict["LapBestLapTime"] = telemetryData.LapBestLapTime;
-                dict["LapDeltaToBestLap"] = telemetryData.LapDeltaToBestLap;
-                dict["LapDeltaToOptimalLap"] = telemetryData.LapDeltaToOptimalLap;
-                dict["LapDeltaToSessionBestLap"] = telemetryData.LapDeltaToSessionBestLap;
-                dict["Lap"] = telemetryData.Lap;
-
-                // Fuel and car state
-                dict["FuelLevel"] = telemetryData.FuelLevel;
-                dict["FuelUsePerHour"] = telemetryData.FuelUsePerHour;
-                dict["Gear"] = telemetryData.Gear;
-                dict["Speed"] = telemetryData.Speed;
-                dict["RPM"] = telemetryData.RPM;
-
-                // Positioning arrays - direct typed access
-                dict["CarIdxLapDistPct"] = telemetryData.CarIdxLapDistPct;
-                dict["CarIdxPosition"] = telemetryData.CarIdxPosition;
-                dict["CarIdxClassPosition"] = telemetryData.CarIdxClassPosition;
-                dict["CarIdxTrackSurface"] = telemetryData.CarIdxTrackSurface;
-                dict["CarIdxLap"] = telemetryData.CarIdxLap;
-                dict["CarIdxLastLapTime"] = telemetryData.CarIdxLastLapTime;
-
-                // Session info
-                dict["SessionState"] = telemetryData.SessionState;
-                dict["SessionTime"] = telemetryData.SessionTime;
-                dict["SessionTimeRemain"] = telemetryData.SessionTimeRemain;
-                dict["SessionLapsRemain"] = telemetryData.SessionLapsRemain;
-                dict["SessionLapsTotal"] = telemetryData.SessionLapsTotal;
-                dict["SessionNum"] = telemetryData.SessionNum;
-
-                // Player specific
-                dict["PlayerCarIdx"] = telemetryData.PlayerCarIdx;
-
-                // Add YAML-parsed data from our session parser
-                dict["CarIdxCarNumber"] = _sessionParser.CarNumbers;
-                dict["CarIdxClass"] = _sessionParser.CarClasses;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[SVappsLAB] Error building telemetry dictionary: {ex.Message}");
-            }
-
-            return dict;
         }
 
         #endregion
@@ -355,5 +393,13 @@ namespace VISOR.Telemetry
         }
 
         #endregion
+    }
+
+    // Simple null logger implementation
+    public class NullLogger<T> : ILogger<T>
+    {
+        public IDisposable BeginScope<TState>(TState state) => null;
+        public bool IsEnabled(LogLevel logLevel) => false;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter) { }
     }
 }

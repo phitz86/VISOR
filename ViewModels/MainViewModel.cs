@@ -1,6 +1,7 @@
 ﻿using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using VISOR.Telemetry;
 
 namespace VISOR.ViewModels
@@ -23,6 +24,25 @@ namespace VISOR.ViewModels
             set { _isTelemetryConnected = value; OnPropertyChanged(); }
         }
 
+        // --- Visibility Toggle Properties (for UI sections) ---
+        private bool _showPosition = true;
+        private bool _showGear = true;
+        private bool _showFuelRemaining = true;
+        private bool _showTimeRemaining = true;
+        private bool _showLapDelta = true;
+        private bool _showLapTimes = true;
+        private bool _showRelative = true;
+        private bool _showWarnings = true;
+
+        public bool ShowPosition { get => _showPosition; set { _showPosition = value; OnPropertyChanged(); } }
+        public bool ShowGear { get => _showGear; set { _showGear = value; OnPropertyChanged(); } }
+        public bool ShowFuelRemaining { get => _showFuelRemaining; set { _showFuelRemaining = value; OnPropertyChanged(); } }
+        public bool ShowTimeRemaining { get => _showTimeRemaining; set { _showTimeRemaining = value; OnPropertyChanged(); } }
+        public bool ShowLapDelta { get => _showLapDelta; set { _showLapDelta = value; OnPropertyChanged(); } }
+        public bool ShowLapTimes { get => _showLapTimes; set { _showLapTimes = value; OnPropertyChanged(); } }
+        public bool ShowRelative { get => _showRelative; set { _showRelative = value; OnPropertyChanged(); } }
+        public bool ShowWarnings { get => _showWarnings; set { _showWarnings = value; OnPropertyChanged(); } }
+
         // --- Position Properties ---
         public string ClassPosition => RelativeVM.LivePlayerClassPosition;
         public string ClassPositionNumber => RelativeVM.LivePlayerClassPositionNumber;
@@ -31,9 +51,12 @@ namespace VISOR.ViewModels
         private string _gearDisplay = "N";
         private string _lastLapTime = "-:--.---";
         private string _bestLapTime = "-:--.---";
+        private string _timeRemainingDisplay = "--:--";
+
         public string GearDisplay { get => _gearDisplay; set { _gearDisplay = value; OnPropertyChanged(); } }
         public string LastLapTime { get => _lastLapTime; set { _lastLapTime = value; OnPropertyChanged(); } }
         public string BestLapTime { get => _bestLapTime; set { _bestLapTime = value; OnPropertyChanged(); } }
+        public string TimeRemainingDisplay { get => _timeRemainingDisplay; set { _timeRemainingDisplay = value; OnPropertyChanged(); } }
 
         public MainViewModel()
         {
@@ -74,9 +97,20 @@ namespace VISOR.ViewModels
 
             float bestLap = snapshot.GetValue<float>("LapBestLapTime");
             if (bestLap > 0) BestLapTime = FormatLapTime(bestLap);
+
+            // Update time remaining
+            double timeRemain = snapshot.GetValue<double>("SessionTimeRemain");
+            if (timeRemain > 0)
+            {
+                TimeSpan remaining = TimeSpan.FromSeconds(timeRemain);
+                TimeRemainingDisplay = $"{(int)remaining.TotalMinutes}:{remaining.Seconds:D2}";
+            }
+            else
+            {
+                TimeRemainingDisplay = "--:--";
+            }
         }
 
-        // THIS METHOD WAS MISSING
         public void Reset()
         {
             FuelVM.Reset();
@@ -84,6 +118,7 @@ namespace VISOR.ViewModels
             GearDisplay = "N";
             LastLapTime = "-:--.---";
             BestLapTime = "-:--.---";
+            TimeRemainingDisplay = "--:--";
             IsTelemetryConnected = false;
         }
 

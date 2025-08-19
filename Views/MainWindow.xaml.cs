@@ -13,14 +13,14 @@ namespace VISOR.Views
     {
         private readonly MainViewModel _viewModel;
         private readonly SVappsLABSDKWrapper _sdk;
-        private readonly SessionDataParser _sessionParser; // Add a field for the parser
+        // REMOVED: Don't create our own SessionDataParser!
 
         public MainWindow(SVappsLABSDKWrapper sdkWrapper)
         {
             InitializeComponent();
 
             _sdk = sdkWrapper;
-            _sessionParser = new SessionDataParser(); // Instantiate the parser
+            // REMOVED: _sessionParser = new SessionDataParser();
             _viewModel = new MainViewModel();
             DataContext = _viewModel;
 
@@ -46,15 +46,26 @@ namespace VISOR.Views
                     DragMove();
             };
         }
+
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             try
             {
+                // Subscribe to events
                 _sdk.SnapshotAvailable += OnSnapshotAvailable;
                 _sdk.SessionYamlAvailable += OnSessionYamlAvailable;
-                _sdk.ConnectionStateChanged += OnConnectionStateChanged; // Subscribe to the new event
+                _sdk.ConnectionStateChanged += OnConnectionStateChanged;
+                _sdk.PrimedStateChanged += OnPrimedStateChanged; // NEW: Subscribe to primed state
+                _sdk.SessionDataUpdated += OnSessionDataUpdated; // NEW: Subscribe to session updates
 
-                await WaitForFirstSnapshotAsync();
+                // Check initial state
+                UpdateUIState();
+
+                // If not primed, show waiting message
+                if (!_sdk.IsPrimed)
+                {
+                    await WaitForPrimedStateAsync();
+                }
             }
             catch (Exception ex)
             {
@@ -65,35 +76,77 @@ namespace VISOR.Views
 
         private void OnConnectionStateChanged(bool isConnected)
         {
-            // Run on the UI thread to safely update UI-bound properties.
             Dispatcher.Invoke(() =>
             {
                 if (!isConnected)
                 {
-                    // If we disconnect, reset everything.
                     _viewModel.Reset();
-                    _sessionParser.ClearCache();
                     StatusText.Text = "Disconnected. Waiting for iRacing...";
                     StatusText.Visibility = Visibility.Visible;
-
-                    // Start the waiting process again.
-                    _ = WaitForFirstSnapshotAsync();
                 }
+                else
+                {
+                    StatusText.Text = "Connected, waiting for session data...";
+                    StatusText.Visibility = Visibility.Visible;
+                }
+            });
+        }
+
+        private void OnPrimedStateChanged(bool isPrimed)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (isPrimed)
+                {
+                    StatusText.Text = "Fully connected!";
+                    StatusText.Visibility = Visibility.Collapsed;
+                    _viewModel.IsTelemetryConnected = true;
+                }
+                else
+                {
+                    StatusText.Text = "Waiting for session data...";
+                    StatusText.Visibility = Visibility.Visible;
+                    _viewModel.IsTelemetryConnected = false;
+                }
+            });
+        }
+
+        private void OnSessionDataUpdated()
+        {
+            // Session data changed (driver joined/left)
+            Dispatcher.Invoke(() =>
+            {
+                // Could show a brief notification if desired
+                Console.WriteLine("[MainWindow] Session data updated - drivers may have changed");
             });
         }
 
         private void OnSnapshotAvailable(SVappsLABSnapshot snapshot)
         {
-            // Now pass both the snapshot and the parser to the ViewModel
-            Dispatcher.Invoke(() => _viewModel.UpdateFromTelemetry(snapshot, _sessionParser));
+            // IMPORTANT: We no longer pass a separate SessionDataParser
+            // The snapshot already contains the parsed session data from the wrapper's internal parser
+            Dispatcher.Invoke(() =>
+            {
+                // Get the session data arrays from the snapshot
+                var carNumbers = snapshot.GetValue<int[]>("CarIdxCarNumber");
+                var carClasses = snapshot.GetValue<string[]>("CarIdxClass");
+
+                // Create a temporary parser just for the ViewModels to use
+                // This is a workaround - ideally ViewModels would work directly with snapshot data
+                var tempParser = new SessionDataParser();
+                if (!string.IsNullOrEmpty(snapshot.RawSessionData))
+                {
+                    tempParser.ParseSessionData(snapshot.RawSessionData);
+                }
+
+                _viewModel.UpdateFromTelemetry(snapshot, tempParser);
+            });
         }
 
         private void OnSessionYamlAvailable(string yaml)
         {
-            // The parser needs to be updated with the latest session info
-            _sessionParser.ParseSessionData(yaml);
-
-            // This can run in the background.
+            // REMOVED: Don't parse it ourselves - the wrapper already did!
+            // Just save it for debugging if needed
             Task.Run(() =>
             {
                 try
@@ -104,20 +157,17 @@ namespace VISOR.Views
                 }
                 catch
                 {
-                    // Non-fatal, can be ignored for now.
+                    // Non-fatal, can be ignored
                 }
             });
         }
 
-        private async Task WaitForFirstSnapshotAsync()
+        private async Task WaitForPrimedStateAsync()
         {
+            // Just wait for telemetry connection, not session data
             int retries = 0;
-            bool gotData = false;
 
-            void Handler(SVappsLABSnapshot s) => gotData = true;
-            _sdk.SnapshotAvailable += Handler;
-
-            while (!gotData && retries < 360) // Wait for up to 3 minutes
+            while (!_sdk.IsConnected && retries < 360) // Wait up to 3 minutes for connection only
             {
                 if (StatusText != null)
                 {
@@ -132,25 +182,47 @@ namespace VISOR.Views
                 retries++;
             }
 
-            _sdk.SnapshotAvailable -= Handler;
-
-            if (!gotData)
-            {
-                if (StatusText != null)
-                {
-                    Dispatcher.Invoke(() => { StatusText.Text = "No telemetry connection found."; });
-                }
-                return;
-            }
-
-            if (StatusText != null)
+            if (_sdk.IsConnected)
             {
                 Dispatcher.Invoke(() =>
                 {
-                    StatusText.Text = "Connected.";
-                    StatusText.Visibility = Visibility.Collapsed;
+                    StatusText.Text = "Connected!";
+                    // Hide after a brief moment
+                    Task.Delay(1000).ContinueWith(_ =>
+                    {
+                        Dispatcher.Invoke(() => StatusText.Visibility = Visibility.Collapsed);
+                    });
                 });
             }
+            else
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    StatusText.Text = "Timeout waiting for telemetry.";
+                });
+            }
+        }
+
+        private void UpdateUIState()
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (_sdk.IsPrimed)
+                {
+                    StatusText.Visibility = Visibility.Collapsed;
+                    _viewModel.IsTelemetryConnected = true;
+                }
+                else if (_sdk.IsConnected)
+                {
+                    StatusText.Text = "Connected, waiting for session data...";
+                    StatusText.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    StatusText.Text = "Waiting for iRacing...";
+                    StatusText.Visibility = Visibility.Visible;
+                }
+            });
         }
 
         private void QuitButton_Click(object sender, RoutedEventArgs e)
