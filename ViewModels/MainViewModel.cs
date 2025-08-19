@@ -11,14 +11,23 @@ namespace VISOR.ViewModels
         private void OnPropertyChanged([CallerMemberName] string? name = null) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
+        // --- Child ViewModels ---
         public FuelViewModel FuelVM { get; private set; }
         public RelativeViewModel RelativeVM { get; private set; }
+
+        // --- State Properties ---
+        private bool _isTelemetryConnected = false;
+        public bool IsTelemetryConnected
+        {
+            get => _isTelemetryConnected;
+            set { _isTelemetryConnected = value; OnPropertyChanged(); }
+        }
 
         // --- Position Properties ---
         public string ClassPosition => RelativeVM.LivePlayerClassPosition;
         public string ClassPositionNumber => RelativeVM.LivePlayerClassPositionNumber;
 
-        // ... (Other properties: GearDisplay, Lap Times, etc.) ...
+        // --- Other Data Properties ---
         private string _gearDisplay = "N";
         private string _lastLapTime = "-:--.---";
         private string _bestLapTime = "-:--.---";
@@ -30,7 +39,6 @@ namespace VISOR.ViewModels
         {
             FuelVM = new FuelViewModel();
             RelativeVM = new RelativeViewModel();
-            // Listen for changes on the RelativeVM's properties
             RelativeVM.PropertyChanged += (sender, args) =>
             {
                 if (args.PropertyName == nameof(RelativeViewModel.LivePlayerClassPosition))
@@ -46,6 +54,7 @@ namespace VISOR.ViewModels
 
         public void UpdateFromTelemetry(SVappsLABSnapshot snapshot, SessionDataParser sessionParser)
         {
+            // This logic will now only run after the connection is established.
             FuelVM.Update(
                 snapshot.GetValue<float>("FuelLevel"),
                 snapshot.GetValue<int>("Lap")
@@ -67,10 +76,21 @@ namespace VISOR.ViewModels
             if (bestLap > 0) BestLapTime = FormatLapTime(bestLap);
         }
 
+        // THIS METHOD WAS MISSING
+        public void Reset()
+        {
+            FuelVM.Reset();
+            RelativeVM.Reset();
+            GearDisplay = "N";
+            LastLapTime = "-:--.---";
+            BestLapTime = "-:--.---";
+            IsTelemetryConnected = false;
+        }
+
         private string FormatLapTime(float timeInSeconds)
         {
             TimeSpan time = TimeSpan.FromSeconds(timeInSeconds);
-            return $"{time.Minutes:D2}.{time.Milliseconds:D3}";
+            return $"{time.Minutes}:{time.Seconds:D2}.{time.Milliseconds:D3}";
         }
     }
 }

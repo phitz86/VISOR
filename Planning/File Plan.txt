@@ -5,17 +5,20 @@ VISOR/
 │   ├── ConfigWindow.xaml
 │   └── ConfigWindow.xaml.cs
 ├── ViewModels/
-│   └── (MainViewModel and other VMs)
+│   ├── MainViewModel.cs
+│   ├── FuelViewModel.cs
+│   ├── RelativeViewModel.cs
+│   └── RelativeRowViewModel.cs
 ├── Resources/
 │   ├── Converters/
 │   │   └── BoolToVisibilityConverter.cs
 │   └── Fonts/
-│       └── Digital-7 (font files)
+│       └── digital-7.ttf
 ├── Telemetry/
-│   ├── TelemetryFieldRegistry.cs          ← NEW (field definitions)
-│   ├── SessionDataParser.cs               ← NEW (YAML parsing)
-│   ├── SVappsLABSDKWrapper.cs             ← REFACTORED (main wrapper)
-│   └── SVappsLABSnapshot.cs               ← EXISTING (data snapshot)
+│   ├── SVappsLABSDKWrapper.cs
+│   ├── SVappsLABSnapshot.cs
+│   ├── SessionDataParser.cs
+│   └── TelemetryFieldRegistry.cs
 ├── Diagnostics/
 │   └── (diagnostic classes)
 ├── VISOR.csproj

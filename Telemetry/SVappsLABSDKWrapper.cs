@@ -56,20 +56,16 @@ namespace VISOR.Telemetry
         #endregion
 
         #region Public Properties
-
         public string Name => "SVappsLAB iRacingTelemetrySDK";
         public bool IsConnected => _isConnected;
-
         #endregion
 
         #region Events
-
-        // Fired when a new telemetry snapshot is available
         public event Action<SVappsLABSnapshot> SnapshotAvailable;
-
-        // Fired when session YAML data is available
         public event Action<string> SessionYamlAvailable;
 
+        // NEW EVENT to broadcast connection state changes.
+        public event Action<bool> ConnectionStateChanged;
         #endregion
 
         #region Constructor
@@ -216,7 +212,6 @@ namespace VISOR.Telemetry
         #endregion
 
         #region Event Handlers
-
         private void OnConnectStateChanged(object sender, EventArgs e)
         {
             bool newConnectionState = _client != null && _client.IsConnected();
@@ -224,6 +219,8 @@ namespace VISOR.Telemetry
             {
                 _isConnected = newConnectionState;
                 Console.WriteLine($"[SVappsLAB] Connection state changed: {_isConnected}");
+                // Fire the new public event.
+                ConnectionStateChanged?.Invoke(_isConnected);
             }
         }
 

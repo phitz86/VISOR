@@ -46,19 +46,13 @@ namespace VISOR.Views
                     DragMove();
             };
         }
-
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             try
             {
-                if (StatusText != null)
-                {
-                    StatusText.Text = "Connecting...";
-                    StatusText.Visibility = Visibility.Visible;
-                }
-
                 _sdk.SnapshotAvailable += OnSnapshotAvailable;
                 _sdk.SessionYamlAvailable += OnSessionYamlAvailable;
+                _sdk.ConnectionStateChanged += OnConnectionStateChanged; // Subscribe to the new event
 
                 await WaitForFirstSnapshotAsync();
             }
@@ -67,6 +61,25 @@ namespace VISOR.Views
                 MessageBox.Show($"An error occurred: {ex.Message}");
                 Close();
             }
+        }
+
+        private void OnConnectionStateChanged(bool isConnected)
+        {
+            // Run on the UI thread to safely update UI-bound properties.
+            Dispatcher.Invoke(() =>
+            {
+                if (!isConnected)
+                {
+                    // If we disconnect, reset everything.
+                    _viewModel.Reset();
+                    _sessionParser.ClearCache();
+                    StatusText.Text = "Disconnected. Waiting for iRacing...";
+                    StatusText.Visibility = Visibility.Visible;
+
+                    // Start the waiting process again.
+                    _ = WaitForFirstSnapshotAsync();
+                }
+            });
         }
 
         private void OnSnapshotAvailable(SVappsLABSnapshot snapshot)

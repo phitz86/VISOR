@@ -9,7 +9,7 @@ using VISOR.Telemetry;
 
 namespace VISOR.ViewModels
 {
-    // Enum to make track surface values readable. Moved to the top of the file to resolve compile error.
+    // Enum to make track surface values readable.
     public enum iRacingTrackSurface
     {
         OnTrack,
@@ -45,13 +45,18 @@ namespace VISOR.ViewModels
 
         public void Update(SVappsLABSnapshot snapshot, SessionDataParser sessionParser)
         {
+            // --- DATA READINESS CHECKS ---
             var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx");
-            if (playerCarIdx == -1) return;
+            if (playerCarIdx == -1) return; // Can't do anything if we don't know who the player is.
+
+            // THE FIX: Don't run logic until the session YAML has been parsed.
+            if (!sessionParser.IsDataReady) return;
 
             var carClasses = sessionParser.CarClasses;
             string playerClass = carClasses[playerCarIdx];
-            if (string.IsNullOrEmpty(playerClass)) return;
+            if (string.IsNullOrEmpty(playerClass)) return; // Wait until the player's class is known.
 
+            // --- Get all necessary data arrays ---
             var lapDistPct = snapshot.GetValue<float[]>("CarIdxLapDistPct");
             var currentLap = snapshot.GetValue<int[]>("CarIdxLap");
             var trackSurface = snapshot.GetValue<int[]>("CarIdxTrackSurface");
@@ -157,6 +162,14 @@ namespace VISOR.ViewModels
             {
                 RelativeRows.RemoveAt(RelativeRows.Count - 1);
             }
+        }
+        public void Reset()
+        {
+            RelativeRows.Clear();
+            _classColorMap.Clear();
+            _nextColorIndex = 0;
+            LivePlayerClassPosition = "P--";
+            LivePlayerClassPositionNumber = "--";
         }
     }
 }

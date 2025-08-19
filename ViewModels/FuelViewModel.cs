@@ -29,10 +29,7 @@ namespace VISOR.ViewModels
                 }
             }
         }
-
-        /// <summary>
         /// Updates the fuel calculation using a robust, historical method.
-        /// </summary>
         /// <param name="fuelLevel">Current fuel in the tank.</param>
         /// <param name="currentLap">The current lap number ("Laps completed").</param>
         public void Update(float fuelLevel, int currentLap)
@@ -81,6 +78,13 @@ namespace VISOR.ViewModels
                 // If we don't have enough data yet, show the default text.
                 FuelDisplay = "--- Laps";
             }
+        }
+        public void Reset()
+        {
+            _lastLapsFuelUsage.Clear();
+            _fuelLevelAtLapEnd.Clear();
+            _lastProcessedLap = -1;
+            FuelDisplay = "--- Laps";
         }
     }
 }
