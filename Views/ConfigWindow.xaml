@@ -19,7 +19,7 @@
                 NOTE: VISOR will only display over iRacing if the simulator is running in borderless windowed mode.
             </TextBlock>
 
-            <Button Content="Dump Session YAML" Click="DumpYaml_Click" />
+            <Button Content="Dump Session YAML" Click="DumpYamlButton_Click" />
 
             <Button Content="Launch" Click="LaunchButton_Click" HorizontalAlignment="Center" Margin="0,20,0,0" Width="80"/>
         </StackPanel>

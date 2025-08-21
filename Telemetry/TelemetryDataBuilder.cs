@@ -6,14 +6,15 @@ namespace VISOR.Telemetry
 {
     /// <summary>
     /// Builds telemetry dictionaries from raw SDK data and merges with session data.
+    /// Updated to work with new session data structure and field names.
     /// </summary>
     public class TelemetryDataBuilder
     {
-        private readonly SessionDataParser _sessionParser;
+        private readonly SVappsLABSDKWrapper _wrapper;
 
-        public TelemetryDataBuilder(SessionDataParser sessionParser)
+        public TelemetryDataBuilder(SVappsLABSDKWrapper wrapper)
         {
-            _sessionParser = sessionParser ?? throw new ArgumentNullException(nameof(sessionParser));
+            _wrapper = wrapper ?? throw new ArgumentNullException(nameof(wrapper));
         }
 
         /// <summary>
@@ -25,14 +26,14 @@ namespace VISOR.Telemetry
 
             try
             {
-                // Add all telemetry fields
+                // Add all telemetry fields using direct approach
                 AddLapTimingData(dict, telemetryData);
                 AddCarStateData(dict, telemetryData);
                 AddPositioningData(dict, telemetryData);
                 AddSessionData(dict, telemetryData);
                 AddPlayerData(dict, telemetryData);
 
-                // Merge in YAML-parsed data
+                // Merge in YAML-parsed data from wrapper's session parser
                 AddYamlData(dict);
             }
             catch (Exception ex)
@@ -65,24 +66,13 @@ namespace VISOR.Telemetry
 
         private void AddPositioningData(Dictionary<string, object> dict, TelemetryData data)
         {
-            // Positioning arrays - validate before adding
-            if (data.CarIdxLapDistPct != null)
-                dict["CarIdxLapDistPct"] = data.CarIdxLapDistPct;
-
-            if (data.CarIdxPosition != null)
-                dict["CarIdxPosition"] = data.CarIdxPosition;
-
-            if (data.CarIdxClassPosition != null)
-                dict["CarIdxClassPosition"] = data.CarIdxClassPosition;
-
-            if (data.CarIdxTrackSurface != null)
-                dict["CarIdxTrackSurface"] = data.CarIdxTrackSurface;
-
-            if (data.CarIdxLap != null)
-                dict["CarIdxLap"] = data.CarIdxLap;
-
-            if (data.CarIdxLastLapTime != null)
-                dict["CarIdxLastLapTime"] = data.CarIdxLastLapTime;
+            // Direct array assignment from telemetry
+            dict["CarIdxLapDistPct"] = data.CarIdxLapDistPct;
+            dict["CarIdxPosition"] = data.CarIdxPosition;
+            dict["CarIdxClassPosition"] = data.CarIdxClassPosition;
+            dict["CarIdxTrackSurface"] = data.CarIdxTrackSurface;
+            dict["CarIdxLap"] = data.CarIdxLap;
+            dict["CarIdxLastLapTime"] = data.CarIdxLastLapTime;
         }
 
         private void AddSessionData(Dictionary<string, object> dict, TelemetryData data)
@@ -102,12 +92,13 @@ namespace VISOR.Telemetry
 
         private void AddYamlData(Dictionary<string, object> dict)
         {
-            // Add YAML-parsed arrays
-            dict["CarIdxCarNumber"] = _sessionParser.CarNumbers;
-            dict["CarIdxClass"] = _sessionParser.CarClasses;
-
-            // Could add more YAML data here if needed
-            // dict["CarIdxDriverName"] = _sessionParser.DriverNames;
+            // Add YAML-parsed arrays from session parser
+            dict["CarIdxUserName"] = _wrapper.GetUserNames();
+            dict["CarIdxCarNumber"] = _wrapper.GetCarNumbers();
+            dict["CarIdxCarNumberRaw"] = _wrapper.GetCarNumberRaw();
+            dict["CarIdxClassID"] = _wrapper.GetCarClassIDs();
+            dict["CarIdxIsAI"] = _wrapper.GetCarIsAI();
+            dict["CarIdxIncidentCount"] = _wrapper.GetCurDriverIncidentCount();
         }
 
         /// <summary>

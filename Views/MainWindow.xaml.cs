@@ -13,14 +13,12 @@ namespace VISOR.Views
     {
         private readonly MainViewModel _viewModel;
         private readonly SVappsLABSDKWrapper _sdk;
-        // REMOVED: Don't create our own SessionDataParser!
 
         public MainWindow(SVappsLABSDKWrapper sdkWrapper)
         {
             InitializeComponent();
 
             _sdk = sdkWrapper;
-            // REMOVED: _sessionParser = new SessionDataParser();
             _viewModel = new MainViewModel();
             DataContext = _viewModel;
 
@@ -55,8 +53,8 @@ namespace VISOR.Views
                 _sdk.SnapshotAvailable += OnSnapshotAvailable;
                 _sdk.SessionYamlAvailable += OnSessionYamlAvailable;
                 _sdk.ConnectionStateChanged += OnConnectionStateChanged;
-                _sdk.PrimedStateChanged += OnPrimedStateChanged; // NEW: Subscribe to primed state
-                _sdk.SessionDataUpdated += OnSessionDataUpdated; // NEW: Subscribe to session updates
+                _sdk.PrimedStateChanged += OnPrimedStateChanged;
+                _sdk.SessionDataUpdated += OnSessionDataUpdated;
 
                 // Check initial state
                 UpdateUIState();
@@ -116,37 +114,33 @@ namespace VISOR.Views
             // Session data changed (driver joined/left)
             Dispatcher.Invoke(() =>
             {
-                // Could show a brief notification if desired
                 Console.WriteLine("[MainWindow] Session data updated - drivers may have changed");
             });
         }
 
         private void OnSnapshotAvailable(SVappsLABSnapshot snapshot)
         {
-            // IMPORTANT: We no longer pass a separate SessionDataParser
-            // The snapshot already contains the parsed session data from the wrapper's internal parser
             Dispatcher.Invoke(() =>
             {
-                // Get the session data arrays from the snapshot
-                var carNumbers = snapshot.GetValue<int[]>("CarIdxCarNumber");
-                var carClasses = snapshot.GetValue<string[]>("CarIdxClass");
-
-                // Create a temporary parser just for the ViewModels to use
-                // This is a workaround - ideally ViewModels would work directly with snapshot data
-                var tempParser = new SessionDataParser();
-                if (!string.IsNullOrEmpty(snapshot.RawSessionData))
+                // Access the wrapper's session parser directly - no need to create our own
+                if (_sdk.IsSessionDataReady)
                 {
-                    tempParser.ParseSessionData(snapshot.RawSessionData);
+                    // Create a simple wrapper to provide the session parser interface
+                    // that the ViewModels expect, using the wrapper's parsed data
+                    var sessionDataWrapper = new SessionDataWrapper(_sdk);
+                    _viewModel.UpdateFromTelemetry(snapshot, sessionDataWrapper);
                 }
-
-                _viewModel.UpdateFromTelemetry(snapshot, tempParser);
+                else
+                {
+                    // Just update the basic telemetry without session-dependent features
+                    _viewModel.UpdateFromTelemetry(snapshot, null);
+                }
             });
         }
 
         private void OnSessionYamlAvailable(string yaml)
         {
-            // REMOVED: Don't parse it ourselves - the wrapper already did!
-            // Just save it for debugging if needed
+            // Save YAML for debugging purposes
             Task.Run(() =>
             {
                 try
@@ -164,10 +158,9 @@ namespace VISOR.Views
 
         private async Task WaitForPrimedStateAsync()
         {
-            // Just wait for telemetry connection, not session data
             int retries = 0;
 
-            while (!_sdk.IsConnected && retries < 360) // Wait up to 3 minutes for connection only
+            while (!_sdk.IsConnected && retries < 360) // Wait up to 3 minutes for connection
             {
                 if (StatusText != null)
                 {
@@ -229,5 +222,27 @@ namespace VISOR.Views
         {
             Application.Current.Shutdown();
         }
+    }
+
+    /// <summary>
+    /// Simple wrapper to provide SessionDataParser interface using the SDK wrapper's data
+    /// </summary>
+    public class SessionDataWrapper : VISOR.ViewModels.ISessionDataProvider
+    {
+        private readonly SVappsLABSDKWrapper _wrapper;
+
+        public SessionDataWrapper(SVappsLABSDKWrapper wrapper)
+        {
+            _wrapper = wrapper;
+        }
+
+        public bool IsDataReady => _wrapper.IsSessionDataReady;
+
+        public string[] UserNames => _wrapper.GetUserNames();
+        public string[] CarNumbers => _wrapper.GetCarNumbers();
+        public int[] CarNumberRaw => _wrapper.GetCarNumberRaw();
+        public int[] CarClassIDs => _wrapper.GetCarClassIDs();
+        public bool[] CarIsAI => _wrapper.GetCarIsAI();
+        public int[] CurDriverIncidentCount => _wrapper.GetCurDriverIncidentCount();
     }
 }

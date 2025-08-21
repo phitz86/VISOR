@@ -24,16 +24,17 @@ namespace VISOR.Telemetry
             
             // Session info
             "SessionState", "SessionTime", "SessionTimeRemain", "SessionLapsRemain",
-            "SessionLapsTotal", "SessionNum",
+            "SessionLapsTotal", "SessionNum", "PlayerCarIdx",
             
             // Environmental
             "TrackTemp", "AirTemp", "Skies", "WindVel"
         };
 
-        // Fields that must be parsed from YAML session data
+        // Fields that are parsed from YAML session data and added to telemetry dictionary
         public static readonly HashSet<string> YamlOnlyFields = new()
         {
-            "CarIdxCarNumber", "CarIdxClass"
+            "CarIdxUserName", "CarIdxCarNumber", "CarIdxCarNumberRaw",
+            "CarIdxClassID", "CarIdxIsAI", "CarIdxIncidentCount"
         };
 
         // Field type mappings for all supported telemetry fields
@@ -70,6 +71,7 @@ namespace VISOR.Telemetry
             ["SessionLapsRemain"] = typeof(int),
             ["SessionLapsTotal"] = typeof(int),
             ["SessionNum"] = typeof(int),
+            ["PlayerCarIdx"] = typeof(int),
 
             // Environmental
             ["TrackTemp"] = typeof(float),
@@ -77,9 +79,13 @@ namespace VISOR.Telemetry
             ["Skies"] = typeof(int),
             ["WindVel"] = typeof(float),
 
-            // YAML-only fields
-            ["CarIdxCarNumber"] = typeof(int[]),
-            ["CarIdxClass"] = typeof(string[])
+            // YAML-parsed fields (updated field names and types)
+            ["CarIdxUserName"] = typeof(string[]),
+            ["CarIdxCarNumber"] = typeof(string[]),
+            ["CarIdxCarNumberRaw"] = typeof(int[]),
+            ["CarIdxClassID"] = typeof(int[]),
+            ["CarIdxIsAI"] = typeof(bool[]),
+            ["CarIdxIncidentCount"] = typeof(int[])
         };
 
         #endregion
@@ -169,7 +175,8 @@ namespace VISOR.Telemetry
             {
                 "CarIdxLapDistPct", "CarIdxPosition", "CarIdxClassPosition",
                 "CarIdxTrackSurface", "CarIdxLap", "CarIdxLastLapTime",
-                "CarIdxCarNumber", "CarIdxClass"
+                "CarIdxUserName", "CarIdxCarNumber", "CarIdxCarNumberRaw",
+                "CarIdxClassID", "CarIdxIsAI", "CarIdxIncidentCount"
             };
         }
 
@@ -179,7 +186,7 @@ namespace VISOR.Telemetry
             return new HashSet<string>
             {
                 "SessionState", "SessionTime", "SessionTimeRemain",
-                "SessionLapsRemain", "SessionLapsTotal", "SessionNum"
+                "SessionLapsRemain", "SessionLapsTotal", "SessionNum", "PlayerCarIdx"
             };
         }
 

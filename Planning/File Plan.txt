@@ -18,6 +18,7 @@ VISOR/
 │   ├── SVappsLABSDKWrapper.cs
 │   ├── SVappsLABSnapshot.cs
 │   ├── SessionDataParser.cs
+│   └── TelemetryDataBuilder.cs
 │   └── TelemetryFieldRegistry.cs
 ├── Diagnostics/
 │   └── (diagnostic classes)

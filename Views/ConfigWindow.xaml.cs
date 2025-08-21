@@ -1,4 +1,5 @@
 ﻿using System.Windows;
+using System.Windows.Controls;
 using VISOR.Telemetry;
 
 namespace VISOR.Views
@@ -13,10 +14,15 @@ namespace VISOR.Views
             _telemetry = telemetry;
         }
 
-        private void DumpYaml_Click(object sender, RoutedEventArgs e)
+        private void DumpYamlButton_Click(object sender, RoutedEventArgs e)
         {
-            var path = _telemetry.DumpLatestYaml();
-            MessageBox.Show(path == "NO_YAML" ? "No session YAML data is available yet. Make sure iRacing is running." : $"YAML data saved to: {path}");
+            // --- Add this line ---
+            VISOR.Diagnostics.ConnectionDiagnostics.RunDiagnostics();
+
+            // The rest of your code for this method...
+            var sdk = ((App)Application.Current).SdkWrapper;
+            var dumpPath = sdk.DumpLatestYaml();
+            MessageBox.Show($"Session YAML dumped to: {dumpPath}");
         }
 
         private void LaunchButton_Click(object sender, RoutedEventArgs e)

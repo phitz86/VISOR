@@ -7,12 +7,16 @@ namespace VISOR.Telemetry
     /// <summary>
     /// Handles parsing and caching of iRacing session YAML data
     /// </summary>
-    public class SessionDataParser
+    public class SessionDataParser : VISOR.ViewModels.ISessionDataProvider
     {
         // YAML-parsed session data cache
-        private readonly int[] _cachedCarNumbers = new int[64];
-        private readonly string[] _cachedCarClasses = new string[64];
-        private readonly string[] _cachedDriverNames = new string[64];
+        private readonly string[] _cachedUserNames = new string[64];
+        private readonly string[] _cachedCarNumbers = new string[64];
+        private readonly int[] _cachedCarNumberRaw = new int[64];
+        private readonly int[] _cachedCarClassIDs = new int[64];
+        private readonly bool[] _cachedCarIsAI = new bool[64];
+        private readonly int[] _cachedCurDriverIncidentCount = new int[64];
+
         private string _lastSessionDataHash = string.Empty;
         private string _cachedSessionYaml = string.Empty;
         private readonly object _parseLock = new();
@@ -21,19 +25,34 @@ namespace VISOR.Telemetry
         public bool IsDataReady { get; private set; } = false;
 
         // Public properties for accessing cached data
-        public int[] CarNumbers
+        public string[] UserNames
         {
-            get { lock (_parseLock) { return (int[])_cachedCarNumbers.Clone(); } }
+            get { lock (_parseLock) { return (string[])_cachedUserNames.Clone(); } }
         }
 
-        public string[] CarClasses
+        public string[] CarNumbers
         {
-            get { lock (_parseLock) { return (string[])_cachedCarClasses.Clone(); } }
+            get { lock (_parseLock) { return (string[])_cachedCarNumbers.Clone(); } }
         }
 
-        public string[] DriverNames
+        public int[] CarNumberRaw
         {
-            get { lock (_parseLock) { return (string[])_cachedDriverNames.Clone(); } }
+            get { lock (_parseLock) { return (int[])_cachedCarNumberRaw.Clone(); } }
+        }
+
+        public int[] CarClassIDs
+        {
+            get { lock (_parseLock) { return (int[])_cachedCarClassIDs.Clone(); } }
+        }
+
+        public bool[] CarIsAI
+        {
+            get { lock (_parseLock) { return (bool[])_cachedCarIsAI.Clone(); } }
+        }
+
+        public int[] CurDriverIncidentCount
+        {
+            get { lock (_parseLock) { return (int[])_cachedCurDriverIncidentCount.Clone(); } }
         }
 
         public SessionDataParser()
@@ -84,23 +103,51 @@ namespace VISOR.Telemetry
                             {
                                 var parts = line.Split(':', 2);
                                 if (parts.Length >= 2)
-                                    _cachedDriverNames[currentCarIdx] = parts[1].Trim().Trim('"');
+                                    _cachedUserNames[currentCarIdx] = parts[1].Trim().Trim('"');
                             }
                             else if (line.StartsWith("CarNumber:"))
                             {
                                 var parts = line.Split(':', 2);
                                 if (parts.Length >= 2)
                                 {
-                                    var carNumberStr = parts[1].Trim().Trim('"');
-                                    if (int.TryParse(carNumberStr, out int carNumber))
-                                        _cachedCarNumbers[currentCarIdx] = carNumber;
+                                    _cachedCarNumbers[currentCarIdx] = parts[1].Trim().Trim('"');
                                 }
                             }
-                            else if (line.StartsWith("CarClassShortName:"))
+                            else if (line.StartsWith("CarNumberRaw:"))
                             {
                                 var parts = line.Split(':', 2);
                                 if (parts.Length >= 2)
-                                    _cachedCarClasses[currentCarIdx] = parts[1].Trim().Trim('"');
+                                {
+                                    if (int.TryParse(parts[1].Trim(), out int carNumberRaw))
+                                        _cachedCarNumberRaw[currentCarIdx] = carNumberRaw;
+                                }
+                            }
+                            else if (line.StartsWith("CarClassID:"))
+                            {
+                                var parts = line.Split(':', 2);
+                                if (parts.Length >= 2)
+                                {
+                                    if (int.TryParse(parts[1].Trim(), out int classId))
+                                        _cachedCarClassIDs[currentCarIdx] = classId;
+                                }
+                            }
+                            else if (line.StartsWith("CarIsAI:"))
+                            {
+                                var parts = line.Split(':', 2);
+                                if (parts.Length >= 2)
+                                {
+                                    var aiValue = parts[1].Trim();
+                                    _cachedCarIsAI[currentCarIdx] = aiValue == "1" || aiValue.ToLower() == "true";
+                                }
+                            }
+                            else if (line.StartsWith("CurDriverIncidentCount:"))
+                            {
+                                var parts = line.Split(':', 2);
+                                if (parts.Length >= 2)
+                                {
+                                    if (int.TryParse(parts[1].Trim(), out int incidentCount))
+                                        _cachedCurDriverIncidentCount[currentCarIdx] = incidentCount;
+                                }
                             }
                         }
                     }
@@ -194,21 +241,28 @@ namespace VISOR.Telemetry
         {
             lock (_parseLock)
             {
-                return _cachedCarNumbers.Count(n => n > 0);
+                return _cachedCarNumbers.Count(n => !string.IsNullOrEmpty(n));
             }
         }
 
         /// <summary>
         /// Get driver info for a specific car index
         /// </summary>
-        public (string name, int number, string carClass) GetDriverInfo(int carIdx)
+        public (string userName, string carNumber, int carNumberRaw, int classId, bool isAI, int incidentCount) GetDriverInfo(int carIdx)
         {
             if (carIdx < 0 || carIdx >= 64)
-                return (string.Empty, 0, string.Empty);
+                return (string.Empty, string.Empty, 0, 0, false, 0);
 
             lock (_parseLock)
             {
-                return (_cachedDriverNames[carIdx], _cachedCarNumbers[carIdx], _cachedCarClasses[carIdx]);
+                return (
+                    _cachedUserNames[carIdx],
+                    _cachedCarNumbers[carIdx],
+                    _cachedCarNumberRaw[carIdx],
+                    _cachedCarClassIDs[carIdx],
+                    _cachedCarIsAI[carIdx],
+                    _cachedCurDriverIncidentCount[carIdx]
+                );
             }
         }
 
@@ -227,17 +281,23 @@ namespace VISOR.Telemetry
         {
             for (int i = 0; i < 64; i++)
             {
-                _cachedCarClasses[i] = string.Empty;
-                _cachedDriverNames[i] = string.Empty;
-                _cachedCarNumbers[i] = 0;
+                _cachedUserNames[i] = string.Empty;
+                _cachedCarNumbers[i] = string.Empty;
+                _cachedCarNumberRaw[i] = 0;
+                _cachedCarClassIDs[i] = 0;
+                _cachedCarIsAI[i] = false;
+                _cachedCurDriverIncidentCount[i] = 0;
             }
         }
 
         private void ClearArrays()
         {
-            Array.Fill(_cachedCarNumbers, 0);
-            Array.Fill(_cachedCarClasses, string.Empty);
-            Array.Fill(_cachedDriverNames, string.Empty);
+            Array.Fill(_cachedUserNames, string.Empty);
+            Array.Fill(_cachedCarNumbers, string.Empty);
+            Array.Fill(_cachedCarNumberRaw, 0);
+            Array.Fill(_cachedCarClassIDs, 0);
+            Array.Fill(_cachedCarIsAI, false);
+            Array.Fill(_cachedCurDriverIncidentCount, 0);
         }
     }
 }

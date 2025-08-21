@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using VISOR.Telemetry;
+using VISOR.Views;
 
 namespace VISOR.ViewModels
 {
@@ -75,15 +76,19 @@ namespace VISOR.ViewModels
             };
         }
 
-        public void UpdateFromTelemetry(SVappsLABSnapshot snapshot, SessionDataParser sessionParser)
+        // Updated to accept either SessionDataParser or SessionDataWrapper
+        public void UpdateFromTelemetry(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
-            // This logic will now only run after the connection is established.
+            // Update fuel calculation (doesn't need session data)
             FuelVM.Update(
                 snapshot.GetValue<float>("FuelLevel"),
                 snapshot.GetValue<int>("Lap")
             );
-            RelativeVM.Update(snapshot, sessionParser);
 
+            // Update relative positioning (needs session data)
+            RelativeVM.Update(snapshot, sessionDataProvider);
+
+            // Update gear display
             int gear = snapshot.GetValue<int>("Gear");
             GearDisplay = gear switch
             {
@@ -92,6 +97,7 @@ namespace VISOR.ViewModels
                 _ => gear.ToString()
             };
 
+            // Update lap times
             float lastLap = snapshot.GetValue<float>("LapLastLapTime");
             if (lastLap > 0) LastLapTime = FormatLapTime(lastLap);
 
@@ -127,5 +133,17 @@ namespace VISOR.ViewModels
             TimeSpan time = TimeSpan.FromSeconds(timeInSeconds);
             return $"{time.Minutes}:{time.Seconds:D2}.{time.Milliseconds:D3}";
         }
+    }
+
+    // Interface to allow both SessionDataParser and SessionDataWrapper to be used
+    public interface ISessionDataProvider
+    {
+        bool IsDataReady { get; }
+        string[] UserNames { get; }
+        string[] CarNumbers { get; }
+        int[] CarNumberRaw { get; }
+        int[] CarClassIDs { get; }
+        bool[] CarIsAI { get; }
+        int[] CurDriverIncidentCount { get; }
     }
 }

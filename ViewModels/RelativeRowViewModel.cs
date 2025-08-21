@@ -21,6 +21,8 @@ namespace VISOR.ViewModels
         private Brush _nameColor = Brushes.White;
         private FontStyle _fontStyle = FontStyles.Normal;
         private bool _isPlayer;
+        private int _classID;
+        private int _incidentCount;
 
         // --- Public Properties for UI Binding ---
         public int CarIdx { get => _carIdx; set { _carIdx = value; OnPropertyChanged(); } }
@@ -33,9 +35,14 @@ namespace VISOR.ViewModels
         public FontStyle FontStyle { get => _fontStyle; set { _fontStyle = value; OnPropertyChanged(); } }
         public bool IsPlayer { get => _isPlayer; set { _isPlayer = value; OnPropertyChanged(); } }
 
+        // Updated to use integer class ID instead of string class name
+        public int ClassID { get => _classID; set { _classID = value; OnPropertyChanged(); } }
+
+        // Added incident count for future display features
+        public int IncidentCount { get => _incidentCount; set { _incidentCount = value; OnPropertyChanged(); } }
+
         // --- Properties for Internal Logic ---
         public float LapDistPct { get; set; }
         public int CurrentLap { get; set; }
-        public string Class { get; set; } = string.Empty; // <-- ADDED THIS MISSING PROPERTY
     }
 }

@@ -1,35 +1,26 @@
 ﻿using System.Windows;
-using VISOR.Telemetry;
-using VISOR.Views;
+using VISOR.Telemetry; // Make sure you have this using statement
+using VISOR.Views;    // And this one
 
 namespace VISOR
 {
     public partial class App : Application
     {
-        private SVappsLABSDKWrapper? _sdkWrapper;
+        // 1. Add the public property to hold the shared wrapper instance.
+        public SVappsLABSDKWrapper SdkWrapper { get; private set; }
 
-        protected override void OnStartup(StartupEventArgs e)
+        // 2. Override the OnStartup method to control the launch sequence.
+        protected override async void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
 
-            // Create a single, shared instance of the SDK Wrapper.
-            // This ensures both ConfigWindow and MainWindow use the same telemetry connection.
-            _sdkWrapper = new SVappsLABSDKWrapper();
+            // Create and initialize the shared SDK wrapper
+            SdkWrapper = new SVappsLABSDKWrapper();
+            await SdkWrapper.Initialize();
 
-            // Start the telemetry connection early so it can be ready
-            // for the "Dump YAML" feature in the ConfigWindow.
-            _sdkWrapper.Start();
-
-            // Create and show the ConfigWindow, passing it the shared SDK instance.
-            var configWindow = new ConfigWindow(_sdkWrapper);
+            // Now, show the ConfigWindow
+            var configWindow = new ConfigWindow(SdkWrapper);
             configWindow.Show();
-        }
-
-        protected override void OnExit(ExitEventArgs e)
-        {
-            // Ensure the telemetry connection is properly shut down when the app closes.
-            _sdkWrapper?.Shutdown();
-            base.OnExit(e);
         }
     }
 }
