@@ -4,6 +4,7 @@
         xmlns:converters="clr-namespace:VISOR.Resources.Converters"
         xmlns:viewModels="clr-namespace:VISOR.ViewModels"
         Title="VISOR"
+        Icon="/VISOR Logo.ico"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="#A0202020"
