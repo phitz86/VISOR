@@ -157,23 +157,25 @@ namespace VISOR.ViewModels
 
                 int currentLap = snapshot.GetValue<int>("Lap", 0);
 
-                // Check if we're on the final lap
+                // More accurate lap counting logic
                 if (currentLap >= sessionLapsTotal)
                 {
+                    // On or past final lap
                     TimeRemainingDisplay = "Final Lap";
                 }
                 else
                 {
-                    // Calculate actual laps remaining after current lap
-                    int actualLapsRemaining = sessionLapsTotal - currentLap;
+                    // Calculate laps remaining (including current lap)
+                    int lapsRemaining = sessionLapsTotal - currentLap;
 
-                    if (actualLapsRemaining == 1)
+                    if (lapsRemaining == 1)
                     {
                         TimeRemainingDisplay = "Final Lap";
                     }
                     else
                     {
-                        TimeRemainingDisplay = $"{actualLapsRemaining} Laps";
+                        // Show total laps remaining including current incomplete lap
+                        TimeRemainingDisplay = $"{lapsRemaining} Laps";
                     }
                 }
             }

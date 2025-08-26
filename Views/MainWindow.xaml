@@ -9,7 +9,7 @@
         Background="#A0202020"
         Topmost="True"
         ResizeMode="NoResize"
-        Width="900" Height="600">
+        Width="750" Height="580">
 
     <Window.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
@@ -40,8 +40,30 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- Row 0: Class Position | Gear -->
-        <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" 
+        <!-- Row 0: Gear | Class Position -->
+        <StackPanel Grid.Row="0" Grid.Column="0"
+                    Orientation="Horizontal"
+            Visibility="{Binding ShowGear, Converter={StaticResource BoolToVisibilityConverter}}"
+            HorizontalAlignment="Center">
+            <TextBlock Text="⚙" FontSize="56" Foreground="White"
+           HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,8,0">
+                <TextBlock.Effect>
+                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
+                </TextBlock.Effect>
+            </TextBlock>
+
+            <TextBlock Text="{Binding GearDisplay}"
+               FontSize="80" FontWeight="Bold"
+               FontFamily="pack://application:,,,/Resources/Fonts/#Digital-7"
+               Foreground="White"
+               HorizontalAlignment="Center" VerticalAlignment="Bottom">
+                <TextBlock.Effect>
+                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
+                </TextBlock.Effect>
+            </TextBlock>
+        </StackPanel>
+
+        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" 
             HorizontalAlignment="Center" VerticalAlignment="Center"
             Visibility="{Binding ShowPosition, Converter={StaticResource BoolToVisibilityConverter}}">
             <TextBlock Text="P"
@@ -50,55 +72,53 @@
                FontWeight="Bold"
                Foreground="White"
                VerticalAlignment="Center" 
-               Margin="0,0,8,0"/>
+               Margin="0,0,8,0">
+                <TextBlock.Effect>
+                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
+                </TextBlock.Effect>
+            </TextBlock>
             <TextBlock Text="{Binding ClassPositionNumber}"
                FontSize="72" 
                FontFamily="pack://application:,,,/Resources/Fonts/#Digital-7"
                Foreground="White"
-               VerticalAlignment="Center"/>
-        </StackPanel>
-
-        <StackPanel Grid.Row="0" Grid.Column="1"
-                    Orientation="Horizontal"
-            Visibility="{Binding ShowGear, Converter={StaticResource BoolToVisibilityConverter}}"
-            HorizontalAlignment="Center">
-            <TextBlock Text="⚙" FontSize="56" Foreground="White"
-           HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,8,0">
+               VerticalAlignment="Center">
                 <TextBlock.Effect>
-                    <DropShadowEffect BlurRadius="0" ShadowDepth="0" Color="Black" Opacity="1"/>
+                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
                 </TextBlock.Effect>
             </TextBlock>
-
-            <TextBlock Text="{Binding GearDisplay}"
-               FontSize="80" FontWeight="Bold"
-               FontFamily="pack://application:,,,/Resources/Fonts/#Digital-7"
-               Foreground="White"
-               HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
         </StackPanel>
 
-        <!-- Row 1: Fuel Remaining | Time/Laps Remaining -->
+        <!-- Row 1: Time/Laps Remaining | Fuel Remaining -->
         <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal"
-            Visibility="{Binding ShowFuelRemaining, Converter={StaticResource BoolToVisibilityConverter}}"
-            HorizontalAlignment="Center">
-            <TextBlock Text="⛽" FontSize="36" Margin="0,0,8,0" Foreground="Red">
-                <TextBlock.Effect>
-                    <DropShadowEffect BlurRadius="0" ShadowDepth="0" Color="Black" Opacity="1"/>
-                </TextBlock.Effect>
-            </TextBlock>
-
-            <TextBlock Text="{Binding FuelVM.FuelDisplay}" FontSize="36" Foreground="White"/>
-        </StackPanel>
-
-        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal"
                     Visibility="{Binding ShowTimeRemaining, Converter={StaticResource BoolToVisibilityConverter}}"
                     HorizontalAlignment="Center">
             <TextBlock Text="{Binding TimeRemainingSymbol}" FontSize="36" Margin="0,0,8,0" Foreground="White">
                 <TextBlock.Effect>
-                    <DropShadowEffect BlurRadius="0" ShadowDepth="0" Color="Black" Opacity="1"/>
+                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
                 </TextBlock.Effect>
             </TextBlock>
 
-            <TextBlock Text="{Binding TimeRemainingDisplay}" FontSize="36" Foreground="White"/>
+            <TextBlock Text="{Binding TimeRemainingDisplay}" FontSize="36" Foreground="White">
+                <TextBlock.Effect>
+                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
+                </TextBlock.Effect>
+            </TextBlock>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal"
+            Visibility="{Binding ShowFuelRemaining, Converter={StaticResource BoolToVisibilityConverter}}"
+            HorizontalAlignment="Center">
+            <TextBlock Text="⛽" FontSize="36" Margin="0,0,8,0" Foreground="Red">
+                <TextBlock.Effect>
+                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
+                </TextBlock.Effect>
+            </TextBlock>
+
+            <TextBlock Text="{Binding FuelVM.FuelDisplay}" FontSize="36" Foreground="White">
+                <TextBlock.Effect>
+                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
+                </TextBlock.Effect>
+            </TextBlock>
         </StackPanel>
 
         <!-- Row 2: Full-width Lap Delta Bar -->
@@ -145,25 +165,33 @@
         <StackPanel Grid.Row="3" Grid.Column="0" Orientation="Horizontal"
             Visibility="{Binding ShowLapTimes, Converter={StaticResource BoolToVisibilityConverter}}"
             HorizontalAlignment="Center">
-            <TextBlock Text="⏱" FontSize="24" Margin="0,0,6,0" Foreground="White">
+            <TextBlock Text="⏱" FontSize="30" Margin="0,0,8,0" Foreground="White">
                 <TextBlock.Effect>
-                    <DropShadowEffect BlurRadius="0" ShadowDepth="0" Color="Black" Opacity="1"/>
+                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
                 </TextBlock.Effect>
             </TextBlock>
 
-            <TextBlock Text="{Binding LastLapTime}" FontSize="24" Foreground="White"/>
+            <TextBlock Text="{Binding LastLapTime}" FontSize="30" Foreground="White">
+                <TextBlock.Effect>
+                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
+                </TextBlock.Effect>
+            </TextBlock>
         </StackPanel>
 
         <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal"
             Visibility="{Binding ShowLapTimes, Converter={StaticResource BoolToVisibilityConverter}}"
             HorizontalAlignment="Center">
-            <TextBlock Text="🏆" FontSize="24" Foreground="DarkGoldenrod" Margin="0,0,6,0">
+            <TextBlock Text="🏆" FontSize="30" Foreground="DarkGoldenrod" Margin="0,0,8,0">
                 <TextBlock.Effect>
-                    <DropShadowEffect BlurRadius="0" ShadowDepth="0" Color="Black" Opacity="1"/>
+                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
                 </TextBlock.Effect>
             </TextBlock>
 
-            <TextBlock Text="{Binding BestLapTime}" FontSize="24" Foreground="White"/>
+            <TextBlock Text="{Binding BestLapTime}" FontSize="30" Foreground="White">
+                <TextBlock.Effect>
+                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
+                </TextBlock.Effect>
+            </TextBlock>
         </StackPanel>
 
         <!-- Row 4: Full-width Relative Block -->
@@ -180,12 +208,28 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="60"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="{Binding ClassPos}" Grid.Column="0" FontSize="24" HorizontalAlignment="Center" Foreground="White"/>
+                        <TextBlock Text="{Binding ClassPos}" Grid.Column="0" FontSize="24" HorizontalAlignment="Center" Foreground="White">
+                            <TextBlock.Effect>
+                                <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
+                            </TextBlock.Effect>
+                        </TextBlock>
                         <Border Grid.Column="1" Background="{Binding ClassBackground}" Padding="2" CornerRadius="3">
-                            <TextBlock Text="{Binding CarNum}" FontSize="24" HorizontalAlignment="Center" FontWeight="Bold"/>
+                            <TextBlock Text="{Binding CarNum}" FontSize="24" HorizontalAlignment="Center" FontWeight="Bold">
+                                <TextBlock.Effect>
+                                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
+                                </TextBlock.Effect>
+                            </TextBlock>
                         </Border>
-                        <TextBlock Text="{Binding Name}" Grid.Column="2" FontSize="24" Foreground="{Binding NameColor}" FontStyle="{Binding FontStyle}" Margin="5,0"/>
-                        <TextBlock Text="{Binding Gap}" Grid.Column="3" FontSize="24" HorizontalAlignment="Right" Foreground="White"/>
+                        <TextBlock Text="{Binding Name}" Grid.Column="2" FontSize="24" Foreground="{Binding NameColor}" FontStyle="{Binding FontStyle}" Margin="5,0">
+                            <TextBlock.Effect>
+                                <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
+                            </TextBlock.Effect>
+                        </TextBlock>
+                        <TextBlock Text="{Binding Gap}" Grid.Column="3" FontSize="24" HorizontalAlignment="Right" Foreground="White">
+                            <TextBlock.Effect>
+                                <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
+                            </TextBlock.Effect>
+                        </TextBlock>
                     </Grid>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
@@ -202,19 +246,23 @@
 
             <!-- Incident Points Counter -->
             <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Center">
-                <TextBlock Text="⚠️" FontSize="18" Margin="0,0,6,0" Foreground="{Binding WarningsVM.IncidentColor}">
+                <TextBlock Text="⚠️" FontSize="36" Margin="0,0,10,0" Foreground="{Binding WarningsVM.IncidentColor}">
                     <TextBlock.Effect>
-                        <DropShadowEffect BlurRadius="0" ShadowDepth="0" Color="Black" Opacity="1"/>
+                        <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
                     </TextBlock.Effect>
                 </TextBlock>
-                <TextBlock Text="{Binding WarningsVM.IncidentDisplay}" FontSize="18" Foreground="{Binding WarningsVM.IncidentColor}"/>
+                <TextBlock Text="{Binding WarningsVM.IncidentDisplay}" FontSize="36" Foreground="{Binding WarningsVM.IncidentColor}">
+                    <TextBlock.Effect>
+                        <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
+                    </TextBlock.Effect>
+                </TextBlock>
             </StackPanel>
 
             <!-- Connection Health -->
             <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
-                <TextBlock Text="📶" FontSize="18" Foreground="{Binding WarningsVM.ConnectionColor}">
+                <TextBlock Text="📶" FontSize="36" Foreground="{Binding WarningsVM.ConnectionColor}">
                     <TextBlock.Effect>
-                        <DropShadowEffect BlurRadius="0" ShadowDepth="0" Color="Black" Opacity="1"/>
+                        <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
                     </TextBlock.Effect>
                 </TextBlock>
             </StackPanel>
