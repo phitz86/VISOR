@@ -244,5 +244,6 @@ namespace VISOR.Views
         public int[] CarClassIDs => _wrapper.GetCarClassIDs();
         public bool[] CarIsAI => _wrapper.GetCarIsAI();
         public int[] CurDriverIncidentCount => _wrapper.GetCurDriverIncidentCount();
+        public int IncidentLimit => _wrapper.GetIncidentLimit();
     }
 }

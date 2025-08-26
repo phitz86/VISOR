@@ -27,6 +27,11 @@ namespace VISOR.Telemetry
         private CancellationTokenSource _cancellationTokenSource;
         private Task _monitoringTask;
         private bool _isConnected = false;
+
+        // YAML retry logic
+        private System.Timers.Timer _yamlRetryTimer;
+        private readonly object _retryLock = new();
+        private bool _isRetryingYaml = false;
         #endregion
 
         #region Public Properties
@@ -49,6 +54,11 @@ namespace VISOR.Telemetry
             _logger = new NullLogger<SVappsLABSDKWrapper>();
             _dataBuilder = new TelemetryDataBuilder(this);
             _sessionParser = new SessionDataParser();
+
+            // Initialize retry timer (but don't start it yet)
+            _yamlRetryTimer = new System.Timers.Timer(1000); // 1 second interval
+            _yamlRetryTimer.Elapsed += OnYamlRetryTimer;
+            _yamlRetryTimer.AutoReset = true;
         }
 
         public async Task<bool> Initialize()
@@ -134,6 +144,11 @@ namespace VISOR.Telemetry
             return _sessionParser.CurDriverIncidentCount;
         }
 
+        public int GetIncidentLimit()
+        {
+            return _sessionParser.IncidentLimit;
+        }
+
         public string GetCachedSessionYaml()
         {
             return _sessionParser.GetCachedSessionYaml();
@@ -152,11 +167,24 @@ namespace VISOR.Telemetry
 
                 if (!_isConnected)
                 {
+                    // Lost connection - stop retrying and clear data
+                    StopYamlRetryTimer();
                     _sessionParser.ClearCache();
+                }
+                else
+                {
+                    // Connected - start trying to get session data
+                    Console.WriteLine("[SVappsLAB] Connected - will attempt to get session data");
                 }
 
                 CheckPrimedStateChange();
             }
+        }
+
+        private void CheckPrimedStateChange()
+        {
+            bool isPrimed = _isConnected && _sessionParser.IsDataReady;
+            PrimedStateChanged?.Invoke(isPrimed);
         }
 
         private void OnSessionInfoUpdate(object sender, object e)
@@ -174,6 +202,9 @@ namespace VISOR.Telemetry
 
                 if (!string.IsNullOrEmpty(sessionInfo))
                 {
+                    // Got valid data - stop any retry timer and parse
+                    StopYamlRetryTimer();
+
                     // Check if this is new data before parsing
                     if (_sessionParser.HasSessionDataChanged(sessionInfo))
                     {
@@ -188,18 +219,21 @@ namespace VISOR.Telemetry
                         }
                         else
                         {
-                            Console.WriteLine("[SVappsLAB] Failed to parse session data");
+                            Console.WriteLine("[SVappsLAB] Failed to parse session data - starting retry timer");
+                            StartYamlRetryTimer();
                         }
                     }
                 }
                 else
                 {
-                    Console.WriteLine("[SVappsLAB] No session data received from GetRawTelemetrySessionInfoYaml()");
+                    Console.WriteLine("[SVappsLAB] No session data received - starting retry timer");
+                    StartYamlRetryTimer();
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[SVappsLAB] Error in OnSessionInfoUpdate: {ex.Message}");
+                StartYamlRetryTimer(); // Retry on any error
             }
         }
 
@@ -223,10 +257,72 @@ namespace VISOR.Telemetry
             }
         }
 
-        private void CheckPrimedStateChange()
+        private void StartYamlRetryTimer()
         {
-            bool isPrimed = _isConnected && _sessionParser.IsDataReady;
-            PrimedStateChanged?.Invoke(isPrimed);
+            lock (_retryLock)
+            {
+                if (!_isRetryingYaml && _isConnected && !_sessionParser.IsDataReady)
+                {
+                    Console.WriteLine("[SVappsLAB] Starting YAML retry timer");
+                    _isRetryingYaml = true;
+                    _yamlRetryTimer.Start();
+                }
+            }
+        }
+
+        private void StopYamlRetryTimer()
+        {
+            lock (_retryLock)
+            {
+                if (_isRetryingYaml)
+                {
+                    Console.WriteLine("[SVappsLAB] Stopping YAML retry timer");
+                    _yamlRetryTimer.Stop();
+                    _isRetryingYaml = false;
+                }
+            }
+        }
+
+        private void OnYamlRetryTimer(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            try
+            {
+                // Don't retry if we already have data or aren't connected
+                if (!_isConnected || _sessionParser.IsDataReady)
+                {
+                    StopYamlRetryTimer();
+                    return;
+                }
+
+                Console.WriteLine("[SVappsLAB] Retrying YAML data retrieval...");
+                string sessionInfo = _client?.GetRawTelemetrySessionInfoYaml();
+
+                if (!string.IsNullOrEmpty(sessionInfo))
+                {
+                    Console.WriteLine($"[SVappsLAB] Retry successful - got session data, length: {sessionInfo.Length}");
+
+                    if (_sessionParser.ParseSessionData(sessionInfo))
+                    {
+                        Console.WriteLine("[SVappsLAB] Retry parse successful");
+                        SessionYamlAvailable?.Invoke(sessionInfo);
+                        SessionDataUpdated?.Invoke();
+                        CheckPrimedStateChange();
+                        StopYamlRetryTimer(); // Success - stop retrying
+                    }
+                    else
+                    {
+                        Console.WriteLine("[SVappsLAB] Retry parse failed - will try again");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("[SVappsLAB] Retry failed - no session data available yet");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[SVappsLAB] Error during YAML retry: {ex.Message}");
+            }
         }
 
         public void Shutdown()
@@ -234,6 +330,10 @@ namespace VISOR.Telemetry
             try
             {
                 Console.WriteLine("[SVappsLAB] Starting shutdown...");
+
+                // Stop retry timer
+                StopYamlRetryTimer();
+                _yamlRetryTimer?.Dispose();
 
                 _cancellationTokenSource?.Cancel();
 

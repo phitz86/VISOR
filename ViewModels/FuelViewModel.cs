@@ -2,6 +2,7 @@
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Diagnostics;
 
 namespace VISOR.ViewModels
 {
@@ -11,7 +12,7 @@ namespace VISOR.ViewModels
         private void OnPropertyChanged([CallerMemberName] string? name = null) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
-        private const int MovingAverageLapCount = 3; // Use a 3-lap moving average for stability
+        private const int MovingAverageLapCount = 3;
         private readonly List<float> _lastLapsFuelUsage = new();
         private readonly Dictionary<int, float> _fuelLevelAtLapEnd = new();
         private int _lastProcessedLap = -1;
@@ -29,62 +30,64 @@ namespace VISOR.ViewModels
                 }
             }
         }
-        /// Updates the fuel calculation using a robust, historical method.
-        /// <param name="fuelLevel">Current fuel in the tank.</param>
-        /// <param name="currentLap">The current lap number ("Laps completed").</param>
+
         public void Update(float fuelLevel, int currentLap)
         {
-            // We only trigger logic when the completed lap number changes.
+            //Debug.WriteLine($"[Fuel Debug] Raw fuelLevel={fuelLevel:F4}, currentLap={currentLap}");
+
             if (currentLap > _lastProcessedLap)
             {
-                // 1. Record the fuel level at the exact moment this lap completed.
                 _fuelLevelAtLapEnd[currentLap] = fuelLevel;
+                //Debug.WriteLine($"[Fuel Debug] Lap {currentLap} completed, fuel recorded: {fuelLevel:F4}");
 
-                // 2. Check if we have the data from the *previous* lap to perform a calculation.
-                //    This implicitly ignores the out-lap.
                 if (_fuelLevelAtLapEnd.TryGetValue(currentLap - 1, out float previousFuelLevel))
                 {
-                    // 3. Calculate the precise fuel used over the lap that just finished.
                     float fuelUsedLastLap = previousFuelLevel - fuelLevel;
+                    //Debug.WriteLine($"[Fuel Debug] Lap {currentLap}: Previous={previousFuelLevel:F4}, Current={fuelLevel:F4}, Used={fuelUsedLastLap:F4}");
 
-                    // 4. Sanity check: Ensure consumption is a realistic positive number.
-                    if (fuelUsedLastLap > 0.1f)
+                    if (fuelUsedLastLap > 0.001f)
                     {
                         _lastLapsFuelUsage.Add(fuelUsedLastLap);
-                        // Keep the moving average list trimmed to the last 3 laps.
+                        //Debug.WriteLine($"[Fuel Debug] Added fuel usage: {fuelUsedLastLap:F4}, Total samples: {_lastLapsFuelUsage.Count}");
+
                         if (_lastLapsFuelUsage.Count > MovingAverageLapCount)
                         {
                             _lastLapsFuelUsage.RemoveAt(0);
                         }
                     }
+                    else
+                    {
+                        //Debug.WriteLine($"[Fuel Debug] Fuel usage too small ({fuelUsedLastLap:F4}), ignoring");
+                    }
                 }
-                // Mark this lap as processed so we don't run the logic again until the next lap.
                 _lastProcessedLap = currentLap;
             }
 
-            // On every telemetry tick, update the display with the latest calculation.
             if (_lastLapsFuelUsage.Any())
             {
                 float averageFuelPerLap = _lastLapsFuelUsage.Average();
-                if (averageFuelPerLap > 0.1f)
+                //Debug.WriteLine($"[Fuel Debug] Average fuel per lap: {averageFuelPerLap:F4}");
+
+                if (averageFuelPerLap > 0.001f)
                 {
-                    // Use the most up-to-date fuelLevel for the most accurate remaining laps.
                     float lapsRemaining = fuelLevel / averageFuelPerLap;
+                    //Debug.WriteLine($"[Fuel Debug] Calculation: {fuelLevel:F4} / {averageFuelPerLap:F4} = {lapsRemaining:F1} laps");
                     FuelDisplay = $"{lapsRemaining:F1} Laps";
                 }
             }
             else
             {
-                // If we don't have enough data yet, show the default text.
                 FuelDisplay = "--- Laps";
             }
         }
+
         public void Reset()
         {
             _lastLapsFuelUsage.Clear();
             _fuelLevelAtLapEnd.Clear();
             _lastProcessedLap = -1;
             FuelDisplay = "--- Laps";
+            Debug.WriteLine("[Fuel Debug] Reset called");
         }
     }
 }

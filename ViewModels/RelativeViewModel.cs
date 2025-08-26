@@ -57,7 +57,7 @@ namespace VISOR.ViewModels
             if (playerCarIdx == -1) return; // Can't do anything if we don't know who the player is.
 
             // Don't run logic until the session YAML has been parsed.
-            if (!sessionDataProvider.IsDataReady) return;
+            if (sessionDataProvider == null || !sessionDataProvider.IsDataReady) return;
 
             // Get updated data arrays with new field names
             var carClassIDs = sessionDataProvider.CarClassIDs;
@@ -96,45 +96,200 @@ namespace VISOR.ViewModels
                         LapDistPct = lapDistPct[i],
                         Name = displayName,
                         CarNum = carNumbers[i],
-                        ClassID = carClassIDs[i], // Updated to use ClassID instead of Class
+                        ClassID = carClassIDs[i],
                         IncidentCount = incidentCounts[i]
                     });
                 }
             }
 
-            // Filter to cars in the same class as the player (using integer comparison)
-            var carsInClass = allValidCars.Where(c => c.ClassID == playerClassID).ToList();
-            if (!carsInClass.Any()) return;
+            if (!allValidCars.Any()) return;
 
-            var sortedClass = carsInClass.OrderByDescending(c => c.CurrentLap + c.LapDistPct).ToList();
-            int playerLivePosition = sortedClass.FindIndex(c => c.IsPlayer) + 1;
-
-            if (playerLivePosition > 0)
+            // Calculate player's live class position using RACE POSITION sorting (for position display)
+            var racePositionSorted = allValidCars.OrderByDescending(c => c.CurrentLap + c.LapDistPct).ToList();
+            var carsInClass = racePositionSorted.Where(c => c.ClassID == playerClassID).ToList();
+            if (carsInClass.Any())
             {
-                LivePlayerClassPosition = $"P{playerLivePosition}";
-                LivePlayerClassPositionNumber = playerLivePosition.ToString();
+                int playerClassPosition = carsInClass.FindIndex(c => c.IsPlayer) + 1;
+                if (playerClassPosition > 0)
+                {
+                    LivePlayerClassPosition = $"P{playerClassPosition}";
+                    LivePlayerClassPositionNumber = playerClassPosition.ToString();
+                }
             }
 
-            var finalRows = BuildRelativeRows(sortedClass, playerCarIdx, playerLastLapTime);
+            // Use proximity-based display with player hard-coded at center
+            var playerRow = allValidCars.FirstOrDefault(r => r.IsPlayer);
+            if (playerRow == null) return;
+
+            var finalRows = BuildProximityBasedRows(allValidCars, playerRow, playerLastLapTime);
+
+            // Apply all the coloring, positioning, and gap logic
+            ApplyDisplayLogic(finalRows, racePositionSorted, playerLastLapTime);
+
             UpdateCollection(finalRows);
         }
 
-        private List<RelativeRowViewModel> BuildRelativeRows(List<RelativeRowViewModel> sortedClass, int playerCarIdx, float playerLastLapTime)
+        /// <summary>
+        /// Simple proximity approach: Player is ALWAYS in position 4, find 3 closest cars in each direction
+        /// </summary>
+        private List<RelativeRowViewModel> BuildProximityBasedRows(List<RelativeRowViewModel> allCars, RelativeRowViewModel playerRow, float playerLastLapTime)
         {
-            var playerRow = sortedClass.FirstOrDefault(r => r.IsPlayer);
-            if (playerRow == null) return new List<RelativeRowViewModel>();
+            float playerTrackPercent = playerRow.LapDistPct;
 
-            int playerIndex = sortedClass.IndexOf(playerRow);
-
-            foreach (var row in sortedClass)
+            // Calculate proximity for all non-player cars
+            var otherCars = allCars.Where(c => !c.IsPlayer).Select(car =>
             {
-                row.ClassPos = $"P{sortedClass.IndexOf(row) + 1}";
+                float carTrackPercent = car.LapDistPct;
 
-                // Calculate gap based on distance delta
-                float distanceDelta = (row.CurrentLap + row.LapDistPct) - (playerRow.CurrentLap + playerRow.LapDistPct);
-                if (playerLastLapTime > 0)
+                // Calculate shortest distance around the track
+                float directDistance = Math.Abs(carTrackPercent - playerTrackPercent);
+                float wrappedDistance = 1.0f - directDistance;
+                float proximity = Math.Min(directDistance, wrappedDistance);
+
+                // Determine if car is "ahead" or "behind" on track
+                float rawDifference = carTrackPercent - playerTrackPercent;
+
+                // Handle wrapping for ahead/behind determination
+                bool isAhead;
+                if (Math.Abs(rawDifference) <= 0.5f)
                 {
-                    row.Gap = (distanceDelta * playerLastLapTime).ToString("F1");
+                    // No wrapping needed
+                    isAhead = rawDifference > 0;
+                }
+                else
+                {
+                    // Wrapping case - flip the logic
+                    isAhead = rawDifference < 0;
+                }
+
+                return new { Car = car, Proximity = proximity, IsAhead = isAhead };
+            }).ToList();
+
+            // Get cars ahead and behind, sorted by proximity
+            var carsAhead = otherCars
+                .Where(x => x.IsAhead)
+                .OrderBy(x => x.Proximity)
+                .Select(x => x.Car)
+                .ToList();
+
+            var carsBehind = otherCars
+                .Where(x => !x.IsAhead)
+                .OrderBy(x => x.Proximity)
+                .Select(x => x.Car)
+                .ToList();
+
+            // Build the final list with proper filling logic
+            var result = new List<RelativeRowViewModel>();
+
+            // Fill 3 slots ahead of player
+            for (int i = 0; i < 3; i++)
+            {
+                if (i < carsAhead.Count)
+                {
+                    // Add closest cars ahead (in reverse order so closest is last)
+                    result.Insert(0, carsAhead[i]);
+                }
+                else if (carsBehind.Count > 3)
+                {
+                    // If we don't have enough cars ahead, wrap around and use cars from behind
+                    // Skip the first 3 cars behind (they'll be used in the behind section)
+                    int wrapIndex = 3 + (i - carsAhead.Count);
+                    if (wrapIndex < carsBehind.Count)
+                    {
+                        result.Insert(0, carsBehind[wrapIndex]);
+                    }
+                }
+            }
+
+            // Add player at center
+            result.Add(playerRow);
+
+            // Fill 3 slots behind player
+            for (int i = 0; i < 3; i++)
+            {
+                if (i < carsBehind.Count)
+                {
+                    result.Add(carsBehind[i]);
+                }
+                else if (carsAhead.Count > 3)
+                {
+                    // If we don't have enough cars behind, wrap around and use cars from ahead
+                    // Skip the first 3 cars ahead (they'll be used in the ahead section)
+                    int wrapIndex = 3 + (i - carsBehind.Count);
+                    if (wrapIndex < carsAhead.Count)
+                    {
+                        result.Add(carsAhead[wrapIndex]);
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        private void ApplyDisplayLogic(List<RelativeRowViewModel> displayRows, List<RelativeRowViewModel> racePositionSorted, float playerLastLapTime)
+        {
+            var playerRow = displayRows.FirstOrDefault(r => r.IsPlayer);
+            if (playerRow == null) return;
+
+            int playerDisplayIndex = displayRows.IndexOf(playerRow);
+            float playerTrackPercent = playerRow.LapDistPct;
+
+            // Ensure player's class always gets the first color (Gold)
+            int playerClassID = playerRow.ClassID;
+            if (playerClassID != 0 && !_classColorMap.ContainsKey(playerClassID))
+            {
+                _classColorMap[playerClassID] = _classColors[0];
+                _nextColorIndex = 1;
+            }
+
+            // Build class position maps using RACE POSITION sorting
+            var classCars = racePositionSorted.GroupBy(c => c.ClassID).ToDictionary(
+                g => g.Key,
+                g => g.OrderByDescending(c => c.CurrentLap + c.LapDistPct).ToList()
+            );
+
+            foreach (var row in displayRows)
+            {
+                // Show class position based on race position
+                if (classCars.TryGetValue(row.ClassID, out var carsInThisClass))
+                {
+                    int classPosition = carsInThisClass.IndexOf(row) + 1;
+                    row.ClassPos = $"P{classPosition}";
+                }
+                else
+                {
+                    row.ClassPos = "P?";
+                }
+
+                // Calculate gap based on TRACK PROXIMITY, with proper sign based on display position
+                if (playerLastLapTime > 0 && !row.IsPlayer)
+                {
+                    float carTrackPercent = row.LapDistPct;
+
+                    // Calculate track proximity distance (same logic as proximity sorting)
+                    float directDistance = Math.Abs(carTrackPercent - playerTrackPercent);
+                    float wrappedDistance = 1.0f - directDistance;
+                    float proximityDistance = Math.Min(directDistance, wrappedDistance);
+
+                    // Convert proximity to time gap
+                    float timeGap = proximityDistance * playerLastLapTime;
+
+                    int rowDisplayIndex = displayRows.IndexOf(row);
+
+                    if (rowDisplayIndex < playerDisplayIndex)
+                    {
+                        // Car is ahead of player in display (rows 1-3) = positive gap
+                        row.Gap = $"+{timeGap:F1}";
+                    }
+                    else if (rowDisplayIndex > playerDisplayIndex)
+                    {
+                        // Car is behind player in display (rows 5-7) = negative gap
+                        row.Gap = $"-{timeGap:F1}";
+                    }
+                    else
+                    {
+                        row.Gap = "0.0";
+                    }
                 }
 
                 // Set name color based on lap differential
@@ -143,7 +298,7 @@ namespace VISOR.ViewModels
                 if (row.CurrentLap < playerRow.CurrentLap) row.NameColor = Brushes.CornflowerBlue;
                 if (row.IsPlayer) row.NameColor = Brushes.Yellow;
 
-                // Assign class background color based on class ID
+                // Assign class background color
                 if (row.ClassID != 0)
                 {
                     if (!_classColorMap.ContainsKey(row.ClassID))
@@ -154,11 +309,6 @@ namespace VISOR.ViewModels
                     row.ClassBackground = _classColorMap[row.ClassID];
                 }
             }
-
-            // Return a 7-car window centered on the player (3 ahead, player, 3 behind)
-            int startIndex = Math.Max(0, playerIndex - 3);
-            int count = Math.Min(sortedClass.Count - startIndex, 7);
-            return sortedClass.GetRange(startIndex, count);
         }
 
         private void UpdateCollection(List<RelativeRowViewModel> newRows)

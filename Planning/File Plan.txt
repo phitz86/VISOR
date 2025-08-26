@@ -1,25 +1,26 @@
 VISOR/
 ├── Views/
 │   ├── MainWindow.xaml
-│   ├── MainWindow.xaml.cs
+│   ├── MainWindow.xaml.cs (with SessionDataWrapper class)
 │   ├── ConfigWindow.xaml
 │   └── ConfigWindow.xaml.cs
 ├── ViewModels/
-│   ├── MainViewModel.cs
-│   ├── FuelViewModel.cs
-│   ├── RelativeViewModel.cs
-│   └── RelativeRowViewModel.cs
+│   ├── MainViewModel.cs (with ISessionDataProvider interface)
+│   ├── FuelViewModel.cs (with Debug.WriteLine for testing)
+│   ├── RelativeViewModel.cs (multi-class, centered positioning)
+│   ├── RelativeRowViewModel.cs (updated with ClassID and IncidentCount)
+│   └── DeltaBarViewModel.cs (with embedded DeltaBarWidthConverter)
 ├── Resources/
 │   ├── Converters/
 │   │   └── BoolToVisibilityConverter.cs
 │   └── Fonts/
 │       └── digital-7.ttf
 ├── Telemetry/
-│   ├── SVappsLABSDKWrapper.cs
+│   ├── SVappsLABSDKWrapper.cs (streamlined with YAML retry logic)
 │   ├── SVappsLABSnapshot.cs
-│   ├── SessionDataParser.cs
-│   └── TelemetryDataBuilder.cs
-│   └── TelemetryFieldRegistry.cs
+│   ├── SessionDataParser.cs (implements ISessionDataProvider)
+│   ├── TelemetryDataBuilder.cs (updated field mappings)
+│   └── TelemetryFieldRegistry.cs (updated with new field names)
 ├── Diagnostics/
 │   └── (diagnostic classes)
 ├── VISOR.csproj

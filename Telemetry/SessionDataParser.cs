@@ -16,6 +16,7 @@ namespace VISOR.Telemetry
         private readonly int[] _cachedCarClassIDs = new int[64];
         private readonly bool[] _cachedCarIsAI = new bool[64];
         private readonly int[] _cachedCurDriverIncidentCount = new int[64];
+        private int _cachedIncidentLimit = 0;
 
         private string _lastSessionDataHash = string.Empty;
         private string _cachedSessionYaml = string.Empty;
@@ -55,6 +56,11 @@ namespace VISOR.Telemetry
             get { lock (_parseLock) { return (int[])_cachedCurDriverIncidentCount.Clone(); } }
         }
 
+        public int IncidentLimit
+        {
+            get { lock (_parseLock) { return _cachedIncidentLimit; } }
+        }
+
         public SessionDataParser()
         {
             InitializeArrays();
@@ -88,7 +94,17 @@ namespace VISOR.Telemetry
                     {
                         var line = lines[i].Trim();
 
-                        if (line.StartsWith("- CarIdx:"))
+                        // Parse IncidentLimit (session-level setting)
+                        if (line.StartsWith("IncidentLimit:"))
+                        {
+                            var parts = line.Split(':', 2);
+                            if (parts.Length >= 2)
+                            {
+                                if (int.TryParse(parts[1].Trim(), out int incidentLimit))
+                                    _cachedIncidentLimit = incidentLimit;
+                            }
+                        }
+                        else if (line.StartsWith("- CarIdx:"))
                         {
                             var parts = line.Split(':');
                             if (parts.Length >= 2 && int.TryParse(parts[1].Trim(), out currentCarIdx))
@@ -157,7 +173,7 @@ namespace VISOR.Telemetry
                     _lastSessionDataHash = currentHash;
                     IsDataReady = true;
 
-                    Console.WriteLine($"[SessionDataParser] Parsed session data: {GetCachedCarCount()} cars found");
+                    Console.WriteLine($"[SessionDataParser] Parsed session data: {GetCachedCarCount()} cars found, IncidentLimit: {_cachedIncidentLimit}");
                     return true;
                 }
             }
@@ -288,6 +304,7 @@ namespace VISOR.Telemetry
                 _cachedCarIsAI[i] = false;
                 _cachedCurDriverIncidentCount[i] = 0;
             }
+            _cachedIncidentLimit = 0;
         }
 
         private void ClearArrays()
@@ -298,6 +315,7 @@ namespace VISOR.Telemetry
             Array.Fill(_cachedCarClassIDs, 0);
             Array.Fill(_cachedCarIsAI, false);
             Array.Fill(_cachedCurDriverIncidentCount, 0);
+            _cachedIncidentLimit = 0;
         }
     }
 }

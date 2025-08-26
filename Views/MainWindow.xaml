@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:converters="clr-namespace:VISOR.Resources.Converters"
+        xmlns:viewModels="clr-namespace:VISOR.ViewModels"
         Title="VISOR"
         WindowStyle="None"
         AllowsTransparency="True"
@@ -12,6 +13,7 @@
 
     <Window.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <viewModels:DeltaBarWidthConverter x:Key="DeltaBarWidthConverter"/>
     </Window.Resources>
 
     <Grid Margin="10">
@@ -40,25 +42,27 @@
 
         <!-- Row 0: Class Position | Gear -->
         <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" 
-                    HorizontalAlignment="Center" VerticalAlignment="Center"
-                    Visibility="{Binding ShowPosition, Converter={StaticResource BoolToVisibilityConverter}}">
+            HorizontalAlignment="Center" VerticalAlignment="Center"
+            Visibility="{Binding ShowPosition, Converter={StaticResource BoolToVisibilityConverter}}">
             <TextBlock Text="P"
-                       FontSize="60" 
-                       Foreground="White"
-                       VerticalAlignment="Bottom" 
-                       Margin="0,0,-5,1"/>
+               FontSize="60" 
+               FontFamily="Segoe UI"
+               FontWeight="Bold"
+               Foreground="White"
+               VerticalAlignment="Center" 
+               Margin="0,0,8,0"/>
             <TextBlock Text="{Binding ClassPositionNumber}"
-                       FontSize="60" 
-                       FontFamily="pack://application:,,,/Resources/Fonts/#Digital-7"
-                       Foreground="White"
-                       VerticalAlignment="Bottom"/>
+               FontSize="72" 
+               FontFamily="pack://application:,,,/Resources/Fonts/#Digital-7"
+               Foreground="White"
+               VerticalAlignment="Center"/>
         </StackPanel>
 
         <StackPanel Grid.Row="0" Grid.Column="1"
                     Orientation="Horizontal"
             Visibility="{Binding ShowGear, Converter={StaticResource BoolToVisibilityConverter}}"
             HorizontalAlignment="Center">
-            <TextBlock Text="⚙" FontSize="36" Foreground="White"
+            <TextBlock Text="⚙" FontSize="56" Foreground="White"
            HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,8,0">
                 <TextBlock.Effect>
                     <DropShadowEffect BlurRadius="0" ShadowDepth="0" Color="Black" Opacity="1"/>
@@ -66,7 +70,7 @@
             </TextBlock>
 
             <TextBlock Text="{Binding GearDisplay}"
-               FontSize="60" FontWeight="Bold"
+               FontSize="80" FontWeight="Bold"
                FontFamily="pack://application:,,,/Resources/Fonts/#Digital-7"
                Foreground="White"
                HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
@@ -85,18 +89,56 @@
             <TextBlock Text="{Binding FuelVM.FuelDisplay}" FontSize="36" Foreground="White"/>
         </StackPanel>
 
-        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding TimeRemainingDisplay}" 
-           FontSize="36" Foreground="White"
-           Visibility="{Binding ShowTimeRemaining, Converter={StaticResource BoolToVisibilityConverter}}"
-           HorizontalAlignment="Center"/>
+        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal"
+                    Visibility="{Binding ShowTimeRemaining, Converter={StaticResource BoolToVisibilityConverter}}"
+                    HorizontalAlignment="Center">
+            <TextBlock Text="{Binding TimeRemainingSymbol}" FontSize="36" Margin="0,0,8,0" Foreground="White">
+                <TextBlock.Effect>
+                    <DropShadowEffect BlurRadius="0" ShadowDepth="0" Color="Black" Opacity="1"/>
+                </TextBlock.Effect>
+            </TextBlock>
 
+            <TextBlock Text="{Binding TimeRemainingDisplay}" FontSize="36" Foreground="White"/>
+        </StackPanel>
 
-        <!-- Row 2: Full-width Lap Delta Bar (Binding will be updated later) -->
-        <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Height="10" Background="Gray"
+        <!-- Row 2: Full-width Lap Delta Bar -->
+        <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Height="12" Background="#333333"
                 Visibility="{Binding ShowLapDelta, Converter={StaticResource BoolToVisibilityConverter}}"
-                Margin="0,10,0,0">
-            <!-- <Rectangle Height="10" Fill="{Binding LapDeltaVM.BarColor}" 
-                       Width="{Binding LapDeltaVM.DeltaValue}" HorizontalAlignment="Left"/> -->
+                Margin="0,10,0,0" CornerRadius="6">
+
+            <Grid Name="DeltaBarContainer">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Left bar (slower - red) -->
+                <Rectangle Grid.Column="0" 
+                           Fill="{Binding DeltaBarVM.LeftBarColor}"
+                           HorizontalAlignment="Right">
+                    <Rectangle.Width>
+                        <MultiBinding Converter="{StaticResource DeltaBarWidthConverter}">
+                            <Binding Path="DeltaBarVM.LeftBarWidth"/>
+                            <Binding Path="ActualWidth" ElementName="DeltaBarContainer"/>
+                        </MultiBinding>
+                    </Rectangle.Width>
+                </Rectangle>
+
+                <!-- Right bar (faster - green) -->
+                <Rectangle Grid.Column="1" 
+                           Fill="{Binding DeltaBarVM.RightBarColor}"
+                           HorizontalAlignment="Left">
+                    <Rectangle.Width>
+                        <MultiBinding Converter="{StaticResource DeltaBarWidthConverter}">
+                            <Binding Path="DeltaBarVM.RightBarWidth"/>
+                            <Binding Path="ActualWidth" ElementName="DeltaBarContainer"/>
+                        </MultiBinding>
+                    </Rectangle.Width>
+                </Rectangle>
+
+                <!-- Center line -->
+                <Rectangle Grid.ColumnSpan="2" Width="2" Fill="White" HorizontalAlignment="Center"/>
+            </Grid>
         </Border>
 
         <!-- Row 3: Last Lap | Best Lap -->
@@ -124,7 +166,6 @@
             <TextBlock Text="{Binding BestLapTime}" FontSize="24" Foreground="White"/>
         </StackPanel>
 
-
         <!-- Row 4: Full-width Relative Block -->
         <ItemsControl Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2"
                       ItemsSource="{Binding RelativeVM.RelativeRows}"
@@ -150,28 +191,34 @@
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <!-- Row 5: Latency | FPS Warning (Bindings will be updated later) -->
-        <StackPanel Grid.Row="5" Grid.Column="0" Orientation="Horizontal"
-            Visibility="{Binding ShowWarnings, Converter={StaticResource BoolToVisibilityConverter}}"
-            HorizontalAlignment="Center">
-            <TextBlock Text="📶" FontSize="18" Margin="0,0,6,0">
-                <!-- Foreground="{Binding WarningsVM.LatencyBrush}" -->
-                <TextBlock.Effect>
-                    <DropShadowEffect BlurRadius="0" ShadowDepth="0" Color="Black" Opacity="1"/>
-                </TextBlock.Effect>
-            </TextBlock>
-        </StackPanel>
+        <!-- Row 5: Incident Points | Connection Health -->
+        <Grid Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2"
+              Visibility="{Binding ShowWarnings, Converter={StaticResource BoolToVisibilityConverter}}"
+              Margin="0,5,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
-        <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal"
-            Visibility="{Binding ShowWarnings, Converter={StaticResource BoolToVisibilityConverter}}"
-            HorizontalAlignment="Center">
-            <TextBlock Text="🖥️" FontSize="18" Margin="0,0,6,0">
-                <!-- Foreground="{Binding WarningsVM.FpsBrush}" -->
-                <TextBlock.Effect>
-                    <DropShadowEffect BlurRadius="0" ShadowDepth="0" Color="Black" Opacity="1"/>
-                </TextBlock.Effect>
-            </TextBlock>
-        </StackPanel>
+            <!-- Incident Points Counter -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Center">
+                <TextBlock Text="⚠️" FontSize="18" Margin="0,0,6,0" Foreground="{Binding WarningsVM.IncidentColor}">
+                    <TextBlock.Effect>
+                        <DropShadowEffect BlurRadius="0" ShadowDepth="0" Color="Black" Opacity="1"/>
+                    </TextBlock.Effect>
+                </TextBlock>
+                <TextBlock Text="{Binding WarningsVM.IncidentDisplay}" FontSize="18" Foreground="{Binding WarningsVM.IncidentColor}"/>
+            </StackPanel>
+
+            <!-- Connection Health -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
+                <TextBlock Text="📶" FontSize="18" Foreground="{Binding WarningsVM.ConnectionColor}">
+                    <TextBlock.Effect>
+                        <DropShadowEffect BlurRadius="0" ShadowDepth="0" Color="Black" Opacity="1"/>
+                    </TextBlock.Effect>
+                </TextBlock>
+            </StackPanel>
+        </Grid>
 
         <!-- Row 6: Status Text Overlay at the Bottom -->
         <TextBlock x:Name="StatusText" Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" Text="Status..." Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,10,0,10" Visibility="Collapsed"/>
