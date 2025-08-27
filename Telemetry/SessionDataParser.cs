@@ -18,6 +18,12 @@ namespace VISOR.Telemetry
         private readonly int[] _cachedCurDriverIncidentCount = new int[64];
         private int _cachedIncidentLimit = 0;
 
+        // NEW: Session-specific data
+        private string _cachedSessionType = string.Empty;
+        private string _cachedSessionName = string.Empty;
+        private readonly int[] _cachedQualifyPositions = new int[64]; // Position by CarIdx
+        private readonly float[] _cachedQualifyFastestTimes = new float[64]; // Fastest time by CarIdx
+
         private string _lastSessionDataHash = string.Empty;
         private string _cachedSessionYaml = string.Empty;
         private readonly object _parseLock = new();
@@ -61,6 +67,27 @@ namespace VISOR.Telemetry
             get { lock (_parseLock) { return _cachedIncidentLimit; } }
         }
 
+        // NEW: Session data accessors
+        public string SessionType
+        {
+            get { lock (_parseLock) { return _cachedSessionType; } }
+        }
+
+        public string SessionName
+        {
+            get { lock (_parseLock) { return _cachedSessionName; } }
+        }
+
+        public int[] QualifyResultsPositions
+        {
+            get { lock (_parseLock) { return (int[])_cachedQualifyPositions.Clone(); } }
+        }
+
+        public float[] QualifyResultsFastestTimes
+        {
+            get { lock (_parseLock) { return (float[])_cachedQualifyFastestTimes.Clone(); } }
+        }
+
         public SessionDataParser()
         {
             InitializeArrays();
@@ -89,6 +116,9 @@ namespace VISOR.Telemetry
                     // Parse the YAML
                     var lines = sessionData.Split('\n');
                     int currentCarIdx = -1;
+                    bool inSessionInfo = false;
+                    bool inQualifyResults = false;
+                    int currentQualifyCarIdx = -1;
 
                     for (int i = 0; i < lines.Length; i++)
                     {
@@ -104,6 +134,73 @@ namespace VISOR.Telemetry
                                     _cachedIncidentLimit = incidentLimit;
                             }
                         }
+                        // NEW: Parse session info section
+                        else if (line.StartsWith("SessionInfo:"))
+                        {
+                            inSessionInfo = true;
+                            Console.WriteLine("[SessionParser DEBUG] Found SessionInfo section");
+                        }
+                        else if (inSessionInfo && line.StartsWith("- SessionNum:"))
+                        {
+                            // We're in the active session data
+                            Console.WriteLine("[SessionParser DEBUG] Found active session data");
+                        }
+                        else if (inSessionInfo && line.StartsWith("SessionType:"))
+                        {
+                            var parts = line.Split(':', 2);
+                            if (parts.Length >= 2)
+                            {
+                                _cachedSessionType = parts[1].Trim();
+                                Console.WriteLine($"[SessionParser DEBUG] SessionType: {_cachedSessionType}");
+                            }
+                        }
+                        else if (inSessionInfo && line.StartsWith("SessionName:"))
+                        {
+                            var parts = line.Split(':', 2);
+                            if (parts.Length >= 2)
+                            {
+                                _cachedSessionName = parts[1].Trim();
+                                Console.WriteLine($"[SessionParser DEBUG] SessionName: {_cachedSessionName}");
+                            }
+                        }
+                        // NEW: Parse qualifying results section
+                        else if (line.StartsWith("QualifyResultsInfo:"))
+                        {
+                            inQualifyResults = true;
+                            Console.WriteLine("[SessionParser DEBUG] Found QualifyResultsInfo section");
+                        }
+                        else if (inQualifyResults && line.StartsWith("- Position:"))
+                        {
+                            // Start of a new qualify result entry
+                            currentQualifyCarIdx = -1;
+                        }
+                        else if (inQualifyResults && line.StartsWith("CarIdx:"))
+                        {
+                            var parts = line.Split(':', 2);
+                            if (parts.Length >= 2 && int.TryParse(parts[1].Trim(), out currentQualifyCarIdx))
+                            {
+                                Console.WriteLine($"[SessionParser DEBUG] QualifyResults CarIdx: {currentQualifyCarIdx}");
+                            }
+                        }
+                        else if (inQualifyResults && line.StartsWith("Position:") && currentQualifyCarIdx >= 0 && currentQualifyCarIdx < 64)
+                        {
+                            var parts = line.Split(':', 2);
+                            if (parts.Length >= 2 && int.TryParse(parts[1].Trim(), out int position))
+                            {
+                                _cachedQualifyPositions[currentQualifyCarIdx] = position;
+                                Console.WriteLine($"[SessionParser DEBUG] Car {currentQualifyCarIdx} qualify position: {position}");
+                            }
+                        }
+                        else if (inQualifyResults && line.StartsWith("FastestTime:") && currentQualifyCarIdx >= 0 && currentQualifyCarIdx < 64)
+                        {
+                            var parts = line.Split(':', 2);
+                            if (parts.Length >= 2 && float.TryParse(parts[1].Trim(), out float fastestTime))
+                            {
+                                _cachedQualifyFastestTimes[currentQualifyCarIdx] = fastestTime;
+                                Console.WriteLine($"[SessionParser DEBUG] Car {currentQualifyCarIdx} fastest time: {fastestTime}");
+                            }
+                        }
+                        // Driver info parsing (existing logic)
                         else if (line.StartsWith("- CarIdx:"))
                         {
                             var parts = line.Split(':');
@@ -173,7 +270,20 @@ namespace VISOR.Telemetry
                     _lastSessionDataHash = currentHash;
                     IsDataReady = true;
 
-                    Console.WriteLine($"[SessionDataParser] Parsed session data: {GetCachedCarCount()} cars found, IncidentLimit: {_cachedIncidentLimit}");
+                    // NEW: Debug session summary
+                    int humanDrivers = _cachedCarIsAI.Count(ai => !ai);
+                    int aiDrivers = _cachedCarIsAI.Count(ai => ai);
+                    int validQualifyEntries = _cachedQualifyFastestTimes.Count(t => t > 0);
+
+                    Console.WriteLine($"[SessionParser DEBUG] === SESSION SUMMARY ===");
+                    Console.WriteLine($"[SessionParser DEBUG] Session: {_cachedSessionType} ({_cachedSessionName})");
+                    Console.WriteLine($"[SessionParser DEBUG] Total cars: {GetCachedCarCount()}");
+                    Console.WriteLine($"[SessionParser DEBUG] Human drivers: {humanDrivers}");
+                    Console.WriteLine($"[SessionParser DEBUG] AI drivers: {aiDrivers}");
+                    Console.WriteLine($"[SessionParser DEBUG] Qualify entries with times: {validQualifyEntries}");
+                    Console.WriteLine($"[SessionParser DEBUG] Incident limit: {_cachedIncidentLimit}");
+                    Console.WriteLine($"[SessionParser DEBUG] ========================");
+
                     return true;
                 }
             }
@@ -303,8 +413,12 @@ namespace VISOR.Telemetry
                 _cachedCarClassIDs[i] = 0;
                 _cachedCarIsAI[i] = false;
                 _cachedCurDriverIncidentCount[i] = 0;
+                _cachedQualifyPositions[i] = 0;
+                _cachedQualifyFastestTimes[i] = 0f;
             }
             _cachedIncidentLimit = 0;
+            _cachedSessionType = string.Empty;
+            _cachedSessionName = string.Empty;
         }
 
         private void ClearArrays()
@@ -315,7 +429,11 @@ namespace VISOR.Telemetry
             Array.Fill(_cachedCarClassIDs, 0);
             Array.Fill(_cachedCarIsAI, false);
             Array.Fill(_cachedCurDriverIncidentCount, 0);
+            Array.Fill(_cachedQualifyPositions, 0);
+            Array.Fill(_cachedQualifyFastestTimes, 0f);
             _cachedIncidentLimit = 0;
+            _cachedSessionType = string.Empty;
+            _cachedSessionName = string.Empty;
         }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
@@ -22,6 +23,21 @@ namespace VISOR.ViewModels
         // --- Session Transition Tracking ---
         private int _lastSessionNum = -1;
         private string _lastSessionType = string.Empty;
+
+        // --- SessionState Debug Tracking ---
+        private int _lastSessionState = -999; // Use invalid initial value to catch first state
+        private DateTime _lastSessionStateChange = DateTime.MinValue;
+        private readonly Dictionary<int, string> _sessionStateNames = new Dictionary<int, string>
+        {
+            { 0, "Invalid" },
+            { 1, "GetInCar" },
+            { 2, "Warmup" },
+            { 3, "ParadeLaps" },
+            { 4, "Racing" },
+            { 5, "Checkered" },
+            { 6, "CoolDown" }
+            // Add more as we discover them
+        };
 
         // --- State Properties ---
         private bool _isTelemetryConnected = false;
@@ -89,6 +105,9 @@ namespace VISOR.ViewModels
         // Updated to accept either SessionDataParser or SessionDataWrapper
         public void UpdateFromTelemetry(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
+            // NEW: Debug session state transitions
+            DebugSessionState(snapshot);
+
             // Check for session transitions and reset session-specific data
             CheckForSessionTransition(snapshot);
 
@@ -191,8 +210,14 @@ namespace VISOR.ViewModels
                 {
                     TimeRemainingDisplay = $"{remaining.Seconds:D2}s";
                 }
+                else if (remaining.TotalHours >= 1.0)
+                {
+                    // Sessions over 1 hour - show h:mm:ss format
+                    TimeRemainingDisplay = $"{(int)remaining.TotalHours}:{remaining.Minutes:D2}:{remaining.Seconds:D2}";
+                }
                 else
                 {
+                    // Sessions under 1 hour - show mm:ss format
                     TimeRemainingDisplay = $"{(int)remaining.TotalMinutes}:{remaining.Seconds:D2}";
                 }
             }
@@ -202,6 +227,104 @@ namespace VISOR.ViewModels
                 // TimeRemainingSymbol stays as previous (don't change during transitions)
                 TimeRemainingDisplay = "--:--";
             }
+        }
+
+        /// <summary>
+        /// Debug SessionState transitions to understand when UI should be cleared
+        /// </summary>
+        private void DebugSessionState(SVappsLABSnapshot snapshot)
+        {
+            int currentSessionState = snapshot.GetValue<int>("SessionState", -1);
+            int currentSessionNum = snapshot.GetValue<int>("SessionNum", -1);
+            int playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx", -1);
+            float speed = snapshot.GetValue<float>("Speed", 0f);
+            double sessionTime = snapshot.GetValue<double>("SessionTime", 0.0);
+
+            // Log state changes with context
+            if (currentSessionState != _lastSessionState)
+            {
+                DateTime now = DateTime.Now;
+                double timeSinceLastChange = _lastSessionStateChange != DateTime.MinValue
+                    ? (now - _lastSessionStateChange).TotalSeconds
+                    : 0.0;
+
+                string currentStateName = _sessionStateNames.TryGetValue(currentSessionState, out string name)
+                    ? name
+                    : $"Unknown({currentSessionState})";
+
+                string lastStateName = _sessionStateNames.TryGetValue(_lastSessionState, out string lastState)
+                    ? lastState
+                    : $"Unknown({_lastSessionState})";
+
+                Console.WriteLine($"[SessionState DEBUG] ===== STATE CHANGE =====");
+                Console.WriteLine($"[SessionState DEBUG] Time: {now:HH:mm:ss.fff}");
+                Console.WriteLine($"[SessionState DEBUG] Transition: {lastStateName} -> {currentStateName}");
+                Console.WriteLine($"[SessionState DEBUG] Raw values: {_lastSessionState} -> {currentSessionState}");
+                Console.WriteLine($"[SessionState DEBUG] Time since last change: {timeSinceLastChange:F1}s");
+                Console.WriteLine($"[SessionState DEBUG] Context:");
+                Console.WriteLine($"[SessionState DEBUG]   SessionNum: {currentSessionNum}");
+                Console.WriteLine($"[SessionState DEBUG]   PlayerCarIdx: {playerCarIdx}");
+                Console.WriteLine($"[SessionState DEBUG]   Speed: {speed:F1}");
+                Console.WriteLine($"[SessionState DEBUG]   SessionTime: {sessionTime:F1}");
+                Console.WriteLine($"[SessionState DEBUG] ============================");
+
+                // Update tracking
+                _lastSessionState = currentSessionState;
+                _lastSessionStateChange = now;
+
+                // This is where we'd add the UI clearing logic once we understand the patterns
+                // For now, just log what we would do
+                if (ShouldClearUIOnStateChange(_lastSessionState, currentSessionState))
+                {
+                    Console.WriteLine($"[SessionState DEBUG] WOULD CLEAR UI: Transition from {lastStateName} to {currentStateName}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Placeholder logic for when to clear UI - will be refined based on logged data
+        /// </summary>
+        private bool ShouldClearUIOnStateChange(int fromState, int toState)
+        {
+            // Initial guesses - will refine based on actual data
+            // Clear when going from active driving states to inactive states
+
+            // From Racing/Warmup to GetInCar/Invalid might indicate session exit
+            if ((fromState == 4 || fromState == 2) && (toState == 1 || toState == 0))
+                return true;
+
+            // From any active state to Checkered/CoolDown might indicate session end
+            if ((fromState == 2 || fromState == 3 || fromState == 4) && (toState == 5 || toState == 6))
+                return true;
+
+            return false;
+        }
+
+        /// <summary>
+        /// Clear session-specific UI elements without affecting connection state
+        /// </summary>
+        private void ClearSessionUI()
+        {
+            // Clear lap times
+            LastLapTime = "-:--.---";
+            BestLapTime = "-:--.---";
+
+            // Clear fuel display
+            FuelVM.Reset();
+
+            // Clear delta bar
+            DeltaBarVM.Reset();
+
+            // Clear relative display
+            RelativeVM.Reset();
+
+            // Reset gear to neutral
+            GearDisplay = "N";
+
+            // Keep time remaining display as it's session info, not driving-specific
+            // Keep incident warnings as they persist across in-car/out-of-car states
+
+            Console.WriteLine("[MainViewModel] Session UI cleared");
         }
 
         /// <summary>
@@ -259,6 +382,10 @@ namespace VISOR.ViewModels
             TimeRemainingDisplay = "--:--";
             TimeRemainingSymbol = "⏳";
             IsTelemetryConnected = false;
+
+            // Reset debug tracking
+            _lastSessionState = -999;
+            _lastSessionStateChange = DateTime.MinValue;
         }
 
         private string FormatLapTime(float timeInSeconds)

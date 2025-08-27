@@ -12,6 +12,11 @@ namespace VISOR.Telemetry
     {
         private readonly SVappsLABSDKWrapper _wrapper;
 
+        // Static fields for tracking state changes
+        private static int _lastSessionState = -1;
+        private static int _lastSessionFlags = -1;
+        private static string _lastSessionInfo = "";
+
         public TelemetryDataBuilder(SVappsLABSDKWrapper wrapper)
         {
             _wrapper = wrapper ?? throw new ArgumentNullException(nameof(wrapper));
@@ -73,16 +78,31 @@ namespace VISOR.Telemetry
             dict["CarIdxTrackSurface"] = data.CarIdxTrackSurface;
             dict["CarIdxLap"] = data.CarIdxLap;
             dict["CarIdxLastLapTime"] = data.CarIdxLastLapTime;
+
+            // CarIdxOnPitRoad might not be available in current TelemetryData struct
+            // Will be available when we update the RequiredTelemetryVars attribute
         }
 
         private void AddSessionData(Dictionary<string, object> dict, TelemetryData data)
         {
-            dict["SessionState"] = data.SessionState;
+            // SessionState is an enum, need to cast to int for dictionary storage
+            dict["SessionState"] = (int)data.SessionState;
             dict["SessionTime"] = data.SessionTime;
             dict["SessionTimeRemain"] = data.SessionTimeRemain;
             dict["SessionLapsRemain"] = data.SessionLapsRemain;
             dict["SessionLapsTotal"] = data.SessionLapsTotal;
             dict["SessionNum"] = data.SessionNum;
+
+            // SessionFlags might not be available in current TelemetryData struct
+            // Will need to add to RequiredTelemetryVars to get it
+
+            // DEBUG: Log session state changes
+            int currentSessionState = (int)data.SessionState;
+            if (currentSessionState != _lastSessionState)
+            {
+                Console.WriteLine($"[DataBuilder DEBUG] SessionState changed: {_lastSessionState} -> {currentSessionState}");
+                _lastSessionState = currentSessionState;
+            }
         }
 
         private void AddPlayerData(Dictionary<string, object> dict, TelemetryData data)
@@ -99,6 +119,35 @@ namespace VISOR.Telemetry
             dict["CarIdxClassID"] = _wrapper.GetCarClassIDs();
             dict["CarIdxIsAI"] = _wrapper.GetCarIsAI();
             dict["CarIdxIncidentCount"] = _wrapper.GetCurDriverIncidentCount();
+
+            // NEW: Add session-specific YAML data
+            dict["SessionType"] = _wrapper.GetSessionType();
+            dict["SessionName"] = _wrapper.GetSessionName();
+            dict["QualifyResultsPositions"] = _wrapper.GetQualifyResultsPositions();
+            dict["QualifyResultsFastestTimes"] = _wrapper.GetQualifyResultsFastestTimes();
+
+            // DEBUG: Log session info when it's available
+            var sessionType = _wrapper.GetSessionType();
+            var sessionName = _wrapper.GetSessionName();
+            if (!string.IsNullOrEmpty(sessionType))
+            {
+                string currentSessionInfo = $"{sessionType}({sessionName})";
+                if (currentSessionInfo != _lastSessionInfo)
+                {
+                    Console.WriteLine($"[DataBuilder DEBUG] Session Info: {currentSessionInfo}");
+
+                    // Count human vs AI drivers for debug
+                    var carIsAI = _wrapper.GetCarIsAI();
+                    int humanCount = 0, aiCount = 0;
+                    foreach (var isAI in carIsAI)
+                    {
+                        if (isAI) aiCount++; else humanCount++;
+                    }
+                    Console.WriteLine($"[DataBuilder DEBUG] Driver counts - Human: {humanCount}, AI: {aiCount}");
+
+                    _lastSessionInfo = currentSessionInfo;
+                }
+            }
         }
 
         /// <summary>

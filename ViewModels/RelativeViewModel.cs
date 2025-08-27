@@ -50,6 +50,9 @@ namespace VISOR.ViewModels
         };
         private int _nextColorIndex = 0;
 
+        // Track which cars we've seen before to manage smoothing
+        private readonly Dictionary<int, RelativeRowViewModel> _carCache = new();
+
         public void Update(SVappsLABSnapshot snapshot, VISOR.ViewModels.ISessionDataProvider sessionDataProvider)
         {
             // --- DATA READINESS CHECKS ---
@@ -88,21 +91,52 @@ namespace VISOR.ViewModels
                     // Format driver name with AI indicator if needed
                     string displayName = carIsAI[i] ? $"🤖 {userNames[i]}" : userNames[i];
 
-                    allValidCars.Add(new RelativeRowViewModel
+                    RelativeRowViewModel row;
+
+                    // Check if we've seen this car before and reuse its smoothing state
+                    if (_carCache.ContainsKey(i))
                     {
-                        CarIdx = i,
-                        IsPlayer = (i == playerCarIdx),
-                        CurrentLap = currentLap[i],
-                        LapDistPct = lapDistPct[i],
-                        Name = displayName,
-                        CarNum = carNumbers[i],
-                        ClassID = carClassIDs[i],
-                        IncidentCount = incidentCounts[i]
-                    });
+                        row = _carCache[i];
+                        // Update the row with new data
+                        row.CarIdx = i;
+                        row.IsPlayer = (i == playerCarIdx);
+                        row.CurrentLap = currentLap[i];
+                        row.LapDistPct = lapDistPct[i];
+                        row.Name = displayName;
+                        row.CarNum = carNumbers[i];
+                        row.ClassID = carClassIDs[i];
+                        row.IncidentCount = incidentCounts[i];
+                    }
+                    else
+                    {
+                        // New car - create fresh row
+                        row = new RelativeRowViewModel
+                        {
+                            CarIdx = i,
+                            IsPlayer = (i == playerCarIdx),
+                            CurrentLap = currentLap[i],
+                            LapDistPct = lapDistPct[i],
+                            Name = displayName,
+                            CarNum = carNumbers[i],
+                            ClassID = carClassIDs[i],
+                            IncidentCount = incidentCounts[i]
+                        };
+                        _carCache[i] = row;
+                    }
+
+                    allValidCars.Add(row);
                 }
             }
 
             if (!allValidCars.Any()) return;
+
+            // Clean up cache for cars that are no longer valid
+            var validCarIndices = allValidCars.Select(c => c.CarIdx).ToHashSet();
+            var cacheKeysToRemove = _carCache.Keys.Where(k => !validCarIndices.Contains(k)).ToList();
+            foreach (var key in cacheKeysToRemove)
+            {
+                _carCache.Remove(key);
+            }
 
             // Calculate player's live class position using RACE POSITION sorting (for position display)
             var racePositionSorted = allValidCars.OrderByDescending(c => c.CurrentLap + c.LapDistPct).ToList();
@@ -123,7 +157,7 @@ namespace VISOR.ViewModels
 
             var finalRows = BuildProximityBasedRows(allValidCars, playerRow, playerLastLapTime);
 
-            // Apply all the coloring, positioning, and gap logic
+            // Apply all the coloring, positioning, and gap logic (now with smoothing)
             ApplyDisplayLogic(finalRows, racePositionSorted, playerLastLapTime);
 
             UpdateCollection(finalRows);
@@ -261,7 +295,7 @@ namespace VISOR.ViewModels
                     row.ClassPos = "P?";
                 }
 
-                // Calculate gap based on TRACK PROXIMITY, with proper sign based on display position
+                // Calculate gap based on TRACK PROXIMITY, with proper sign based on display position and SMOOTHING
                 if (playerLastLapTime > 0 && !row.IsPlayer)
                 {
                     float carTrackPercent = row.LapDistPct;
@@ -272,19 +306,23 @@ namespace VISOR.ViewModels
                     float proximityDistance = Math.Min(directDistance, wrappedDistance);
 
                     // Convert proximity to time gap
-                    float timeGap = proximityDistance * playerLastLapTime;
+                    float rawTimeGap = proximityDistance * playerLastLapTime;
+
+                    // Apply smoothing - this is the key change
+                    row.UpdateSmoothedGap(rawTimeGap);
+                    float smoothedTimeGap = row.SmoothedGap;
 
                     int rowDisplayIndex = displayRows.IndexOf(row);
 
                     if (rowDisplayIndex < playerDisplayIndex)
                     {
                         // Car is ahead of player in display (rows 1-3) = positive gap
-                        row.Gap = $"+{timeGap:F1}";
+                        row.Gap = $"+{smoothedTimeGap:F1}";
                     }
                     else if (rowDisplayIndex > playerDisplayIndex)
                     {
                         // Car is behind player in display (rows 5-7) = negative gap
-                        row.Gap = $"-{timeGap:F1}";
+                        row.Gap = $"-{smoothedTimeGap:F1}";
                     }
                     else
                     {
@@ -351,6 +389,13 @@ namespace VISOR.ViewModels
             _nextColorIndex = 0;
             LivePlayerClassPosition = "P--";
             LivePlayerClassPositionNumber = "--";
+
+            // Clear the car cache and reset all smoothing
+            foreach (var row in _carCache.Values)
+            {
+                row.ResetSmoothing();
+            }
+            _carCache.Clear();
         }
     }
 }

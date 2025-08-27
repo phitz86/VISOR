@@ -20,11 +20,11 @@ namespace VISOR.Telemetry
             
             // Positioning arrays
             "CarIdxLapDistPct", "CarIdxPosition", "CarIdxClassPosition", "CarIdxTrackSurface",
-            "CarIdxLap", "CarIdxLastLapTime",
+            "CarIdxLap", "CarIdxLastLapTime", "CarIdxOnPitRoad",
             
-            // Session info
+            // Session info - EXPANDED
             "SessionState", "SessionTime", "SessionTimeRemain", "SessionLapsRemain",
-            "SessionLapsTotal", "SessionNum", "PlayerCarIdx",
+            "SessionLapsTotal", "SessionNum", "PlayerCarIdx", "SessionFlags",
             
             // Environmental
             "TrackTemp", "AirTemp", "Skies", "WindVel"
@@ -34,7 +34,10 @@ namespace VISOR.Telemetry
         public static readonly HashSet<string> YamlOnlyFields = new()
         {
             "CarIdxUserName", "CarIdxCarNumber", "CarIdxCarNumberRaw",
-            "CarIdxClassID", "CarIdxIsAI", "CarIdxIncidentCount"
+            "CarIdxClassID", "CarIdxIsAI", "CarIdxIncidentCount",
+            
+            // Session-specific YAML fields - NEW
+            "SessionType", "SessionName", "QualifyResultsPositions", "QualifyResultsFastestTimes"
         };
 
         // Field type mappings for all supported telemetry fields
@@ -63,8 +66,9 @@ namespace VISOR.Telemetry
             ["CarIdxTrackSurface"] = typeof(int[]),
             ["CarIdxLap"] = typeof(int[]),
             ["CarIdxLastLapTime"] = typeof(float[]),
+            ["CarIdxOnPitRoad"] = typeof(bool[]),
 
-            // Session info
+            // Session info - EXPANDED
             ["SessionState"] = typeof(int),
             ["SessionTime"] = typeof(double),
             ["SessionTimeRemain"] = typeof(double),
@@ -72,6 +76,7 @@ namespace VISOR.Telemetry
             ["SessionLapsTotal"] = typeof(int),
             ["SessionNum"] = typeof(int),
             ["PlayerCarIdx"] = typeof(int),
+            ["SessionFlags"] = typeof(int), // NEW - session flags enum
 
             // Environmental
             ["TrackTemp"] = typeof(float),
@@ -85,7 +90,13 @@ namespace VISOR.Telemetry
             ["CarIdxCarNumberRaw"] = typeof(int[]),
             ["CarIdxClassID"] = typeof(int[]),
             ["CarIdxIsAI"] = typeof(bool[]),
-            ["CarIdxIncidentCount"] = typeof(int[])
+            ["CarIdxIncidentCount"] = typeof(int[]),
+
+            // Session-specific YAML fields - NEW
+            ["SessionType"] = typeof(string), // "Race", "Practice", "Qualifying"
+            ["SessionName"] = typeof(string), // "RACE", "PRACTICE", "QUALIFY"
+            ["QualifyResultsPositions"] = typeof(int[]), // Position by CarIdx
+            ["QualifyResultsFastestTimes"] = typeof(float[]) // Fastest time by CarIdx
         };
 
         #endregion
@@ -174,19 +185,21 @@ namespace VISOR.Telemetry
             return new HashSet<string>
             {
                 "CarIdxLapDistPct", "CarIdxPosition", "CarIdxClassPosition",
-                "CarIdxTrackSurface", "CarIdxLap", "CarIdxLastLapTime",
+                "CarIdxTrackSurface", "CarIdxLap", "CarIdxLastLapTime", "CarIdxOnPitRoad",
                 "CarIdxUserName", "CarIdxCarNumber", "CarIdxCarNumberRaw",
                 "CarIdxClassID", "CarIdxIsAI", "CarIdxIncidentCount"
             };
         }
 
-        // Get fields related to session information
+        // Get fields related to session information - EXPANDED
         public static HashSet<string> GetSessionFields()
         {
             return new HashSet<string>
             {
                 "SessionState", "SessionTime", "SessionTimeRemain",
-                "SessionLapsRemain", "SessionLapsTotal", "SessionNum", "PlayerCarIdx"
+                "SessionLapsRemain", "SessionLapsTotal", "SessionNum", "PlayerCarIdx",
+                "SessionFlags", "SessionType", "SessionName",
+                "QualifyResultsPositions", "QualifyResultsFastestTimes"
             };
         }
 

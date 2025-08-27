@@ -1,28 +1,26 @@
 VISOR/
 ├── Views/
-│   ├── MainWindow.xaml
-│   ├── MainWindow.xaml.cs (with SessionDataWrapper class)
-│   ├── ConfigWindow.xaml
-│   └── ConfigWindow.xaml.cs
+│   ├── MainWindow.xaml (750x580, proximity relative, session timer, warnings)
+│   └── MainWindow.xaml.cs (with SessionDataWrapper + IncidentLimit)
 ├── ViewModels/
-│   ├── MainViewModel.cs (with ISessionDataProvider interface)
-│   ├── FuelViewModel.cs (with Debug.WriteLine for testing)
-│   ├── RelativeViewModel.cs (multi-class, centered positioning)
-│   ├── RelativeRowViewModel.cs (updated with ClassID and IncidentCount)
-│   └── DeltaBarViewModel.cs (with embedded DeltaBarWidthConverter)
+│   ├── MainViewModel.cs (session transitions, dual timer logic, reset handling)
+│   ├── FuelViewModel.cs (3-lap moving average, debug logging)
+│   ├── RelativeViewModel.cs (proximity-based sorting, track wrapping, 7-car window)
+│   ├── RelativeRowViewModel.cs (ClassID, IncidentCount, multi-class support)
+│   ├── DeltaBarViewModel.cs (center-out design, embedded DeltaBarWidthConverter)
+│   └── WarningsViewModel.cs (dual incident flashing, connection health persistence)
 ├── Resources/
 │   ├── Converters/
-│   │   └── BoolToVisibilityConverter.cs
+│   │   └── BoolToVisibilityConverter.cs (visibility toggle support)
 │   └── Fonts/
-│       └── digital-7.ttf
+│       └── digital-7.ttf (position and gear displays)
 ├── Telemetry/
-│   ├── SVappsLABSDKWrapper.cs (streamlined with YAML retry logic)
-│   ├── SVappsLABSnapshot.cs
-│   ├── SessionDataParser.cs (implements ISessionDataProvider)
-│   ├── TelemetryDataBuilder.cs (updated field mappings)
-│   └── TelemetryFieldRegistry.cs (updated with new field names)
-├── Diagnostics/
-│   └── (diagnostic classes)
-├── VISOR.csproj
+│   ├── SVappsLABSDKWrapper.cs (YAML retry logic, GetIncidentLimit method)
+│   ├── SVappsLABSnapshot.cs (telemetry data container)
+│   ├── SessionDataParser.cs (IncidentLimit parsing, thread-safe caching)
+│   ├── TelemetryDataBuilder.cs (YAML integration, field mapping)
+│   └── TelemetryFieldRegistry.cs (field definitions and validation)
+├── Visor Logo.ico (application icon for taskbar/explorer)
+├── VISOR.csproj (ApplicationIcon property, dependencies)
 ├── App.xaml
 └── App.xaml.cs

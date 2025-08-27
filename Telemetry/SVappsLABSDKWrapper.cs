@@ -12,9 +12,9 @@ namespace VISOR.Telemetry
         "LapDeltaToOptimalLap", "LapDeltaToSessionBestLap", "Lap",
         "FuelLevel", "FuelUsePerHour", "Gear", "Speed", "RPM",
         "CarIdxLapDistPct", "CarIdxPosition", "CarIdxClassPosition", "CarIdxTrackSurface",
-        "CarIdxLap", "CarIdxLastLapTime",
+        "CarIdxLap", "CarIdxLastLapTime", "CarIdxOnPitRoad",
         "SessionState", "SessionTime", "SessionTimeRemain", "SessionLapsRemain",
-        "SessionLapsTotal", "SessionNum", "PlayerCarIdx"
+        "SessionLapsTotal", "SessionNum", "PlayerCarIdx", "SessionFlags"
     ])]
     public class SVappsLABSDKWrapper : IDisposable
     {
@@ -147,6 +147,27 @@ namespace VISOR.Telemetry
         public int GetIncidentLimit()
         {
             return _sessionParser.IncidentLimit;
+        }
+
+        // NEW: Session-specific data accessors
+        public string GetSessionType()
+        {
+            return _sessionParser.SessionType;
+        }
+
+        public string GetSessionName()
+        {
+            return _sessionParser.SessionName;
+        }
+
+        public int[] GetQualifyResultsPositions()
+        {
+            return _sessionParser.QualifyResultsPositions;
+        }
+
+        public float[] GetQualifyResultsFastestTimes()
+        {
+            return _sessionParser.QualifyResultsFastestTimes;
         }
 
         public string GetCachedSessionYaml()

@@ -24,6 +24,10 @@ namespace VISOR.ViewModels
         private int _classID;
         private int _incidentCount;
 
+        // Gap smoothing fields
+        private float _smoothedGap = 0f;
+        private bool _hasInitializedGap = false;
+
         // --- Public Properties for UI Binding ---
         public int CarIdx { get => _carIdx; set { _carIdx = value; OnPropertyChanged(); } }
         public string ClassPos { get => _classPos; set { _classPos = value; OnPropertyChanged(); } }
@@ -44,5 +48,39 @@ namespace VISOR.ViewModels
         // --- Properties for Internal Logic ---
         public float LapDistPct { get; set; }
         public int CurrentLap { get; set; }
+
+        // --- Gap Smoothing Methods ---
+        /// <summary>
+        /// Update the smoothed gap value using exponential moving average
+        /// </summary>
+        /// <param name="newGap">Raw calculated gap value</param>
+        /// <param name="smoothingFactor">Weight given to new value (0.1 = very smooth, 0.5 = responsive)</param>
+        public void UpdateSmoothedGap(float newGap, float smoothingFactor = 0.3f)
+        {
+            if (!_hasInitializedGap)
+            {
+                _smoothedGap = newGap;
+                _hasInitializedGap = true;
+            }
+            else
+            {
+                // Exponential smoothing: new value gets smoothingFactor weight, previous gets (1-smoothingFactor)
+                _smoothedGap = (smoothingFactor * newGap) + ((1f - smoothingFactor) * _smoothedGap);
+            }
+        }
+
+        /// <summary>
+        /// Get the current smoothed gap value
+        /// </summary>
+        public float SmoothedGap => _smoothedGap;
+
+        /// <summary>
+        /// Reset smoothing state - call when car enters/exits relative display
+        /// </summary>
+        public void ResetSmoothing()
+        {
+            _smoothedGap = 0f;
+            _hasInitializedGap = false;
+        }
     }
 }
