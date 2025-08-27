@@ -284,6 +284,9 @@ namespace VISOR.Telemetry
                     Console.WriteLine($"[SessionParser DEBUG] Incident limit: {_cachedIncidentLimit}");
                     Console.WriteLine($"[SessionParser DEBUG] ========================");
 
+                    // Also write to VS Debug Output
+                    System.Diagnostics.Debug.WriteLine($"[SessionParser] {_cachedSessionType}({_cachedSessionName}) - {humanDrivers} human, {aiDrivers} AI drivers");
+
                     return true;
                 }
             }

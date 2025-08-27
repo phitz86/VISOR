@@ -101,6 +101,7 @@ namespace VISOR.Telemetry
             if (currentSessionState != _lastSessionState)
             {
                 Console.WriteLine($"[DataBuilder DEBUG] SessionState changed: {_lastSessionState} -> {currentSessionState}");
+                System.Diagnostics.Debug.WriteLine($"[DataBuilder] SessionState: {_lastSessionState} -> {currentSessionState}");
                 _lastSessionState = currentSessionState;
             }
         }

@@ -295,7 +295,7 @@ namespace VISOR.ViewModels
                     row.ClassPos = "P?";
                 }
 
-                // Calculate gap based on TRACK PROXIMITY, with proper sign based on display position and SMOOTHING
+                // Calculate gap based on TRACK PROXIMITY, with proper sign based on display position
                 if (playerLastLapTime > 0 && !row.IsPlayer)
                 {
                     float carTrackPercent = row.LapDistPct;
@@ -305,24 +305,46 @@ namespace VISOR.ViewModels
                     float wrappedDistance = 1.0f - directDistance;
                     float proximityDistance = Math.Min(directDistance, wrappedDistance);
 
+                    // Detect track wrapping transition
+                    float rawDifference = carTrackPercent - playerTrackPercent;
+                    bool isWrappingTransition = Math.Abs(rawDifference) > 0.5f;
+
                     // Convert proximity to time gap
                     float rawTimeGap = proximityDistance * playerLastLapTime;
 
-                    // Apply smoothing - this is the key change
-                    row.UpdateSmoothedGap(rawTimeGap);
-                    float smoothedTimeGap = row.SmoothedGap;
+                    // Apply smoothing using cache if available
+                    if (_carCache.ContainsKey(row.CarIdx))
+                    {
+                        var cachedRow = _carCache[row.CarIdx];
+
+                        // Reset smoothing if wrapping occurred to prevent oscillation
+                        if (isWrappingTransition)
+                        {
+                            cachedRow.ResetSmoothing();
+                        }
+
+                        cachedRow.UpdateSmoothedGap(rawTimeGap);
+                        rawTimeGap = cachedRow.SmoothedGap;
+                    }
+                    else
+                    {
+                        // First time seeing this car - create cache entry
+                        var newCacheEntry = new RelativeRowViewModel();
+                        newCacheEntry.UpdateSmoothedGap(rawTimeGap);
+                        _carCache[row.CarIdx] = newCacheEntry;
+                    }
 
                     int rowDisplayIndex = displayRows.IndexOf(row);
 
                     if (rowDisplayIndex < playerDisplayIndex)
                     {
                         // Car is ahead of player in display (rows 1-3) = positive gap
-                        row.Gap = $"+{smoothedTimeGap:F1}";
+                        row.Gap = $"+{rawTimeGap:F1}";
                     }
                     else if (rowDisplayIndex > playerDisplayIndex)
                     {
                         // Car is behind player in display (rows 5-7) = negative gap
-                        row.Gap = $"-{smoothedTimeGap:F1}";
+                        row.Gap = $"-{rawTimeGap:F1}";
                     }
                     else
                     {
@@ -351,34 +373,13 @@ namespace VISOR.ViewModels
 
         private void UpdateCollection(List<RelativeRowViewModel> newRows)
         {
-            // Update existing rows or add new ones
-            for (int i = 0; i < newRows.Count; i++)
-            {
-                if (i < RelativeRows.Count)
-                {
-                    var existing = RelativeRows[i];
-                    existing.CarIdx = newRows[i].CarIdx;
-                    existing.ClassPos = newRows[i].ClassPos;
-                    existing.CarNum = newRows[i].CarNum;
-                    existing.Name = newRows[i].Name;
-                    existing.Gap = newRows[i].Gap;
-                    existing.ClassBackground = newRows[i].ClassBackground;
-                    existing.NameColor = newRows[i].NameColor;
-                    existing.FontStyle = newRows[i].FontStyle;
-                    existing.IsPlayer = newRows[i].IsPlayer;
-                    existing.ClassID = newRows[i].ClassID;
-                    existing.IncidentCount = newRows[i].IncidentCount;
-                }
-                else
-                {
-                    RelativeRows.Add(newRows[i]);
-                }
-            }
+            // Clear and rebuild instead of trying to update in-place
+            // This prevents stale data and duplication issues
+            RelativeRows.Clear();
 
-            // Remove excess rows if the new list is shorter
-            while (RelativeRows.Count > newRows.Count)
+            foreach (var row in newRows)
             {
-                RelativeRows.RemoveAt(RelativeRows.Count - 1);
+                RelativeRows.Add(row);
             }
         }
 

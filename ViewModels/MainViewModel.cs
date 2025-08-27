@@ -27,6 +27,8 @@ namespace VISOR.ViewModels
         // --- SessionState Debug Tracking ---
         private int _lastSessionState = -999; // Use invalid initial value to catch first state
         private DateTime _lastSessionStateChange = DateTime.MinValue;
+        private int _debugLogCounter = 0; // Throttle debug output to reduce lag
+        private int _lapDebugCounter = 0; // For lap counting debug throttling
         private readonly Dictionary<int, string> _sessionStateNames = new Dictionary<int, string>
         {
             { 0, "Invalid" },
@@ -158,44 +160,37 @@ namespace VISOR.ViewModels
             float bestLap = snapshot.GetValue<float>("LapBestLapTime");
             if (bestLap > 0) BestLapTime = FormatLapTime(bestLap);
 
-            // Update session timer - smart switching between time and laps with symbols
+            // Update session timer - simplified to trust iRacing's SessionLapsRemain
             int sessionLapsTotal = snapshot.GetValue<int>("SessionLapsTotal", 0);
             int sessionLapsRemain = snapshot.GetValue<int>("SessionLapsRemain", 0);
             double timeRemain = snapshot.GetValue<double>("SessionTimeRemain", 0.0);
+            int currentLap = snapshot.GetValue<int>("Lap", 0);
 
-            // Check if this is a legitimate lap-limited session
-            bool isLapLimitedSession = sessionLapsTotal > 0 &&
-                                       sessionLapsTotal < 1000 && // Reasonable max lap count
-                                       sessionLapsRemain > 0 &&
-                                       sessionLapsRemain <= sessionLapsTotal; // Remaining can't exceed total
+            // Debug output for lap counting issues (always log when lap-limited to debug the off-by-one)
+            if (sessionLapsRemain > 0 && sessionLapsRemain < 10000)
+            {
+                // Always log when we're in a lap-limited session to debug the issue
+                System.Diagnostics.Debug.WriteLine($"[Lap DEBUG] ACTIVE: Total={sessionLapsTotal}, Remain={sessionLapsRemain}, Current={currentLap}, Display={TimeRemainingDisplay}");
+            }
+            else if (++_lapDebugCounter % 300 == 0) // Every 5 seconds for time-limited
+            {
+                System.Diagnostics.Debug.WriteLine($"[Lap DEBUG] Time-limited: SessionLapsTotal={sessionLapsTotal}, SessionLapsRemain={sessionLapsRemain}, CurrentLap={currentLap}, TimeRemain={timeRemain:F1}");
+            }
 
-            if (isLapLimitedSession)
+            // If we have reasonable laps remaining data, use it directly
+            // Filter out invalid default values (iRacing uses ~32000 as default)
+            if (sessionLapsRemain > 0 && sessionLapsRemain < 10000)
             {
                 // Lap-limited session - show laps remaining with checkered flag
                 TimeRemainingSymbol = "🏁";
 
-                int currentLap = snapshot.GetValue<int>("Lap", 0);
-
-                // More accurate lap counting logic
-                if (currentLap >= sessionLapsTotal)
+                if (sessionLapsRemain == 1)
                 {
-                    // On or past final lap
                     TimeRemainingDisplay = "Final Lap";
                 }
                 else
                 {
-                    // Calculate laps remaining (including current lap)
-                    int lapsRemaining = sessionLapsTotal - currentLap;
-
-                    if (lapsRemaining == 1)
-                    {
-                        TimeRemainingDisplay = "Final Lap";
-                    }
-                    else
-                    {
-                        // Show total laps remaining including current incomplete lap
-                        TimeRemainingDisplay = $"{lapsRemaining} Laps";
-                    }
+                    TimeRemainingDisplay = $"{sessionLapsRemain} Laps";
                 }
             }
             else if (timeRemain > 0)
@@ -223,8 +218,7 @@ namespace VISOR.ViewModels
             }
             else
             {
-                // Session transition or unknown state - keep last known symbol but show waiting
-                // TimeRemainingSymbol stays as previous (don't change during transitions)
+                // No valid time or lap data - show waiting
                 TimeRemainingDisplay = "--:--";
             }
         }

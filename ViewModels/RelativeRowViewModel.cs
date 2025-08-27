@@ -24,9 +24,9 @@ namespace VISOR.ViewModels
         private int _classID;
         private int _incidentCount;
 
-        // Gap smoothing fields
-        private float _smoothedGap = 0f;
-        private bool _hasInitializedGap = false;
+        // Gap smoothing fields - made internal/public for cache transfer
+        internal float _smoothedGap = 0f;
+        internal bool _hasInitializedGap = false;
 
         // --- Public Properties for UI Binding ---
         public int CarIdx { get => _carIdx; set { _carIdx = value; OnPropertyChanged(); } }
