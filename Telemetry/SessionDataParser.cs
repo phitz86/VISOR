@@ -285,7 +285,7 @@ namespace VISOR.Telemetry
                     Console.WriteLine($"[SessionParser DEBUG] ========================");
 
                     // Also write to VS Debug Output
-                    System.Diagnostics.Debug.WriteLine($"[SessionParser] {_cachedSessionType}({_cachedSessionName}) - {humanDrivers} human, {aiDrivers} AI drivers");
+                    System.Diagnostics.Debug.WriteLine($"[SessionParser] SessionType: {_cachedSessionType}, Cars: {humanDrivers} human/{aiDrivers} AI");
 
                     return true;
                 }

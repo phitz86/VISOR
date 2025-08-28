@@ -136,6 +136,7 @@ namespace VISOR.Telemetry
                 if (currentSessionInfo != _lastSessionInfo)
                 {
                     Console.WriteLine($"[DataBuilder DEBUG] Session Info: {currentSessionInfo}");
+                    System.Diagnostics.Debug.WriteLine($"[DataBuilder] Session Info: {currentSessionInfo}");
 
                     // Count human vs AI drivers for debug
                     var carIsAI = _wrapper.GetCarIsAI();
@@ -145,6 +146,7 @@ namespace VISOR.Telemetry
                         if (isAI) aiCount++; else humanCount++;
                     }
                     Console.WriteLine($"[DataBuilder DEBUG] Driver counts - Human: {humanCount}, AI: {aiCount}");
+                    System.Diagnostics.Debug.WriteLine($"[DataBuilder] Drivers: {humanCount} human, {aiCount} AI");
 
                     _lastSessionInfo = currentSessionInfo;
                 }

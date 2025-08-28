@@ -107,8 +107,16 @@ namespace VISOR.ViewModels
         // Updated to accept either SessionDataParser or SessionDataWrapper
         public void UpdateFromTelemetry(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
-            // NEW: Debug session state transitions
-            DebugSessionState(snapshot);
+            // Check for session state transitions (including UI clearing logic)
+            CheckSessionStateTransitions(snapshot);
+
+            // Always monitor SessionNum changes
+            int currentSessionNum = snapshot.GetValue<int>("SessionNum", -1);
+            if (currentSessionNum != _lastSessionNum)
+            {
+                System.Diagnostics.Debug.WriteLine($"[SessionNum] Changed: {_lastSessionNum} -> {currentSessionNum}");
+                _lastSessionNum = currentSessionNum;
+            }
 
             // Check for session transitions and reset session-specific data
             CheckForSessionTransition(snapshot);
@@ -160,28 +168,34 @@ namespace VISOR.ViewModels
             float bestLap = snapshot.GetValue<float>("LapBestLapTime");
             if (bestLap > 0) BestLapTime = FormatLapTime(bestLap);
 
-            // Update session timer - simplified to trust iRacing's SessionLapsRemain
+            // Update session timer with context-aware logic
+            UpdateSessionTimer(snapshot);
+        }
+
+        /// <summary>
+        /// Context-aware session timer that uses SessionNum to determine display logic
+        /// </summary>
+        private void UpdateSessionTimer(SVappsLABSnapshot snapshot)
+        {
+            int currentSessionNum = snapshot.GetValue<int>("SessionNum", -1);
             int sessionLapsTotal = snapshot.GetValue<int>("SessionLapsTotal", 0);
             int sessionLapsRemain = snapshot.GetValue<int>("SessionLapsRemain", 0);
             double timeRemain = snapshot.GetValue<double>("SessionTimeRemain", 0.0);
             int currentLap = snapshot.GetValue<int>("Lap", 0);
 
-            // Debug output for lap counting issues (always log when lap-limited to debug the off-by-one)
-            if (sessionLapsRemain > 0 && sessionLapsRemain < 10000)
-            {
-                // Always log when we're in a lap-limited session to debug the issue
-                System.Diagnostics.Debug.WriteLine($"[Lap DEBUG] ACTIVE: Total={sessionLapsTotal}, Remain={sessionLapsRemain}, Current={currentLap}, Display={TimeRemainingDisplay}");
-            }
-            else if (++_lapDebugCounter % 300 == 0) // Every 5 seconds for time-limited
-            {
-                System.Diagnostics.Debug.WriteLine($"[Lap DEBUG] Time-limited: SessionLapsTotal={sessionLapsTotal}, SessionLapsRemain={sessionLapsRemain}, CurrentLap={currentLap}, TimeRemain={timeRemain:F1}");
-            }
+            // Context detection
+            bool isQualifying = (currentSessionNum == 1);
+            bool isPracticeOrQualifying = (currentSessionNum == 0 || currentSessionNum == 1);
 
-            // If we have reasonable laps remaining data, use it directly
-            // Filter out invalid default values (iRacing uses ~32000 as default)
-            if (sessionLapsRemain > 0 && sessionLapsRemain < 10000)
+            Console.WriteLine($"[SessionTimer DEBUG] SessionNum: {currentSessionNum}, " +
+                            $"LapsRemain: {sessionLapsRemain}, TimeRemain: {timeRemain:F1}s, " +
+                            $"IsQualifying: {isQualifying}");
+
+            // ISSUE 1 FIX: Ignore SessionLapsRemain during qualifying (SessionNum 1)
+            // Use lap-limited logic only for race sessions with valid lap data
+            if (!isQualifying && sessionLapsRemain > 0 && sessionLapsRemain < 10000)
             {
-                // Lap-limited session - show laps remaining with checkered flag
+                // Lap-limited session (race only) - show laps remaining with checkered flag
                 TimeRemainingSymbol = "🏁";
 
                 if (sessionLapsRemain == 1)
@@ -192,10 +206,13 @@ namespace VISOR.ViewModels
                 {
                     TimeRemainingDisplay = $"{sessionLapsRemain} Laps";
                 }
+
+                Console.WriteLine($"[SessionTimer DEBUG] Using lap-limited display: {TimeRemainingDisplay}");
             }
             else if (timeRemain > 0)
             {
                 // Time-limited session - show time remaining with hourglass
+                // This handles practice, qualifying, and time-limited races
                 TimeRemainingSymbol = "⏳";
 
                 TimeSpan remaining = TimeSpan.FromSeconds(timeRemain);
@@ -215,18 +232,21 @@ namespace VISOR.ViewModels
                     // Sessions under 1 hour - show mm:ss format
                     TimeRemainingDisplay = $"{(int)remaining.TotalMinutes}:{remaining.Seconds:D2}";
                 }
+
+                Console.WriteLine($"[SessionTimer DEBUG] Using time-limited display: {TimeRemainingDisplay}");
             }
             else
             {
                 // No valid time or lap data - show waiting
                 TimeRemainingDisplay = "--:--";
+                Console.WriteLine("[SessionTimer DEBUG] No valid session data available");
             }
         }
 
         /// <summary>
-        /// Debug SessionState transitions to understand when UI should be cleared
+        /// ISSUE 2 FIX: Check for SessionState transitions and handle UI clearing
         /// </summary>
-        private void DebugSessionState(SVappsLABSnapshot snapshot)
+        private void CheckSessionStateTransitions(SVappsLABSnapshot snapshot)
         {
             int currentSessionState = snapshot.GetValue<int>("SessionState", -1);
             int currentSessionNum = snapshot.GetValue<int>("SessionNum", -1);
@@ -262,36 +282,17 @@ namespace VISOR.ViewModels
                 Console.WriteLine($"[SessionState DEBUG]   SessionTime: {sessionTime:F1}");
                 Console.WriteLine($"[SessionState DEBUG] ============================");
 
+                // ISSUE 2 FIX: Clear UI on CoolDown -> GetInCar transition (session exit)
+                if (_lastSessionState == 6 && currentSessionState == 1)
+                {
+                    Console.WriteLine($"[SessionState] Session exit detected (CoolDown -> GetInCar) - clearing UI");
+                    ClearSessionUI();
+                }
+
                 // Update tracking
                 _lastSessionState = currentSessionState;
                 _lastSessionStateChange = now;
-
-                // This is where we'd add the UI clearing logic once we understand the patterns
-                // For now, just log what we would do
-                if (ShouldClearUIOnStateChange(_lastSessionState, currentSessionState))
-                {
-                    Console.WriteLine($"[SessionState DEBUG] WOULD CLEAR UI: Transition from {lastStateName} to {currentStateName}");
-                }
             }
-        }
-
-        /// <summary>
-        /// Placeholder logic for when to clear UI - will be refined based on logged data
-        /// </summary>
-        private bool ShouldClearUIOnStateChange(int fromState, int toState)
-        {
-            // Initial guesses - will refine based on actual data
-            // Clear when going from active driving states to inactive states
-
-            // From Racing/Warmup to GetInCar/Invalid might indicate session exit
-            if ((fromState == 4 || fromState == 2) && (toState == 1 || toState == 0))
-                return true;
-
-            // From any active state to Checkered/CoolDown might indicate session end
-            if ((fromState == 2 || fromState == 3 || fromState == 4) && (toState == 5 || toState == 6))
-                return true;
-
-            return false;
         }
 
         /// <summary>
@@ -299,6 +300,8 @@ namespace VISOR.ViewModels
         /// </summary>
         private void ClearSessionUI()
         {
+            Console.WriteLine("[MainViewModel] Clearing session UI due to session exit");
+
             // Clear lap times
             LastLapTime = "-:--.---";
             BestLapTime = "-:--.---";
@@ -315,10 +318,14 @@ namespace VISOR.ViewModels
             // Reset gear to neutral
             GearDisplay = "N";
 
-            // Keep time remaining display as it's session info, not driving-specific
-            // Keep incident warnings as they persist across in-car/out-of-car states
+            // Reset session timer display
+            TimeRemainingDisplay = "--:--";
+            TimeRemainingSymbol = "⏳";
 
-            Console.WriteLine("[MainViewModel] Session UI cleared");
+            // Keep incident warnings as they persist across in-car/out-of-car states
+            // Connection health should also persist
+
+            Console.WriteLine("[MainViewModel] Session UI cleared successfully");
         }
 
         /// <summary>
@@ -331,10 +338,16 @@ namespace VISOR.ViewModels
             // Detect session change
             if (currentSessionNum != _lastSessionNum && _lastSessionNum != -1)
             {
+                System.Diagnostics.Debug.WriteLine($"[SessionTransition] SessionNum: {_lastSessionNum} -> {currentSessionNum}");
                 Console.WriteLine($"[MainViewModel] Session transition detected: {_lastSessionNum} -> {currentSessionNum}");
 
                 // Reset session-specific data
                 ResetSessionData();
+            }
+            else if (_lastSessionNum == -1)
+            {
+                // First session detected
+                System.Diagnostics.Debug.WriteLine($"[SessionTransition] Initial SessionNum: {currentSessionNum}");
             }
 
             _lastSessionNum = currentSessionNum;

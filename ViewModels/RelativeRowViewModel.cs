@@ -49,6 +49,9 @@ namespace VISOR.ViewModels
         public float LapDistPct { get; set; }
         public int CurrentLap { get; set; }
 
+        // NEW: For detecting wrap-around in signed distance calculation
+        public float LastSignedDistance { get; set; }
+
         // --- Gap Smoothing Methods ---
         /// <summary>
         /// Update the smoothed gap value using exponential moving average
@@ -81,6 +84,7 @@ namespace VISOR.ViewModels
         {
             _smoothedGap = 0f;
             _hasInitializedGap = false;
+            LastSignedDistance = 0f; // Reset wrap-around tracking as well
         }
     }
 }
