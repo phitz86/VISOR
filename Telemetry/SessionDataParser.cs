@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -18,11 +19,18 @@ namespace VISOR.Telemetry
         private readonly int[] _cachedCurDriverIncidentCount = new int[64];
         private int _cachedIncidentLimit = 0;
 
-        // NEW: Session-specific data
+        // Session-specific data
         private string _cachedSessionType = string.Empty;
         private string _cachedSessionName = string.Empty;
         private readonly int[] _cachedQualifyPositions = new int[64]; // Position by CarIdx
         private readonly float[] _cachedQualifyFastestTimes = new float[64]; // Fastest time by CarIdx
+
+        // NEW: Session schedule parsing
+        private int _cachedCurrentSessionNum = -1;
+        private readonly Dictionary<int, string> _sessionSchedule = new(); // SessionNum -> SessionType
+        private readonly Dictionary<int, string> _sessionNames = new(); // SessionNum -> SessionName
+        private readonly Dictionary<int, int> _sessionLaps = new(); // SessionNum -> SessionLaps (-1 = unlimited)
+        private readonly Dictionary<int, double> _sessionTimes = new(); // SessionNum -> SessionTime (seconds)
 
         private string _lastSessionDataHash = string.Empty;
         private string _cachedSessionYaml = string.Empty;
@@ -67,7 +75,7 @@ namespace VISOR.Telemetry
             get { lock (_parseLock) { return _cachedIncidentLimit; } }
         }
 
-        // NEW: Session data accessors
+        // Legacy session data accessors (for backward compatibility)
         public string SessionType
         {
             get { lock (_parseLock) { return _cachedSessionType; } }
@@ -86,6 +94,75 @@ namespace VISOR.Telemetry
         public float[] QualifyResultsFastestTimes
         {
             get { lock (_parseLock) { return (float[])_cachedQualifyFastestTimes.Clone(); } }
+        }
+
+        // NEW: Session schedule accessors
+        public int CurrentSessionNum
+        {
+            get { lock (_parseLock) { return _cachedCurrentSessionNum; } }
+        }
+
+        public string GetSessionTypeForNum(int sessionNum)
+        {
+            lock (_parseLock)
+            {
+                return _sessionSchedule.GetValueOrDefault(sessionNum, "Unknown");
+            }
+        }
+
+        public string GetSessionNameForNum(int sessionNum)
+        {
+            lock (_parseLock)
+            {
+                return _sessionNames.GetValueOrDefault(sessionNum, "Unknown");
+            }
+        }
+
+        public bool IsLoneQualifying(int sessionNum)
+        {
+            return GetSessionTypeForNum(sessionNum).Contains("Lone");
+        }
+
+        public bool IsPracticeSession(int sessionNum)
+        {
+            var sessionType = GetSessionTypeForNum(sessionNum);
+            return sessionType.Contains("Practice") || sessionType.Contains("PRACTICE");
+        }
+
+        public bool IsQualifyingSession(int sessionNum)
+        {
+            var sessionType = GetSessionTypeForNum(sessionNum);
+            return sessionType.Contains("Qualify") || sessionType.Contains("QUALIFY");
+        }
+
+        public bool IsRaceSession(int sessionNum)
+        {
+            var sessionType = GetSessionTypeForNum(sessionNum);
+            return sessionType.Contains("Race") || sessionType.Contains("RACE");
+        }
+
+        public int GetSessionLaps(int sessionNum)
+        {
+            lock (_parseLock)
+            {
+                return _sessionLaps.GetValueOrDefault(sessionNum, -1);
+            }
+        }
+
+        public double GetSessionTimeSeconds(int sessionNum)
+        {
+            lock (_parseLock)
+            {
+                return _sessionTimes.GetValueOrDefault(sessionNum, 0.0);
+            }
+        }
+
+        public Dictionary<int, string> GetSessionSchedule()
+        {
+            lock (_parseLock)
+            {
+                return new Dictionary<int, string>(_sessionSchedule);
+            }
         }
 
         public SessionDataParser()
@@ -116,8 +193,10 @@ namespace VISOR.Telemetry
                     // Parse the YAML
                     var lines = sessionData.Split('\n');
                     int currentCarIdx = -1;
+                    int currentSessionIdx = -1;
                     bool inSessionInfo = false;
                     bool inQualifyResults = false;
+                    bool inSessionsArray = false;
                     int currentQualifyCarIdx = -1;
 
                     for (int i = 0; i < lines.Length; i++)
@@ -134,39 +213,118 @@ namespace VISOR.Telemetry
                                     _cachedIncidentLimit = incidentLimit;
                             }
                         }
-                        // NEW: Parse session info section
+                        // Parse session info section
                         else if (line.StartsWith("SessionInfo:"))
                         {
                             inSessionInfo = true;
                             Console.WriteLine("[SessionParser DEBUG] Found SessionInfo section");
                         }
+                        // NEW: Parse CurrentSessionNum
+                        else if (inSessionInfo && line.StartsWith("CurrentSessionNum:"))
+                        {
+                            var parts = line.Split(':', 2);
+                            if (parts.Length >= 2 && int.TryParse(parts[1].Trim(), out int currentSessionNum))
+                            {
+                                _cachedCurrentSessionNum = currentSessionNum;
+                                Console.WriteLine($"[SessionParser DEBUG] CurrentSessionNum: {_cachedCurrentSessionNum}");
+                            }
+                        }
+                        // NEW: Detect Sessions array
+                        else if (inSessionInfo && line.StartsWith("Sessions:"))
+                        {
+                            inSessionsArray = true;
+                            Console.WriteLine("[SessionParser DEBUG] Found Sessions array");
+                        }
+                        // NEW: Parse individual session entries
+                        else if (inSessionsArray && line.StartsWith("- SessionNum:"))
+                        {
+                            var parts = line.Split(':', 2);
+                            if (parts.Length >= 2 && int.TryParse(parts[1].Trim(), out int sessionNum))
+                            {
+                                currentSessionIdx = sessionNum;
+                                Console.WriteLine($"[SessionParser DEBUG] Found session definition for SessionNum {currentSessionIdx}");
+                            }
+                        }
+                        else if (inSessionsArray && line.StartsWith("SessionType:") && currentSessionIdx >= 0)
+                        {
+                            var parts = line.Split(':', 2);
+                            if (parts.Length >= 2)
+                            {
+                                var sessionType = parts[1].Trim();
+                                _sessionSchedule[currentSessionIdx] = sessionType;
+                                Console.WriteLine($"[SessionParser DEBUG] Session {currentSessionIdx} type: {sessionType}");
+                            }
+                        }
+                        else if (inSessionsArray && line.StartsWith("SessionName:") && currentSessionIdx >= 0)
+                        {
+                            var parts = line.Split(':', 2);
+                            if (parts.Length >= 2)
+                            {
+                                var sessionName = parts[1].Trim();
+                                _sessionNames[currentSessionIdx] = sessionName;
+                                Console.WriteLine($"[SessionParser DEBUG] Session {currentSessionIdx} name: {sessionName}");
+                            }
+                        }
+                        else if (inSessionsArray && line.StartsWith("SessionLaps:") && currentSessionIdx >= 0)
+                        {
+                            var parts = line.Split(':', 2);
+                            if (parts.Length >= 2)
+                            {
+                                var lapsText = parts[1].Trim();
+                                if (lapsText == "unlimited")
+                                {
+                                    _sessionLaps[currentSessionIdx] = -1;
+                                }
+                                else if (int.TryParse(lapsText, out int laps))
+                                {
+                                    _sessionLaps[currentSessionIdx] = laps;
+                                }
+                                Console.WriteLine($"[SessionParser DEBUG] Session {currentSessionIdx} laps: {lapsText}");
+                            }
+                        }
+                        else if (inSessionsArray && line.StartsWith("SessionTime:") && currentSessionIdx >= 0)
+                        {
+                            var parts = line.Split(':', 2);
+                            if (parts.Length >= 2)
+                            {
+                                var timeText = parts[1].Trim().Replace(" sec", "");
+                                if (double.TryParse(timeText, out double timeSeconds))
+                                {
+                                    _sessionTimes[currentSessionIdx] = timeSeconds;
+                                    Console.WriteLine($"[SessionParser DEBUG] Session {currentSessionIdx} time: {timeSeconds}s");
+                                }
+                            }
+                        }
+                        // Legacy session type parsing (for backward compatibility)
                         else if (inSessionInfo && line.StartsWith("- SessionNum:"))
                         {
                             // We're in the active session data
                             Console.WriteLine("[SessionParser DEBUG] Found active session data");
                         }
-                        else if (inSessionInfo && line.StartsWith("SessionType:"))
+                        else if (inSessionInfo && line.StartsWith("SessionType:") && !inSessionsArray)
                         {
                             var parts = line.Split(':', 2);
                             if (parts.Length >= 2)
                             {
                                 _cachedSessionType = parts[1].Trim();
-                                Console.WriteLine($"[SessionParser DEBUG] SessionType: {_cachedSessionType}");
+                                Console.WriteLine($"[SessionParser DEBUG] Legacy SessionType: {_cachedSessionType}");
                             }
                         }
-                        else if (inSessionInfo && line.StartsWith("SessionName:"))
+                        else if (inSessionInfo && line.StartsWith("SessionName:") && !inSessionsArray)
                         {
                             var parts = line.Split(':', 2);
                             if (parts.Length >= 2)
                             {
                                 _cachedSessionName = parts[1].Trim();
-                                Console.WriteLine($"[SessionParser DEBUG] SessionName: {_cachedSessionName}");
+                                Console.WriteLine($"[SessionParser DEBUG] Legacy SessionName: {_cachedSessionName}");
                             }
                         }
-                        // NEW: Parse qualifying results section
+                        // Parse qualifying results section
                         else if (line.StartsWith("QualifyResultsInfo:"))
                         {
                             inQualifyResults = true;
+                            inSessionInfo = false; // Exit SessionInfo parsing
+                            inSessionsArray = false;
                             Console.WriteLine("[SessionParser DEBUG] Found QualifyResultsInfo section");
                         }
                         else if (inQualifyResults && line.StartsWith("- Position:"))
@@ -201,7 +359,7 @@ namespace VISOR.Telemetry
                             }
                         }
                         // Driver info parsing (existing logic)
-                        else if (line.StartsWith("- CarIdx:"))
+                        else if (line.StartsWith("- CarIdx:") && !inSessionsArray)
                         {
                             var parts = line.Split(':');
                             if (parts.Length >= 2 && int.TryParse(parts[1].Trim(), out currentCarIdx))
@@ -210,7 +368,7 @@ namespace VISOR.Telemetry
                             }
                         }
 
-                        if (currentCarIdx >= 0 && currentCarIdx < 64)
+                        if (currentCarIdx >= 0 && currentCarIdx < 64 && !inSessionsArray)
                         {
                             if (line.StartsWith("UserName:"))
                             {
@@ -270,13 +428,22 @@ namespace VISOR.Telemetry
                     _lastSessionDataHash = currentHash;
                     IsDataReady = true;
 
-                    // NEW: Debug session summary
+                    // Debug session summary
                     int humanDrivers = _cachedCarIsAI.Count(ai => !ai);
                     int aiDrivers = _cachedCarIsAI.Count(ai => ai);
                     int validQualifyEntries = _cachedQualifyFastestTimes.Count(t => t > 0);
 
                     Console.WriteLine($"[SessionParser DEBUG] === SESSION SUMMARY ===");
-                    Console.WriteLine($"[SessionParser DEBUG] Session: {_cachedSessionType} ({_cachedSessionName})");
+                    Console.WriteLine($"[SessionParser DEBUG] Current Session: {_cachedCurrentSessionNum}");
+                    Console.WriteLine($"[SessionParser DEBUG] Session Schedule:");
+                    foreach (var kvp in _sessionSchedule.OrderBy(x => x.Key))
+                    {
+                        var sessionName = _sessionNames.GetValueOrDefault(kvp.Key, "Unknown");
+                        var sessionLaps = _sessionLaps.GetValueOrDefault(kvp.Key, -1);
+                        var sessionTime = _sessionTimes.GetValueOrDefault(kvp.Key, 0.0);
+                        var lapsText = sessionLaps == -1 ? "unlimited" : sessionLaps.ToString();
+                        Console.WriteLine($"[SessionParser DEBUG]   SessionNum {kvp.Key}: {kvp.Value} ({sessionName}) - {lapsText} laps, {sessionTime}s");
+                    }
                     Console.WriteLine($"[SessionParser DEBUG] Total cars: {GetCachedCarCount()}");
                     Console.WriteLine($"[SessionParser DEBUG] Human drivers: {humanDrivers}");
                     Console.WriteLine($"[SessionParser DEBUG] AI drivers: {aiDrivers}");
@@ -285,7 +452,7 @@ namespace VISOR.Telemetry
                     Console.WriteLine($"[SessionParser DEBUG] ========================");
 
                     // Also write to VS Debug Output
-                    System.Diagnostics.Debug.WriteLine($"[SessionParser] SessionType: {_cachedSessionType}, Cars: {humanDrivers} human/{aiDrivers} AI");
+                    System.Diagnostics.Debug.WriteLine($"[SessionParser] Current Session: {_cachedCurrentSessionNum}, Schedule: {_sessionSchedule.Count} sessions");
 
                     return true;
                 }
@@ -422,6 +589,7 @@ namespace VISOR.Telemetry
             _cachedIncidentLimit = 0;
             _cachedSessionType = string.Empty;
             _cachedSessionName = string.Empty;
+            _cachedCurrentSessionNum = -1;
         }
 
         private void ClearArrays()
@@ -437,6 +605,11 @@ namespace VISOR.Telemetry
             _cachedIncidentLimit = 0;
             _cachedSessionType = string.Empty;
             _cachedSessionName = string.Empty;
+            _cachedCurrentSessionNum = -1;
+            _sessionSchedule.Clear();
+            _sessionNames.Clear();
+            _sessionLaps.Clear();
+            _sessionTimes.Clear();
         }
     }
 }

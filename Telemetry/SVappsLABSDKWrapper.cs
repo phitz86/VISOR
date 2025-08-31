@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using VISOR.Diagnostics;
 
 namespace VISOR.Telemetry
 {
@@ -23,6 +24,7 @@ namespace VISOR.Telemetry
         private readonly ILogger _logger;
         private readonly TelemetryDataBuilder _dataBuilder;
         private readonly SessionDataParser _sessionParser;
+        private readonly SessionDataLogger _sessionLogger;
         private SVappsLABSnapshot _latestSnapshot;
         private CancellationTokenSource _cancellationTokenSource;
         private Task _monitoringTask;
@@ -32,6 +34,9 @@ namespace VISOR.Telemetry
         private System.Timers.Timer _yamlRetryTimer;
         private readonly object _retryLock = new();
         private bool _isRetryingYaml = false;
+
+        // Session logging tracking
+        private int _lastSessionNumForLog = -1;
         #endregion
 
         #region Public Properties
@@ -54,6 +59,12 @@ namespace VISOR.Telemetry
             _logger = new NullLogger<SVappsLABSDKWrapper>();
             _dataBuilder = new TelemetryDataBuilder(this);
             _sessionParser = new SessionDataParser();
+            _sessionLogger = new SessionDataLogger(
+                () => _sessionParser.GetCachedSessionYaml(),
+                () => GetFieldTypes()
+            );
+
+            System.Diagnostics.Debug.WriteLine("[SVappsLAB] SVappsLABSDKWrapper constructor completed");
 
             // Initialize retry timer (but don't start it yet)
             _yamlRetryTimer = new System.Timers.Timer(1000); // 1 second interval
@@ -191,6 +202,7 @@ namespace VISOR.Telemetry
                     // Lost connection - stop retrying and clear data
                     StopYamlRetryTimer();
                     _sessionParser.ClearCache();
+                    _lastSessionNumForLog = -1; // Reset logging tracking
                 }
                 else
                 {
@@ -233,10 +245,13 @@ namespace VISOR.Telemetry
 
                         if (_sessionParser.ParseSessionData(sessionInfo))
                         {
-                            Console.WriteLine($"[SVappsLAB] Session data parsed successfully");
+                            System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Session data parsed successfully");
                             SessionYamlAvailable?.Invoke(sessionInfo);
                             SessionDataUpdated?.Invoke();
                             CheckPrimedStateChange();
+
+                            // NEW: Check if this represents a session transition for logging
+                            CheckForSessionTransitionLog();
                         }
                         else
                         {
@@ -256,6 +271,139 @@ namespace VISOR.Telemetry
                 Console.WriteLine($"[SVappsLAB] Error in OnSessionInfoUpdate: {ex.Message}");
                 StartYamlRetryTimer(); // Retry on any error
             }
+        }
+
+        /// <summary>
+        /// Check for session transitions and schedule dumps accordingly
+        /// This is called from OnSessionInfoUpdate when session data changes
+        /// </summary>
+        private void CheckForSessionTransitionDump()
+        {
+            try
+            {
+                // Parse SessionNum from the newly parsed session data
+                string sessionType = GetSessionType();
+                int currentSessionNum = -1;
+
+                // Map session type to session number for consistency
+                if (sessionType.Contains("Practice") || sessionType.Contains("PRACTICE"))
+                    currentSessionNum = 0;
+                else if (sessionType.Contains("Qualify") || sessionType.Contains("QUALIFY"))
+                    currentSessionNum = 1;
+                else if (sessionType.Contains("Race") || sessionType.Contains("RACE"))
+                    currentSessionNum = 2;
+
+                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] CheckForSessionTransitionDump: SessionType='{sessionType}', Mapped SessionNum={currentSessionNum}, LastDumped={_lastSessionNumForLog}");
+
+                // Only dump for valid sessions that we haven't dumped yet
+                if (currentSessionNum >= 0 && currentSessionNum <= 2 && currentSessionNum != _lastSessionNumForLog)
+                {
+                    string sessionName = GetSessionName(currentSessionNum);
+                    System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Scheduling data log for {sessionName} (SessionNum {currentSessionNum})");
+
+                    _sessionLogger.ScheduleLogForSession(currentSessionNum, sessionName);
+                    _lastSessionNumForLog = currentSessionNum;
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Not scheduling dump - SessionNum: {currentSessionNum}, LastDumped: {_lastSessionNumForLog}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Error in CheckForSessionTransitionDump: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Check if we should trigger a session data dump for debugging
+        /// </summary>
+        private void CheckForSessionDump()
+        {
+            System.Diagnostics.Debug.WriteLine("[SVappsLAB] CheckForSessionDump called");
+
+            try
+            {
+                // Get session info from the latest snapshot or create a quick one
+                if (_latestSnapshot != null)
+                {
+                    int currentSessionNum = _latestSnapshot.GetValue<int>("SessionNum", -1);
+                    System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Current SessionNum from snapshot: {currentSessionNum}, LastDumped: {_lastSessionNumForLog}");
+
+                    // Only dump for practice, qualifying, and race sessions
+                    // AND only when SessionNum actually changes
+                    if (currentSessionNum >= 0 && currentSessionNum <= 2 && currentSessionNum != _lastSessionNumForLog)
+                    {
+                        string sessionType = GetSessionName(currentSessionNum);
+                        System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Scheduling data dump for {sessionType} (SessionNum {currentSessionNum})");
+
+                        _sessionLogger.ScheduleLogForSession(currentSessionNum, sessionType);
+                        _lastSessionNumForLog = currentSessionNum; // Update AFTER scheduling
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Not scheduling dump - SessionNum: {currentSessionNum}, LastDumped: {_lastSessionNumForLog}");
+                    }
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("[SVappsLAB] No latest snapshot available for dump check");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Error checking for session dump: {ex.Message}");
+                // Non-fatal, continue operation
+            }
+        }
+
+        /// <summary>
+        /// Check for session transitions and schedule logging accordingly
+        /// This is called from OnSessionInfoUpdate when session data changes
+        /// </summary>
+        private void CheckForSessionTransitionLog()
+        {
+            try
+            {
+                // Use CurrentSessionNum from the proper session schedule parsing
+                int currentSessionNum = _sessionParser.CurrentSessionNum;
+
+                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] CheckForSessionTransitionLog: CurrentSessionNum={currentSessionNum}, LastLogged={_lastSessionNumForLog}");
+
+                // Only log for valid sessions that we haven't logged yet
+                if (currentSessionNum >= 0 && currentSessionNum <= 2 && currentSessionNum != _lastSessionNumForLog)
+                {
+                    string sessionType = _sessionParser.GetSessionTypeForNum(currentSessionNum);
+                    string sessionName = _sessionParser.GetSessionNameForNum(currentSessionNum);
+
+                    System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Scheduling data log for {sessionName} ({sessionType}, SessionNum {currentSessionNum})");
+
+                    _sessionLogger.ScheduleLogForSession(currentSessionNum, sessionName);
+                    _lastSessionNumForLog = currentSessionNum;
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Not scheduling log - SessionNum: {currentSessionNum}, LastLogged: {_lastSessionNumForLog}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Error in CheckForSessionTransitionLog: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Convert SessionNum to readable name
+        /// </summary>
+        private string GetSessionName(int sessionNum)
+        {
+            return sessionNum switch
+            {
+                0 => "Practice",
+                1 => "Qualifying",
+                2 => "Race",
+                _ => $"Session{sessionNum}"
+            };
         }
 
         private void OnTelemetryUpdate(object sender, TelemetryData telemetryData)
@@ -328,6 +476,10 @@ namespace VISOR.Telemetry
                         SessionYamlAvailable?.Invoke(sessionInfo);
                         SessionDataUpdated?.Invoke();
                         CheckPrimedStateChange();
+
+                        // NEW: Check for session dump after successful retry
+                        CheckForSessionTransitionLog();
+
                         StopYamlRetryTimer(); // Success - stop retrying
                     }
                     else
@@ -355,6 +507,9 @@ namespace VISOR.Telemetry
                 // Stop retry timer
                 StopYamlRetryTimer();
                 _yamlRetryTimer?.Dispose();
+
+                // Dispose session logger
+                _sessionLogger?.Dispose();
 
                 _cancellationTokenSource?.Cancel();
 
