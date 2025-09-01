@@ -122,12 +122,13 @@ namespace VISOR.Views
         {
             Dispatcher.Invoke(() =>
             {
-                // The wrapper now directly implements ISessionDataProvider via the coordinator
+                // MODIFIED: The wrapper no longer implements the interface.
+                // We now pass the wrapper's public Coordinator property, which does.
                 if (_sdk.IsSessionDataReady)
                 {
-                    System.Diagnostics.Debug.WriteLine("[MainWindow] Session data ready - passing SDK wrapper");
-                    // Pass the SDK wrapper directly - it implements ISessionDataProvider
-                    _viewModel.UpdateFromTelemetry(snapshot, _sdk);
+                    System.Diagnostics.Debug.WriteLine("[MainWindow] Session data ready - passing SDK's Coordinator");
+                    // Pass the Coordinator property, which implements ISessionDataProvider
+                    _viewModel.UpdateFromTelemetry(snapshot, _sdk.Coordinator);
                 }
                 else
                 {

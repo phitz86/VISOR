@@ -17,13 +17,13 @@ namespace VISOR.Telemetry
         "SessionState", "SessionTime", "SessionTimeRemain", "SessionLapsRemain",
         "SessionLapsTotal", "SessionNum", "PlayerCarIdx", "SessionFlags"
     ])]
-    public class SVappsLABSDKWrapper : IDisposable, VISOR.ViewModels.ISessionDataProvider
+    public class SVappsLABSDKWrapper : IDisposable
     {
         #region Private Fields
         private ITelemetryClient<TelemetryData> _client;
         private readonly ILogger _logger;
         private readonly TelemetryDataBuilder _dataBuilder;
-        private readonly SessionDataCoordinator _sessionCoordinator; // NEW: Replaced SessionDataParser
+        private readonly SessionDataCoordinator _sessionCoordinator;
         private readonly SessionDataLogger _sessionLogger;
         private SVappsLABSnapshot _latestSnapshot;
         private CancellationTokenSource _cancellationTokenSource;
@@ -41,9 +41,12 @@ namespace VISOR.Telemetry
 
         #region Public Properties
         public string Name => "SVappsLAB iRacingTelemetrySDK";
-        public bool IsSessionDataReady => _sessionCoordinator.IsDataReady; // Updated
+        public bool IsSessionDataReady => _sessionCoordinator.IsDataReady;
         public bool IsConnected => _isConnected;
-        public bool IsPrimed => _isConnected && _sessionCoordinator.IsDataReady; // Updated
+        public bool IsPrimed => _isConnected && _sessionCoordinator.IsDataReady;
+
+        // NEW: Expose the coordinator for other parts of the app to use
+        public SessionDataCoordinator Coordinator => _sessionCoordinator;
         #endregion
 
         #region Events
@@ -57,10 +60,13 @@ namespace VISOR.Telemetry
         public SVappsLABSDKWrapper()
         {
             _logger = new NullLogger<SVappsLABSDKWrapper>();
-            _dataBuilder = new TelemetryDataBuilder(this);
-            _sessionCoordinator = new SessionDataCoordinator(); // NEW: Using coordinator
+            _sessionCoordinator = new SessionDataCoordinator();
+
+            // MODIFIED: Pass the coordinator directly to the builder
+            _dataBuilder = new TelemetryDataBuilder(_sessionCoordinator);
+
             _sessionLogger = new SessionDataLogger(
-                () => _sessionCoordinator.GetCachedSessionYaml(), // Updated
+                () => _sessionCoordinator.GetCachedSessionYaml(),
                 () => GetFieldTypes()
             );
 
@@ -120,9 +126,6 @@ namespace VISOR.Telemetry
         public Dictionary<string, Type> GetFieldTypes() => new Dictionary<string, Type>(TelemetryFieldRegistry.FieldTypes);
         public bool SupportsField(string fieldName) => TelemetryFieldRegistry.IsFieldSupported(fieldName);
 
-        // ========== File Logging Methods ==========
-        // All file output handled by SessionDataLogger - only console debug messages here
-
         public void LogCurrentSessionData()
         {
             // Trigger immediate logging via SessionDataLogger
@@ -133,64 +136,7 @@ namespace VISOR.Telemetry
             _sessionLogger.ScheduleLogForSession(currentSession, sessionType);
         }
 
-        // ========== ISessionDataProvider Implementation ==========
-
-        public bool IsDataReady => _sessionCoordinator.IsDataReady;
-        public string[] UserNames => _sessionCoordinator.UserNames;
-        public string[] CarNumbers => _sessionCoordinator.CarNumbers;
-        public int[] CarNumberRaw => _sessionCoordinator.CarNumberRaw;
-        public int[] CarClassIDs => _sessionCoordinator.CarClassIDs;
-        public bool[] CarIsAI => _sessionCoordinator.CarIsAI;
-        public int[] CurDriverIncidentCount => _sessionCoordinator.CurDriverIncidentCount;
-        public int IncidentLimit => _sessionCoordinator.IncidentLimit;
-
-        // ========== ISessionDataProvider Proxy Methods (for backward compatibility) ==========
-        // These methods proxy calls to the coordinator to maintain backward compatibility
-
-        public string[] GetUserNames() => UserNames;
-        public string[] GetCarNumbers() => CarNumbers;
-        public int[] GetCarNumberRaw() => CarNumberRaw;
-        public int[] GetCarClassIDs() => CarClassIDs;
-        public bool[] GetCarIsAI() => CarIsAI;
-        public int[] GetCurDriverIncidentCount() => CurDriverIncidentCount;
-        public int GetIncidentLimit() => IncidentLimit;
-
-        // ========== Enhanced Session-Aware Methods ==========
-
-        public string GetSessionType() => _sessionCoordinator.GetCurrentSessionType();
-        public string GetSessionName() => _sessionCoordinator.GetCurrentSessionName();
-        public int GetCurrentSessionNum() => _sessionCoordinator.CurrentSessionNum;
-
-        // Session type checks
-        public bool IsPracticeSession(int sessionNum) => _sessionCoordinator.IsPracticeSession(sessionNum);
-        public bool IsQualifyingSession(int sessionNum) => _sessionCoordinator.IsQualifyingSession(sessionNum);
-        public bool IsLoneQualifying(int sessionNum) => _sessionCoordinator.IsLoneQualifying(sessionNum);
-        public bool IsRaceSession(int sessionNum) => _sessionCoordinator.IsRaceSession(sessionNum);
-
-        // Current session type checks
-        public bool IsCurrentSessionPractice() => IsPracticeSession(GetCurrentSessionNum());
-        public bool IsCurrentSessionQualifying() => IsQualifyingSession(GetCurrentSessionNum());
-        public bool IsCurrentSessionLoneQualifying() => IsLoneQualifying(GetCurrentSessionNum());
-        public bool IsCurrentSessionRace() => IsRaceSession(GetCurrentSessionNum());
-
-        // Live results access
-        public List<LiveSessionData.ResultPosition> GetCurrentSessionResultsPositions() =>
-            _sessionCoordinator.GetCurrentSessionResultsPositions();
-
-        public List<LiveSessionData.FastestLapResult> GetCurrentSessionFastestLaps() =>
-            _sessionCoordinator.GetCurrentSessionFastestLaps();
-
-        // Helper methods for RelativeViewModel
-        public bool ShouldUseFastestLapPositioning() => _sessionCoordinator.ShouldUseFastestLapPositioning();
-        public bool ShouldHideRelativeDisplay() => _sessionCoordinator.ShouldHideRelativeDisplay();
-
-        public List<(int carIdx, float fastestTime, int position)> GetFastestLapPositioning() =>
-            _sessionCoordinator.GetFastestLapPositioning();
-
-        // Legacy methods for backward compatibility
-        public int[] GetQualifyResultsPositions() => _sessionCoordinator.GetQualifyResultsPositions();
-        public float[] GetQualifyResultsFastestTimes() => _sessionCoordinator.GetQualifyResultsFastestTimes();
-        public string GetCachedSessionYaml() => _sessionCoordinator.GetCachedSessionYaml();
+        // REMOVED: All ISessionDataProvider implementation and proxy methods have been deleted.
 
         private void OnConnectStateChanged(object sender, EventArgs e)
         {
@@ -207,7 +153,7 @@ namespace VISOR.Telemetry
                 {
                     // Lost connection - stop retrying and clear data
                     StopYamlRetryTimer();
-                    _sessionCoordinator.ClearCache(); // Updated
+                    _sessionCoordinator.ClearCache();
                     _lastSessionNumForLog = -1; // Reset logging tracking
                 }
                 else
@@ -222,7 +168,7 @@ namespace VISOR.Telemetry
 
         private void CheckPrimedStateChange()
         {
-            bool isPrimed = _isConnected && _sessionCoordinator.IsDataReady; // Updated
+            bool isPrimed = _isConnected && _sessionCoordinator.IsDataReady;
             PrimedStateChanged?.Invoke(isPrimed);
         }
 
@@ -236,27 +182,22 @@ namespace VISOR.Telemetry
                     return;
                 }
 
-                // Get session data using the working method
                 string sessionInfo = _client.GetRawTelemetrySessionInfoYaml();
 
                 if (!string.IsNullOrEmpty(sessionInfo))
                 {
-                    // Got valid data - stop any retry timer and parse
                     StopYamlRetryTimer();
 
-                    // Check if this is new data before parsing
-                    if (_sessionCoordinator.HasSessionDataChanged(sessionInfo)) // Updated
+                    if (_sessionCoordinator.HasSessionDataChanged(sessionInfo))
                     {
                         Console.WriteLine($"[SVappsLAB] New session data received, length: {sessionInfo.Length}");
 
-                        if (_sessionCoordinator.ParseSessionData(sessionInfo)) // Updated
+                        if (_sessionCoordinator.ParseSessionData(sessionInfo))
                         {
                             System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Session data parsed successfully");
                             SessionYamlAvailable?.Invoke(sessionInfo);
                             SessionDataUpdated?.Invoke();
                             CheckPrimedStateChange();
-
-                            // Check if this represents a session transition for logging
                             CheckForSessionTransitionLog();
                         }
                         else
@@ -275,35 +216,25 @@ namespace VISOR.Telemetry
             catch (Exception ex)
             {
                 Console.WriteLine($"[SVappsLAB] Error in OnSessionInfoUpdate: {ex.Message}");
-                StartYamlRetryTimer(); // Retry on any error
+                StartYamlRetryTimer();
             }
         }
 
-        /// <summary>
-        /// Check for session transitions and schedule logging accordingly
-        /// This is called from OnSessionInfoUpdate when session data changes
-        /// </summary>
         private void CheckForSessionTransitionLog()
         {
             try
             {
-                // Use CurrentSessionNum from the coordinator
                 int currentSessionNum = _sessionCoordinator.CurrentSessionNum;
-
                 System.Diagnostics.Debug.WriteLine($"[SVappsLAB] CheckForSessionTransitionLog: CurrentSessionNum={currentSessionNum}, LastLogged={_lastSessionNumForLog}");
 
-                // Only log for valid sessions that we haven't logged yet
                 if (currentSessionNum >= 0 && currentSessionNum <= 2 && currentSessionNum != _lastSessionNumForLog)
                 {
                     string sessionType = _sessionCoordinator.GetSessionType(currentSessionNum);
                     string sessionName = _sessionCoordinator.GetSessionName(currentSessionNum);
-
-                    // Get session duration from the coordinator
                     double sessionTimeSeconds = GetSessionTimeSeconds(currentSessionNum);
 
                     System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Scheduling session-aware log for {sessionName} ({sessionType}, SessionNum {currentSessionNum}, Duration: {sessionTimeSeconds}s)");
 
-                    // Use session-aware logging with duration
                     _sessionLogger.ScheduleSessionAwareLogs(currentSessionNum, sessionName, sessionTimeSeconds);
                     _lastSessionNumForLog = currentSessionNum;
                 }
@@ -318,14 +249,10 @@ namespace VISOR.Telemetry
             }
         }
 
-        /// <summary>
-        /// Get session duration from the coordinator
-        /// </summary>
         private double GetSessionTimeSeconds(int sessionNum)
         {
             try
             {
-                // Get actual session duration from parsed YAML data
                 double sessionTimeSeconds = _sessionCoordinator.GetSessionTimeSeconds(sessionNum);
 
                 if (sessionTimeSeconds > 0)
@@ -334,23 +261,22 @@ namespace VISOR.Telemetry
                 }
                 else
                 {
-                    // Fallback to sensible defaults if YAML parsing didn't get duration
                     string sessionType = _sessionCoordinator.GetSessionType(sessionNum);
                     System.Diagnostics.Debug.WriteLine($"[SVappsLAB] No session duration found, using fallback for {sessionType}");
 
                     return sessionType.ToLowerInvariant() switch
                     {
-                        var type when type.Contains("practice") => 1200.0, // 20 minutes
-                        var type when type.Contains("qualify") => 900.0,   // 15 minutes  
-                        var type when type.Contains("race") => 1800.0,     // 30 minutes
-                        _ => 900.0 // 15 minute fallback
+                        var type when type.Contains("practice") => 1200.0,
+                        var type when type.Contains("qualify") => 900.0,
+                        var type when type.Contains("race") => 1800.0,
+                        _ => 900.0
                     };
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Error getting session time: {ex.Message}");
-                return 900.0; // 15 minute fallback
+                return 900.0;
             }
         }
 
@@ -362,7 +288,7 @@ namespace VISOR.Telemetry
 
                 _latestSnapshot = new SVappsLABSnapshot(
                     telemetryDict,
-                    _sessionCoordinator.GetCachedSessionYaml(), // Updated
+                    _sessionCoordinator.GetCachedSessionYaml(),
                     DateTime.UtcNow
                 );
 
@@ -378,7 +304,7 @@ namespace VISOR.Telemetry
         {
             lock (_retryLock)
             {
-                if (!_isRetryingYaml && _isConnected && !_sessionCoordinator.IsDataReady) // Updated
+                if (!_isRetryingYaml && _isConnected && !_sessionCoordinator.IsDataReady)
                 {
                     Console.WriteLine("[SVappsLAB] Starting YAML retry timer");
                     _isRetryingYaml = true;
@@ -404,8 +330,7 @@ namespace VISOR.Telemetry
         {
             try
             {
-                // Don't retry if we already have data or aren't connected
-                if (!_isConnected || _sessionCoordinator.IsDataReady) // Updated
+                if (!_isConnected || _sessionCoordinator.IsDataReady)
                 {
                     StopYamlRetryTimer();
                     return;
@@ -418,17 +343,14 @@ namespace VISOR.Telemetry
                 {
                     Console.WriteLine($"[SVappsLAB] Retry successful - got session data, length: {sessionInfo.Length}");
 
-                    if (_sessionCoordinator.ParseSessionData(sessionInfo)) // Updated
+                    if (_sessionCoordinator.ParseSessionData(sessionInfo))
                     {
                         Console.WriteLine("[SVappsLAB] Retry parse successful");
                         SessionYamlAvailable?.Invoke(sessionInfo);
                         SessionDataUpdated?.Invoke();
                         CheckPrimedStateChange();
-
-                        // Check for session dump after successful retry
                         CheckForSessionTransitionLog();
-
-                        StopYamlRetryTimer(); // Success - stop retrying
+                        StopYamlRetryTimer();
                     }
                     else
                     {
@@ -452,11 +374,9 @@ namespace VISOR.Telemetry
             {
                 Console.WriteLine("[SVappsLAB] Starting shutdown...");
 
-                // Stop retry timer
                 StopYamlRetryTimer();
                 _yamlRetryTimer?.Dispose();
 
-                // Dispose session logger
                 _sessionLogger?.Dispose();
 
                 _cancellationTokenSource?.Cancel();
@@ -476,7 +396,7 @@ namespace VISOR.Telemetry
                 }
 
                 _cancellationTokenSource?.Dispose();
-                _sessionCoordinator.ClearCache(); // Updated
+                _sessionCoordinator.ClearCache();
 
                 Console.WriteLine("[SVappsLAB] Shutdown complete");
             }

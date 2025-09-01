@@ -10,16 +10,18 @@ namespace VISOR.Telemetry
     /// </summary>
     public class TelemetryDataBuilder
     {
-        private readonly SVappsLABSDKWrapper _wrapper;
+        // MODIFIED: Changed dependency from the wrapper to the coordinator
+        private readonly SessionDataCoordinator _coordinator;
 
         // Static fields for tracking state changes
         private static int _lastSessionState = -1;
         private static int _lastSessionFlags = -1;
         private static string _lastSessionInfo = "";
 
-        public TelemetryDataBuilder(SVappsLABSDKWrapper wrapper)
+        // MODIFIED: Constructor now accepts the coordinator
+        public TelemetryDataBuilder(SessionDataCoordinator coordinator)
         {
-            _wrapper = wrapper ?? throw new ArgumentNullException(nameof(wrapper));
+            _coordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
         }
 
         /// <summary>
@@ -38,7 +40,7 @@ namespace VISOR.Telemetry
                 AddSessionData(dict, telemetryData);
                 AddPlayerData(dict, telemetryData);
 
-                // Merge in YAML-parsed data from wrapper's session parser
+                // Merge in YAML-parsed data from the coordinator
                 AddYamlData(dict);
             }
             catch (Exception ex)
@@ -113,23 +115,23 @@ namespace VISOR.Telemetry
 
         private void AddYamlData(Dictionary<string, object> dict)
         {
-            // Add YAML-parsed arrays from session parser
-            dict["CarIdxUserName"] = _wrapper.GetUserNames();
-            dict["CarIdxCarNumber"] = _wrapper.GetCarNumbers();
-            dict["CarIdxCarNumberRaw"] = _wrapper.GetCarNumberRaw();
-            dict["CarIdxClassID"] = _wrapper.GetCarClassIDs();
-            dict["CarIdxIsAI"] = _wrapper.GetCarIsAI();
-            dict["CarIdxIncidentCount"] = _wrapper.GetCurDriverIncidentCount();
+            // MODIFIED: Get YAML-parsed arrays from the coordinator's cached properties
+            dict["CarIdxUserName"] = _coordinator.UserNames;
+            dict["CarIdxCarNumber"] = _coordinator.CarNumbers;
+            dict["CarIdxCarNumberRaw"] = _coordinator.CarNumberRaw;
+            dict["CarIdxClassID"] = _coordinator.CarClassIDs;
+            dict["CarIdxIsAI"] = _coordinator.CarIsAI;
+            dict["CarIdxIncidentCount"] = _coordinator.CurDriverIncidentCount;
 
-            // NEW: Add session-specific YAML data
-            dict["SessionType"] = _wrapper.GetSessionType();
-            dict["SessionName"] = _wrapper.GetSessionName();
-            dict["QualifyResultsPositions"] = _wrapper.GetQualifyResultsPositions();
-            dict["QualifyResultsFastestTimes"] = _wrapper.GetQualifyResultsFastestTimes();
+            // MODIFIED: Get session-specific YAML data from coordinator methods
+            dict["SessionType"] = _coordinator.GetCurrentSessionType();
+            dict["SessionName"] = _coordinator.GetCurrentSessionName();
+            dict["QualifyResultsPositions"] = _coordinator.GetQualifyResultsPositions();
+            dict["QualifyResultsFastestTimes"] = _coordinator.GetQualifyResultsFastestTimes();
 
             // DEBUG: Log session info when it's available
-            var sessionType = _wrapper.GetSessionType();
-            var sessionName = _wrapper.GetSessionName();
+            var sessionType = _coordinator.GetCurrentSessionType();
+            var sessionName = _coordinator.GetCurrentSessionName();
             if (!string.IsNullOrEmpty(sessionType))
             {
                 string currentSessionInfo = $"{sessionType}({sessionName})";
@@ -139,7 +141,7 @@ namespace VISOR.Telemetry
                     System.Diagnostics.Debug.WriteLine($"[DataBuilder] Session Info: {currentSessionInfo}");
 
                     // Count human vs AI drivers for debug
-                    var carIsAI = _wrapper.GetCarIsAI();
+                    var carIsAI = _coordinator.CarIsAI;
                     int humanCount = 0, aiCount = 0;
                     foreach (var isAI in carIsAI)
                     {

@@ -13,116 +13,79 @@
         Width="750" Height="580">
 
     <Window.Resources>
-        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
-        <viewModels:DeltaBarWidthConverter x:Key="DeltaBarWidthConverter"/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Resources/Styles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+            <viewModels:DeltaBarWidthConverter x:Key="DeltaBarWidthConverter"/>
+        </ResourceDictionary>
     </Window.Resources>
 
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <!-- Row 0: Class Pos + Gear -->
             <RowDefinition Height="Auto"/>
-            <!-- Row 1: Fuel + Time -->
             <RowDefinition Height="Auto"/>
-            <!-- Row 2: Lap Delta Bar -->
             <RowDefinition Height="Auto"/>
-            <!-- Row 3: Lap Times -->
             <RowDefinition Height="Auto"/>
-            <!-- Row 4: Relative Block -->
             <RowDefinition Height="Auto"/>
-            <!-- Row 5: Warnings -->
             <RowDefinition Height="Auto"/>
-            <!-- Row 6: StatusText -->
         </Grid.RowDefinitions>
 
-        <!-- Columns used for all 2-column rows -->
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- Row 0: Gear | Class Position -->
         <StackPanel Grid.Row="0" Grid.Column="0"
                     Orientation="Horizontal"
-            Visibility="{Binding ShowGear, Converter={StaticResource BoolToVisibilityConverter}}"
-            HorizontalAlignment="Center">
-            <TextBlock Text="⚙" FontSize="56" Foreground="White"
-           HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,8,0">
-                <TextBlock.Effect>
-                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
-                </TextBlock.Effect>
-            </TextBlock>
+                    Visibility="{Binding ShowGear, Converter={StaticResource BoolToVisibilityConverter}}"
+                    HorizontalAlignment="Center">
+            <TextBlock Text="⚙" FontSize="56" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,8,0"/>
 
             <TextBlock Text="{Binding GearDisplay}"
-               FontSize="80" FontWeight="Bold"
-               FontFamily="pack://application:,,,/Resources/Fonts/#Digital-7"
-               Foreground="White"
-               HorizontalAlignment="Center" VerticalAlignment="Bottom">
-                <TextBlock.Effect>
-                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
-                </TextBlock.Effect>
-            </TextBlock>
+                       FontSize="80" FontWeight="Bold"
+                       FontFamily="pack://application:,,,/Resources/Fonts/#Digital-7"
+                       Foreground="White"
+                       HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
         </StackPanel>
 
         <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" 
-            HorizontalAlignment="Center" VerticalAlignment="Center"
-            Visibility="{Binding ShowPosition, Converter={StaticResource BoolToVisibilityConverter}}">
+                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Visibility="{Binding ShowPosition, Converter={StaticResource BoolToVisibilityConverter}}">
             <TextBlock Text="P"
-               FontSize="60" 
-               FontFamily="Segoe UI"
-               FontWeight="Bold"
-               Foreground="White"
-               VerticalAlignment="Center" 
-               Margin="0,0,8,0">
-                <TextBlock.Effect>
-                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
-                </TextBlock.Effect>
-            </TextBlock>
+                       FontSize="60" 
+                       FontFamily="Segoe UI"
+                       FontWeight="Bold"
+                       Foreground="White"
+                       VerticalAlignment="Center" 
+                       Margin="0,0,8,0"/>
+
             <TextBlock Text="{Binding ClassPositionNumber}"
-               FontSize="72" 
-               FontFamily="pack://application:,,,/Resources/Fonts/#Digital-7"
-               Foreground="White"
-               VerticalAlignment="Center">
-                <TextBlock.Effect>
-                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
-                </TextBlock.Effect>
-            </TextBlock>
+                       FontSize="72" 
+                       FontFamily="pack://application:,,,/Resources/Fonts/#Digital-7"
+                       Foreground="White"
+                       VerticalAlignment="Center"/>
         </StackPanel>
 
-        <!-- Row 1: Time/Laps Remaining | Fuel Remaining -->
         <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal"
                     Visibility="{Binding ShowTimeRemaining, Converter={StaticResource BoolToVisibilityConverter}}"
                     HorizontalAlignment="Center">
-            <TextBlock Text="{Binding TimeRemainingSymbol}" FontSize="36" Margin="0,0,8,0" Foreground="White">
-                <TextBlock.Effect>
-                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
-                </TextBlock.Effect>
-            </TextBlock>
+            <TextBlock Text="{Binding TimeRemainingSymbol}" FontSize="36" Margin="0,0,8,0" Foreground="White"/>
 
-            <TextBlock Text="{Binding TimeRemainingDisplay}" FontSize="36" Foreground="White">
-                <TextBlock.Effect>
-                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
-                </TextBlock.Effect>
-            </TextBlock>
+            <TextBlock Text="{Binding TimeRemainingDisplay}" FontSize="36" Foreground="White"/>
         </StackPanel>
 
         <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal"
             Visibility="{Binding ShowFuelRemaining, Converter={StaticResource BoolToVisibilityConverter}}"
             HorizontalAlignment="Center">
-            <TextBlock Text="⛽" FontSize="36" Margin="0,0,8,0" Foreground="Red">
-                <TextBlock.Effect>
-                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
-                </TextBlock.Effect>
-            </TextBlock>
+            <TextBlock Text="⛽" FontSize="36" Margin="0,0,8,0" Foreground="Red"/>
 
-            <TextBlock Text="{Binding FuelVM.FuelDisplay}" FontSize="36" Foreground="White">
-                <TextBlock.Effect>
-                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
-                </TextBlock.Effect>
-            </TextBlock>
+            <TextBlock Text="{Binding FuelVM.FuelDisplay}" FontSize="36" Foreground="White"/>
         </StackPanel>
 
-        <!-- Row 2: Full-width Lap Delta Bar -->
         <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Height="12" Background="#333333"
                 Visibility="{Binding ShowLapDelta, Converter={StaticResource BoolToVisibilityConverter}}"
                 Margin="0,10,0,0" CornerRadius="6">
@@ -133,7 +96,6 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Left bar (slower - red) -->
                 <Rectangle Grid.Column="0" 
                            Fill="{Binding DeltaBarVM.LeftBarColor}"
                            HorizontalAlignment="Right">
@@ -145,7 +107,6 @@
                     </Rectangle.Width>
                 </Rectangle>
 
-                <!-- Right bar (faster - green) -->
                 <Rectangle Grid.Column="1" 
                            Fill="{Binding DeltaBarVM.RightBarColor}"
                            HorizontalAlignment="Left">
@@ -157,45 +118,26 @@
                     </Rectangle.Width>
                 </Rectangle>
 
-                <!-- Center line -->
                 <Rectangle Grid.ColumnSpan="2" Width="2" Fill="White" HorizontalAlignment="Center"/>
             </Grid>
         </Border>
 
-        <!-- Row 3: Last Lap | Best Lap -->
         <StackPanel Grid.Row="3" Grid.Column="0" Orientation="Horizontal"
             Visibility="{Binding ShowLapTimes, Converter={StaticResource BoolToVisibilityConverter}}"
             HorizontalAlignment="Center">
-            <TextBlock Text="⏱" FontSize="30" Margin="0,0,8,0" Foreground="White">
-                <TextBlock.Effect>
-                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
-                </TextBlock.Effect>
-            </TextBlock>
+            <TextBlock Text="⏱" FontSize="30" Margin="0,0,8,0" Foreground="White"/>
 
-            <TextBlock Text="{Binding LastLapTime}" FontSize="30" Foreground="White">
-                <TextBlock.Effect>
-                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
-                </TextBlock.Effect>
-            </TextBlock>
+            <TextBlock Text="{Binding LastLapTime}" FontSize="30" Foreground="White"/>
         </StackPanel>
 
         <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal"
             Visibility="{Binding ShowLapTimes, Converter={StaticResource BoolToVisibilityConverter}}"
             HorizontalAlignment="Center">
-            <TextBlock Text="🏆" FontSize="30" Foreground="DarkGoldenrod" Margin="0,0,8,0">
-                <TextBlock.Effect>
-                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
-                </TextBlock.Effect>
-            </TextBlock>
+            <TextBlock Text="🏆" FontSize="30" Foreground="DarkGoldenrod" Margin="0,0,8,0"/>
 
-            <TextBlock Text="{Binding BestLapTime}" FontSize="30" Foreground="White">
-                <TextBlock.Effect>
-                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
-                </TextBlock.Effect>
-            </TextBlock>
+            <TextBlock Text="{Binding BestLapTime}" FontSize="30" Foreground="White"/>
         </StackPanel>
 
-        <!-- Row 4: Full-width Relative Block -->
         <ItemsControl Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2"
                       ItemsSource="{Binding RelativeVM.RelativeRows}"
                       Visibility="{Binding ShowRelative, Converter={StaticResource BoolToVisibilityConverter}}"
@@ -209,34 +151,17 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="80"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="{Binding ClassPos}" Grid.Column="0" FontSize="24" HorizontalAlignment="Center" Foreground="White" Margin="0,0,8,0">
-                            <TextBlock.Effect>
-                                <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
-                            </TextBlock.Effect>
-                        </TextBlock>
+                        <TextBlock Text="{Binding ClassPos}" Grid.Column="0" FontSize="24" HorizontalAlignment="Center" Foreground="White" Margin="0,0,8,0"/>
                         <Border Grid.Column="1" Background="{Binding ClassBackground}" Padding="4" CornerRadius="3" Margin="0,0,8,0">
-                            <TextBlock Text="{Binding CarNum}" FontSize="24" HorizontalAlignment="Center" FontWeight="Bold">
-                                <TextBlock.Effect>
-                                    <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
-                                </TextBlock.Effect>
-                            </TextBlock>
+                            <TextBlock Text="{Binding CarNum}" FontSize="24" HorizontalAlignment="Center" FontWeight="Bold"/>
                         </Border>
-                        <TextBlock Text="{Binding Name}" Grid.Column="2" FontSize="24" Foreground="{Binding NameColor}" FontStyle="{Binding FontStyle}" Margin="8,0">
-                            <TextBlock.Effect>
-                                <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
-                            </TextBlock.Effect>
-                        </TextBlock>
-                        <TextBlock Text="{Binding Gap}" Grid.Column="3" FontSize="24" HorizontalAlignment="Right" Foreground="White" Margin="8,0,0,0">
-                            <TextBlock.Effect>
-                                <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
-                            </TextBlock.Effect>
-                        </TextBlock>
+                        <TextBlock Text="{Binding Name}" Grid.Column="2" FontSize="24" Foreground="{Binding NameColor}" FontStyle="{Binding FontStyle}" Margin="8,0"/>
+                        <TextBlock Text="{Binding Gap}" Grid.Column="3" FontSize="24" HorizontalAlignment="Right" Foreground="White" Margin="8,0,0,0"/>
                     </Grid>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <!-- Row 5: Incident Points | Connection Health -->
         <Grid Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2"
               Visibility="{Binding ShowWarnings, Converter={StaticResource BoolToVisibilityConverter}}"
               Margin="0,5,0,0">
@@ -245,32 +170,16 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Incident Points Counter -->
             <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Center">
-                <TextBlock Text="⚠️" FontSize="36" Margin="0,0,10,0" Foreground="{Binding WarningsVM.IncidentColor}">
-                    <TextBlock.Effect>
-                        <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
-                    </TextBlock.Effect>
-                </TextBlock>
-                <TextBlock Text="{Binding WarningsVM.IncidentDisplay}" FontSize="36" Foreground="{Binding WarningsVM.IncidentColor}">
-                    <TextBlock.Effect>
-                        <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
-                    </TextBlock.Effect>
-                </TextBlock>
+                <TextBlock Text="⚠️" FontSize="36" Margin="0,0,10,0" Foreground="{Binding WarningsVM.IncidentColor}"/>
+                <TextBlock Text="{Binding WarningsVM.IncidentDisplay}" FontSize="36" Foreground="{Binding WarningsVM.IncidentColor}"/>
             </StackPanel>
 
-            <!-- Connection Health -->
             <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
-                <TextBlock Text="📶" FontSize="36" Foreground="{Binding WarningsVM.ConnectionColor}">
-                    <TextBlock.Effect>
-                        <DropShadowEffect BlurRadius="1" ShadowDepth="1" Color="Black" Opacity="0.8"/>
-                    </TextBlock.Effect>
-                </TextBlock>
+                <TextBlock Text="📶" FontSize="36" Foreground="{Binding WarningsVM.ConnectionColor}"/>
             </StackPanel>
         </Grid>
 
-        <!-- Row 6: Status Text Overlay at the Bottom -->
         <TextBlock x:Name="StatusText" Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" Text="Status..." Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,10,0,10" Visibility="Collapsed"/>
-
     </Grid>
 </Window>

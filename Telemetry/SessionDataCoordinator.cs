@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace VISOR.Telemetry
 {
     /// <summary>
     /// Coordinates all parsing and provides unified access to session data
     /// </summary>
-    public class SessionDataCoordinator : VISOR.ViewModels.ISessionDataProvider
+    // MODIFIED: No longer needs to specify the ViewModels namespace for the interface.
+    public class SessionDataCoordinator : ISessionDataProvider
     {
         private readonly StaticEventParser _staticParser = new();
         private readonly SessionTransitionParser _transitionParser = new();
@@ -21,19 +23,22 @@ namespace VISOR.Telemetry
 
         public bool IsDataReady { get; private set; }
 
+        // NEW: Private backing fields for cached arrays to improve performance
+        private readonly string[] _userNamesCache = new string[64];
+        private readonly string[] _carNumbersCache = new string[64];
+        private readonly int[] _carNumberRawCache = new int[64];
+        private readonly int[] _carClassIDsCache = new int[64];
+        private readonly bool[] _carIsAICache = new bool[64];
+        private readonly int[] _curDriverIncidentCountCache = new int[64];
+
         // ========== ISessionDataProvider Implementation ==========
 
+        // MODIFIED: Properties now return cached arrays
         public string[] UserNames
         {
             get
             {
-                lock (_parseLock)
-                {
-                    var names = new string[64];
-                    foreach (var kvp in _staticData.Drivers)
-                        names[kvp.Key] = kvp.Value.UserName;
-                    return names;
-                }
+                lock (_parseLock) { return _userNamesCache; }
             }
         }
 
@@ -41,13 +46,7 @@ namespace VISOR.Telemetry
         {
             get
             {
-                lock (_parseLock)
-                {
-                    var numbers = new string[64];
-                    foreach (var kvp in _staticData.Drivers)
-                        numbers[kvp.Key] = kvp.Value.CarNumber;
-                    return numbers;
-                }
+                lock (_parseLock) { return _carNumbersCache; }
             }
         }
 
@@ -55,13 +54,7 @@ namespace VISOR.Telemetry
         {
             get
             {
-                lock (_parseLock)
-                {
-                    var numbers = new int[64];
-                    foreach (var kvp in _staticData.Drivers)
-                        numbers[kvp.Key] = kvp.Value.CarNumberRaw;
-                    return numbers;
-                }
+                lock (_parseLock) { return _carNumberRawCache; }
             }
         }
 
@@ -69,13 +62,7 @@ namespace VISOR.Telemetry
         {
             get
             {
-                lock (_parseLock)
-                {
-                    var classIds = new int[64];
-                    foreach (var kvp in _staticData.Drivers)
-                        classIds[kvp.Key] = kvp.Value.CarClassID;
-                    return classIds;
-                }
+                lock (_parseLock) { return _carClassIDsCache; }
             }
         }
 
@@ -83,13 +70,7 @@ namespace VISOR.Telemetry
         {
             get
             {
-                lock (_parseLock)
-                {
-                    var isAI = new bool[64];
-                    foreach (var kvp in _staticData.Drivers)
-                        isAI[kvp.Key] = kvp.Value.IsAI;
-                    return isAI;
-                }
+                lock (_parseLock) { return _carIsAICache; }
             }
         }
 
@@ -97,13 +78,7 @@ namespace VISOR.Telemetry
         {
             get
             {
-                lock (_parseLock)
-                {
-                    var counts = new int[64];
-                    foreach (var kvp in _transitionData.DriverIncidentCounts)
-                        counts[kvp.Key] = kvp.Value;
-                    return counts;
-                }
+                lock (_parseLock) { return _curDriverIncidentCountCache; }
             }
         }
 
@@ -265,7 +240,7 @@ namespace VISOR.Telemetry
             }
         }
 
-        // ========== Helper Methods for RelativeViewModel ==========
+        // ========== Helper Methods for RelativeViewModel (fulfilling ISessionDataProvider contract) ==========
 
         /// <summary>
         /// Determines if the current session should use fastest lap positioning
@@ -372,6 +347,10 @@ namespace VISOR.Telemetry
                     {
                         _lastDataHash = currentHash;
                         _cachedSessionYaml = sessionData; // Cache the raw YAML
+
+                        // NEW: Update cached arrays now that new data has been parsed
+                        UpdateDriverDataCaches();
+
                         IsDataReady = true;
 
                         // Debug output
@@ -391,6 +370,42 @@ namespace VISOR.Telemetry
             return false;
         }
 
+        /// <summary>
+        /// NEW: Updates the cached driver data arrays. Called only when session data changes.
+        /// </summary>
+        private void UpdateDriverDataCaches()
+        {
+            // Clear old data to handle drivers leaving the session
+            Array.Fill(_userNamesCache, null);
+            Array.Fill(_carNumbersCache, null);
+            Array.Fill(_carNumberRawCache, 0);
+            Array.Fill(_carClassIDsCache, 0);
+            Array.Fill(_carIsAICache, false);
+            Array.Fill(_curDriverIncidentCountCache, 0);
+
+            // Populate static data from the parsed models
+            foreach (var kvp in _staticData.Drivers)
+            {
+                if (kvp.Key >= 0 && kvp.Key < 64)
+                {
+                    _userNamesCache[kvp.Key] = kvp.Value.UserName;
+                    _carNumbersCache[kvp.Key] = kvp.Value.CarNumber;
+                    _carNumberRawCache[kvp.Key] = kvp.Value.CarNumberRaw;
+                    _carClassIDsCache[kvp.Key] = kvp.Value.CarClassID;
+                    _carIsAICache[kvp.Key] = kvp.Value.IsAI;
+                }
+            }
+
+            // Populate transition data from the parsed models
+            foreach (var kvp in _transitionData.DriverIncidentCounts)
+            {
+                if (kvp.Key >= 0 && kvp.Key < 64)
+                {
+                    _curDriverIncidentCountCache[kvp.Key] = kvp.Value;
+                }
+            }
+        }
+
         public void ClearCache()
         {
             lock (_parseLock)
@@ -408,6 +423,9 @@ namespace VISOR.Telemetry
                 _liveData.QualifyFastestTimes.Clear();
                 _lastDataHash = string.Empty;
                 IsDataReady = false;
+
+                // NEW: Clear the cached arrays as well
+                UpdateDriverDataCaches();
             }
         }
 
@@ -432,7 +450,5 @@ namespace VISOR.Telemetry
                 return currentHash != _lastDataHash;
             }
         }
-
-
     }
 }
