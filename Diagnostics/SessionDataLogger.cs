@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
@@ -7,19 +8,20 @@ using System.Timers;
 namespace VISOR.Diagnostics
 {
     /// <summary>
-    /// Simple session data logger that dumps YAML and telemetry info
-    /// for debugging what data is available during different session types
+    /// Session-aware data logger that creates multi-interval logs based on session duration
+    /// Adapts logging intervals to session length for optimal data capture
     /// </summary>
     public class SessionDataLogger : IDisposable
     {
         private readonly string _outputDirectory;
-        private System.Timers.Timer _dumpTimer;
-        private int _lastLoggedSessionNum = -1;
-        private bool _isLogging = false;
-        private Func<string> _getSessionYaml;
-        private Func<System.Collections.Generic.Dictionary<string, Type>> _getFieldTypes;
+        private readonly List<System.Timers.Timer> _activeTimers = new();
+        private readonly HashSet<int> _loggedSessions = new();
+        private bool _isDisposed = false;
 
-        public SessionDataLogger(Func<string> getSessionYaml, Func<System.Collections.Generic.Dictionary<string, Type>> getFieldTypes)
+        private readonly Func<string> _getSessionYaml;
+        private readonly Func<Dictionary<string, Type>> _getFieldTypes;
+
+        public SessionDataLogger(Func<string> getSessionYaml, Func<Dictionary<string, Type>> getFieldTypes)
         {
             _getSessionYaml = getSessionYaml;
             _getFieldTypes = getFieldTypes;
@@ -32,81 +34,149 @@ namespace VISOR.Diagnostics
         }
 
         /// <summary>
-        /// Schedule a data dump for 2 minutes after a session change
+        /// Schedule session-aware logs based on session duration
+        /// Creates multiple log points optimized for different session lengths
         /// </summary>
-        public void ScheduleLogForSession(int sessionNum, string sessionType)
+        public void ScheduleSessionAwareLogs(int sessionNum, string sessionType, double sessionTimeSeconds)
         {
-            if (_isLogging || sessionNum == _lastLoggedSessionNum)
+            if (_isDisposed) return;
+
+            if (_loggedSessions.Contains(sessionNum))
             {
-                Debug.WriteLine($"[SessionLogger] Already logged or logging for session {sessionNum}, skipping");
+                Debug.WriteLine($"[SessionLogger] Already scheduled logging for session {sessionNum}, skipping");
                 return;
             }
 
-            Debug.WriteLine($"[SessionLogger] Scheduling log for SessionNum {sessionNum} ({sessionType}) in 2 minutes");
+            _loggedSessions.Add(sessionNum);
 
-            // Cancel any existing timer
-            _dumpTimer?.Stop();
-            _dumpTimer?.Dispose();
-
-            // Create new timer for 2 minutes
-            _dumpTimer = new System.Timers.Timer(120000);
-            _dumpTimer.Elapsed += async (sender, e) =>
+            if (sessionTimeSeconds <= 0)
             {
-                Debug.WriteLine($"[SessionLogger] Timer elapsed - executing log for {sessionType}");
-                await ExecuteLog(sessionNum, sessionType);
-                _dumpTimer?.Stop();
-                _dumpTimer?.Dispose();
-            };
-            _dumpTimer.AutoReset = false;
-            _dumpTimer.Start();
+                Debug.WriteLine($"[SessionLogger] Invalid session time ({sessionTimeSeconds}s) for {sessionType}, using fallback logging");
+                ScheduleLogForSession(sessionNum, sessionType); // Fallback to simple 2-minute log
+                return;
+            }
+
+            Debug.WriteLine($"[SessionLogger] Scheduling session-aware logs for {sessionType} ({sessionTimeSeconds}s duration):");
+
+            // Always log early (2 minutes)
+            ScheduleLogAtInterval(sessionNum, sessionType, TimeSpan.FromMinutes(2), "early");
+            Debug.WriteLine($"[SessionLogger]   Early log: 2 minutes");
+
+            // If session > 10 minutes, add a mid-session log
+            if (sessionTimeSeconds > 600) // 10 minutes
+            {
+                var midTime = TimeSpan.FromSeconds(sessionTimeSeconds * 0.6); // 60% through session
+                ScheduleLogAtInterval(sessionNum, sessionType, midTime, "mid");
+                Debug.WriteLine($"[SessionLogger]   Mid log: {midTime.TotalMinutes:F1} minutes");
+            }
+
+            // Always log near the end (30 seconds before session ends, or 90% through if very short)
+            var endTime = TimeSpan.FromSeconds(Math.Max(sessionTimeSeconds - 30, sessionTimeSeconds * 0.9));
+            ScheduleLogAtInterval(sessionNum, sessionType, endTime, "late");
+            Debug.WriteLine($"[SessionLogger]   Late log: {endTime.TotalMinutes:F1} minutes");
+
+            Debug.WriteLine($"[SessionLogger] Total scheduled logs for {sessionType}: {(sessionTimeSeconds > 600 ? 3 : 2)}");
         }
 
         /// <summary>
-        /// Execute the session data logging
+        /// Legacy method for backward compatibility - uses simple 2-minute delay
         /// </summary>
-        private async Task ExecuteLog(int sessionNum, string sessionType)
+        public void ScheduleLogForSession(int sessionNum, string sessionType)
         {
-            if (_isLogging) return;
+            if (_isDisposed) return;
 
-            _isLogging = true;
-            _lastLoggedSessionNum = sessionNum;
+            if (_loggedSessions.Contains(sessionNum))
+            {
+                Debug.WriteLine($"[SessionLogger] Already scheduled logging for session {sessionNum}, skipping");
+                return;
+            }
+
+            _loggedSessions.Add(sessionNum);
+            Debug.WriteLine($"[SessionLogger] Scheduling simple log for SessionNum {sessionNum} ({sessionType}) in 2 minutes");
+
+            ScheduleLogAtInterval(sessionNum, sessionType, TimeSpan.FromMinutes(2), "simple");
+        }
+
+        /// <summary>
+        /// Schedule a log at a specific interval with a suffix for the filename
+        /// </summary>
+        private void ScheduleLogAtInterval(int sessionNum, string sessionType, TimeSpan delay, string suffix)
+        {
+            if (_isDisposed) return;
+
+            var timer = new System.Timers.Timer(delay.TotalMilliseconds);
+            timer.Elapsed += async (sender, e) =>
+            {
+                Debug.WriteLine($"[SessionLogger] Timer elapsed - executing {suffix} log for {sessionType}");
+                await ExecuteLog(sessionNum, sessionType, suffix);
+
+                // Clean up this timer
+                timer.Stop();
+                timer.Dispose();
+                lock (_activeTimers)
+                {
+                    _activeTimers.Remove(timer);
+                }
+            };
+
+            timer.AutoReset = false;
+
+            lock (_activeTimers)
+            {
+                if (!_isDisposed)
+                {
+                    _activeTimers.Add(timer);
+                    timer.Start();
+                }
+                else
+                {
+                    timer.Dispose();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Execute the session data logging with suffix for multiple logs per session
+        /// </summary>
+        private async Task ExecuteLog(int sessionNum, string sessionType, string suffix)
+        {
+            if (_isDisposed) return;
 
             try
             {
                 string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
                 string sessionName = GetSessionName(sessionNum);
 
-                // Log YAML data
-                await LogSessionYaml(sessionName, timestamp);
+                // Log YAML data with suffix
+                await LogSessionYaml(sessionName, timestamp, suffix);
 
-                // Log available telemetry fields
-                await LogTelemetryFields(sessionName, timestamp);
+                // Log available telemetry fields (only once per session - on early log)
+                if (suffix == "early" || suffix == "simple")
+                {
+                    await LogTelemetryFields(sessionName, timestamp);
+                }
 
-                Debug.WriteLine($"[SessionLogger] Logging completed successfully for {sessionName}");
+                Debug.WriteLine($"[SessionLogger] {suffix} logging completed successfully for {sessionName}");
                 Debug.WriteLine($"[SessionLogger] Files saved to: {_outputDirectory}");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[SessionLogger] Exception during logging: {ex.Message}");
+                Debug.WriteLine($"[SessionLogger] Exception during {suffix} logging: {ex.Message}");
                 Debug.WriteLine($"[SessionLogger] Stack trace: {ex.StackTrace}");
-            }
-            finally
-            {
-                _isLogging = false;
             }
         }
 
         /// <summary>
-        /// Log the session YAML data to file
+        /// Log the session YAML data to file with suffix
         /// </summary>
-        private async Task LogSessionYaml(string sessionName, string timestamp)
+        private async Task LogSessionYaml(string sessionName, string timestamp, string suffix)
         {
             try
             {
                 string yamlData = _getSessionYaml?.Invoke();
                 if (!string.IsNullOrEmpty(yamlData))
                 {
-                    string filename = $"Session_{sessionName}_{timestamp}.yaml";
+                    string filename = $"Session_{sessionName}_{timestamp}_{suffix}.yaml";
                     string filepath = Path.Combine(_outputDirectory, filename);
 
                     await File.WriteAllTextAsync(filepath, yamlData);
@@ -114,12 +184,12 @@ namespace VISOR.Diagnostics
                 }
                 else
                 {
-                    Debug.WriteLine("[SessionLogger] No YAML data available to log");
+                    Debug.WriteLine($"[SessionLogger] No YAML data available for {suffix} log");
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[SessionLogger] Error writing YAML: {ex.Message}");
+                Debug.WriteLine($"[SessionLogger] Error writing {suffix} YAML: {ex.Message}");
             }
         }
 
@@ -184,13 +254,26 @@ namespace VISOR.Diagnostics
         }
 
         /// <summary>
-        /// Clean up timers
+        /// Clean up all active timers
         /// </summary>
         public void Dispose()
         {
-            Debug.WriteLine("[SessionLogger] Disposing");
-            _dumpTimer?.Stop();
-            _dumpTimer?.Dispose();
+            if (_isDisposed) return;
+
+            Debug.WriteLine("[SessionLogger] Disposing - cleaning up active timers");
+            _isDisposed = true;
+
+            lock (_activeTimers)
+            {
+                foreach (var timer in _activeTimers)
+                {
+                    timer?.Stop();
+                    timer?.Dispose();
+                }
+                _activeTimers.Clear();
+            }
+
+            Debug.WriteLine($"[SessionLogger] Disposed with {_loggedSessions.Count} sessions logged");
         }
     }
 }

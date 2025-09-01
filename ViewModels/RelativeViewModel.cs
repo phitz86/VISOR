@@ -25,6 +25,12 @@ namespace VISOR.ViewModels
 
         public ObservableCollection<RelativeRowViewModel> RelativeRows { get; } = new();
 
+        // Debug throttling
+        private int _debugCounter = 0;
+        private bool _lastUsedFastestLap = false;
+        private int _lastPlayerPosition = -1;
+        private int _lastValidCarCount = -1;
+
         private string _livePlayerClassPosition = "P--";
         public string LivePlayerClassPosition
         {
@@ -55,32 +61,135 @@ namespace VISOR.ViewModels
 
         public void Update(SVappsLABSnapshot snapshot, VISOR.ViewModels.ISessionDataProvider sessionDataProvider)
         {
+            // Throttled debug - only every 60th frame (~once per second at 60fps)
+            _debugCounter++;
+            bool shouldDebug = _debugCounter % 60 == 0;
+
+            if (shouldDebug) System.Diagnostics.Debug.WriteLine("[RelativeVM] Update() called");
+
             // --- DATA READINESS CHECKS ---
             var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx");
-            if (playerCarIdx == -1) return; // Can't do anything if we don't know who the player is.
+            if (playerCarIdx == -1)
+            {
+                if (shouldDebug) System.Diagnostics.Debug.WriteLine("[RelativeVM] PlayerCarIdx is -1, returning early");
+                return; // Can't do anything if we don't know who the player is.
+            }
 
             // Don't run logic until the session YAML has been parsed.
-            if (sessionDataProvider == null || !sessionDataProvider.IsDataReady) return;
+            if (sessionDataProvider == null || !sessionDataProvider.IsDataReady)
+            {
+                if (shouldDebug) System.Diagnostics.Debug.WriteLine($"[RelativeVM] Session data not ready - provider null: {sessionDataProvider == null}, data ready: {sessionDataProvider?.IsDataReady}");
+                return;
+            }
 
-            // Get updated data arrays with new field names
+            // NEW: Session-aware positioning logic
+            var sdkWrapper = sessionDataProvider as SVappsLABSDKWrapper;
+            if (shouldDebug) System.Diagnostics.Debug.WriteLine($"[RelativeVM] SDK wrapper cast successful: {sdkWrapper != null}");
+
+            // Check if we should hide relative display entirely (lone qualifying)
+            bool shouldHide = false;
+            try
+            {
+                shouldHide = sdkWrapper?.ShouldHideRelativeDisplay() == true;
+                if (shouldDebug) System.Diagnostics.Debug.WriteLine($"[RelativeVM] ShouldHideRelativeDisplay returned: {shouldHide}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[RelativeVM] Exception in ShouldHideRelativeDisplay: {ex.Message}");
+            }
+
+            if (shouldHide)
+            {
+                if (shouldDebug) System.Diagnostics.Debug.WriteLine("[RelativeVM] Lone qualifying detected - hiding relative display");
+                RelativeRows.Clear();
+                LivePlayerClassPosition = "P--";
+                LivePlayerClassPositionNumber = "--";
+                return;
+            }
+
+            // Get updated data arrays
             var carClassIDs = sessionDataProvider.CarClassIDs;
             var userNames = sessionDataProvider.UserNames;
             var carNumbers = sessionDataProvider.CarNumbers;
             var carIsAI = sessionDataProvider.CarIsAI;
             var incidentCounts = sessionDataProvider.CurDriverIncidentCount;
 
-            int playerClassID = carClassIDs[playerCarIdx];
-            if (playerClassID == 0) return; // Wait until the player's class is known.
+            if (shouldDebug) System.Diagnostics.Debug.WriteLine($"[RelativeVM] Retrieved session data arrays - userNames count: {userNames?.Length ?? 0}");
 
-            // --- Get all necessary data arrays ---
+            int playerClassID = carClassIDs[playerCarIdx];
+            if (shouldDebug)
+            {
+                System.Diagnostics.Debug.WriteLine($"[RelativeVM] PlayerCarIdx: {playerCarIdx}, PlayerClassID: {playerClassID}");
+
+                // Debug: Show first few class IDs to see what we're getting (only on debug frames)
+                for (int i = 0; i < Math.Min(3, carClassIDs.Length); i++)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[RelativeVM] CarIdx {i}: ClassID = {carClassIDs[i]}, UserName = '{userNames[i]}'");
+                }
+            }
+
+            // FIXED: In single-class sessions, class ID 0 is valid. Only reject if player has no name (not loaded yet)
+            if (string.IsNullOrEmpty(userNames[playerCarIdx]))
+            {
+                if (shouldDebug) System.Diagnostics.Debug.WriteLine("[RelativeVM] Player has no user name yet, returning early");
+                return; // Wait until the player's data is loaded
+            }
+
+            if (shouldDebug) System.Diagnostics.Debug.WriteLine($"[RelativeVM] Player class ID: {playerClassID}");
+
+            // Get all necessary data arrays
             var lapDistPct = snapshot.GetValue<float[]>("CarIdxLapDistPct");
             var currentLap = snapshot.GetValue<int[]>("CarIdxLap");
             var trackSurface = snapshot.GetValue<int[]>("CarIdxTrackSurface");
             var playerLastLapTime = snapshot.GetValue<float>("LapLastLapTime");
 
-            if (lapDistPct == null || currentLap == null || trackSurface == null) return;
+            if (lapDistPct == null || currentLap == null || trackSurface == null)
+            {
+                if (shouldDebug) System.Diagnostics.Debug.WriteLine("[RelativeVM] Missing telemetry arrays, returning early");
+                return;
+            }
 
+            if (shouldDebug) System.Diagnostics.Debug.WriteLine($"[RelativeVM] Got telemetry arrays - trackSurface length: {trackSurface.Length}");
+
+            var allValidCars = BuildValidCarsList(trackSurface, carNumbers, userNames, carIsAI,
+                carClassIDs, incidentCounts, currentLap, lapDistPct, playerCarIdx);
+
+            if (!allValidCars.Any()) return;
+
+            // NEW: Context-aware positioning logic
+            List<RelativeRowViewModel> finalRows;
+            bool useFastestLap = sdkWrapper?.ShouldUseFastestLapPositioning() == true;
+
+            // Only debug when positioning mode changes
+            if (useFastestLap != _lastUsedFastestLap)
+            {
+                System.Diagnostics.Debug.WriteLine($"[RelativeVM] Positioning mode changed to: {(useFastestLap ? "Fastest Lap" : "Race Position")}");
+                _lastUsedFastestLap = useFastestLap;
+            }
+
+            if (useFastestLap)
+            {
+                finalRows = BuildFastestLapBasedRows(allValidCars, playerCarIdx, sdkWrapper);
+            }
+            else
+            {
+                finalRows = BuildProximityBasedRows(allValidCars, playerCarIdx, playerLastLapTime);
+            }
+
+            // Calculate player's live class position (context-aware)
+            CalculatePlayerClassPosition(allValidCars, playerClassID, playerCarIdx, sdkWrapper?.ShouldUseFastestLapPositioning() == true, sdkWrapper);
+
+            // Apply display logic (coloring, gaps, etc.)
+            ApplyDisplayLogic(finalRows, allValidCars, playerLastLapTime, sdkWrapper?.ShouldUseFastestLapPositioning() == true, sdkWrapper);
+
+            UpdateCollection(finalRows);
+        }
+
+        private List<RelativeRowViewModel> BuildValidCarsList(int[] trackSurface, string[] carNumbers, string[] userNames,
+            bool[] carIsAI, int[] carClassIDs, int[] incidentCounts, int[] currentLap, float[] lapDistPct, int playerCarIdx)
+        {
             var allValidCars = new List<RelativeRowViewModel>();
+
             for (int i = 0; i < trackSurface.Length; i++)
             {
                 // Check if car is valid: on track, has a car number, and has a driver name
@@ -128,46 +237,97 @@ namespace VISOR.ViewModels
                 }
             }
 
-            if (!allValidCars.Any()) return;
-
-            // Clean up cache for cars that are no longer valid
-            var validCarIndices = allValidCars.Select(c => c.CarIdx).ToHashSet();
-            var cacheKeysToRemove = _carCache.Keys.Where(k => !validCarIndices.Contains(k)).ToList();
-            foreach (var key in cacheKeysToRemove)
-            {
-                _carCache.Remove(key);
-            }
-
-            // Calculate player's live class position using RACE POSITION sorting (for position display)
-            var racePositionSorted = allValidCars.OrderByDescending(c => c.CurrentLap + c.LapDistPct).ToList();
-            var carsInClass = racePositionSorted.Where(c => c.ClassID == playerClassID).ToList();
-            if (carsInClass.Any())
-            {
-                int playerClassPosition = carsInClass.FindIndex(c => c.IsPlayer) + 1;
-                if (playerClassPosition > 0)
-                {
-                    LivePlayerClassPosition = $"P{playerClassPosition}";
-                    LivePlayerClassPositionNumber = playerClassPosition.ToString();
-                }
-            }
-
-            // Use proximity-based display with player hard-coded at center
-            var playerRow = allValidCars.FirstOrDefault(r => r.IsPlayer);
-            if (playerRow == null) return;
-
-            var finalRows = BuildProximityBasedRows(allValidCars, playerRow, playerLastLapTime);
-
-            // Apply all the coloring, positioning, and gap logic (now with smoothing)
-            ApplyDisplayLogic(finalRows, racePositionSorted, playerLastLapTime);
-
-            UpdateCollection(finalRows);
+            return allValidCars;
         }
 
         /// <summary>
-        /// Simple proximity approach: Player is ALWAYS in position 4, find 3 closest cars in each direction
+        /// NEW: Build relative display based on fastest lap times for practice/qualifying
         /// </summary>
-        private List<RelativeRowViewModel> BuildProximityBasedRows(List<RelativeRowViewModel> allCars, RelativeRowViewModel playerRow, float playerLastLapTime)
+        private List<RelativeRowViewModel> BuildFastestLapBasedRows(List<RelativeRowViewModel> allCars,
+            int playerCarIdx, SVappsLABSDKWrapper sdkWrapper)
         {
+            var playerRow = allCars.FirstOrDefault(r => r.IsPlayer);
+            if (playerRow == null) return new List<RelativeRowViewModel>();
+
+            // Get fastest lap positioning data from the wrapper
+            var fastestLapData = sdkWrapper.GetFastestLapPositioning();
+
+            // Create position list including cars without lap times
+            var allCarsWithPositions = new List<(RelativeRowViewModel car, int position, bool hasValidTime)>();
+
+            if (fastestLapData.Any())
+            {
+                // Cars with fastest lap times get their actual positions
+                var fastestLapLookup = fastestLapData.ToDictionary(x => x.carIdx, x => new { x.position, x.fastestTime });
+
+                foreach (var car in allCars)
+                {
+                    if (fastestLapLookup.ContainsKey(car.CarIdx) && fastestLapLookup[car.CarIdx].fastestTime > 0)
+                    {
+                        // Has valid fastest lap time
+                        allCarsWithPositions.Add((car, fastestLapLookup[car.CarIdx].position, true));
+                    }
+                    else
+                    {
+                        // No valid fastest lap time - goes to bottom
+                        allCarsWithPositions.Add((car, 999 + car.CarIdx, false)); // Use carIdx to maintain consistent ordering
+                    }
+                }
+            }
+            else
+            {
+                // No fastest lap data at all - all cars get bottom positions
+                foreach (var car in allCars)
+                {
+                    allCarsWithPositions.Add((car, 999 + car.CarIdx, false));
+                }
+            }
+
+            // Sort by position (cars with times first, then cars without times)
+            var sortedByFastestLap = allCarsWithPositions
+                .OrderBy(x => x.position)
+                .Select(x => x.car)
+                .ToList();
+
+            // Find player position in fastest lap order
+            int playerFastestLapIndex = sortedByFastestLap.FindIndex(c => c.IsPlayer);
+            if (playerFastestLapIndex == -1)
+            {
+                System.Diagnostics.Debug.WriteLine("[RelativeVM] Player not found in sorted list");
+                return new List<RelativeRowViewModel> { playerRow }; // Return just player if something went wrong
+            }
+
+            // Build display with player at center, showing cars ahead/behind in fastest lap order
+            var result = new List<RelativeRowViewModel>();
+
+            // Add 3 cars ahead of player in fastest lap order
+            for (int i = Math.Max(0, playerFastestLapIndex - 3); i < playerFastestLapIndex; i++)
+            {
+                result.Add(sortedByFastestLap[i]);
+            }
+
+            // Add player
+            result.Add(playerRow);
+
+            // Add 3 cars behind player in fastest lap order
+            for (int i = playerFastestLapIndex + 1; i < Math.Min(sortedByFastestLap.Count, playerFastestLapIndex + 4); i++)
+            {
+                result.Add(sortedByFastestLap[i]);
+            }
+
+            System.Diagnostics.Debug.WriteLine($"[RelativeVM] Built fastest lap display: Player at position {playerFastestLapIndex + 1}/{sortedByFastestLap.Count}");
+            return result;
+        }
+
+        /// <summary>
+        /// Existing proximity-based display for races
+        /// </summary>
+        private List<RelativeRowViewModel> BuildProximityBasedRows(List<RelativeRowViewModel> allCars,
+            int playerCarIdx, float playerLastLapTime)
+        {
+            var playerRow = allCars.FirstOrDefault(r => r.IsPlayer);
+            if (playerRow == null) return new List<RelativeRowViewModel>();
+
             float playerTrackPercent = playerRow.LapDistPct;
 
             // Calculate proximity for all non-player cars
@@ -260,13 +420,97 @@ namespace VISOR.ViewModels
             return result;
         }
 
-        private void ApplyDisplayLogic(List<RelativeRowViewModel> displayRows, List<RelativeRowViewModel> racePositionSorted, float playerLastLapTime)
+        private void CalculatePlayerClassPosition(List<RelativeRowViewModel> allCars, int playerClassID, int playerCarIdx, bool isFastestLapMode, SVappsLABSDKWrapper sdkWrapper)
+        {
+            if (isFastestLapMode && sdkWrapper != null)
+            {
+                // Use fastest lap positioning for class position in practice/qualifying
+                var fastestLapData = sdkWrapper.GetFastestLapPositioning();
+
+                // Get all cars in player's class
+                var classCarIndices = allCars.Where(car => car.ClassID == playerClassID).Select(car => car.CarIdx).ToList();
+
+                // Build class standings including cars without valid times
+                var classStandings = new List<(int carIdx, int position, bool hasValidTime)>();
+
+                if (fastestLapData.Any())
+                {
+                    var fastestLapLookup = fastestLapData.ToDictionary(x => x.carIdx, x => new { x.position, x.fastestTime });
+
+                    foreach (var carIdx in classCarIndices)
+                    {
+                        if (fastestLapLookup.ContainsKey(carIdx) && fastestLapLookup[carIdx].fastestTime > 0)
+                        {
+                            // Has valid fastest lap time
+                            classStandings.Add((carIdx, fastestLapLookup[carIdx].position, true));
+                        }
+                        else
+                        {
+                            // No valid fastest lap time - goes to bottom
+                            classStandings.Add((carIdx, 999 + carIdx, false));
+                        }
+                    }
+                }
+                else
+                {
+                    // No fastest lap data - all cars get bottom positions
+                    foreach (var carIdx in classCarIndices)
+                    {
+                        classStandings.Add((carIdx, 999 + carIdx, false));
+                    }
+                }
+
+                // Sort and find player position
+                var sortedClassStandings = classStandings.OrderBy(x => x.position).ToList();
+                var playerPosition = sortedClassStandings.FindIndex(x => x.carIdx == playerCarIdx) + 1;
+
+                if (playerPosition > 0)
+                {
+                    LivePlayerClassPosition = $"P{playerPosition}";
+                    LivePlayerClassPositionNumber = playerPosition.ToString();
+
+                    // Only debug when position changes
+                    if (playerPosition != _lastPlayerPosition)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[RelativeVM] Player fastest lap class position: {playerPosition}/{sortedClassStandings.Count}");
+                        _lastPlayerPosition = playerPosition;
+                    }
+                    return;
+                }
+
+                // This shouldn't happen, but fallback just in case
+                System.Diagnostics.Debug.WriteLine("[RelativeVM] Player not found in class standings");
+            }
+
+            // Default race position sorting for races or fallback
+            var racePositionSorted = allCars.OrderByDescending(c => c.CurrentLap + c.LapDistPct).ToList();
+            var carsInClass = racePositionSorted.Where(c => c.ClassID == playerClassID).ToList();
+
+            if (carsInClass.Any())
+            {
+                int playerClassPosition = carsInClass.FindIndex(c => c.IsPlayer) + 1;
+                if (playerClassPosition > 0)
+                {
+                    LivePlayerClassPosition = $"P{playerClassPosition}";
+                    LivePlayerClassPositionNumber = playerClassPosition.ToString();
+
+                    // Only debug when position changes
+                    if (playerClassPosition != _lastPlayerPosition)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[RelativeVM] Player race class position: {playerClassPosition}/{carsInClass.Count}");
+                        _lastPlayerPosition = playerClassPosition;
+                    }
+                }
+            }
+        }
+
+        private void ApplyDisplayLogic(List<RelativeRowViewModel> displayRows, List<RelativeRowViewModel> allCars,
+            float playerLastLapTime, bool isFastestLapMode, SVappsLABSDKWrapper sdkWrapper)
         {
             var playerRow = displayRows.FirstOrDefault(r => r.IsPlayer);
             if (playerRow == null) return;
 
             int playerDisplayIndex = displayRows.IndexOf(playerRow);
-            float playerTrackPercent = playerRow.LapDistPct;
 
             // Ensure player's class always gets the first color (Gold)
             int playerClassID = playerRow.ClassID;
@@ -276,7 +520,8 @@ namespace VISOR.ViewModels
                 _nextColorIndex = 1;
             }
 
-            // Build class position maps using RACE POSITION sorting
+            // Build class position maps using RACE POSITION sorting (for class position display)
+            var racePositionSorted = allCars.OrderByDescending(c => c.CurrentLap + c.LapDistPct).ToList();
             var classCars = racePositionSorted.GroupBy(c => c.ClassID).ToDictionary(
                 g => g.Key,
                 g => g.OrderByDescending(c => c.CurrentLap + c.LapDistPct).ToList()
@@ -284,72 +529,55 @@ namespace VISOR.ViewModels
 
             foreach (var row in displayRows)
             {
-                // Show class position based on race position
-                if (classCars.TryGetValue(row.ClassID, out var carsInThisClass))
+                // Show class position based on context (fastest lap for practice/qualifying, race position for races)
+                if (isFastestLapMode && sdkWrapper != null)
                 {
-                    int classPosition = carsInThisClass.IndexOf(row) + 1;
-                    row.ClassPos = $"P{classPosition}";
+                    // Use fastest lap positioning for individual car positions
+                    var fastestLapData = sdkWrapper.GetFastestLapPositioning();
+                    if (fastestLapData.Any())
+                    {
+                        var classCarData = fastestLapData
+                            .Where(lap => allCars.Any(car => car.CarIdx == lap.carIdx && car.ClassID == row.ClassID))
+                            .OrderBy(lap => lap.position)
+                            .ToList();
+
+                        var carPosition = classCarData.FindIndex(lap => lap.carIdx == row.CarIdx) + 1;
+                        if (carPosition > 0)
+                        {
+                            row.ClassPos = $"P{carPosition}";
+                        }
+                        else
+                        {
+                            row.ClassPos = "P?";
+                        }
+                    }
+                    else
+                    {
+                        row.ClassPos = "P?";
+                    }
                 }
                 else
                 {
-                    row.ClassPos = "P?";
+                    // Use race position for individual car positions
+                    if (classCars.TryGetValue(row.ClassID, out var carsInThisClass))
+                    {
+                        int classPosition = carsInThisClass.IndexOf(row) + 1;
+                        row.ClassPos = $"P{classPosition}";
+                    }
+                    else
+                    {
+                        row.ClassPos = "P?";
+                    }
                 }
 
-                // Calculate gap based on TRACK PROXIMITY, with proper sign based on display position
-                if (playerLastLapTime > 0 && !row.IsPlayer)
+                // Gap calculation depends on mode
+                if (isFastestLapMode)
                 {
-                    float carTrackPercent = row.LapDistPct;
-
-                    // Calculate track proximity distance (same logic as proximity sorting)
-                    float directDistance = Math.Abs(carTrackPercent - playerTrackPercent);
-                    float wrappedDistance = 1.0f - directDistance;
-                    float proximityDistance = Math.Min(directDistance, wrappedDistance);
-
-                    // Detect track wrapping transition
-                    float rawDifference = carTrackPercent - playerTrackPercent;
-                    bool isWrappingTransition = Math.Abs(rawDifference) > 0.5f;
-
-                    // Convert proximity to time gap
-                    float rawTimeGap = proximityDistance * playerLastLapTime;
-
-                    // Apply smoothing using cache if available
-                    if (_carCache.ContainsKey(row.CarIdx))
-                    {
-                        var cachedRow = _carCache[row.CarIdx];
-
-                        // Reset smoothing if wrapping occurred to prevent oscillation
-                        if (isWrappingTransition)
-                        {
-                            cachedRow.ResetSmoothing();
-                        }
-
-                        cachedRow.UpdateSmoothedGap(rawTimeGap);
-                        rawTimeGap = cachedRow.SmoothedGap;
-                    }
-                    else
-                    {
-                        // First time seeing this car - create cache entry
-                        var newCacheEntry = new RelativeRowViewModel();
-                        newCacheEntry.UpdateSmoothedGap(rawTimeGap);
-                        _carCache[row.CarIdx] = newCacheEntry;
-                    }
-
-                    int rowDisplayIndex = displayRows.IndexOf(row);
-
-                    if (rowDisplayIndex < playerDisplayIndex)
-                    {
-                        // Car is ahead of player in display (rows 1-3) = positive gap
-                        row.Gap = $"+{rawTimeGap:F1}";
-                    }
-                    else if (rowDisplayIndex > playerDisplayIndex)
-                    {
-                        // Car is behind player in display (rows 5-7) = negative gap
-                        row.Gap = $"-{rawTimeGap:F1}";
-                    }
-                    else
-                    {
-                        row.Gap = "0.0";
-                    }
+                    CalculateFastestLapGaps(row, playerRow, displayRows, playerDisplayIndex);
+                }
+                else
+                {
+                    CalculateProximityGaps(row, playerRow, displayRows, playerDisplayIndex, playerLastLapTime);
                 }
 
                 // Set name color based on lap differential
@@ -368,6 +596,85 @@ namespace VISOR.ViewModels
                     }
                     row.ClassBackground = _classColorMap[row.ClassID];
                 }
+            }
+        }
+
+        private void CalculateFastestLapGaps(RelativeRowViewModel row, RelativeRowViewModel playerRow,
+            List<RelativeRowViewModel> displayRows, int playerDisplayIndex)
+        {
+            if (row.IsPlayer)
+            {
+                row.Gap = "0.0";
+                return;
+            }
+
+            int rowDisplayIndex = displayRows.IndexOf(row);
+
+            // For fastest lap mode, gaps represent position difference, not time
+            int positionDiff = Math.Abs(rowDisplayIndex - playerDisplayIndex);
+
+            if (rowDisplayIndex < playerDisplayIndex)
+            {
+                // Car is ahead of player in fastest lap order
+                row.Gap = $"+{positionDiff}";
+            }
+            else
+            {
+                // Car is behind player in fastest lap order  
+                row.Gap = $"-{positionDiff}";
+            }
+        }
+
+        private void CalculateProximityGaps(RelativeRowViewModel row, RelativeRowViewModel playerRow,
+            List<RelativeRowViewModel> displayRows, int playerDisplayIndex, float playerLastLapTime)
+        {
+            if (row.IsPlayer || playerLastLapTime <= 0)
+            {
+                row.Gap = "0.0";
+                return;
+            }
+
+            float playerTrackPercent = playerRow.LapDistPct;
+            float carTrackPercent = row.LapDistPct;
+
+            // Calculate track proximity distance (same logic as proximity sorting)
+            float directDistance = Math.Abs(carTrackPercent - playerTrackPercent);
+            float wrappedDistance = 1.0f - directDistance;
+            float proximityDistance = Math.Min(directDistance, wrappedDistance);
+
+            // Detect track wrapping transition
+            float rawDifference = carTrackPercent - playerTrackPercent;
+            bool isWrappingTransition = Math.Abs(rawDifference) > 0.5f;
+
+            // Convert proximity to time gap
+            float rawTimeGap = proximityDistance * playerLastLapTime;
+
+            // Apply smoothing using cache if available
+            if (_carCache.ContainsKey(row.CarIdx))
+            {
+                var cachedRow = _carCache[row.CarIdx];
+
+                // Reset smoothing if wrapping occurred to prevent oscillation
+                if (isWrappingTransition)
+                {
+                    cachedRow.ResetSmoothing();
+                }
+
+                cachedRow.UpdateSmoothedGap(rawTimeGap);
+                rawTimeGap = cachedRow.SmoothedGap;
+            }
+
+            int rowDisplayIndex = displayRows.IndexOf(row);
+
+            if (rowDisplayIndex < playerDisplayIndex)
+            {
+                // Car is ahead of player in display (rows 1-3) = positive gap
+                row.Gap = $"+{rawTimeGap:F1}";
+            }
+            else if (rowDisplayIndex > playerDisplayIndex)
+            {
+                // Car is behind player in display (rows 5-7) = negative gap
+                row.Gap = $"-{rawTimeGap:F1}";
             }
         }
 

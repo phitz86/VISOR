@@ -122,16 +122,16 @@ namespace VISOR.Views
         {
             Dispatcher.Invoke(() =>
             {
-                // Access the wrapper's session parser directly - no need to create our own
+                // The wrapper now directly implements ISessionDataProvider via the coordinator
                 if (_sdk.IsSessionDataReady)
                 {
-                    // Create a simple wrapper to provide the session parser interface
-                    // that the ViewModels expect, using the wrapper's parsed data
-                    var sessionDataWrapper = new SessionDataWrapper(_sdk);
-                    _viewModel.UpdateFromTelemetry(snapshot, sessionDataWrapper);
+                    System.Diagnostics.Debug.WriteLine("[MainWindow] Session data ready - passing SDK wrapper");
+                    // Pass the SDK wrapper directly - it implements ISessionDataProvider
+                    _viewModel.UpdateFromTelemetry(snapshot, _sdk);
                 }
                 else
                 {
+                    System.Diagnostics.Debug.WriteLine("[MainWindow] Session data not ready - passing null");
                     // Just update the basic telemetry without session-dependent features
                     _viewModel.UpdateFromTelemetry(snapshot, null);
                 }
@@ -222,28 +222,5 @@ namespace VISOR.Views
         {
             Application.Current.Shutdown();
         }
-    }
-
-    /// <summary>
-    /// Simple wrapper to provide SessionDataParser interface using the SDK wrapper's data
-    /// </summary>
-    public class SessionDataWrapper : VISOR.ViewModels.ISessionDataProvider
-    {
-        private readonly SVappsLABSDKWrapper _wrapper;
-
-        public SessionDataWrapper(SVappsLABSDKWrapper wrapper)
-        {
-            _wrapper = wrapper;
-        }
-
-        public bool IsDataReady => _wrapper.IsSessionDataReady;
-
-        public string[] UserNames => _wrapper.GetUserNames();
-        public string[] CarNumbers => _wrapper.GetCarNumbers();
-        public int[] CarNumberRaw => _wrapper.GetCarNumberRaw();
-        public int[] CarClassIDs => _wrapper.GetCarClassIDs();
-        public bool[] CarIsAI => _wrapper.GetCarIsAI();
-        public int[] CurDriverIncidentCount => _wrapper.GetCurDriverIncidentCount();
-        public int IncidentLimit => _wrapper.GetIncidentLimit();
     }
 }

@@ -18,11 +18,6 @@ namespace VISOR.Views
         {
             // --- Add this line ---
             VISOR.Diagnostics.ConnectionDiagnostics.RunDiagnostics();
-
-            // The rest of your code for this method...
-            var sdk = ((App)Application.Current).SdkWrapper;
-            var dumpPath = sdk.DumpLatestYaml();
-            MessageBox.Show($"Session YAML dumped to: {dumpPath}");
         }
 
         private void LaunchButton_Click(object sender, RoutedEventArgs e)

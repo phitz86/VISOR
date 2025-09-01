@@ -1,9 +1,9 @@
-Thread: VISOR window behavior and initial data field wiring
+Thread: VISOR Telemetry ingest w/SVapps cheat sheet
 
 Context:
-Good morning Gemini,
+Good afternoon Claude,
 
-I'm building an overlay UI for iRacing called VISOR (Virtual Intelligence Simulator Overlay & Radar). I'm using this project to evaluate the coding and project management capabilities of various LLMs, primarily ChatGPT and Claude. I'd like to give you a turn to see how you handle the complexity.
+I'm building an overlay UI for iRacing called VISOR (Virtual Intelligence Simulator Overlay & Radar). I'm using this project to evaluate the coding and project management capabilities of various LLMs, including you, Gemini, and ChatGPT.
 
 VISOR is a C# application, built in VS with .NET 8.0 and WPF. I've set AnyCPU for now, but can pivot if needed. We're targeting a MVVM architecture with discrete classes/files to handle individual tasks.
 
@@ -12,10 +12,8 @@ Our SDK for ingesting the telemetry is the SVappsLAB iRacing SDK, installed via 
 Goals for this thread:
 
 Fix window launch behavior
-- Upon launch, the first thing the user should see is the Config Window. The "Dump Session YAML" button needs to activate the the ./Samples/DumpVariables_DumpSessionInfo utility that's included in the SDK, and the "Launch" button needs to close the Config Window and launch the Main window.
-
-Connect Telemetry outputs to Main Window fields
- - Once Main Window is loaded, we need to wire up the appropriate outputs from the Telemetry files to the right fields in Main Window. 
+- I discovered this in our source SDK's repo: https://github.com/SVappsLAB/iRacingTelemetrySDK/blob/main/AI_CONTEXT.md
+- What I want to do is take a look at our current code base and see if any of the things we were hunting for (via YAML parsing or reflection, for instance) might already be nicely defined for us, and then clean up our code based on that.
  
  Rules & Methods:
  - Let's talk about what you see, understand, and want to do before we make any modifications to the code.
