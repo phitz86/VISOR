@@ -25,7 +25,7 @@ namespace VISOR.ViewModels
         private string _lastSessionType = string.Empty;
 
         // --- SessionState Debug Tracking ---
-        private int _lastSessionState = -999; // Use invalid initial value to catch first state
+        private int _lastSessionState = -999;
         private DateTime _lastSessionStateChange = DateTime.MinValue;
         private readonly Dictionary<int, string> _sessionStateNames = new Dictionary<int, string>
         {
@@ -95,7 +95,9 @@ namespace VISOR.ViewModels
             FuelVM.Update(snapshot.GetValue<float>("FuelLevel"), snapshot.GetValue<int>("Lap"));
             RelativeVM.Update(snapshot, sessionDataProvider);
             DeltaBarVM.Update(snapshot);
-            WarningsVM.UpdateConnectionHealth();
+
+            // REMOVED: The call to WarningsVM.UpdateConnectionHealth() has been deleted.
+            // The new performance timer in WarningsViewModel handles its own updates.
 
             if (sessionDataProvider != null && sessionDataProvider.IsDataReady)
             {
