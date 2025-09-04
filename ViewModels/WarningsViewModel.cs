@@ -1,79 +1,37 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel;
-using System.Diagnostics;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
-using System.Windows.Threading;
 
 namespace VISOR.ViewModels
 {
-    public class WarningsViewModel : INotifyPropertyChanged, IDisposable
+    public class WarningsViewModel : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string? name = null) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
         // --- Private Fields ---
-        private PerformanceCounter? _cpuCounter;
-        private PerformanceCounter? _gpuCounter;
-        private readonly DispatcherTimer _performanceTimer;
-        private DateTime _highGpuStartTime = DateTime.MinValue;
-        private DateTime _highCpuStartTime = DateTime.MinValue;
         private int _incidentCount = 0;
         private string _incidentDisplay = "0x";
         private Brush _incidentColor = Brushes.White;
-        private bool _isCpuWarningVisible = false;
-        private Brush _cpuColor = Brushes.White;
-        private string _cpuUsageDisplay = "--%";
-        private bool _isGpuWarningVisible = false;
-        private Brush _gpuColor = Brushes.White;
-        private string _gpuUsageDisplay = "--%";
+
+        private readonly List<float> _rollingPaceLapTimes = new List<float>();
+        private readonly List<float> _bestPaceLapTimes = new List<float>();
+        private const int PaceLapWindow = 4;
+        private bool _isPaceWarningVisible = false;
+        private bool _isPersistentDotVisible = false;
+        private bool _isPitNowVisible = false;
 
         // --- Public Properties ---
         public string IncidentDisplay { get => _incidentDisplay; private set { _incidentDisplay = value; OnPropertyChanged(); } }
         public Brush IncidentColor { get => _incidentColor; private set { _incidentColor = value; OnPropertyChanged(); } }
-        public bool IsCpuWarningVisible { get => _isCpuWarningVisible; private set { _isCpuWarningVisible = value; OnPropertyChanged(); } }
-        public Brush CpuColor { get => _cpuColor; private set { _cpuColor = value; OnPropertyChanged(); } }
-        public string CpuUsageDisplay { get => _cpuUsageDisplay; private set { _cpuUsageDisplay = value; OnPropertyChanged(); } }
-        public bool IsGpuWarningVisible { get => _isGpuWarningVisible; private set { _isGpuWarningVisible = value; OnPropertyChanged(); } }
-        public Brush GpuColor { get => _gpuColor; private set { _gpuColor = value; OnPropertyChanged(); } }
-        public string GpuUsageDisplay { get => _gpuUsageDisplay; private set { _gpuUsageDisplay = value; OnPropertyChanged(); } }
-
-        public WarningsViewModel()
-        {
-            _performanceTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-            _performanceTimer.Tick += OnPerformanceTick;
-            _performanceTimer.Start();
-        }
-
-        public void InitializePerformanceCounters(string? gpuInstanceName, string? cpuInstanceName)
-        {
-            if (!string.IsNullOrEmpty(gpuInstanceName))
-            {
-                try
-                {
-                    _gpuCounter = new PerformanceCounter("GPU Engine", "Utilization Percentage", gpuInstanceName);
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"Failed to create GPU counter: {ex.Message}");
-                    _gpuCounter = null;
-                }
-            }
-
-            if (!string.IsNullOrEmpty(cpuInstanceName))
-            {
-                try
-                {
-                    _cpuCounter = new PerformanceCounter("Processor", "% Processor Time", cpuInstanceName);
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"Failed to create CPU counter: {ex.Message}");
-                    _cpuCounter = null;
-                }
-            }
-        }
+        public bool IsPaceWarningVisible { get => _isPaceWarningVisible; private set { _isPaceWarningVisible = value; OnPropertyChanged(); } }
+        public bool IsPersistentDotVisible { get => _isPersistentDotVisible; private set { _isPersistentDotVisible = value; OnPropertyChanged(); } }
+        public bool IsPitNowVisible { get => _isPitNowVisible; private set { _isPitNowVisible = value; OnPropertyChanged(); } }
+        public string PitNowText => "PIT";
 
         public void UpdateIncidentCount(int newCount, int incidentLimit)
         {
@@ -85,39 +43,74 @@ namespace VISOR.ViewModels
             }
         }
 
-        private void OnPerformanceTick(object sender, EventArgs e)
+        public void CheckPace(float lastLapTime, float topSpeed, float topSpeedBaseline, int lapsRemaining, bool isOnPitRoad)
         {
-            // --- CPU Monitoring ---
-            float cpuUsage = _cpuCounter?.NextValue() ?? 0f;
-            CpuUsageDisplay = $"{cpuUsage:F0}%";
-            UpdateWarningState(cpuUsage, ref _highCpuStartTime, out bool cpuVisible, out Brush cpuBrush);
-            IsCpuWarningVisible = cpuVisible;
-            CpuColor = cpuBrush;
-
-            // --- GPU Monitoring ---
-            float gpuUsage = _gpuCounter?.NextValue() ?? 0f;
-            GpuUsageDisplay = $"{gpuUsage:F0}%";
-            UpdateWarningState(gpuUsage, ref _highGpuStartTime, out bool gpuVisible, out Brush gpuBrush);
-            IsGpuWarningVisible = gpuVisible;
-            GpuColor = gpuBrush;
-        }
-
-        private void UpdateWarningState(float usage, ref DateTime highUsageStartTime, out bool isVisible, out Brush color)
-        {
-            const float warningThreshold = 85.0f;
-            const float criticalThreshold = 95.0f;
-
-            if (usage < warningThreshold)
+            if (lastLapTime <= 0 || isOnPitRoad || _rollingPaceLapTimes.Count < 2)
             {
-                isVisible = false;
-                color = Brushes.White;
-                highUsageStartTime = DateTime.MinValue;
+                if (lastLapTime > 0 && !isOnPitRoad) _rollingPaceLapTimes.Add(lastLapTime);
+                ClearPaceWarnings();
+                return;
+            }
+
+            // --- Update Baselines ---
+            _rollingPaceLapTimes.Add(lastLapTime);
+            while (_rollingPaceLapTimes.Count > PaceLapWindow) _rollingPaceLapTimes.RemoveAt(0);
+
+            if (!_bestPaceLapTimes.Any() || lastLapTime < _bestPaceLapTimes.Min() * 1.02f)
+            {
+                _bestPaceLapTimes.Add(lastLapTime);
+            }
+
+            float rollingAverage = _rollingPaceLapTimes.Take(_rollingPaceLapTimes.Count - 1).Average();
+            float bestPaceAverage = _bestPaceLapTimes.Average();
+
+            // --- Tier 2 Trigger ---
+            bool isTier2Active = (topSpeed < (topSpeedBaseline * 0.96f)) && (lastLapTime > (rollingAverage * 1.04f));
+
+            IsPaceWarningVisible = isTier2Active;
+            if (isTier2Active) IsPersistentDotVisible = true;
+
+            // --- Tier 3 Trigger ---
+            if (isTier2Active && lapsRemaining > 0)
+            {
+                float timeLostPerLap = lastLapTime - rollingAverage;
+                float paceLossPercent = (lastLapTime / rollingAverage) - 1.0f;
+                float dynamicRepairEstimate = CalculateDynamicRepairTime(paceLossPercent);
+                float totalPitTime = 35.0f + dynamicRepairEstimate;
+
+                if ((timeLostPerLap * lapsRemaining) > totalPitTime)
+                {
+                    IsPitNowVisible = true;
+                }
+                else
+                {
+                    IsPitNowVisible = false;
+                }
             }
             else
             {
-                isVisible = true;
-                color = (usage >= criticalThreshold) ? Brushes.Red : Brushes.Yellow;
+                IsPitNowVisible = false;
             }
+
+            // --- Persistent Dot Reset Logic ---
+            if (IsPersistentDotVisible && lastLapTime < (bestPaceAverage * 1.01f))
+            {
+                IsPersistentDotVisible = false;
+            }
+        }
+
+        private float CalculateDynamicRepairTime(float paceLossPercent)
+        {
+            if (paceLossPercent <= 0.04f) return 60f;      // 2-4% loss -> 1 min repair
+            if (paceLossPercent <= 0.08f) return 150f;     // 5-8% loss -> 2.5 min repair
+            return 300f;                                   // >9% loss -> 5 min repair
+        }
+
+        private void ClearPaceWarnings()
+        {
+            IsPaceWarningVisible = false;
+            IsPitNowVisible = false;
+            // Persistent dot is not cleared here.
         }
 
         private Brush GetIncidentColor(int count)
@@ -133,19 +126,10 @@ namespace VISOR.ViewModels
             _incidentCount = 0;
             IncidentDisplay = "0x";
             IncidentColor = Brushes.White;
-            IsCpuWarningVisible = false;
-            CpuColor = Brushes.White;
-            CpuUsageDisplay = "--%";
-            IsGpuWarningVisible = false;
-            GpuColor = Brushes.White;
-            GpuUsageDisplay = "--%";
-        }
-
-        public void Dispose()
-        {
-            _performanceTimer?.Stop();
-            _gpuCounter?.Dispose();
-            _cpuCounter?.Dispose();
+            _rollingPaceLapTimes.Clear();
+            _bestPaceLapTimes.Clear();
+            ClearPaceWarnings();
+            IsPersistentDotVisible = false;
         }
     }
 }

@@ -20,53 +20,19 @@ namespace VISOR.ViewModels
         public DeltaBarViewModel DeltaBarVM { get; private set; }
         public WarningsViewModel WarningsVM { get; private set; }
 
-        // --- Session Transition Tracking ---
+        // --- Session Tracking ---
         private int _lastSessionNum = -1;
-        private string _lastSessionType = string.Empty;
-
-        // --- SessionState Debug Tracking ---
         private int _lastSessionState = -999;
-        private DateTime _lastSessionStateChange = DateTime.MinValue;
-        private readonly Dictionary<int, string> _sessionStateNames = new Dictionary<int, string>
-        {
-            { 0, "Invalid" }, { 1, "GetInCar" }, { 2, "Warmup" }, { 3, "ParadeLaps" },
-            { 4, "Racing" }, { 5, "Checkered" }, { 6, "CoolDown" }
-        };
+        private float _topSpeedBaseline = 0f; // For car health monitor
 
-        // --- State Properties ---
-        private bool _isTelemetryConnected = false;
-        public bool IsTelemetryConnected
-        {
-            get => _isTelemetryConnected;
-            set { _isTelemetryConnected = value; OnPropertyChanged(); }
-        }
-
-        // --- Visibility Toggle Properties (for UI sections) ---
-        public bool ShowPosition { get; set; } = true;
-        public bool ShowGear { get; set; } = true;
-        public bool ShowFuelRemaining { get; set; } = true;
-        public bool ShowTimeRemaining { get; set; } = true;
-        public bool ShowLapDelta { get; set; } = true;
-        public bool ShowLapTimes { get; set; } = true;
-        public bool ShowRelative { get; set; } = true;
-        public bool ShowWarnings { get; set; } = true;
-
-        // --- Position Properties ---
+        // --- Public Properties ---
         public string ClassPosition => RelativeVM.LivePlayerClassPosition;
         public string ClassPositionNumber => RelativeVM.LivePlayerClassPositionNumber;
-
-        // --- Other Data Properties ---
-        private string _gearDisplay = "N";
-        private string _lastLapTime = "-:--.---";
-        private string _bestLapTime = "-:--.---";
-        private string _timeRemainingDisplay = "--:--";
-        private string _timeRemainingSymbol = "⏳";
-
-        public string GearDisplay { get => _gearDisplay; set { _gearDisplay = value; OnPropertyChanged(); } }
-        public string LastLapTime { get => _lastLapTime; set { _lastLapTime = value; OnPropertyChanged(); } }
-        public string BestLapTime { get => _bestLapTime; set { _bestLapTime = value; OnPropertyChanged(); } }
-        public string TimeRemainingDisplay { get => _timeRemainingDisplay; set { _timeRemainingDisplay = value; OnPropertyChanged(); } }
-        public string TimeRemainingSymbol { get => _timeRemainingSymbol; set { _timeRemainingSymbol = value; OnPropertyChanged(); } }
+        public string GearDisplay { get; private set; } = "N";
+        public string LastLapTime { get; private set; } = "-:--.---";
+        public string BestLapTime { get; private set; } = "-:--.---";
+        public string TimeRemainingDisplay { get; private set; } = "--:--";
+        public string TimeRemainingSymbol { get; private set; } = "⏳";
 
         public MainViewModel()
         {
@@ -74,6 +40,7 @@ namespace VISOR.ViewModels
             RelativeVM = new RelativeViewModel();
             DeltaBarVM = new DeltaBarViewModel();
             WarningsVM = new WarningsViewModel();
+
             RelativeVM.PropertyChanged += (sender, args) =>
             {
                 if (args.PropertyName == nameof(RelativeViewModel.LivePlayerClassPosition))
@@ -92,12 +59,10 @@ namespace VISOR.ViewModels
             CheckSessionStateTransitions(snapshot);
             CheckForSessionTransition(snapshot);
 
+            // Update child view models
             FuelVM.Update(snapshot.GetValue<float>("FuelLevel"), snapshot.GetValue<int>("Lap"));
             RelativeVM.Update(snapshot, sessionDataProvider);
             DeltaBarVM.Update(snapshot);
-
-            // REMOVED: The call to WarningsVM.UpdateConnectionHealth() has been deleted.
-            // The new performance timer in WarningsViewModel handles its own updates.
 
             if (sessionDataProvider != null && sessionDataProvider.IsDataReady)
             {
@@ -112,16 +77,45 @@ namespace VISOR.ViewModels
                 }
             }
 
-            int gear = snapshot.GetValue<int>("Gear");
-            GearDisplay = gear switch { -1 => "R", 0 => "N", _ => gear.ToString() };
+            // --- Car Health & Lap Time Logic ---
+            float currentSpeed = snapshot.GetValue<float>("Speed");
+            if (currentSpeed > _topSpeedBaseline)
+            {
+                _topSpeedBaseline = currentSpeed;
+            }
 
             float lastLap = snapshot.GetValue<float>("LapLastLapTime");
-            if (lastLap > 0) LastLapTime = FormatLapTime(lastLap);
+            if (lastLap > 0)
+            {
+                LastLapTime = FormatLapTime(lastLap);
+                OnPropertyChanged(nameof(LastLapTime));
+
+                bool onPitRoad = snapshot.GetValue<bool[]>("CarIdxOnPitRoad")?[snapshot.GetValue<int>("PlayerCarIdx")] ?? false;
+                int lapsRemaining = snapshot.GetValue<int>("SessionLapsRemain");
+
+                WarningsVM.CheckPace(lastLap, currentSpeed, _topSpeedBaseline, lapsRemaining, onPitRoad);
+            }
 
             float bestLap = snapshot.GetValue<float>("LapBestLapTime");
-            if (bestLap > 0) BestLapTime = FormatLapTime(bestLap);
+            if (bestLap > 0)
+            {
+                BestLapTime = FormatLapTime(bestLap);
+                OnPropertyChanged(nameof(BestLapTime));
+            }
 
+            UpdateGearDisplay(snapshot);
             UpdateSessionTimer(snapshot);
+        }
+
+        private void UpdateGearDisplay(SVappsLABSnapshot snapshot)
+        {
+            int gear = snapshot.GetValue<int>("Gear");
+            string newGearDisplay = gear switch { -1 => "R", 0 => "N", _ => gear.ToString() };
+            if (GearDisplay != newGearDisplay)
+            {
+                GearDisplay = newGearDisplay;
+                OnPropertyChanged(nameof(GearDisplay));
+            }
         }
 
         private void UpdateSessionTimer(SVappsLABSnapshot snapshot)
@@ -139,23 +133,17 @@ namespace VISOR.ViewModels
             {
                 TimeRemainingSymbol = "⏳";
                 TimeSpan remaining = TimeSpan.FromSeconds(timeRemain);
-                if (remaining.TotalMinutes < 1.0)
-                {
-                    TimeRemainingDisplay = $"{remaining.Seconds:D2}s";
-                }
-                else if (remaining.TotalHours >= 1.0)
-                {
+                if (remaining.TotalHours >= 1.0)
                     TimeRemainingDisplay = $"{(int)remaining.TotalHours}:{remaining.Minutes:D2}:{remaining.Seconds:D2}";
-                }
                 else
-                {
                     TimeRemainingDisplay = $"{(int)remaining.TotalMinutes}:{remaining.Seconds:D2}";
-                }
             }
             else
             {
                 TimeRemainingDisplay = "--:--";
             }
+            OnPropertyChanged(nameof(TimeRemainingDisplay));
+            OnPropertyChanged(nameof(TimeRemainingSymbol));
         }
 
         private void CheckSessionStateTransitions(SVappsLABSnapshot snapshot)
@@ -167,9 +155,7 @@ namespace VISOR.ViewModels
                 {
                     ClearSessionUI();
                 }
-
                 _lastSessionState = currentSessionState;
-                _lastSessionStateChange = DateTime.Now;
             }
         }
 
@@ -177,12 +163,14 @@ namespace VISOR.ViewModels
         {
             LastLapTime = "-:--.---";
             BestLapTime = "-:--.---";
+            _topSpeedBaseline = 0f;
             FuelVM.Reset();
             DeltaBarVM.Reset();
             RelativeVM.Reset();
             GearDisplay = "N";
             TimeRemainingDisplay = "--:--";
             TimeRemainingSymbol = "⏳";
+            OnPropertyChanged(string.Empty); // Update all properties
         }
 
         private void CheckForSessionTransition(SVappsLABSnapshot snapshot)
@@ -199,25 +187,19 @@ namespace VISOR.ViewModels
         {
             LastLapTime = "-:--.---";
             BestLapTime = "-:--.---";
+            _topSpeedBaseline = 0f;
             DeltaBarVM.Reset();
             FuelVM.Reset();
             WarningsVM.Reset();
+            OnPropertyChanged(string.Empty); // Update all properties
         }
 
         public void Reset()
         {
-            FuelVM.Reset();
-            RelativeVM.Reset();
-            DeltaBarVM.Reset();
-            WarningsVM.Reset();
-            GearDisplay = "N";
-            LastLapTime = "-:--.---";
-            BestLapTime = "-:--.---";
-            TimeRemainingDisplay = "--:--";
-            TimeRemainingSymbol = "⏳";
-            IsTelemetryConnected = false;
+            _lastSessionNum = -1;
             _lastSessionState = -999;
-            _lastSessionStateChange = DateTime.MinValue;
+            ClearSessionUI();
+            WarningsVM.Reset();
         }
 
         private string FormatLapTime(float timeInSeconds)

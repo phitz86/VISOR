@@ -162,32 +162,53 @@
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
+        <!-- MODIFIED: Row 5: Now includes the flashing PIT cue -->
         <Grid Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2"
       Visibility="{Binding ShowWarnings, Converter={StaticResource BoolToVisibilityConverter}}"
       Margin="0,5,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
+            <!-- Incident Points (Centered in column 0) -->
             <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Center">
                 <TextBlock Text="⚠️" FontSize="36" Margin="0,0,10,0" Foreground="{Binding WarningsVM.IncidentColor}"/>
                 <TextBlock Text="{Binding WarningsVM.IncidentDisplay}" FontSize="36" Foreground="{Binding WarningsVM.IncidentColor}"/>
             </StackPanel>
 
-            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
-                <TextBlock Text="🖥️" FontSize="36" Margin="0,0,10,0" Foreground="{Binding WarningsVM.GpuColor}"
-                   Visibility="{Binding WarningsVM.IsGpuWarningVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                <TextBlock Text="{Binding WarningsVM.GpuUsageDisplay}" FontSize="36" Foreground="{Binding WarningsVM.GpuColor}"
-                   Visibility="{Binding WarningsVM.IsGpuWarningVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
-            </StackPanel>
+            <!-- Pace & Pit Warnings (Centered in column 1) -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <!-- Main, short-term warning icon -->
+                <TextBlock Text="📉" FontSize="36" Foreground="Red"
+                   Visibility="{Binding WarningsVM.IsPaceWarningVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                <!-- Persistent dot indicator -->
+                <TextBlock Text="•" FontSize="36" Foreground="Red" Margin="5,0,0,0"
+                   VerticalAlignment="Center"
+                   Visibility="{Binding WarningsVM.IsPersistentDotVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
-            <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Center">
-                <TextBlock Text="🧠" FontSize="36" Margin="0,0,10,0" Foreground="{Binding WarningsVM.CpuColor}"
-                   Visibility="{Binding WarningsVM.IsCpuWarningVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                <TextBlock Text="{Binding WarningsVM.CpuUsageDisplay}" FontSize="36" Foreground="{Binding WarningsVM.CpuColor}"
-                   Visibility="{Binding WarningsVM.IsCpuWarningVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                <!-- NEW: Flashing PIT cue -->
+                <TextBlock Text="{Binding WarningsVM.PitNowText}" FontSize="36" FontWeight="Bold" Foreground="Yellow" Margin="15,0,0,0">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding WarningsVM.IsPitNowVisible}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <DataTrigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                         From="1.0" To="0.2" Duration="0:0:0.5"
+                                                         AutoReverse="True" RepeatBehavior="Forever"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.EnterActions>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
             </StackPanel>
         </Grid>
 
