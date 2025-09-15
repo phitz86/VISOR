@@ -27,7 +27,10 @@ namespace VISOR.Telemetry
             "SessionLapsTotal", "SessionNum", "PlayerCarIdx", "SessionFlags",
             
             // Environmental
-            "TrackTemp", "AirTemp", "Skies", "WindVel"
+            "TrackTemp", "AirTemp", "Skies", "WindVel",
+            
+            // NEW: Radar support fields
+            "CarLeftRight", "CarIdxF2Time", "TrackLength"
         };
 
         // Fields that are parsed from YAML session data and added to telemetry dictionary
@@ -84,6 +87,11 @@ namespace VISOR.Telemetry
             ["Skies"] = typeof(int),
             ["WindVel"] = typeof(float),
 
+            // NEW: Radar support fields
+            ["CarLeftRight"] = typeof(float[]),
+            ["CarIdxF2Time"] = typeof(float[]),
+            ["TrackLength"] = typeof(float),
+
             // YAML-parsed fields (updated field names and types)
             ["CarIdxUserName"] = typeof(string[]),
             ["CarIdxCarNumber"] = typeof(string[]),
@@ -92,11 +100,14 @@ namespace VISOR.Telemetry
             ["CarIdxIsAI"] = typeof(bool[]),
             ["CarIdxIncidentCount"] = typeof(int[]),
 
-            // Session-specific YAML fields - NEW
+            // Session-specific YAML fields
             ["SessionType"] = typeof(string), // "Race", "Practice", "Qualifying"
             ["SessionName"] = typeof(string), // "RACE", "PRACTICE", "QUALIFY"
             ["QualifyResultsPositions"] = typeof(int[]), // Position by CarIdx
-            ["QualifyResultsFastestTimes"] = typeof(float[]) // Fastest time by CarIdx
+            ["QualifyResultsFastestTimes"] = typeof(float[]), // Fastest time by CarIdx
+
+            // NEW: Track information from YAML
+            ["TrackLength"] = typeof(float) // Track length in meters
         };
 
         #endregion
@@ -209,6 +220,15 @@ namespace VISOR.Telemetry
             return new HashSet<string>
             {
                 "TrackTemp", "AirTemp", "Skies", "WindVel"
+            };
+        }
+
+        // NEW: Get fields related to radar functionality
+        public static HashSet<string> GetRadarFields()
+        {
+            return new HashSet<string>
+            {
+                "CarLeftRight", "CarIdxF2Time", "TrackLength", "CarIdxLapDistPct", "CarIdxOnPitRoad"
             };
         }
 

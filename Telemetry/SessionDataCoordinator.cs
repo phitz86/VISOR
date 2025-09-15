@@ -7,7 +7,6 @@ namespace VISOR.Telemetry
     /// <summary>
     /// Coordinates all parsing and provides unified access to session data
     /// </summary>
-    // MODIFIED: No longer needs to specify the ViewModels namespace for the interface.
     public class SessionDataCoordinator : ISessionDataProvider
     {
         private readonly StaticEventParser _staticParser = new();
@@ -23,7 +22,7 @@ namespace VISOR.Telemetry
 
         public bool IsDataReady { get; private set; }
 
-        // NEW: Private backing fields for cached arrays to improve performance
+        // Private backing fields for cached arrays to improve performance
         private readonly string[] _userNamesCache = new string[64];
         private readonly string[] _carNumbersCache = new string[64];
         private readonly int[] _carNumberRawCache = new int[64];
@@ -33,7 +32,6 @@ namespace VISOR.Telemetry
 
         // ========== ISessionDataProvider Implementation ==========
 
-        // MODIFIED: Properties now return cached arrays
         public string[] UserNames
         {
             get
@@ -176,6 +174,63 @@ namespace VISOR.Telemetry
                 return _staticData.Schedule.Sessions.TryGetValue(sessionNum, out var session)
                     ? session.SessionLaps
                     : -1;
+            }
+        }
+
+        // ========== Track Information Access ==========
+
+        /// <summary>
+        /// Get track length in meters from YAML data
+        /// </summary>
+        public float GetTrackLength()
+        {
+            lock (_parseLock)
+            {
+                return _staticData.Weekend.TrackLength;
+            }
+        }
+
+        /// <summary>
+        /// Get track name from YAML data
+        /// </summary>
+        public string GetTrackName()
+        {
+            lock (_parseLock)
+            {
+                return _staticData.Weekend.TrackName;
+            }
+        }
+
+        /// <summary>
+        /// Get track configuration name from YAML data
+        /// </summary>
+        public string GetTrackConfig()
+        {
+            lock (_parseLock)
+            {
+                return _staticData.Weekend.TrackConfig;
+            }
+        }
+
+        /// <summary>
+        /// Get track display name from YAML data
+        /// </summary>
+        public string GetTrackDisplayName()
+        {
+            lock (_parseLock)
+            {
+                return _staticData.Weekend.TrackDisplayName;
+            }
+        }
+
+        /// <summary>
+        /// Get track display short name from YAML data
+        /// </summary>
+        public string GetTrackDisplayShortName()
+        {
+            lock (_parseLock)
+            {
+                return _staticData.Weekend.TrackDisplayShortName;
             }
         }
 
@@ -348,7 +403,7 @@ namespace VISOR.Telemetry
                         _lastDataHash = currentHash;
                         _cachedSessionYaml = sessionData; // Cache the raw YAML
 
-                        // NEW: Update cached arrays now that new data has been parsed
+                        // Update cached arrays now that new data has been parsed
                         UpdateDriverDataCaches();
 
                         IsDataReady = true;
@@ -356,6 +411,7 @@ namespace VISOR.Telemetry
                         // Debug output
                         Console.WriteLine($"[SessionCoordinator] Parsed: {_staticData.Drivers.Count} drivers, " +
                                         $"Session {_transitionData.CurrentSessionNum} ({GetCurrentSessionType()}), " +
+                                        $"Track: {GetTrackDisplayName()} ({GetTrackLength():F1}m), " +
                                         $"ShouldUseFastestLap: {ShouldUseFastestLapPositioning()}");
 
                         return true;
@@ -371,7 +427,7 @@ namespace VISOR.Telemetry
         }
 
         /// <summary>
-        /// NEW: Updates the cached driver data arrays. Called only when session data changes.
+        /// Updates the cached driver data arrays. Called only when session data changes.
         /// </summary>
         private void UpdateDriverDataCaches()
         {
@@ -413,6 +469,14 @@ namespace VISOR.Telemetry
                 _staticData.Drivers.Clear();
                 _staticData.Schedule.Sessions.Clear();
                 _staticData.IncidentLimit = 0;
+
+                // Clear weekend/track info
+                _staticData.Weekend.TrackName = string.Empty;
+                _staticData.Weekend.TrackConfig = string.Empty;
+                _staticData.Weekend.TrackLength = 0f;
+                _staticData.Weekend.TrackDisplayName = string.Empty;
+                _staticData.Weekend.TrackDisplayShortName = string.Empty;
+
                 _transitionData.DriverIncidentCounts.Clear();
                 _transitionData.CurrentSessionNum = -1;
                 _transitionData.CurrentSessionType = string.Empty;
@@ -424,7 +488,7 @@ namespace VISOR.Telemetry
                 _lastDataHash = string.Empty;
                 IsDataReady = false;
 
-                // NEW: Clear the cached arrays as well
+                // Clear the cached arrays as well
                 UpdateDriverDataCaches();
             }
         }

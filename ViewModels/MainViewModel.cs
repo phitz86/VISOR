@@ -53,7 +53,12 @@ namespace VISOR.ViewModels
                 }
             };
         }
-
+        private bool _isTelemetryConnected = false;
+        public bool IsTelemetryConnected
+        {
+            get => _isTelemetryConnected;
+            set { _isTelemetryConnected = value; OnPropertyChanged(); }
+        }
         public void UpdateFromTelemetry(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
             CheckSessionStateTransitions(snapshot);

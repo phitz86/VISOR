@@ -9,6 +9,7 @@ namespace VISOR.Telemetry
     {
         public readonly Dictionary<int, DriverInfo> Drivers = new();
         public readonly SessionSchedule Schedule = new();
+        public readonly WeekendInfo Weekend = new(); // NEW: Weekend information including track data
         public int IncidentLimit { get; set; }
 
         public class DriverInfo
@@ -32,6 +33,16 @@ namespace VISOR.Telemetry
                 public int SessionLaps { get; set; } = -1; // -1 = unlimited
                 public double SessionTimeSeconds { get; set; }
             }
+        }
+
+        // NEW: Weekend/Track information
+        public class WeekendInfo
+        {
+            public string TrackName { get; set; } = string.Empty;
+            public string TrackConfig { get; set; } = string.Empty;
+            public float TrackLength { get; set; } = 0f; // Track length in meters
+            public string TrackDisplayName { get; set; } = string.Empty;
+            public string TrackDisplayShortName { get; set; } = string.Empty;
         }
     }
 

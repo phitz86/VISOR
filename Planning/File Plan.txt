@@ -1,17 +1,23 @@
 VISOR/
 ├── Views/
-│   ├── MainWindow.xaml (750x580, proximity relative, session timer, warnings)
-│   └── MainWindow.xaml.cs (direct SDK wrapper usage, no SessionDataWrapper needed)
+│   ├── ConfigWindow.xaml
+│   ├── ConfigWindow.xaml.cs
+│   ├── RadarWindow.xaml
+│   ├── RadarWindow.xaml.cs
+│   ├── MainWindow.xaml
+│   └── MainWindow.xaml.cs
 ├── ViewModels/
-│   ├── MainViewModel.cs (session transitions, dual timer logic, reset handling)
-│   ├── FuelViewModel.cs (3-lap moving average, debug logging)
-│   ├── RelativeViewModel.cs (context-aware positioning: fastest lap for practice/qualifying, proximity for races, lone qualify hiding)
-│   ├── RelativeRowViewModel.cs (ClassID, IncidentCount, multi-class support, gap smoothing)
-│   ├── DeltaBarViewModel.cs (center-out design, embedded DeltaBarWidthConverter)
-│   └── WarningsViewModel.cs (dual incident flashing, connection health persistence)
+│   ├── MainViewModel.cs
+│   ├── FuelViewModel.cs
+│   ├── RadarViewModel.cs
+│   ├── RelativeViewModel.cs
+│   ├── RelativeRowViewModel.cs
+│   ├── RelativeDisplayCalculator.cs
+│   ├── DeltaBarViewModel.cs
+│   └── WarningsViewModel.cs
 ├── Resources/
 │   ├── Converters/
-│   │   └── BoolToVisibilityConverter.cs (visibility toggle support)
+│   │   └── BoolToVisibilityConverter.cs
 │   └── Fonts/
 │       └── digital-7.ttf (position and gear displays)
 ├── Telemetry/
@@ -19,28 +25,13 @@ VISOR/
 │   ├── SVappsLABSnapshot.cs (telemetry data container)
 │   ├── SessionDataModels.cs (StaticEventData, SessionTransitionData, LiveSessionData classes)
 │   ├── SessionDataParsers.cs (StaticEventParser, SessionTransitionParser, LiveSessionParser classes)
+│   ├── SessionDataProvider.cs
 │   ├── SessionDataCoordinator.cs (implements ISessionDataProvider, session-aware helper methods, unified parsing)
 │   ├── TelemetryDataBuilder.cs (YAML integration, field mapping)
 │   └── TelemetryFieldRegistry.cs (field definitions and validation)
 ├── Diagnostics/
 │   └── SessionDataLogger.cs (session-time-aware logging with multi-interval captures, consolidated file output)
 ├── Visor Logo.ico (application icon for taskbar/explorer)
-├── VISOR.csproj (ApplicationIcon property, dependencies)
+├── VISOR.csproj 
 ├── App.xaml
 └── App.xaml.cs
-
-MAJOR ARCHITECTURAL CHANGES:
-- Replaced monolithic SessionDataParser.cs (600+ lines) with 3-file modular architecture
-- SessionDataCoordinator provides unified ISessionDataProvider implementation with session-aware helper methods
-- SVappsLABSDKWrapper enhanced with session context methods (ShouldUseFastestLapPositioning, ShouldHideRelativeDisplay, etc.)
-- RelativeViewModel now implements context-aware positioning logic based on session type
-- SessionDataLogger consolidated all file output with session-duration-aware multi-interval logging
-- MainWindow.xaml.cs simplified by removing SessionDataWrapper (direct SDK wrapper usage)
-
-NEW FEATURES:
-- Session-aware positioning: Fastest lap sorting for practice/qualifying, proximity for races
-- Lone qualifying detection with relative display hiding
-- Multi-interval session logging (early/mid/late) based on actual session duration from YAML
-- Session schedule parsing with type detection (Practice, Lone Qualify, Race)
-- Live results parsing (ResultsPositions, ResultsFastestLap sections)
-- Enhanced session transition detection and UI clearing logic

@@ -39,6 +39,7 @@ namespace VISOR.Telemetry
                 AddPositioningData(dict, telemetryData);
                 AddSessionData(dict, telemetryData);
                 AddPlayerData(dict, telemetryData);
+                AddRadarData(dict, telemetryData);
 
                 // Merge in YAML-parsed data from the coordinator
                 AddYamlData(dict);
@@ -81,8 +82,8 @@ namespace VISOR.Telemetry
             dict["CarIdxLap"] = data.CarIdxLap;
             dict["CarIdxLastLapTime"] = data.CarIdxLastLapTime;
 
-            // CarIdxOnPitRoad might not be available in current TelemetryData struct
-            // Will be available when we update the RequiredTelemetryVars attribute
+            // CarIdxOnPitRoad should be available now with updated RequiredTelemetryVars
+            dict["CarIdxOnPitRoad"] = SafeGetFieldValue(data, "CarIdxOnPitRoad", new bool[64]);
         }
 
         private void AddSessionData(Dictionary<string, object> dict, TelemetryData data)
@@ -95,8 +96,8 @@ namespace VISOR.Telemetry
             dict["SessionLapsTotal"] = data.SessionLapsTotal;
             dict["SessionNum"] = data.SessionNum;
 
-            // SessionFlags might not be available in current TelemetryData struct
-            // Will need to add to RequiredTelemetryVars to get it
+            // SessionFlags with safe access
+            dict["SessionFlags"] = SafeGetFieldValue(data, "SessionFlags", 0);
 
             // DEBUG: Log session state changes
             int currentSessionState = (int)data.SessionState;
@@ -111,6 +112,29 @@ namespace VISOR.Telemetry
         private void AddPlayerData(Dictionary<string, object> dict, TelemetryData data)
         {
             dict["PlayerCarIdx"] = data.PlayerCarIdx;
+        }
+
+        private void AddRadarData(Dictionary<string, object> dict, TelemetryData data)
+        {
+            // Add radar-specific fields with safe access
+            // These fields may not be available in all versions of the TelemetryData struct
+
+            // CarLeftRight - lateral position array
+            dict["CarLeftRight"] = SafeGetFieldValue(data, "CarLeftRight", new float[64]);
+
+            // CarIdxF2Time - gap to leader array  
+            dict["CarIdxF2Time"] = SafeGetFieldValue(data, "CarIdxF2Time", new float[64]);
+
+            // TrackLength - total track length
+            dict["TrackLength"] = SafeGetFieldValue(data, "TrackLength", 0f);
+
+            // DEBUG: Log when radar fields are available
+            var carLeftRight = dict["CarLeftRight"] as float[];
+            var trackLength = (float)dict["TrackLength"];
+            if (carLeftRight != null && carLeftRight.Length > 0 && trackLength > 0)
+            {
+                System.Diagnostics.Debug.WriteLine($"[DataBuilder] Radar data available - TrackLength: {trackLength:F1}m");
+            }
         }
 
         private void AddYamlData(Dictionary<string, object> dict)
@@ -129,9 +153,14 @@ namespace VISOR.Telemetry
             dict["QualifyResultsPositions"] = _coordinator.GetQualifyResultsPositions();
             dict["QualifyResultsFastestTimes"] = _coordinator.GetQualifyResultsFastestTimes();
 
+            // NEW: Get track information from YAML data
+            dict["TrackLength"] = _coordinator.GetTrackLength();
+
             // DEBUG: Log session info when it's available
             var sessionType = _coordinator.GetCurrentSessionType();
             var sessionName = _coordinator.GetCurrentSessionName();
+            var trackLength = _coordinator.GetTrackLength();
+
             if (!string.IsNullOrEmpty(sessionType))
             {
                 string currentSessionInfo = $"{sessionType}({sessionName})";
@@ -139,6 +168,12 @@ namespace VISOR.Telemetry
                 {
                     Console.WriteLine($"[DataBuilder DEBUG] Session Info: {currentSessionInfo}");
                     System.Diagnostics.Debug.WriteLine($"[DataBuilder] Session Info: {currentSessionInfo}");
+
+                    if (trackLength > 0)
+                    {
+                        Console.WriteLine($"[DataBuilder DEBUG] Track Length: {trackLength:F1}m");
+                        System.Diagnostics.Debug.WriteLine($"[DataBuilder] Track Length: {trackLength:F1}m");
+                    }
 
                     // Count human vs AI drivers for debug
                     var carIsAI = _coordinator.CarIsAI;
@@ -156,6 +191,50 @@ namespace VISOR.Telemetry
         }
 
         /// <summary>
+        /// Safely get a field value from TelemetryData using reflection
+        /// Returns defaultValue if field doesn't exist or can't be accessed
+        /// </summary>
+        private T SafeGetFieldValue<T>(TelemetryData data, string fieldName, T defaultValue)
+        {
+            try
+            {
+                // Try to get field using reflection
+                var field = data.GetType().GetField(fieldName);
+                if (field != null)
+                {
+                    var value = field.GetValue(data);
+                    if (value is T tValue)
+                        return tValue;
+                }
+
+                // Try to get property using reflection
+                var property = data.GetType().GetProperty(fieldName);
+                if (property != null)
+                {
+                    var value = property.GetValue(data);
+                    if (value is T tValue)
+                        return tValue;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[DataBuilder] Error accessing field '{fieldName}': {ex.Message}");
+            }
+
+            return defaultValue;
+        }
+
+        /// <summary>
+        /// Check if a field exists in the TelemetryData structure
+        /// </summary>
+        private bool HasField(TelemetryData data, string fieldName)
+        {
+            var field = data.GetType().GetField(fieldName);
+            var property = data.GetType().GetProperty(fieldName);
+            return field != null || property != null;
+        }
+
+        /// <summary>
         /// Validate that we have minimum required data for a valid snapshot
         /// </summary>
         public bool ValidateSnapshot(Dictionary<string, object> data)
@@ -168,8 +247,35 @@ namespace VISOR.Telemetry
             if (playerIdx == null || (int)playerIdx == -1)
                 return false;
 
+            // Check for basic positioning data
+            if (!data.ContainsKey("CarIdxLapDistPct"))
+                return false;
+
             // Could add more validation here
             return true;
+        }
+
+        /// <summary>
+        /// Get debug info about available telemetry fields
+        /// </summary>
+        public string GetAvailableFieldsDebugInfo(TelemetryData data)
+        {
+            var fields = new List<string>();
+            var type = data.GetType();
+
+            // Get all public fields
+            foreach (var field in type.GetFields())
+            {
+                fields.Add($"Field: {field.Name} ({field.FieldType.Name})");
+            }
+
+            // Get all public properties
+            foreach (var property in type.GetProperties())
+            {
+                fields.Add($"Property: {property.Name} ({property.PropertyType.Name})");
+            }
+
+            return string.Join("\n", fields);
         }
     }
 }

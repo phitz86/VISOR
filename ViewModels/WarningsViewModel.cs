@@ -131,5 +131,9 @@ namespace VISOR.ViewModels
             ClearPaceWarnings();
             IsPersistentDotVisible = false;
         }
+        public void InitializePerformanceCounters()
+        {
+            System.Diagnostics.Debug.WriteLine("[WarningsViewModel] Performance counters initialized");
+        }
     }
 }

@@ -1,25 +1,36 @@
-Thread: VISOR Telemetry ingest w/SVapps cheat sheet
+Thread: VISOR Overlay Radar Feature & Relative improvement
 
 Context:
 Good afternoon Claude,
 
-I'm building an overlay UI for iRacing called VISOR (Virtual Intelligence Simulator Overlay & Radar). I'm using this project to evaluate the coding and project management capabilities of various LLMs, including you, Gemini, and ChatGPT.
+I'm building an overlay UI for iRacing called VISOR (Virtual Intelligence Simulator Overlay & Radar). VISOR is a C# application, built in Visual Studio with .NET 8.0 and WPF. I've set AnyCPU for now, but can pivot if needed. We're targeting a MVVM architecture with discrete classes/files to handle individual tasks.
 
-VISOR is a C# application, built in VS with .NET 8.0 and WPF. I've set AnyCPU for now, but can pivot if needed. We're targeting a MVVM architecture with discrete classes/files to handle individual tasks.
+I'm using this project to evaluate the coding and project management capabilities of various LLMs, including you, Gemini, Grok, and ChatGPT. Gemini just completed a significant refactor and code cleanup, resulting in more files, but shorter lengths per file, and Grok found a couple key telemetry variables that will enable our next big effort.
 
-Our SDK for ingesting the telemetry is the SVappsLAB iRacing SDK, installed via NuGet. The repo for the SDK is here: https://github.com/SVappsLAB/iRacingTelemetrySDK/tree/main
+Our SDK wrapper for ingesting the telemetry is the SVappsLAB iRacing SDK, installed via NuGet. The repo for the SDK is here: https://github.com/SVappsLAB/iRacingTelemetrySDK/tree/main
 
 Goals for this thread:
 
-Fix window launch behavior
-- I discovered this in our source SDK's repo: https://github.com/SVappsLAB/iRacingTelemetrySDK/blob/main/AI_CONTEXT.md
-- What I want to do is take a look at our current code base and see if any of the things we were hunting for (via YAML parsing or reflection, for instance) might already be nicely defined for us, and then clean up our code based on that.
+Refactor Relative view models
+ - We've been calculating time gaps for our Relative display block based on some smoothed estimations using CarIdxLapDistPct. There is another variable called CarIdxF2Time that may provide a more accurate calculation straight from the game, that we might want to use instead for our time gaps, while keeping the existing logic for ordering etc. unaltered.
+ - I'd like you to research how F2Time works and figure out if and how we should use it for our Relative display.
+
+Prototype Radar Display
+ - It's time to take a stab at the "R" in VISOR. A radar display should be a separate window from MainWindow, but with the same translucent style and drag to reposition feature, and the same launch behavior (i.e. after ConfigWindow closes). After we've got it working the way we want, we will want the window to auto-hide when there are no cars close to us.
+ - The size of the window should be 300x300 pixels, and it should be positioned in the upper right quadrant of the display, with similar center-offset logic as we used on the MainWindow.
+ - The Radar window should be a simple target-style UI with two concentric rings and a crosshair, with the user's car in the center as a green rectangle, and other cars depicted as class-colored rectangles, positioned according to the logic we'll develop.
+ - The concentric rings should be calculated to be 2 and 4 car lengths, respectively. To calculate these rings and the car positions within them, we should use CarIdxLapDistPct and the TrackLength variable from the session data. The outer boundary of the display (i.e. when we start or stop displaying cars) should be 5 car lengths.
+ - The variables we need to use to position other cars in the display are CarLeftRight and CarIdxLapDistPct.
+ - Other car blips should be colored according to their class, using the same scheme we developed for the Relative display. 
+ - We also need to overlay the blips with the car's number, which we also already parsed for the Relative display. The sizes of the blips and car numbers should be selected so that the car number fits within the blip. The font should be white with a slight black outline so that it stands out, but it can be the default font.
  
  Rules & Methods:
  - Let's talk about what you see, understand, and want to do before we make any modifications to the code.
  - If you need more context or have decisions you want more information to support, say so. 
  - If you see something that makes you think you need to see another file, let me know and I'll upload it.
  - Let me know if we're approaching limits of your context window.
+ - I prefer complete new versions of files instead of code snippets or diffs. Exceptions to this can be short snippets that only need inserted one place in a file, single-line changes, or syntax corrections.
+ - We need to keep our files under 500 lines of code each. If we're getting close to breaking that, we need to investigate breaking out functions into separate files.
  
  Next Steps:
  I'll upload several of the key files from the project, including a folder structure. Assess those along with the context above, and then let's talk about the way ahead.

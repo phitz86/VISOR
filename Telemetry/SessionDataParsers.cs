@@ -14,6 +14,7 @@ namespace VISOR.Telemetry
             bool inDriverInfo = false;
             bool inSessionInfo = false;
             bool inSessionsArray = false;
+            bool inWeekendInfo = false;
             int currentSessionIdx = -1;
 
             foreach (var line in lines)
@@ -26,10 +27,42 @@ namespace VISOR.Telemetry
                     if (TryParseIntValue(trimmed, out int limit))
                         eventData.IncidentLimit = limit;
                 }
+                // Enter weekend info section
+                else if (trimmed.StartsWith("WeekendInfo:"))
+                {
+                    inWeekendInfo = true;
+                    inDriverInfo = false;
+                    inSessionInfo = false;
+                }
+                // Parse weekend/track information
+                else if (inWeekendInfo)
+                {
+                    if (trimmed.StartsWith("TrackName:"))
+                        eventData.Weekend.TrackName = ParseStringValue(trimmed);
+                    else if (trimmed.StartsWith("TrackConfigName:"))
+                        eventData.Weekend.TrackConfig = ParseStringValue(trimmed);
+                    else if (trimmed.StartsWith("TrackLength:"))
+                    {
+                        var lengthStr = ParseStringValue(trimmed).Replace(" km", "").Replace(" m", "");
+                        if (float.TryParse(lengthStr, out float length))
+                        {
+                            // Convert to meters if needed
+                            if (trimmed.Contains(" km"))
+                                length *= 1000f;
+                            eventData.Weekend.TrackLength = length;
+                        }
+                    }
+                    else if (trimmed.StartsWith("TrackDisplayName:"))
+                        eventData.Weekend.TrackDisplayName = ParseStringValue(trimmed);
+                    else if (trimmed.StartsWith("TrackDisplayShortName:"))
+                        eventData.Weekend.TrackDisplayShortName = ParseStringValue(trimmed);
+                }
                 // Enter driver info section
                 else if (trimmed.StartsWith("DriverInfo:"))
                 {
                     inDriverInfo = true;
+                    inWeekendInfo = false;
+                    inSessionInfo = false;
                 }
                 // Parse individual drivers
                 else if (inDriverInfo && trimmed.StartsWith("- CarIdx:"))
@@ -60,6 +93,7 @@ namespace VISOR.Telemetry
                 {
                     inSessionInfo = true;
                     inDriverInfo = false;
+                    inWeekendInfo = false;
                 }
                 else if (inSessionInfo && trimmed.StartsWith("Sessions:"))
                 {
