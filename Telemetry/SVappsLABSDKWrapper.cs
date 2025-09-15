@@ -16,6 +16,7 @@ namespace VISOR.Telemetry
         "CarIdxLap", "CarIdxLastLapTime", "CarIdxOnPitRoad",
         "SessionState", "SessionTime", "SessionTimeRemain", "SessionLapsRemain",
         "SessionLapsTotal", "SessionNum", "PlayerCarIdx", "SessionFlags",
+        // Radar support fields
         "CarLeftRight", "CarIdxF2Time"
     ])]
     public class SVappsLABSDKWrapper : IDisposable
@@ -46,7 +47,7 @@ namespace VISOR.Telemetry
         public bool IsConnected => _isConnected;
         public bool IsPrimed => _isConnected && _sessionCoordinator.IsDataReady;
 
-        // NEW: Expose the coordinator for other parts of the app to use
+        // Expose the coordinator for other parts of the app to use
         public SessionDataCoordinator Coordinator => _sessionCoordinator;
         #endregion
 
@@ -63,7 +64,6 @@ namespace VISOR.Telemetry
             _logger = new NullLogger<SVappsLABSDKWrapper>();
             _sessionCoordinator = new SessionDataCoordinator();
 
-            // MODIFIED: Pass the coordinator directly to the builder
             _dataBuilder = new TelemetryDataBuilder(_sessionCoordinator);
 
             _sessionLogger = new SessionDataLogger(
@@ -83,7 +83,7 @@ namespace VISOR.Telemetry
         {
             try
             {
-                Console.WriteLine("[SVappsLAB] Starting initialization...");
+                System.Diagnostics.Debug.WriteLine("[SVappsLAB] Starting initialization...");
 
                 _client = TelemetryClient<TelemetryData>.Create(_logger);
                 _client.OnSessionInfoUpdate += OnSessionInfoUpdate;
@@ -100,21 +100,21 @@ namespace VISOR.Telemetry
                     }
                     catch (OperationCanceledException)
                     {
-                        Console.WriteLine("[SVappsLAB] Monitoring cancelled");
+                        System.Diagnostics.Debug.WriteLine("[SVappsLAB] Monitoring cancelled");
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[SVappsLAB] Monitoring error: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Monitoring error: {ex.Message}");
                     }
                 });
 
                 await Task.Delay(200);
-                Console.WriteLine($"[SVappsLAB] Initialization complete.");
+                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Initialization complete.");
                 return true;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[SVappsLAB] Initialize error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Initialize error: {ex.Message}");
                 return false;
             }
         }
@@ -133,11 +133,9 @@ namespace VISOR.Telemetry
             int currentSession = _sessionCoordinator.CurrentSessionNum;
             string sessionType = _sessionCoordinator.GetCurrentSessionType();
 
-            Console.WriteLine($"[SVappsLAB] Manual log request for Session {currentSession} ({sessionType})");
+            System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Manual log request for Session {currentSession} ({sessionType})");
             _sessionLogger.ScheduleLogForSession(currentSession, sessionType);
         }
-
-        // REMOVED: All ISessionDataProvider implementation and proxy methods have been deleted.
 
         private void OnConnectStateChanged(object sender, EventArgs e)
         {
@@ -146,7 +144,7 @@ namespace VISOR.Telemetry
             if (newConnectionState != _isConnected)
             {
                 _isConnected = newConnectionState;
-                Console.WriteLine($"[SVappsLAB] Connection state changed: {_isConnected}");
+                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Connection state changed: {_isConnected}");
 
                 ConnectionStateChanged?.Invoke(_isConnected);
 
@@ -160,7 +158,7 @@ namespace VISOR.Telemetry
                 else
                 {
                     // Connected - start trying to get session data
-                    Console.WriteLine("[SVappsLAB] Connected - will attempt to get session data");
+                    System.Diagnostics.Debug.WriteLine("[SVappsLAB] Connected - will attempt to get session data");
                 }
 
                 CheckPrimedStateChange();
@@ -179,19 +177,30 @@ namespace VISOR.Telemetry
             {
                 if (_client == null)
                 {
-                    Console.WriteLine("[SVappsLAB] ERROR: Client is null during session info update");
+                    System.Diagnostics.Debug.WriteLine("[SVappsLAB] ERROR: Client is null during session info update");
                     return;
                 }
 
                 string sessionInfo = _client.GetRawTelemetrySessionInfoYaml();
 
+                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Raw YAML length: {sessionInfo?.Length ?? 0}");
+
                 if (!string.IsNullOrEmpty(sessionInfo))
                 {
+                    // Log first few lines of YAML to see what we're getting
+                    var lines = sessionInfo.Split('\n');
+                    System.Diagnostics.Debug.WriteLine($"[SVappsLAB] First 5 YAML lines:");
+                    for (int i = 0; i < Math.Min(5, lines.Length); i++)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"  {i}: {lines[i]}");
+                    }
+
                     StopYamlRetryTimer();
 
                     if (_sessionCoordinator.HasSessionDataChanged(sessionInfo))
                     {
-                        Console.WriteLine($"[SVappsLAB] New session data received, length: {sessionInfo.Length}");
+                        System.Diagnostics.Debug.WriteLine($"[SVappsLAB] New session data received, length: {sessionInfo.Length}");
+                        System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Parsing session data...");
 
                         if (_sessionCoordinator.ParseSessionData(sessionInfo))
                         {
@@ -203,20 +212,25 @@ namespace VISOR.Telemetry
                         }
                         else
                         {
-                            Console.WriteLine("[SVappsLAB] Failed to parse session data - starting retry timer");
+                            System.Diagnostics.Debug.WriteLine("[SVappsLAB] FAILED to parse session data - starting retry timer");
                             StartYamlRetryTimer();
                         }
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine("[SVappsLAB] Session data unchanged");
                     }
                 }
                 else
                 {
-                    Console.WriteLine("[SVappsLAB] No session data received - starting retry timer");
+                    System.Diagnostics.Debug.WriteLine("[SVappsLAB] No session data received - starting retry timer");
                     StartYamlRetryTimer();
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[SVappsLAB] Error in OnSessionInfoUpdate: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Error in OnSessionInfoUpdate: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Stack trace: {ex.StackTrace}");
                 StartYamlRetryTimer();
             }
         }
@@ -297,7 +311,7 @@ namespace VISOR.Telemetry
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[SVappsLAB] Telemetry update error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Telemetry update error: {ex.Message}");
             }
         }
 
@@ -307,7 +321,7 @@ namespace VISOR.Telemetry
             {
                 if (!_isRetryingYaml && _isConnected && !_sessionCoordinator.IsDataReady)
                 {
-                    Console.WriteLine("[SVappsLAB] Starting YAML retry timer");
+                    System.Diagnostics.Debug.WriteLine("[SVappsLAB] Starting YAML retry timer");
                     _isRetryingYaml = true;
                     _yamlRetryTimer.Start();
                 }
@@ -320,7 +334,7 @@ namespace VISOR.Telemetry
             {
                 if (_isRetryingYaml)
                 {
-                    Console.WriteLine("[SVappsLAB] Stopping YAML retry timer");
+                    System.Diagnostics.Debug.WriteLine("[SVappsLAB] Stopping YAML retry timer");
                     _yamlRetryTimer.Stop();
                     _isRetryingYaml = false;
                 }
@@ -337,16 +351,16 @@ namespace VISOR.Telemetry
                     return;
                 }
 
-                Console.WriteLine("[SVappsLAB] Retrying YAML data retrieval...");
+                System.Diagnostics.Debug.WriteLine("[SVappsLAB] Retrying YAML data retrieval...");
                 string sessionInfo = _client?.GetRawTelemetrySessionInfoYaml();
 
                 if (!string.IsNullOrEmpty(sessionInfo))
                 {
-                    Console.WriteLine($"[SVappsLAB] Retry successful - got session data, length: {sessionInfo.Length}");
+                    System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Retry successful - got session data, length: {sessionInfo.Length}");
 
                     if (_sessionCoordinator.ParseSessionData(sessionInfo))
                     {
-                        Console.WriteLine("[SVappsLAB] Retry parse successful");
+                        System.Diagnostics.Debug.WriteLine("[SVappsLAB] Retry parse successful");
                         SessionYamlAvailable?.Invoke(sessionInfo);
                         SessionDataUpdated?.Invoke();
                         CheckPrimedStateChange();
@@ -355,17 +369,17 @@ namespace VISOR.Telemetry
                     }
                     else
                     {
-                        Console.WriteLine("[SVappsLAB] Retry parse failed - will try again");
+                        System.Diagnostics.Debug.WriteLine("[SVappsLAB] Retry parse failed - will try again");
                     }
                 }
                 else
                 {
-                    Console.WriteLine("[SVappsLAB] Retry failed - no session data available yet");
+                    System.Diagnostics.Debug.WriteLine("[SVappsLAB] Retry failed - no session data available yet");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[SVappsLAB] Error during YAML retry: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Error during YAML retry: {ex.Message}");
             }
         }
 
@@ -373,7 +387,7 @@ namespace VISOR.Telemetry
         {
             try
             {
-                Console.WriteLine("[SVappsLAB] Starting shutdown...");
+                System.Diagnostics.Debug.WriteLine("[SVappsLAB] Starting shutdown...");
 
                 StopYamlRetryTimer();
                 _yamlRetryTimer?.Dispose();
@@ -384,7 +398,7 @@ namespace VISOR.Telemetry
 
                 if (_monitoringTask != null && !_monitoringTask.Wait(TimeSpan.FromSeconds(2)))
                 {
-                    Console.WriteLine("[SVappsLAB] Monitoring task did not shut down gracefully");
+                    System.Diagnostics.Debug.WriteLine("[SVappsLAB] Monitoring task did not shut down gracefully");
                 }
 
                 if (_client != null)
@@ -399,11 +413,11 @@ namespace VISOR.Telemetry
                 _cancellationTokenSource?.Dispose();
                 _sessionCoordinator.ClearCache();
 
-                Console.WriteLine("[SVappsLAB] Shutdown complete");
+                System.Diagnostics.Debug.WriteLine("[SVappsLAB] Shutdown complete");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[SVappsLAB] Shutdown error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Shutdown error: {ex.Message}");
             }
         }
 

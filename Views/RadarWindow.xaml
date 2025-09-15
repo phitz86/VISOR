@@ -58,7 +58,7 @@
 
 		<!-- Player car (green rectangle in center) -->
 		<Rectangle x:Name="PlayerCar"
-                   Width="12" Height="24"
+                   Width="18" Height="32"
                    Fill="Lime"
                    Stroke="DarkGreen" StrokeThickness="1"
                    HorizontalAlignment="Center"

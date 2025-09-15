@@ -63,7 +63,6 @@ namespace VISOR.ViewModels
             var userNames = sessionDataProvider.UserNames;
             var carClassIDs = sessionDataProvider.CarClassIDs;
             var onPitRoad = snapshot.GetValue<bool[]>("CarIdxOnPitRoad");
-            var carLeftRight = snapshot.GetValue<float[]>("CarLeftRight");
 
             if (lapDistPct == null || trackSurface == null) return;
 
@@ -77,7 +76,7 @@ namespace VISOR.ViewModels
                 if (trackSurface[i] == (int)iRacingTrackSurface.NotInWorld) continue;
                 if (string.IsNullOrEmpty(carNumbers?[i])) continue;
 
-                // Calculate distance from player
+                // Calculate distance from player (for range checking only)
                 float carDistance = CalculateTrackDistance(playerLapDistPct, lapDistPct[i], _trackLength);
 
                 // Check if car is within radar range
@@ -91,7 +90,7 @@ namespace VISOR.ViewModels
                         CarNumber = carNumbers[i],
                         ClassID = carClassIDs[i],
                         IsOnPitRoad = onPitRoad?[i] ?? false,
-                        LeftRight = carLeftRight?[i] ?? 0f
+                        LeftRight = 0f // CarLeftRight is non-functional, always zero
                     };
 
                     visibleCars.Add(carData);
@@ -125,7 +124,7 @@ namespace VISOR.ViewModels
 
         private float CalculateTrackDistance(float playerDistPct, float carDistPct, float trackLength)
         {
-            // Calculate the shortest distance around the track
+            // Calculate the shortest distance around the track (for range checking only)
             float directDistance = Math.Abs(carDistPct - playerDistPct) * trackLength;
             float wrapAroundDistance = trackLength - directDistance;
 
@@ -185,47 +184,45 @@ namespace VISOR.ViewModels
 
         private RadarPosition CalculateRadarPosition(RadarCarData car, float playerLapDistPct)
         {
-            // Calculate angle based on track position relative to player
+            // FIXED: Calculate relative position preserving direction
             float relativeDistPct = car.LapDistPct - playerLapDistPct;
 
-            // Normalize to -0.5 to 0.5 range
+            // Normalize to -0.5 to 0.5 range (preserves sign for direction)
             if (relativeDistPct > 0.5f) relativeDistPct -= 1.0f;
             if (relativeDistPct < -0.5f) relativeDistPct += 1.0f;
 
-            // Convert to angle (0 = ahead, π/2 = right, π = behind, 3π/2 = left)
-            // Player faces "up" on radar, so ahead is negative Y
-            float angle = relativeDistPct * 2.0f * (float)Math.PI;
-
-            // Calculate radius based on distance (with some lateral offset from CarLeftRight)
+            // Use the actual track distance for radius calculation (how far from center)
             float distanceCarLengths = car.TrackDistance / AVERAGE_CAR_LENGTH;
             float radiusRatio = Math.Min(distanceCarLengths / DETECTION_RANGE, 1.0f);
             float radius = radiusRatio * RADAR_RADIUS;
 
-            // Add slight lateral offset based on CarLeftRight (if available)
-            float lateralOffset = car.LeftRight * 10f; // Scale factor for visibility
+            // Use relativeDistPct for angle calculation (direction around radar)
+            // Positive relativeDistPct = ahead of player = top of radar
+            // Negative relativeDistPct = behind player = bottom of radar
+            float angle = relativeDistPct * 2.0f * (float)Math.PI;
 
             // Calculate final position
-            float x = RADAR_RADIUS + (radius * (float)Math.Sin(angle)) + lateralOffset;
-            float y = RADAR_RADIUS - (radius * (float)Math.Cos(angle)); // Negative cos for "up" direction
+            float x = RADAR_RADIUS + (radius * (float)Math.Sin(angle));
+            float y = RADAR_RADIUS - (radius * (float)Math.Cos(angle)); // Minus cos puts ahead (positive) at top
 
             return new RadarPosition { X = x, Y = y, Angle = angle };
         }
 
         private RadarCarElement CreateCarElement(RadarCarData car)
         {
-            // Create rectangle for car
+            // Create rectangle for car - larger size for 12pt font
             var rectangle = new Rectangle
             {
-                Width = 8,
-                Height = 8,
+                Width = 18,  // Large enough for 12pt font
+                Height = 32, // Taller for better visibility
                 Stroke = Brushes.Black,
                 StrokeThickness = 1
             };
 
-            // Create text for car number
+            // Create text for car number - 12pt font as requested
             var numberText = new TextBlock
             {
-                FontSize = 8,
+                FontSize = 12, // 12pt as requested
                 FontWeight = FontWeights.Bold,
                 Foreground = Brushes.White,
                 Text = car.CarNumber,
@@ -251,15 +248,15 @@ namespace VISOR.ViewModels
 
         private void UpdateCarElement(RadarCarElement element, RadarCarData car, RadarPosition position)
         {
-            // Update position - adjust for new rectangle size (12x24)
+            // Update position - adjust for rectangle size (18x32)
             Canvas.SetLeft(element.Rectangle, position.X - element.Rectangle.Width / 2);
             Canvas.SetTop(element.Rectangle, position.Y - element.Rectangle.Height / 2);
 
-            // Center text within the rectangle
-            Canvas.SetLeft(element.NumberText, position.X - 6); // Half of width (12/2)
-            Canvas.SetTop(element.NumberText, position.Y - 8);  // Roughly center vertically in 24px height
+            // Center text within the rectangle - properly centered
+            Canvas.SetLeft(element.NumberText, position.X - 9);  // Half of 18px width (centered horizontally)
+            Canvas.SetTop(element.NumberText, position.Y - 14); // Adjusted for 32px height and 12pt font (centered vertically)
 
-            // Update color based on class
+            // Update color based on class - use same logic as Relative display
             element.Rectangle.Fill = GetClassColor(car.ClassID);
 
             // Update appearance based on pit road status

@@ -33,6 +33,23 @@ namespace VISOR.Telemetry
                     inWeekendInfo = true;
                     inDriverInfo = false;
                     inSessionInfo = false;
+                    inSessionsArray = false; // Add this
+                }
+                // Enter driver info section
+                else if (trimmed.StartsWith("DriverInfo:"))
+                {
+                    inDriverInfo = true;
+                    inWeekendInfo = false;
+                    inSessionInfo = false;
+                    inSessionsArray = false; // Add this
+                }
+                // Parse session schedule
+                else if (trimmed.StartsWith("SessionInfo:"))
+                {
+                    inSessionInfo = true;
+                    inDriverInfo = false;
+                    inWeekendInfo = false;
+                    inSessionsArray = false; // Add this - reset when entering SessionInfo
                 }
                 // Parse weekend/track information
                 else if (inWeekendInfo)

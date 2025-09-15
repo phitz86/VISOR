@@ -13,6 +13,7 @@ namespace VISOR.Views
     {
         private readonly MainViewModel _viewModel;
         private readonly SVappsLABSDKWrapper _sdk;
+        private static DateTime _lastSessionReadyLog = DateTime.MinValue;
 
         public MainWindow(SVappsLABSDKWrapper sdkWrapper)
         {
@@ -122,18 +123,21 @@ namespace VISOR.Views
         {
             Dispatcher.Invoke(() =>
             {
-                // MODIFIED: The wrapper no longer implements the interface.
-                // We now pass the wrapper's public Coordinator property, which does.
                 if (_sdk.IsSessionDataReady)
                 {
-                    System.Diagnostics.Debug.WriteLine("[MainWindow] Session data ready - passing SDK's Coordinator");
-                    // Pass the Coordinator property, which implements ISessionDataProvider
+                    // Throttle debug output to once per second
+                    var now = DateTime.Now;
+                    if ((now - _lastSessionReadyLog).TotalSeconds > 1)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[MainWindow] Session data ready - passing SDK's Coordinator");
+                        _lastSessionReadyLog = now;
+                    }
+
                     _viewModel.UpdateFromTelemetry(snapshot, _sdk.Coordinator);
                 }
                 else
                 {
                     System.Diagnostics.Debug.WriteLine("[MainWindow] Session data not ready - passing null");
-                    // Just update the basic telemetry without session-dependent features
                     _viewModel.UpdateFromTelemetry(snapshot, null);
                 }
             });
