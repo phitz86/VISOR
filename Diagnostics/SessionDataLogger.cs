@@ -2,15 +2,12 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using System.Timers;
 
 namespace VISOR.Diagnostics
 {
-    /// <summary>
-    /// Session-aware data logger that creates multi-interval logs and continuous telemetry logs.
-    /// Adapts logging intervals to session length for optimal data capture.
-    /// </summary>
     public class SessionDataLogger : IDisposable
     {
         private readonly string _outputDirectory;
@@ -21,9 +18,11 @@ namespace VISOR.Diagnostics
         private readonly Func<string> _getSessionYaml;
         private readonly Func<Dictionary<string, Type>> _getFieldTypes;
 
-        // Added for continuous telemetry logging
         private readonly StreamWriter _telemetryWriter;
         private readonly object _telemetryLock = new();
+
+        private readonly StreamWriter _f2TimeWriter;
+        private readonly object _f2TimeLock = new();
 
         public SessionDataLogger(Func<string> getSessionYaml, Func<Dictionary<string, Type>> getFieldTypes)
         {
@@ -35,17 +34,21 @@ namespace VISOR.Diagnostics
 
             Debug.WriteLine($"[SessionLogger] Output directory: {_outputDirectory}");
 
-            // Initialize the continuous telemetry log file
+            // Initialize the CarLeftRight telemetry log file
             var telemetryFilePath = Path.Combine(_outputDirectory, $"CarLeftRight_telemetry_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
-            var fs = new FileStream(telemetryFilePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
-            _telemetryWriter = new StreamWriter(fs);
+            var fsClr = new FileStream(telemetryFilePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
+            _telemetryWriter = new StreamWriter(fsClr, Encoding.UTF8);
             _telemetryWriter.WriteLine("SessionTime,PlayerCarIdx,TargetCarIdx,CarLeftRight_Value,PlayerLapDistPct,TargetLapDistPct,LapDistDelta");
             _telemetryWriter.Flush();
+
+            // Initialize the F2Time telemetry log file
+            var f2TimeFilePath = Path.Combine(_outputDirectory, $"F2Time_telemetry_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+            var fsF2 = new FileStream(f2TimeFilePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
+            _f2TimeWriter = new StreamWriter(fsF2, Encoding.UTF8);
+            _f2TimeWriter.WriteLine("SessionTime,PlayerCarIdx,TargetCarIdx,F2Time_Value,PlayerLapDistPct,TargetLapDistPct,LapDistDelta");
+            _f2TimeWriter.Flush();
         }
 
-        /// <summary>
-        /// Logs a single frame of high-frequency telemetry data when a meaningful change is detected.
-        /// </summary>
         public void LogTelemetryFrame(double sessionTime, int playerCarIdx, int targetCarIdx, float clrValue, float playerLapDist, float targetLapDist)
         {
             if (_isDisposed) return;
@@ -56,23 +59,42 @@ namespace VISOR.Diagnostics
                 {
                     float lapDistDelta = playerLapDist - targetLapDist;
                     _telemetryWriter.WriteLine($"{sessionTime:F3},{playerCarIdx},{targetCarIdx},{clrValue:F4},{playerLapDist:F4},{targetLapDist:F4},{lapDistDelta:F4}");
+                    _telemetryWriter.Flush();
                 }
             }
         }
 
-        /// <summary>
-        /// Schedule session-aware logs based on session duration.
-        /// </summary>
+        public void LogF2TimeFrame(double sessionTime, int playerCarIdx, int targetCarIdx, float f2TimeValue, float playerLapDist, float targetLapDist)
+        {
+            if (_isDisposed) return;
+
+            lock (_f2TimeLock)
+            {
+                if (_f2TimeWriter != null)
+                {
+                    float lapDistDelta = playerLapDist - targetLapDist;
+                    _f2TimeWriter.WriteLine($"{sessionTime:F3},{playerCarIdx},{targetCarIdx},{f2TimeValue:F4},{playerLapDist:F4},{targetLapDist:F4},{lapDistDelta:F4}");
+                    _f2TimeWriter.Flush();
+                }
+            }
+        }
+
         public void ScheduleSessionAwareLogs(int sessionNum, string sessionType, double sessionTimeSeconds)
         {
-            if (_isDisposed || _loggedSessions.Contains(sessionNum)) return;
+            if (_isDisposed) return;
+
+            if (_loggedSessions.Contains(sessionNum))
+            {
+                Debug.WriteLine($"[SessionLogger] Already scheduled logging for session {sessionNum}, skipping");
+                return;
+            }
 
             _loggedSessions.Add(sessionNum);
 
             if (sessionTimeSeconds <= 0)
             {
                 Debug.WriteLine($"[SessionLogger] Invalid session time ({sessionTimeSeconds}s) for {sessionType}, using fallback logging");
-                ScheduleLogForSession(sessionNum, sessionType); // Fallback to simple 2-minute log
+                ScheduleLogForSession(sessionNum, sessionType);
                 return;
             }
 
@@ -81,7 +103,7 @@ namespace VISOR.Diagnostics
             ScheduleLogAtInterval(sessionNum, sessionType, TimeSpan.FromMinutes(2), "early");
             Debug.WriteLine($"[SessionLogger]   Early log: 2 minutes");
 
-            if (sessionTimeSeconds > 600) // 10 minutes
+            if (sessionTimeSeconds > 600)
             {
                 var midTime = TimeSpan.FromSeconds(sessionTimeSeconds * 0.6);
                 ScheduleLogAtInterval(sessionNum, sessionType, midTime, "mid");
@@ -93,12 +115,15 @@ namespace VISOR.Diagnostics
             Debug.WriteLine($"[SessionLogger]   Late log: {endTime.TotalMinutes:F1} minutes");
         }
 
-        /// <summary>
-        /// Legacy method for backward compatibility - uses simple 2-minute delay.
-        /// </summary>
         public void ScheduleLogForSession(int sessionNum, string sessionType)
         {
-            if (_isDisposed || _loggedSessions.Contains(sessionNum)) return;
+            if (_isDisposed) return;
+
+            if (_loggedSessions.Contains(sessionNum))
+            {
+                Debug.WriteLine($"[SessionLogger] Already scheduled logging for session {sessionNum}, skipping");
+                return;
+            }
 
             _loggedSessions.Add(sessionNum);
             Debug.WriteLine($"[SessionLogger] Scheduling simple log for SessionNum {sessionNum} ({sessionType}) in 2 minutes");
@@ -239,6 +264,12 @@ namespace VISOR.Diagnostics
             {
                 _telemetryWriter?.Flush();
                 _telemetryWriter?.Dispose();
+            }
+
+            lock (_f2TimeLock)
+            {
+                _f2TimeWriter?.Flush();
+                _f2TimeWriter?.Dispose();
             }
 
             Debug.WriteLine($"[SessionLogger] Disposed with {_loggedSessions.Count} sessions logged");

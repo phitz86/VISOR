@@ -16,7 +16,7 @@ namespace VISOR.Telemetry
         "CarIdxLap", "CarIdxLastLapTime", "CarIdxOnPitRoad",
         "SessionState", "SessionTime", "SessionTimeRemain", "SessionLapsRemain",
         "SessionLapsTotal", "SessionNum", "PlayerCarIdx", "SessionFlags",
-        // Radar support fields
+        // Radar and F2 support fields
         "CarLeftRight", "CarIdxF2Time"
     ])]
     public class SVappsLABSDKWrapper : IDisposable
@@ -38,8 +38,14 @@ namespace VISOR.Telemetry
 
         private int _lastSessionNumForLog = -1;
 
-        // Cache for efficient "log on change" logic
+        // Caches for efficient "log on change" logic
         private float[] _lastCarLeftRight = new float[64];
+        private float[] _lastF2Time = new float[64];
+
+        // Flags for one-time diagnostic logging
+        private static bool _clrFieldNotFoundLogged = false;
+        private static bool _clrValueIsNullLogged = false;
+        private static bool _clrTypeCastFailedLogged = false;
         #endregion
 
         #region Public Properties
@@ -113,7 +119,13 @@ namespace VISOR.Telemetry
                 StopYamlRetryTimer();
                 _sessionCoordinator.ClearCache();
                 _lastSessionNumForLog = -1;
-                Array.Clear(_lastCarLeftRight, 0, _lastCarLeftRight.Length); // Reset cache on disconnect
+                Array.Clear(_lastCarLeftRight, 0, _lastCarLeftRight.Length);
+                Array.Clear(_lastF2Time, 0, _lastF2Time.Length);
+
+                // Reset diagnostic flags for the next connection
+                _clrFieldNotFoundLogged = false;
+                _clrValueIsNullLogged = false;
+                _clrTypeCastFailedLogged = false;
             }
             CheckPrimedStateChange();
         }
@@ -174,58 +186,79 @@ namespace VISOR.Telemetry
 
         private void OnTelemetryUpdate(object sender, TelemetryData telemetryData)
         {
-            // --- Telemetry Logging with error handling ---
+            // --- CarLeftRight Logging Block ---
             try
             {
-                // Use reflection to access CarLeftRight, as it's not a direct property.
                 var clrField = typeof(TelemetryData).GetField("CarLeftRight");
-                if (clrField != null)
+                if (clrField == null)
                 {
-                    // Get the value and safely cast it to the expected float array.
-                    if (clrField.GetValue(telemetryData) is float[] carLeftRight)
+                    if (!_clrFieldNotFoundLogged)
                     {
-                        int playerCarIdx = telemetryData.PlayerCarIdx;
-                        var lapDistPct = telemetryData.CarIdxLapDistPct;
-
-                        for (int i = 0; i < carLeftRight.Length; i++)
+                        System.Diagnostics.Debug.WriteLine("[DIAGNOSTIC] CarLeftRight field was NOT FOUND via reflection.");
+                        _clrFieldNotFoundLogged = true;
+                    }
+                }
+                else if (clrField.GetValue(telemetryData) is float[] carLeftRight)
+                {
+                    int playerCarIdx = telemetryData.PlayerCarIdx;
+                    var lapDistPct = telemetryData.CarIdxLapDistPct;
+                    for (int i = 0; i < carLeftRight.Length; i++)
+                    {
+                        if (i != playerCarIdx && carLeftRight[i] != _lastCarLeftRight[i])
                         {
-                            if (i != playerCarIdx && carLeftRight[i] != _lastCarLeftRight[i])
+                            if (carLeftRight[i] != 0f)
                             {
-                                if (carLeftRight[i] != 0f)
-                                {
-                                    _sessionLogger.LogTelemetryFrame(
-                                        telemetryData.SessionTime,
-                                        playerCarIdx,
-                                        i,
-                                        carLeftRight[i],
-                                        lapDistPct[playerCarIdx],
-                                        lapDistPct[i]
-                                    );
-                                }
-                                _lastCarLeftRight[i] = carLeftRight[i];
+                                _sessionLogger.LogTelemetryFrame(
+                                    telemetryData.SessionTime, playerCarIdx, i, carLeftRight[i],
+                                    lapDistPct[playerCarIdx], lapDistPct[i]);
                             }
+                            _lastCarLeftRight[i] = carLeftRight[i];
                         }
                     }
                 }
             }
             catch (Exception ex)
             {
-                // If anything goes wrong with the logging, we'll see it in the debug output
-                // but the rest of the application will continue to function.
                 System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Error during CarLeftRight logging: {ex.Message}");
+            }
+
+            // --- F2Time Logging Block ---
+            try
+            {
+                var f2Field = typeof(TelemetryData).GetField("CarIdxF2Time");
+                if (f2Field != null && f2Field.GetValue(telemetryData) is float[] f2Time)
+                {
+                    int playerCarIdx = telemetryData.PlayerCarIdx;
+                    var lapDistPct = telemetryData.CarIdxLapDistPct;
+                    for (int i = 0; i < f2Time.Length; i++)
+                    {
+                        if (i != playerCarIdx && f2Time[i] != _lastF2Time[i])
+                        {
+                            if (f2Time[i] != 0f)
+                            {
+                                _sessionLogger.LogF2TimeFrame(
+                                   telemetryData.SessionTime, playerCarIdx, i, f2Time[i],
+                                   lapDistPct[playerCarIdx], lapDistPct[i]);
+                            }
+                            _lastF2Time[i] = f2Time[i];
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Error during F2Time logging: {ex.Message}");
             }
 
             // --- Core Telemetry Processing ---
             try
             {
                 var telemetryDict = _dataBuilder.BuildTelemetryDictionary(telemetryData);
-
                 _latestSnapshot = new SVappsLABSnapshot(
                     telemetryDict,
                     _sessionCoordinator.GetCachedSessionYaml(),
                     DateTime.UtcNow
                 );
-
                 SnapshotAvailable?.Invoke(_latestSnapshot);
             }
             catch (Exception ex)
@@ -265,7 +298,6 @@ namespace VISOR.Telemetry
                 StopYamlRetryTimer();
                 return;
             }
-
             OnSessionInfoUpdate(this, EventArgs.Empty);
         }
 

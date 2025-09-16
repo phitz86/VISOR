@@ -151,7 +151,7 @@ namespace VISOR.ViewModels
             {
                 float directDistance = Math.Abs(car.LapDistPct - playerTrackPercent);
                 float proximity = Math.Min(directDistance, 1.0f - directDistance);
-                bool isAhead = (car.LapDistPct - playerTrackPercent + 1.5f) % 1.0f < 0.5f;
+                bool isAhead = (car.LapDistPct - playerTrackPercent + 1.5f) % 1.0f > 0.5f;
                 return new { Car = car, Proximity = proximity, IsAhead = isAhead };
             }).ToList();
 
