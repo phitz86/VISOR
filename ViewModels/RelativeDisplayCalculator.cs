@@ -57,14 +57,8 @@ namespace VISOR.ViewModels
             List<RelativeRowViewModel> finalRows;
             bool useFastestLap = dataProvider.ShouldUseFastestLapPositioning();
 
-            if (useFastestLap)
-            {
-                finalRows = BuildFastestLapBasedRows(allValidCars, playerCarIdx, dataProvider);
-            }
-            else
-            {
-                finalRows = BuildProximityBasedRows(allValidCars, playerLastLapTime);
-            }
+            // ALWAYS build the list of cars shown in the relative display based on physical proximity on track.
+            finalRows = BuildProximityBasedRows(allValidCars, playerLastLapTime);
 
             var playerPos = CalculatePlayerClassPosition(allValidCars, playerCarIdx, useFastestLap, dataProvider);
             ApplyDisplayLogic(finalRows, allValidCars, playerLastLapTime, useFastestLap, dataProvider);
@@ -234,23 +228,28 @@ namespace VISOR.ViewModels
 
         private void AssignGapDisplay(RelativeRowViewModel row, RelativeRowViewModel playerRow, List<RelativeRowViewModel> displayRows, float playerLastLapTime, bool isFastestLapMode)
         {
-            if (row.IsPlayer) { row.Gap = "0.0"; return; }
+            if (row.IsPlayer)
+            {
+                row.Gap = "0.0";
+                return;
+            }
+
+            if (playerLastLapTime <= 0)
+            {
+                row.Gap = "0.0";
+                return;
+            }
+
+            // This logic now runs for all session types.
+            float proximityDistance = Math.Min(Math.Abs(row.LapDistPct - playerRow.LapDistPct), 1.0f - Math.Abs(row.LapDistPct - playerRow.LapDistPct));
+            float rawTimeGap = proximityDistance * playerLastLapTime;
+            row.UpdateSmoothedGap(rawTimeGap);
+
             int playerDisplayIndex = displayRows.IndexOf(playerRow);
             int rowDisplayIndex = displayRows.IndexOf(row);
-            if (isFastestLapMode)
-            {
-                int positionDiff = rowDisplayIndex - playerDisplayIndex;
-                row.Gap = $"{positionDiff:+#;-#;0}";
-            }
-            else
-            {
-                if (playerLastLapTime <= 0) { row.Gap = "0.0"; return; }
-                float proximityDistance = Math.Min(Math.Abs(row.LapDistPct - playerRow.LapDistPct), 1.0f - Math.Abs(row.LapDistPct - playerRow.LapDistPct));
-                float rawTimeGap = proximityDistance * playerLastLapTime;
-                row.UpdateSmoothedGap(rawTimeGap);
-                string sign = (rowDisplayIndex < playerDisplayIndex) ? "+" : "-";
-                row.Gap = $"{sign}{row.SmoothedGap:F1}";
-            }
+            string sign = (rowDisplayIndex < playerDisplayIndex) ? "+" : "-";
+
+            row.Gap = $"{sign}{row.SmoothedGap:F1}";
         }
 
         private void AssignNameColor(RelativeRowViewModel row, RelativeRowViewModel playerRow)

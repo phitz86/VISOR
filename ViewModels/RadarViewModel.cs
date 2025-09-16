@@ -205,7 +205,7 @@ namespace VISOR.ViewModels
             // Create rectangle for car - larger size for 12pt font
             var rectangle = new Rectangle
             {
-                Width = 18,
+                Width = 24,
                 Height = 32,
                 Stroke = Brushes.Black,
                 StrokeThickness = 1
@@ -214,7 +214,7 @@ namespace VISOR.ViewModels
             // Create text for car number - 12pt font as requested
             var numberText = new TextBlock
             {
-                Width = 18, // <-- ADD THIS LINE
+                Width = 24,
                 FontSize = 12,
                 FontWeight = FontWeights.Bold,
                 Foreground = Brushes.White,
@@ -246,8 +246,12 @@ namespace VISOR.ViewModels
             Canvas.SetTop(element.Rectangle, position.Y - element.Rectangle.Height / 2);
 
             // Center text within the rectangle - properly centered
-            Canvas.SetLeft(element.NumberText, position.X - 9);  // Half of 18px width (centered horizontally)
-            Canvas.SetTop(element.NumberText, position.Y - 14); // Adjusted for 32px height and 12pt font (centered vertically)
+            // The new half-width is 12 (24 / 2)
+            Canvas.SetLeft(element.Rectangle, position.X - 12);
+            Canvas.SetTop(element.Rectangle, position.Y - 16);
+
+            Canvas.SetLeft(element.NumberText, position.X - 12);
+            Canvas.SetTop(element.NumberText, position.Y - 14);
 
             // Update color based on class - use same logic as Relative display
             element.Rectangle.Fill = GetClassColor(car.ClassID);
