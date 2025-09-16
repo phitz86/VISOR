@@ -184,28 +184,20 @@ namespace VISOR.ViewModels
 
         private RadarPosition CalculateRadarPosition(RadarCarData car, float playerLapDistPct)
         {
-            // FIXED: Calculate relative position preserving direction
             float relativeDistPct = car.LapDistPct - playerLapDistPct;
 
-            // Normalize to -0.5 to 0.5 range (preserves sign for direction)
             if (relativeDistPct > 0.5f) relativeDistPct -= 1.0f;
             if (relativeDistPct < -0.5f) relativeDistPct += 1.0f;
 
-            // Use the actual track distance for radius calculation (how far from center)
-            float distanceCarLengths = car.TrackDistance / AVERAGE_CAR_LENGTH;
-            float radiusRatio = Math.Min(distanceCarLengths / DETECTION_RANGE, 1.0f);
-            float radius = radiusRatio * RADAR_RADIUS;
+            float aheadBehindMeters = relativeDistPct * _trackLength;
 
-            // Use relativeDistPct for angle calculation (direction around radar)
-            // Positive relativeDistPct = ahead of player = top of radar
-            // Negative relativeDistPct = behind player = bottom of radar
-            float angle = relativeDistPct * 2.0f * (float)Math.PI;
+            float distanceRatio = aheadBehindMeters / (DETECTION_RANGE * AVERAGE_CAR_LENGTH);
+            distanceRatio = Math.Clamp(distanceRatio, -1.0f, 1.0f);
 
-            // Calculate final position
-            float x = RADAR_RADIUS + (radius * (float)Math.Sin(angle));
-            float y = RADAR_RADIUS - (radius * (float)Math.Cos(angle)); // Minus cos puts ahead (positive) at top
+            float y = RADAR_RADIUS - (distanceRatio * RADAR_RADIUS);
+            float x = RADAR_RADIUS;
 
-            return new RadarPosition { X = x, Y = y, Angle = angle };
+            return new RadarPosition { X = x, Y = y, Angle = 0 };
         }
 
         private RadarCarElement CreateCarElement(RadarCarData car)
@@ -213,8 +205,8 @@ namespace VISOR.ViewModels
             // Create rectangle for car - larger size for 12pt font
             var rectangle = new Rectangle
             {
-                Width = 18,  // Large enough for 12pt font
-                Height = 32, // Taller for better visibility
+                Width = 18,
+                Height = 32,
                 Stroke = Brushes.Black,
                 StrokeThickness = 1
             };
@@ -222,7 +214,8 @@ namespace VISOR.ViewModels
             // Create text for car number - 12pt font as requested
             var numberText = new TextBlock
             {
-                FontSize = 12, // 12pt as requested
+                Width = 18, // <-- ADD THIS LINE
+                FontSize = 12,
                 FontWeight = FontWeights.Bold,
                 Foreground = Brushes.White,
                 Text = car.CarNumber,

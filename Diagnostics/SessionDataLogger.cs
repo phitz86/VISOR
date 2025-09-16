@@ -8,8 +8,8 @@ using System.Timers;
 namespace VISOR.Diagnostics
 {
     /// <summary>
-    /// Session-aware data logger that creates multi-interval logs based on session duration
-    /// Adapts logging intervals to session length for optimal data capture
+    /// Session-aware data logger that creates multi-interval logs and continuous telemetry logs.
+    /// Adapts logging intervals to session length for optimal data capture.
     /// </summary>
     public class SessionDataLogger : IDisposable
     {
@@ -21,31 +21,51 @@ namespace VISOR.Diagnostics
         private readonly Func<string> _getSessionYaml;
         private readonly Func<Dictionary<string, Type>> _getFieldTypes;
 
+        // Added for continuous telemetry logging
+        private readonly StreamWriter _telemetryWriter;
+        private readonly object _telemetryLock = new();
+
         public SessionDataLogger(Func<string> getSessionYaml, Func<Dictionary<string, Type>> getFieldTypes)
         {
             _getSessionYaml = getSessionYaml;
             _getFieldTypes = getFieldTypes;
 
-            // Create output directory
             _outputDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "VISOR_SessionData");
             Directory.CreateDirectory(_outputDirectory);
 
             Debug.WriteLine($"[SessionLogger] Output directory: {_outputDirectory}");
+
+            // Initialize the continuous telemetry log file
+            var telemetryFilePath = Path.Combine(_outputDirectory, $"CarLeftRight_telemetry_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+            var fs = new FileStream(telemetryFilePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
+            _telemetryWriter = new StreamWriter(fs);
+            _telemetryWriter.WriteLine("SessionTime,PlayerCarIdx,TargetCarIdx,CarLeftRight_Value,PlayerLapDistPct,TargetLapDistPct,LapDistDelta");
+            _telemetryWriter.Flush();
         }
 
         /// <summary>
-        /// Schedule session-aware logs based on session duration
-        /// Creates multiple log points optimized for different session lengths
+        /// Logs a single frame of high-frequency telemetry data when a meaningful change is detected.
         /// </summary>
-        public void ScheduleSessionAwareLogs(int sessionNum, string sessionType, double sessionTimeSeconds)
+        public void LogTelemetryFrame(double sessionTime, int playerCarIdx, int targetCarIdx, float clrValue, float playerLapDist, float targetLapDist)
         {
             if (_isDisposed) return;
 
-            if (_loggedSessions.Contains(sessionNum))
+            lock (_telemetryLock)
             {
-                Debug.WriteLine($"[SessionLogger] Already scheduled logging for session {sessionNum}, skipping");
-                return;
+                if (_telemetryWriter != null)
+                {
+                    float lapDistDelta = playerLapDist - targetLapDist;
+                    _telemetryWriter.WriteLine($"{sessionTime:F3},{playerCarIdx},{targetCarIdx},{clrValue:F4},{playerLapDist:F4},{targetLapDist:F4},{lapDistDelta:F4}");
+                }
             }
+        }
+
+        /// <summary>
+        /// Schedule session-aware logs based on session duration.
+        /// </summary>
+        public void ScheduleSessionAwareLogs(int sessionNum, string sessionType, double sessionTimeSeconds)
+        {
+            if (_isDisposed || _loggedSessions.Contains(sessionNum)) return;
 
             _loggedSessions.Add(sessionNum);
 
@@ -58,38 +78,27 @@ namespace VISOR.Diagnostics
 
             Debug.WriteLine($"[SessionLogger] Scheduling session-aware logs for {sessionType} ({sessionTimeSeconds}s duration):");
 
-            // Always log early (2 minutes)
             ScheduleLogAtInterval(sessionNum, sessionType, TimeSpan.FromMinutes(2), "early");
             Debug.WriteLine($"[SessionLogger]   Early log: 2 minutes");
 
-            // If session > 10 minutes, add a mid-session log
             if (sessionTimeSeconds > 600) // 10 minutes
             {
-                var midTime = TimeSpan.FromSeconds(sessionTimeSeconds * 0.6); // 60% through session
+                var midTime = TimeSpan.FromSeconds(sessionTimeSeconds * 0.6);
                 ScheduleLogAtInterval(sessionNum, sessionType, midTime, "mid");
                 Debug.WriteLine($"[SessionLogger]   Mid log: {midTime.TotalMinutes:F1} minutes");
             }
 
-            // Always log near the end (30 seconds before session ends, or 90% through if very short)
             var endTime = TimeSpan.FromSeconds(Math.Max(sessionTimeSeconds - 30, sessionTimeSeconds * 0.9));
             ScheduleLogAtInterval(sessionNum, sessionType, endTime, "late");
             Debug.WriteLine($"[SessionLogger]   Late log: {endTime.TotalMinutes:F1} minutes");
-
-            Debug.WriteLine($"[SessionLogger] Total scheduled logs for {sessionType}: {(sessionTimeSeconds > 600 ? 3 : 2)}");
         }
 
         /// <summary>
-        /// Legacy method for backward compatibility - uses simple 2-minute delay
+        /// Legacy method for backward compatibility - uses simple 2-minute delay.
         /// </summary>
         public void ScheduleLogForSession(int sessionNum, string sessionType)
         {
-            if (_isDisposed) return;
-
-            if (_loggedSessions.Contains(sessionNum))
-            {
-                Debug.WriteLine($"[SessionLogger] Already scheduled logging for session {sessionNum}, skipping");
-                return;
-            }
+            if (_isDisposed || _loggedSessions.Contains(sessionNum)) return;
 
             _loggedSessions.Add(sessionNum);
             Debug.WriteLine($"[SessionLogger] Scheduling simple log for SessionNum {sessionNum} ({sessionType}) in 2 minutes");
@@ -97,20 +106,16 @@ namespace VISOR.Diagnostics
             ScheduleLogAtInterval(sessionNum, sessionType, TimeSpan.FromMinutes(2), "simple");
         }
 
-        /// <summary>
-        /// Schedule a log at a specific interval with a suffix for the filename
-        /// </summary>
         private void ScheduleLogAtInterval(int sessionNum, string sessionType, TimeSpan delay, string suffix)
         {
             if (_isDisposed) return;
 
-            var timer = new System.Timers.Timer(delay.TotalMilliseconds);
+            var timer = new System.Timers.Timer(delay.TotalMilliseconds) { AutoReset = false };
             timer.Elapsed += async (sender, e) =>
             {
                 Debug.WriteLine($"[SessionLogger] Timer elapsed - executing {suffix} log for {sessionType}");
                 await ExecuteLog(sessionNum, sessionType, suffix);
 
-                // Clean up this timer
                 timer.Stop();
                 timer.Dispose();
                 lock (_activeTimers)
@@ -118,8 +123,6 @@ namespace VISOR.Diagnostics
                     _activeTimers.Remove(timer);
                 }
             };
-
-            timer.AutoReset = false;
 
             lock (_activeTimers)
             {
@@ -135,9 +138,6 @@ namespace VISOR.Diagnostics
             }
         }
 
-        /// <summary>
-        /// Execute the session data logging with suffix for multiple logs per session
-        /// </summary>
         private async Task ExecuteLog(int sessionNum, string sessionType, string suffix)
         {
             if (_isDisposed) return;
@@ -147,28 +147,20 @@ namespace VISOR.Diagnostics
                 string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
                 string sessionName = GetSessionName(sessionNum);
 
-                // Log YAML data with suffix
                 await LogSessionYaml(sessionName, timestamp, suffix);
 
-                // Log available telemetry fields (only once per session - on early log)
                 if (suffix == "early" || suffix == "simple")
                 {
                     await LogTelemetryFields(sessionName, timestamp);
                 }
-
-                Debug.WriteLine($"[SessionLogger] {suffix} logging completed successfully for {sessionName}");
                 Debug.WriteLine($"[SessionLogger] Files saved to: {_outputDirectory}");
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[SessionLogger] Exception during {suffix} logging: {ex.Message}");
-                Debug.WriteLine($"[SessionLogger] Stack trace: {ex.StackTrace}");
             }
         }
 
-        /// <summary>
-        /// Log the session YAML data to file with suffix
-        /// </summary>
         private async Task LogSessionYaml(string sessionName, string timestamp, string suffix)
         {
             try
@@ -178,13 +170,7 @@ namespace VISOR.Diagnostics
                 {
                     string filename = $"Session_{sessionName}_{timestamp}_{suffix}.yaml";
                     string filepath = Path.Combine(_outputDirectory, filename);
-
                     await File.WriteAllTextAsync(filepath, yamlData);
-                    Debug.WriteLine($"[SessionLogger] YAML data written to: {filepath}");
-                }
-                else
-                {
-                    Debug.WriteLine($"[SessionLogger] No YAML data available for {suffix} log");
                 }
             }
             catch (Exception ex)
@@ -193,9 +179,6 @@ namespace VISOR.Diagnostics
             }
         }
 
-        /// <summary>
-        /// Log available telemetry field information
-        /// </summary>
         private async Task LogTelemetryFields(string sessionName, string timestamp)
         {
             try
@@ -210,27 +193,13 @@ namespace VISOR.Diagnostics
                     {
                         await writer.WriteLineAsync($"VISOR Telemetry Fields - {sessionName} Session");
                         await writer.WriteLineAsync($"Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                        await writer.WriteLineAsync($"Total Fields: {fieldTypes.Count}");
                         await writer.WriteLineAsync();
-
-                        await writer.WriteLineAsync("Field Name\tType");
-                        await writer.WriteLineAsync("----------\t----");
-
                         foreach (var kvp in fieldTypes)
                         {
-                            string typeName = kvp.Value.Name;
-                            if (kvp.Value.IsArray)
-                                typeName = $"{kvp.Value.GetElementType()?.Name ?? "Unknown"}[]";
-
-                            await writer.WriteLineAsync($"{kvp.Key}\t{typeName}");
+                            string typeName = kvp.Value.IsArray ? $"{kvp.Value.GetElementType()?.Name ?? "Unknown"}[]" : kvp.Value.Name;
+                            await writer.WriteLineAsync($"{kvp.Key,-30}\t{typeName}");
                         }
                     }
-
-                    Debug.WriteLine($"[SessionLogger] Field data written to: {filepath}");
-                }
-                else
-                {
-                    Debug.WriteLine("[SessionLogger] No field type data available to log");
                 }
             }
             catch (Exception ex)
@@ -239,9 +208,6 @@ namespace VISOR.Diagnostics
             }
         }
 
-        /// <summary>
-        /// Convert SessionNum to readable name
-        /// </summary>
         private string GetSessionName(int sessionNum)
         {
             return sessionNum switch
@@ -253,15 +219,11 @@ namespace VISOR.Diagnostics
             };
         }
 
-        /// <summary>
-        /// Clean up all active timers
-        /// </summary>
         public void Dispose()
         {
             if (_isDisposed) return;
-
-            Debug.WriteLine("[SessionLogger] Disposing - cleaning up active timers");
             _isDisposed = true;
+            Debug.WriteLine("[SessionLogger] Disposing - cleaning up active timers and writers");
 
             lock (_activeTimers)
             {
@@ -271,6 +233,12 @@ namespace VISOR.Diagnostics
                     timer?.Dispose();
                 }
                 _activeTimers.Clear();
+            }
+
+            lock (_telemetryLock)
+            {
+                _telemetryWriter?.Flush();
+                _telemetryWriter?.Dispose();
             }
 
             Debug.WriteLine($"[SessionLogger] Disposed with {_loggedSessions.Count} sessions logged");
