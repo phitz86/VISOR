@@ -47,6 +47,9 @@ namespace VISOR.Views
                 if (e.ButtonState == MouseButtonState.Pressed)
                     DragMove();
             };
+
+            // Initialize player car number display
+            UpdatePlayerCarDisplay();
         }
 
         private async void RadarWindow_Loaded(object sender, RoutedEventArgs e)
@@ -76,10 +79,14 @@ namespace VISOR.Views
                 {
                     _viewModel.Reset();
                     DebugText.Text = "Radar: Disconnected";
+                    CarLeftRightIndicator.Text = "Offline";
+                    ResetZoneHighlights();
+                    UpdatePlayerCarDisplay();
                 }
                 else
                 {
                     DebugText.Text = "Radar: Connected";
+                    CarLeftRightIndicator.Text = "Connecting";
                 }
             });
         }
@@ -91,11 +98,15 @@ namespace VISOR.Views
                 if (isPrimed)
                 {
                     DebugText.Text = "Radar: Active";
+                    CarLeftRightIndicator.Text = "Ready";
                 }
                 else
                 {
                     DebugText.Text = "Radar: Waiting for session data";
+                    CarLeftRightIndicator.Text = "Waiting";
                     _viewModel.Reset();
+                    ResetZoneHighlights();
+                    UpdatePlayerCarDisplay();
                 }
             });
         }
@@ -106,15 +117,102 @@ namespace VISOR.Views
             {
                 if (_sdk.IsSessionDataReady)
                 {
+                    // Update player car display first
+                    UpdatePlayerCarDisplay(snapshot);
+
+                    // Update radar with new zone-based logic
                     _viewModel.UpdateFromTelemetry(snapshot, _sdk.Coordinator, CarsContainer);
+
+                    // Update zone highlights based on CarLeftRight state
+                    UpdateZoneHighlights(snapshot);
+
+                    // Update debug info
                     DebugText.Text = $"Cars: {_viewModel.VisibleCarCount}";
                 }
                 else
                 {
                     _viewModel.Reset();
+                    ResetZoneHighlights();
                     DebugText.Text = "Radar: No session data";
+                    CarLeftRightIndicator.Text = "No Data";
                 }
             });
+        }
+
+        private void UpdatePlayerCarDisplay(SVappsLABSnapshot snapshot = null)
+        {
+            if (snapshot == null || !_sdk.IsSessionDataReady)
+            {
+                PlayerCarNumber.Text = "??";
+                return;
+            }
+
+            var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx", -1);
+            if (playerCarIdx >= 0)
+            {
+                var carNumbers = _sdk.Coordinator.CarNumbers;
+                if (carNumbers != null && carNumbers.Length > playerCarIdx)
+                {
+                    PlayerCarNumber.Text = carNumbers[playerCarIdx] ?? "??";
+                }
+            }
+        }
+
+        private void UpdateZoneHighlights(SVappsLABSnapshot snapshot)
+        {
+            // Get CarLeftRight state from telemetry
+            var carLeftRightEnum = snapshot.GetValue<object>("CarLeftRight", null);
+            var carLeftRight = carLeftRightEnum?.ToString() ?? "Off";
+
+            // Reset all highlights first
+            ResetZoneHighlights();
+
+            // Update CarLeftRight indicator text
+            CarLeftRightIndicator.Text = carLeftRight;
+
+            // Apply zone highlights based on state
+            const double highlightOpacity = 0.15;
+
+            switch (carLeftRight)
+            {
+                case "CarLeft":
+                    LeftZone2Highlight.Opacity = highlightOpacity;
+                    break;
+
+                case "CarRight":
+                    RightZone2Highlight.Opacity = highlightOpacity;
+                    break;
+
+                case "CarLeftRight":
+                    LeftZone2Highlight.Opacity = highlightOpacity;
+                    RightZone2Highlight.Opacity = highlightOpacity;
+                    break;
+
+                case "TwoCarsLeft":
+                    LeftZone1Highlight.Opacity = highlightOpacity;
+                    LeftZone2Highlight.Opacity = highlightOpacity;
+                    break;
+
+                case "TwoCarsRight":
+                    RightZone1Highlight.Opacity = highlightOpacity;
+                    RightZone2Highlight.Opacity = highlightOpacity;
+                    break;
+
+                case "Clear": // Clear - no highlights needed
+                case "Off": // Off - no highlights needed
+                default:
+                    // Already reset above
+                    break;
+            }
+        }
+
+        private void ResetZoneHighlights()
+        {
+            LeftZone1Highlight.Opacity = 0;
+            LeftZone2Highlight.Opacity = 0;
+            CenterZoneHighlight.Opacity = 0;
+            RightZone1Highlight.Opacity = 0;
+            RightZone2Highlight.Opacity = 0;
         }
 
         private void UpdateUIState()
@@ -124,15 +222,20 @@ namespace VISOR.Views
                 if (_sdk.IsPrimed)
                 {
                     DebugText.Text = "Radar: Active";
+                    CarLeftRightIndicator.Text = "Ready";
                 }
                 else if (_sdk.IsConnected)
                 {
                     DebugText.Text = "Radar: Connected, waiting for session data";
+                    CarLeftRightIndicator.Text = "Waiting";
                 }
                 else
                 {
                     DebugText.Text = "Radar: Waiting for iRacing";
+                    CarLeftRightIndicator.Text = "Offline";
                 }
+
+                UpdatePlayerCarDisplay();
             });
         }
 

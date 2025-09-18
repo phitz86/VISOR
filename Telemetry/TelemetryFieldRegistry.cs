@@ -29,7 +29,7 @@ namespace VISOR.Telemetry
             // Environmental
             "TrackTemp", "AirTemp", "Skies", "WindVel",
             
-            // NEW: Radar support fields
+            // UPDATED: Radar support fields with correct types
             "CarLeftRight", "CarIdxF2Time", "TrackLength"
         };
 
@@ -87,9 +87,9 @@ namespace VISOR.Telemetry
             ["Skies"] = typeof(int),
             ["WindVel"] = typeof(float),
 
-            // NEW: Radar support fields
-            ["CarLeftRight"] = typeof(float[]),
-            ["CarIdxF2Time"] = typeof(float[]),
+            // FIXED: Radar support fields with correct types
+            ["CarLeftRight"] = typeof(int),      // CORRECTED: Single integer, not array
+            ["CarIdxF2Time"] = typeof(float[]),  // This was already correct
             ["TrackLength"] = typeof(float),
 
             // YAML-parsed fields (updated field names and types)
@@ -223,12 +223,16 @@ namespace VISOR.Telemetry
             };
         }
 
-        // NEW: Get fields related to radar functionality
+        // UPDATED: Get fields related to radar functionality
         public static HashSet<string> GetRadarFields()
         {
             return new HashSet<string>
             {
-                "CarLeftRight", "CarIdxF2Time", "TrackLength", "CarIdxLapDistPct", "CarIdxOnPitRoad"
+                "CarLeftRight",      // Single int - left/right notification
+                "CarIdxF2Time",      // Array - gap times  
+                "TrackLength",       // Track length for calculations
+                "CarIdxLapDistPct",  // Position data for context
+                "CarIdxOnPitRoad"    // Filter out cars on pit road
             };
         }
 

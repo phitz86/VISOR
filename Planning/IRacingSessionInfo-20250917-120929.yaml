@@ -22,19 +22,19 @@ WeekendInfo:
  TrackDirection: neutral
  TrackWeatherType: Realistic
  TrackSkies: Dynamic
- TrackSurfaceTemp: 24.81 C
- TrackSurfaceTempCrew: 24.44 C
- TrackAirTemp: 21.81 C
- TrackAirPressure: 29.21 Hg
+ TrackSurfaceTemp: 24.65 C
+ TrackSurfaceTempCrew: 25.00 C
+ TrackAirTemp: 21.65 C
+ TrackAirPressure: 29.17 Hg
  TrackAirDensity: 1.16 kg/m^3
- TrackWindVel: 4.41 m/s
- TrackWindDir: 5.50 rad
- TrackRelativeHumidity: 93 %
+ TrackWindVel: 4.46 m/s
+ TrackWindDir: 0.66 rad
+ TrackRelativeHumidity: 85 %
  TrackFogLevel: 0 %
  TrackPrecipitation: 0 %
  TrackCleanup: 0
  TrackDynamicTrack: 1
- TrackVersion: 2025.06.18.02
+ TrackVersion: 2025.09.08.01
  SeriesID: 0
  SeasonID: 0
  SessionID: 0
@@ -50,16 +50,16 @@ WeekendInfo:
  MaxDrivers: 0
  DCRuleSet: None
  QualifierMustStartRace: 0
- NumCarClasses: 2
- NumCarTypes: 16
- AIRosterName: "GT3 and 4 Bots"
+ NumCarClasses: 4
+ NumCarTypes: 5
+ AIRosterName: "Production Car Challenge (In Progress)"
  HeatRacing: 0
  BuildType: Release
  BuildTarget: Members
- BuildVersion: 2025.08.06.02
+ BuildVersion: 2025.09.12.01
  RaceFarm: 
  WeekendOptions:
-  NumStarters: 21
+  NumStarters: 29
   StartingGrid: single file
   QualifyScoring: best lap
   CourseCautions: local
@@ -105,205 +105,10 @@ SessionInfo:
    SessionRunGroupsUsed: 0
    SessionEnforceTireCompoundChange: 0
    ResultsPositions:
-   - Position: 1
-     ClassPosition: 0
-     CarIdx: 4
-     Lap: 1
-     Time: 87.2023
-     FastestLap: 1
-     FastestTime: 87.2023
-     LastTime: 87.6509
-     LapsLed: 0
-     LapsComplete: 2
-     JokerLapsComplete: 0
-     LapsDriven: 0.000
-     Incidents: 0
-     ReasonOutId: 0
-     ReasonOutStr: Running
-   - Position: 2
-     ClassPosition: 1
-     CarIdx: 8
-     Lap: 2
-     Time: 90.2889
-     FastestLap: 2
-     FastestTime: 90.2889
-     LastTime: 90.2889
-     LapsLed: 0
-     LapsComplete: 2
-     JokerLapsComplete: 0
-     LapsDriven: 0.000
-     Incidents: 0
-     ReasonOutId: 0
-     ReasonOutStr: Running
-   - Position: 3
-     ClassPosition: 2
-     CarIdx: 1
-     Lap: 1
-     Time: 90.5593
-     FastestLap: 1
-     FastestTime: 90.5593
-     LastTime: 90.5593
-     LapsLed: 0
-     LapsComplete: 1
-     JokerLapsComplete: 0
-     LapsDriven: 0.000
-     Incidents: 0
-     ReasonOutId: 0
-     ReasonOutStr: Running
-   - Position: 4
-     ClassPosition: 3
-     CarIdx: 9
-     Lap: 1
-     Time: 91.1746
-     FastestLap: 1
-     FastestTime: 91.1746
-     LastTime: 91.6084
-     LapsLed: 0
-     LapsComplete: 2
-     JokerLapsComplete: 0
-     LapsDriven: 0.000
-     Incidents: 0
-     ReasonOutId: 0
-     ReasonOutStr: Running
-   - Position: 5
-     ClassPosition: 4
-     CarIdx: 5
-     Lap: 1
-     Time: 91.3692
-     FastestLap: 1
-     FastestTime: 91.3692
-     LastTime: 91.6329
-     LapsLed: 0
-     LapsComplete: 2
-     JokerLapsComplete: 0
-     LapsDriven: 0.000
-     Incidents: 0
-     ReasonOutId: 0
-     ReasonOutStr: Running
-   - Position: 6
-     ClassPosition: 5
-     CarIdx: 10
-     Lap: 1
-     Time: 92.3366
-     FastestLap: 1
-     FastestTime: 92.3366
-     LastTime: 92.3366
-     LapsLed: 0
-     LapsComplete: 1
-     JokerLapsComplete: 0
-     LapsDriven: 0.000
-     Incidents: 0
-     ReasonOutId: 0
-     ReasonOutStr: Running
-   - Position: 7
-     ClassPosition: 0
-     CarIdx: 17
-     Lap: 1
-     Time: 96.2457
-     FastestLap: 1
-     FastestTime: 96.2457
-     LastTime: 96.2457
-     LapsLed: 0
-     LapsComplete: 1
-     JokerLapsComplete: 0
-     LapsDriven: 0.000
-     Incidents: 0
-     ReasonOutId: 0
-     ReasonOutStr: Running
-   - Position: 8
-     ClassPosition: 1
-     CarIdx: 19
-     Lap: 1
-     Time: 97.2017
-     FastestLap: 1
-     FastestTime: 97.2017
-     LastTime: 97.2017
-     LapsLed: 0
-     LapsComplete: 1
-     JokerLapsComplete: 0
-     LapsDriven: 0.000
-     Incidents: 0
-     ReasonOutId: 0
-     ReasonOutStr: Running
-   - Position: 9
-     ClassPosition: 2
-     CarIdx: 15
-     Lap: 1
-     Time: 97.3533
-     FastestLap: 1
-     FastestTime: 97.3533
-     LastTime: 97.3533
-     LapsLed: 0
-     LapsComplete: 1
-     JokerLapsComplete: 0
-     LapsDriven: 0.000
-     Incidents: 0
-     ReasonOutId: 0
-     ReasonOutStr: Running
-   - Position: 10
-     ClassPosition: 3
-     CarIdx: 16
-     Lap: 1
-     Time: 97.3759
-     FastestLap: 1
-     FastestTime: 97.3759
-     LastTime: 97.3759
-     LapsLed: 0
-     LapsComplete: 1
-     JokerLapsComplete: 0
-     LapsDriven: 0.000
-     Incidents: 0
-     ReasonOutId: 0
-     ReasonOutStr: Running
-   - Position: 11
-     ClassPosition: 4
-     CarIdx: 14
-     Lap: 1
-     Time: 97.5665
-     FastestLap: 1
-     FastestTime: 97.5665
-     LastTime: 110.8632
-     LapsLed: 0
-     LapsComplete: 2
-     JokerLapsComplete: 0
-     LapsDriven: 0.000
-     Incidents: 0
-     ReasonOutId: 0
-     ReasonOutStr: Running
-   - Position: 12
-     ClassPosition: 5
-     CarIdx: 20
-     Lap: 1
-     Time: 97.9341
-     FastestLap: 1
-     FastestTime: 97.9341
-     LastTime: 97.9341
-     LapsLed: 0
-     LapsComplete: 1
-     JokerLapsComplete: 0
-     LapsDriven: 0.000
-     Incidents: 0
-     ReasonOutId: 0
-     ReasonOutStr: Running
-   - Position: 13
-     ClassPosition: 6
-     CarIdx: 18
-     Lap: 1
-     Time: 99.3888
-     FastestLap: 1
-     FastestTime: 99.3888
-     LastTime: 99.3888
-     LapsLed: 0
-     LapsComplete: 1
-     JokerLapsComplete: 0
-     LapsDriven: 0.000
-     Incidents: 0
-     ReasonOutId: 0
-     ReasonOutStr: Running
    ResultsFastestLap:
-   - CarIdx: 4
-     FastestLap: 1
-     FastestTime: 87.2023
+   - CarIdx: 255
+     FastestLap: 0
+     FastestTime: -1.0000
    ResultsAverageLapTime: -1.0000
    ResultsNumCautionFlags: 0
    ResultsNumCautionLaps: 0
@@ -311,7 +116,7 @@ SessionInfo:
    ResultsLapsComplete: -1
    ResultsOfficial: 0
  - SessionNum: 1
-   SessionLaps: 3
+   SessionLaps: 2
    SessionTime: 86400.0000 sec
    SessionNumLapsToAvg: 0
    SessionType: Lone Qualify
@@ -579,7 +384,7 @@ RadioInfo:
  SelectedRadioNum: 0
  Radios:
  - RadioNum: 0
-   HopCount: 1
+   HopCount: 2
    NumFrequencies: 6
    TunedToFrequencyNum: 0
    ScanningIsOn: 1
@@ -654,33 +459,34 @@ RadioInfo:
 DriverInfo:
  DriverCarIdx: 0
  DriverUserID: 1204302
- PaceCarIdx: 21
- DriverHeadPosX: -0.489
- DriverHeadPosY: 0.310
- DriverHeadPosZ: 0.692
+ PaceCarIdx: 29
+ DriverIsAdmin: 1
+ DriverHeadPosX: -0.221
+ DriverHeadPosY: 0.350
+ DriverHeadPosZ: 0.660
  DriverCarIsElectric: 0
- DriverCarIdleRPM: 1480.000
- DriverCarRedLine: 7000.000
- DriverCarEngCylinderCount: 6
+ DriverCarIdleRPM: 1000.000
+ DriverCarRedLine: 7500.000
+ DriverCarEngCylinderCount: 4
  DriverCarFuelKgPerLtr: 0.750
- DriverCarFuelMaxLtr: 100.000
+ DriverCarFuelMaxLtr: 83.333
  DriverCarMaxFuelPct: 1.000
  DriverCarGearNumForward: 6
  DriverCarGearNeutral: 1
  DriverCarGearReverse: 1
  DriverGearboxType: Sequential
  DriverGearboxControlType: Sequential
- DriverCarShiftAid: Automatic
- DriverCarSLFirstRPM: 6000.000
- DriverCarSLShiftRPM: 6900.000
- DriverCarSLLastRPM: 6925.000
- DriverCarSLBlinkRPM: 6950.000
- DriverCarVersion: 2025.06.27.02
+ DriverCarShiftAid: Antistall_Clutch_Throttle
+ DriverCarSLFirstRPM: 6130.000
+ DriverCarSLShiftRPM: 6690.000
+ DriverCarSLLastRPM: 6800.000
+ DriverCarSLBlinkRPM: 7210.000
+ DriverCarVersion: 2025.09.10.03
  DriverPitTrkPct: 0.096986
- DriverCarEstLapTime: 81.5490
+ DriverCarEstLapTime: 98.8390
  DriverSetupName: baseline.sto
  DriverSetupIsModified: 0
- DriverSetupLoadTypeName: baseline
+ DriverSetupLoadTypeName: iracing
  DriverSetupPassedTech: 1
  DriverIncidentCount: 0
  DriverBrakeCurvingFactor: 1.800
@@ -699,33 +505,33 @@ DriverInfo:
    TeamName: Peter Hitzeman
    CarNumber: "92"
    CarNumberRaw: 92
-   CarPath: bmwm4gt3
-   CarClassID: 2708
-   CarID: 132
+   CarPath: toyotagr86
+   CarClassID: 4012
+   CarID: 160
    CarIsPaceCar: 0
    CarIsAI: 0
    CarIsElectric: 0
-   CarScreenName: BMW M4 GT3
-   CarScreenNameShort: BMW M4 GT3
+   CarScreenName: Toyota GR86
+   CarScreenNameShort: Toyota GR86
    CarCfg: -1
    CarCfgName: 
    CarCfgCustomPaintExt: 
    CarClassShortName: 
-   CarClassRelSpeed: 52
+   CarClassRelSpeed: 36
    CarClassLicenseLevel: 0
    CarClassMaxFuelPct: 1.000 %
    CarClassWeightPenalty: 0.000 kg
    CarClassPowerAdjust: 0.000 %
    CarClassDryTireSetLimit: 0 %
-   CarClassColor: 0xffda59
-   CarClassEstLapTime: 81.5490
+   CarClassColor: 0xff5888
+   CarClassEstLapTime: 98.8390
    IRating: 1
    LicLevel: 1
    LicSubLevel: 1
    LicString: R 0.01
    LicColor: 0xundefined
    IsSpectator: 0
-   CarDesignStr: 1,ff0000,00ff00,0000ff.ffffff
+   CarDesignStr: 4,0063d6,000000,ed21eb-ccca09
    HelmetDesignStr: 36,0a01ae,ca0000,cdcdcd
    SuitDesignStr: 31,2522c9,000000,ec01f9
    BodyType: 1
@@ -733,360 +539,1188 @@ DriverInfo:
    HelmetType: 0
    CarNumberDesignStr: 0,0,ffffff,777777,000000
    CarSponsor_1: 0
-   CarSponsor_2: 0
+   CarSponsor_2: 105
    CurDriverIncidentCount: 0
    TeamIncidentCount: 0
  - CarIdx: 1
-   UserName: Sean Ambrose
+   UserName: Terence Groening
    AbbrevName: 
    Initials: 
    UserID: 9700
    TeamID: 2
-   TeamName: Sean Ambrose
-   CarNumber: "71"
-   CarNumberRaw: 71
-   CarPath: mercedesamgevogt3
-   CarClassID: 2708
-   CarID: 156
+   TeamName: Terence Groening
+   CarNumber: "6"
+   CarNumberRaw: 6
+   CarPath: mx5 mx52016
+   CarClassID: 74
+   CarID: 67
    CarIsPaceCar: 0
    CarIsAI: 1
    CarIsElectric: 0
-   CarScreenName: Mercedes-AMG GT3 2020
-   CarScreenNameShort: Mercedes GT3 2020
+   CarScreenName: Mazda MX-5 Cup
+   CarScreenNameShort: MX-5 Cup
    CarCfg: -1
    CarCfgName: 
    CarCfgCustomPaintExt: 
    CarClassShortName: 
-   CarClassRelSpeed: 52
+   CarClassRelSpeed: 35
    CarClassLicenseLevel: 0
    CarClassMaxFuelPct: 1.000 %
    CarClassWeightPenalty: 0.000 kg
    CarClassPowerAdjust: 0.000 %
    CarClassDryTireSetLimit: 0 %
-   CarClassColor: 0xffda59
-   CarClassEstLapTime: 82.1960
+   CarClassColor: 0xae6bff
+   CarClassEstLapTime: 102.7445
    IRating: 0
    LicLevel: 1
    LicSubLevel: 0
    LicString: R 0.00
    LicColor: 0x8800A0
    IsSpectator: 0
-   CarDesignStr: 10,ffdf00,ef383e,ffffff
-   HelmetDesignStr: 54,ffdf00,ef383e,ffffff
-   SuitDesignStr: 1,ffdf00,ef383e,ffffff
-   BodyType: 0
-   FaceType: 0
-   HelmetType: 0
-   CarNumberDesignStr: 48,2,043673,ffdf00,ffdf00
-   CarSponsor_1: 258
-   CarSponsor_2: 0
-   CurDriverIncidentCount: 0
-   TeamIncidentCount: 0
- - CarIdx: 2
-   UserName: Michael Hinkle
-   AbbrevName: 
-   Initials: 
-   UserID: 9701
-   TeamID: 3
-   TeamName: Michael Hinkle
-   CarNumber: "46"
-   CarNumberRaw: 46
-   CarPath: mclaren720sgt3
-   CarClassID: 2708
-   CarID: 188
-   CarIsPaceCar: 0
-   CarIsAI: 1
-   CarIsElectric: 0
-   CarScreenName: McLaren 720S GT3 EVO
-   CarScreenNameShort: McLaren 720S GT3 EVO
-   CarCfg: -1
-   CarCfgName: 
-   CarCfgCustomPaintExt: 
-   CarClassShortName: 
-   CarClassRelSpeed: 52
-   CarClassLicenseLevel: 0
-   CarClassMaxFuelPct: 1.000 %
-   CarClassWeightPenalty: 0.000 kg
-   CarClassPowerAdjust: 0.000 %
-   CarClassDryTireSetLimit: 0 %
-   CarClassColor: 0xffda59
-   CarClassEstLapTime: 81.1947
-   IRating: 0
-   LicLevel: 1
-   LicSubLevel: 0
-   LicString: R 0.00
-   LicColor: 0x8800A0
-   IsSpectator: 0
-   CarDesignStr: 2,FF0000,00FF00,0000FF
-   HelmetDesignStr: 2,F159E6,555555,000000
-   SuitDesignStr: 2,F159E6,555555,000000
-   BodyType: 0
-   FaceType: 0
-   HelmetType: 0
-   CarNumberDesignStr: 40,1,EE3A43,FFFFFF,00050B
-   CarSponsor_1: 0
-   CarSponsor_2: 0
-   CurDriverIncidentCount: 0
-   TeamIncidentCount: 0
- - CarIdx: 3
-   UserName: Brian Simpson
-   AbbrevName: 
-   Initials: 
-   UserID: 9702
-   TeamID: 4
-   TeamName: Brian Simpson
-   CarNumber: "3"
-   CarNumberRaw: 3
-   CarPath: ferrari296gt3
-   CarClassID: 2708
-   CarID: 173
-   CarIsPaceCar: 0
-   CarIsAI: 1
-   CarIsElectric: 0
-   CarScreenName: Ferrari 296 GT3
-   CarScreenNameShort: Ferrari 296 GT3
-   CarCfg: -1
-   CarCfgName: 
-   CarCfgCustomPaintExt: 
-   CarClassShortName: 
-   CarClassRelSpeed: 52
-   CarClassLicenseLevel: 0
-   CarClassMaxFuelPct: 1.000 %
-   CarClassWeightPenalty: 0.000 kg
-   CarClassPowerAdjust: 0.000 %
-   CarClassDryTireSetLimit: 0 %
-   CarClassColor: 0xffda59
-   CarClassEstLapTime: 81.3922
-   IRating: 0
-   LicLevel: 1
-   LicSubLevel: 0
-   LicString: R 0.00
-   LicColor: 0x8800A0
-   IsSpectator: 0
-   CarDesignStr: 7,00050B,FFD65A,007AC3
-   HelmetDesignStr: 36,00050B,FFD65A,007AC3
-   SuitDesignStr: 13,00050B,FFD65A,007AC3
-   BodyType: 0
-   FaceType: 0
-   HelmetType: 0
-   CarNumberDesignStr: 5,2,FFFFFF,007AC3,007AC3
-   CarSponsor_1: 0
-   CarSponsor_2: 0
-   CurDriverIncidentCount: 0
-   TeamIncidentCount: 0
- - CarIdx: 4
-   UserName: Shawn Nash
-   AbbrevName: 
-   Initials: 
-   UserID: 9703
-   TeamID: 5
-   TeamName: Shawn Nash
-   CarNumber: "4"
-   CarNumberRaw: 4
-   CarPath: audir8lmsevo2gt3
-   CarClassID: 2708
-   CarID: 176
-   CarIsPaceCar: 0
-   CarIsAI: 1
-   CarIsElectric: 0
-   CarScreenName: Audi R8 LMS EVO II GT3
-   CarScreenNameShort: Audi R8 LMS EVO II GT3
-   CarCfg: -1
-   CarCfgName: 
-   CarCfgCustomPaintExt: 
-   CarClassShortName: 
-   CarClassRelSpeed: 52
-   CarClassLicenseLevel: 0
-   CarClassMaxFuelPct: 1.000 %
-   CarClassWeightPenalty: 0.000 kg
-   CarClassPowerAdjust: 0.000 %
-   CarClassDryTireSetLimit: 0 %
-   CarClassColor: 0xffda59
-   CarClassEstLapTime: 81.3750
-   IRating: 0
-   LicLevel: 1
-   LicSubLevel: 0
-   LicString: R 0.00
-   LicColor: 0x8800A0
-   IsSpectator: 0
-   CarDesignStr: 25,000000,000000,E72729
-   HelmetDesignStr: 0,000000,000000,E72729
+   CarDesignStr: 10,000000,000000,E72729
+   HelmetDesignStr: 53,000000,000000,E72729
    SuitDesignStr: 24,000000,000000,E72729
    BodyType: 0
    FaceType: 0
    HelmetType: 0
    CarNumberDesignStr: 7,3,FFFFFF,E72729,000000
-   CarSponsor_1: 372
+   CarSponsor_1: 0
+   CarSponsor_2: 372
+   CurDriverIncidentCount: 0
+   TeamIncidentCount: 0
+ - CarIdx: 2
+   UserName: Nick Leep
+   AbbrevName: 
+   Initials: 
+   UserID: 9701
+   TeamID: 3
+   TeamName: Nick Leep
+   CarNumber: "13"
+   CarNumberRaw: 13
+   CarPath: mx5 mx52016
+   CarClassID: 74
+   CarID: 67
+   CarIsPaceCar: 0
+   CarIsAI: 1
+   CarIsElectric: 0
+   CarScreenName: Mazda MX-5 Cup
+   CarScreenNameShort: MX-5 Cup
+   CarCfg: -1
+   CarCfgName: 
+   CarCfgCustomPaintExt: 
+   CarClassShortName: 
+   CarClassRelSpeed: 35
+   CarClassLicenseLevel: 0
+   CarClassMaxFuelPct: 1.000 %
+   CarClassWeightPenalty: 0.000 kg
+   CarClassPowerAdjust: 0.000 %
+   CarClassDryTireSetLimit: 0 %
+   CarClassColor: 0xae6bff
+   CarClassEstLapTime: 102.7445
+   IRating: 0
+   LicLevel: 1
+   LicSubLevel: 0
+   LicString: R 0.00
+   LicColor: 0x8800A0
+   IsSpectator: 0
+   CarDesignStr: 2,000000,000000,4F1E9C,000000
+   HelmetDesignStr: 30,4ba6db,61520,f08f00
+   SuitDesignStr: 5,4ba6db,61520,f08f00
+   BodyType: 0
+   FaceType: 0
+   HelmetType: 0
+   CarNumberDesignStr: 55,0,f3f3f3,777777,f08f00
+   CarSponsor_1: 0
    CarSponsor_2: 0
    CurDriverIncidentCount: 0
    TeamIncidentCount: 0
+ - CarIdx: 3
+   UserName: Steven Kourepenos
+   AbbrevName: 
+   Initials: 
+   UserID: 9702
+   TeamID: 4
+   TeamName: Steven Kourepenos
+   CarNumber: "3"
+   CarNumberRaw: 3
+   CarPath: mx5 mx52016
+   CarClassID: 74
+   CarID: 67
+   CarIsPaceCar: 0
+   CarIsAI: 1
+   CarIsElectric: 0
+   CarScreenName: Mazda MX-5 Cup
+   CarScreenNameShort: MX-5 Cup
+   CarCfg: -1
+   CarCfgName: 
+   CarCfgCustomPaintExt: 
+   CarClassShortName: 
+   CarClassRelSpeed: 35
+   CarClassLicenseLevel: 0
+   CarClassMaxFuelPct: 1.000 %
+   CarClassWeightPenalty: 0.000 kg
+   CarClassPowerAdjust: 0.000 %
+   CarClassDryTireSetLimit: 0 %
+   CarClassColor: 0xae6bff
+   CarClassEstLapTime: 102.7445
+   IRating: 0
+   LicLevel: 1
+   LicSubLevel: 0
+   LicString: R 0.00
+   LicColor: 0x8800A0
+   IsSpectator: 0
+   CarDesignStr: 8,000F9F,000000,C6D1EE
+   HelmetDesignStr: 54,000F9F,000000,C6D1EE
+   SuitDesignStr: 16,000F9F,000000,C6D1EE
+   BodyType: 0
+   FaceType: 0
+   HelmetType: 0
+   CarNumberDesignStr: 25,0,FFFFFF,000000,86837B
+   CarSponsor_1: 304
+   CarSponsor_2: 351
+   CurDriverIncidentCount: 0
+   TeamIncidentCount: 0
+ - CarIdx: 4
+   UserName: Robert Plumley
+   AbbrevName: 
+   Initials: 
+   UserID: 9703
+   TeamID: 5
+   TeamName: Robert Plumley
+   CarNumber: "47"
+   CarNumberRaw: 47
+   CarPath: mx5 mx52016
+   CarClassID: 74
+   CarID: 67
+   CarIsPaceCar: 0
+   CarIsAI: 1
+   CarIsElectric: 0
+   CarScreenName: Mazda MX-5 Cup
+   CarScreenNameShort: MX-5 Cup
+   CarCfg: -1
+   CarCfgName: 
+   CarCfgCustomPaintExt: 
+   CarClassShortName: 
+   CarClassRelSpeed: 35
+   CarClassLicenseLevel: 0
+   CarClassMaxFuelPct: 1.000 %
+   CarClassWeightPenalty: 0.000 kg
+   CarClassPowerAdjust: 0.000 %
+   CarClassDryTireSetLimit: 0 %
+   CarClassColor: 0xae6bff
+   CarClassEstLapTime: 102.7445
+   IRating: 0
+   LicLevel: 1
+   LicSubLevel: 0
+   LicString: R 0.00
+   LicColor: 0x8800A0
+   IsSpectator: 0
+   CarDesignStr: 23,ed1c24,ed1c24,ffffff
+   HelmetDesignStr: 54,ed1c24,ed1c24,ffffff
+   SuitDesignStr: 33,ed1c24,ed1c24,ffffff
+   BodyType: 0
+   FaceType: 0
+   HelmetType: 0
+   CarNumberDesignStr: 12,0,ffffff,ed1c24,0a0a0a
+   CarSponsor_1: 247
+   CarSponsor_2: 247
+   CurDriverIncidentCount: 0
+   TeamIncidentCount: 0
  - CarIdx: 5
-   UserName: Vicente Maestre
+   UserName: Dave Gosselin
    AbbrevName: 
    Initials: 
    UserID: 9704
    TeamID: 6
-   TeamName: Vicente Maestre
+   TeamName: Dave Gosselin
    CarNumber: "5"
    CarNumberRaw: 5
-   CarPath: acuransxevo22gt3
-   CarClassID: 2708
-   CarID: 194
+   CarPath: mx5 mx52016
+   CarClassID: 74
+   CarID: 67
    CarIsPaceCar: 0
    CarIsAI: 1
    CarIsElectric: 0
-   CarScreenName: Acura NSX GT3 EVO 22
-   CarScreenNameShort: Acura NSX GT3 EVO 22
+   CarScreenName: Mazda MX-5 Cup
+   CarScreenNameShort: MX-5 Cup
    CarCfg: -1
    CarCfgName: 
    CarCfgCustomPaintExt: 
    CarClassShortName: 
-   CarClassRelSpeed: 52
+   CarClassRelSpeed: 35
    CarClassLicenseLevel: 0
    CarClassMaxFuelPct: 1.000 %
    CarClassWeightPenalty: 0.000 kg
    CarClassPowerAdjust: 0.000 %
    CarClassDryTireSetLimit: 0 %
-   CarClassColor: 0xffda59
-   CarClassEstLapTime: 80.5667
+   CarClassColor: 0xae6bff
+   CarClassEstLapTime: 102.7445
    IRating: 0
    LicLevel: 1
    LicSubLevel: 0
    LicString: R 0.00
    LicColor: 0x8800A0
    IsSpectator: 0
-   CarDesignStr: 25,FFFFFF,007AC3,EE3A43
-   HelmetDesignStr: 14,FFFFFF,007AC3,EE3A43
-   SuitDesignStr: 16,FFFFFF,007AC3,EE3A43
+   CarDesignStr: 16,ff2500,000000,ffffff
+   HelmetDesignStr: 30,ff2500,000000,ffffff
+   SuitDesignStr: 32,ff2500,000000,ffffff
    BodyType: 0
    FaceType: 0
    HelmetType: 0
-   CarNumberDesignStr: 11,2,FFD65A,00050B,FFFFFF
-   CarSponsor_1: 336
-   CarSponsor_2: 327
+   CarNumberDesignStr: 40,2,ffffff,0a0a0a,ff2500
+   CarSponsor_1: 130
+   CarSponsor_2: 130
    CurDriverIncidentCount: 0
    TeamIncidentCount: 0
  - CarIdx: 6
-   UserName: Randy Cassidy
+   UserName: Dale Earnhardt Jr.
    AbbrevName: 
    Initials: 
    UserID: 9705
    TeamID: 7
-   TeamName: Randy Cassidy
-   CarNumber: "6"
-   CarNumberRaw: 6
-   CarPath: bmwm4gt3
-   CarClassID: 2708
-   CarID: 132
+   TeamName: Dale Earnhardt Jr.
+   CarNumber: "7"
+   CarNumberRaw: 7
+   CarPath: mx5 mx52016
+   CarClassID: 74
+   CarID: 67
    CarIsPaceCar: 0
    CarIsAI: 1
    CarIsElectric: 0
-   CarScreenName: BMW M4 GT3
-   CarScreenNameShort: BMW M4 GT3
+   CarScreenName: Mazda MX-5 Cup
+   CarScreenNameShort: MX-5 Cup
    CarCfg: -1
    CarCfgName: 
    CarCfgCustomPaintExt: 
    CarClassShortName: 
-   CarClassRelSpeed: 52
+   CarClassRelSpeed: 35
    CarClassLicenseLevel: 0
    CarClassMaxFuelPct: 1.000 %
    CarClassWeightPenalty: 0.000 kg
    CarClassPowerAdjust: 0.000 %
    CarClassDryTireSetLimit: 0 %
-   CarClassColor: 0xffda59
-   CarClassEstLapTime: 81.5490
+   CarClassColor: 0xae6bff
+   CarClassEstLapTime: 102.7445
    IRating: 0
    LicLevel: 1
    LicSubLevel: 0
    LicString: R 0.00
    LicColor: 0x8800A0
    IsSpectator: 0
-   CarDesignStr: 2,ffffff,231f20,ef3e22
-   HelmetDesignStr: 29,ffffff,231f20,ef3e22
-   SuitDesignStr: 7,ffffff,231f20,ef3e22
+   CarDesignStr: 2,0abff8,ffffff,ffc300
+   HelmetDesignStr: 15,0abff8,ffffff,ffc300
+   SuitDesignStr: 30,0abff8,ffffff,ffc300
    BodyType: 0
    FaceType: 0
    HelmetType: 0
-   CarNumberDesignStr: 0,2,ef3e22,231f20,ffffff
-   CarSponsor_1: 245
-   CarSponsor_2: 0
+   CarNumberDesignStr: 46,3,1b1366,0abff8,ffffff
+   CarSponsor_1: 47
+   CarSponsor_2: 3
    CurDriverIncidentCount: 0
    TeamIncidentCount: 0
  - CarIdx: 7
-   UserName: Grant Reeve
+   UserName: Greg West
    AbbrevName: 
    Initials: 
    UserID: 9706
    TeamID: 8
-   TeamName: Grant Reeve
-   CarNumber: "7"
-   CarNumberRaw: 7
-   CarPath: lamborghinievogt3
-   CarClassID: 2708
-   CarID: 133
+   TeamName: Greg West
+   CarNumber: "36"
+   CarNumberRaw: 36
+   CarPath: mx5 mx52016
+   CarClassID: 74
+   CarID: 67
    CarIsPaceCar: 0
    CarIsAI: 1
    CarIsElectric: 0
-   CarScreenName: Lamborghini Huracan GT3 EVO
-   CarScreenNameShort: Lamborghini GT3
+   CarScreenName: Mazda MX-5 Cup
+   CarScreenNameShort: MX-5 Cup
    CarCfg: -1
    CarCfgName: 
    CarCfgCustomPaintExt: 
    CarClassShortName: 
-   CarClassRelSpeed: 52
+   CarClassRelSpeed: 35
    CarClassLicenseLevel: 0
    CarClassMaxFuelPct: 1.000 %
    CarClassWeightPenalty: 0.000 kg
    CarClassPowerAdjust: 0.000 %
    CarClassDryTireSetLimit: 0 %
-   CarClassColor: 0xffda59
-   CarClassEstLapTime: 81.5392
+   CarClassColor: 0xae6bff
+   CarClassEstLapTime: 102.7445
    IRating: 0
    LicLevel: 1
    LicSubLevel: 0
    LicString: R 0.00
    LicColor: 0x8800A0
    IsSpectator: 0
-   CarDesignStr: 10,4bd3fd,13990,ffffff
-   HelmetDesignStr: 14,4bd3fd,13990,ffffff
-   SuitDesignStr: 23,4bd3fd,13990,ffffff
+   CarDesignStr: 2,000000,2A3795,2A3795
+   HelmetDesignStr: 2,000000,2A3795,2A3795
+   SuitDesignStr: 2,000000,2A3795,2A3795
    BodyType: 0
    FaceType: 0
    HelmetType: 0
-   CarNumberDesignStr: 48,3,cccccc,ffffff,111111
+   CarNumberDesignStr: 48,2,FF6D2D,9ACDE7,000000
    CarSponsor_1: 0
-   CarSponsor_2: 295
+   CarSponsor_2: 0
    CurDriverIncidentCount: 0
    TeamIncidentCount: 0
  - CarIdx: 8
-   UserName: Tom Brown
+   UserName: Derek Edgerton
    AbbrevName: 
    Initials: 
    UserID: 9707
    TeamID: 9
-   TeamName: Tom Brown
-   CarNumber: "17"
-   CarNumberRaw: 17
-   CarPath: chevyvettez06rgt3
-   CarClassID: 2708
-   CarID: 184
+   TeamName: Derek Edgerton
+   CarNumber: "32"
+   CarNumberRaw: 32
+   CarPath: toyotagr86
+   CarClassID: 4012
+   CarID: 160
    CarIsPaceCar: 0
    CarIsAI: 1
    CarIsElectric: 0
-   CarScreenName: Chevrolet Corvette Z06 GT3.R
-   CarScreenNameShort: Corvette GT3.R
+   CarScreenName: Toyota GR86
+   CarScreenNameShort: Toyota GR86
    CarCfg: -1
    CarCfgName: 
    CarCfgCustomPaintExt: 
    CarClassShortName: 
-   CarClassRelSpeed: 52
+   CarClassRelSpeed: 36
+   CarClassLicenseLevel: 0
+   CarClassMaxFuelPct: 1.000 %
+   CarClassWeightPenalty: 0.000 kg
+   CarClassPowerAdjust: 0.000 %
+   CarClassDryTireSetLimit: 0 %
+   CarClassColor: 0xff5888
+   CarClassEstLapTime: 98.8390
+   IRating: 0
+   LicLevel: 1
+   LicSubLevel: 0
+   LicString: R 0.00
+   LicColor: 0x8800A0
+   IsSpectator: 0
+   CarDesignStr: 2,152649,FFFFFF,ff0000
+   HelmetDesignStr: 2,2f2a30,fa6f96,00cda6
+   SuitDesignStr: 2,2f2a30,fa6f96,00cda6
+   BodyType: 0
+   FaceType: 0
+   HelmetType: 0
+   CarNumberDesignStr: 48,2,FFE900,20201E,3DB348
+   CarSponsor_1: 2
+   CarSponsor_2: 2
+   CurDriverIncidentCount: 0
+   TeamIncidentCount: 0
+ - CarIdx: 9
+   UserName: Cory Vervynckt
+   AbbrevName: 
+   Initials: 
+   UserID: 9708
+   TeamID: 10
+   TeamName: Cory Vervynckt
+   CarNumber: "12"
+   CarNumberRaw: 12
+   CarPath: toyotagr86
+   CarClassID: 4012
+   CarID: 160
+   CarIsPaceCar: 0
+   CarIsAI: 1
+   CarIsElectric: 0
+   CarScreenName: Toyota GR86
+   CarScreenNameShort: Toyota GR86
+   CarCfg: -1
+   CarCfgName: 
+   CarCfgCustomPaintExt: 
+   CarClassShortName: 
+   CarClassRelSpeed: 36
+   CarClassLicenseLevel: 0
+   CarClassMaxFuelPct: 1.000 %
+   CarClassWeightPenalty: 0.000 kg
+   CarClassPowerAdjust: 0.000 %
+   CarClassDryTireSetLimit: 0 %
+   CarClassColor: 0xff5888
+   CarClassEstLapTime: 98.8390
+   IRating: 0
+   LicLevel: 1
+   LicSubLevel: 0
+   LicString: R 0.00
+   LicColor: 0x8800A0
+   IsSpectator: 0
+   CarDesignStr: 12,FFFFFF,9CC540,18399A
+   HelmetDesignStr: 59,FFFFFF,9CC540,18399A
+   SuitDesignStr: 26,FFFFFF,9CC540,18399A
+   BodyType: 0
+   FaceType: 0
+   HelmetType: 0
+   CarNumberDesignStr: 47,2,0075BF,9CC540,000000
+   CarSponsor_1: 309
+   CarSponsor_2: 373
+   CurDriverIncidentCount: 0
+   TeamIncidentCount: 0
+ - CarIdx: 10
+   UserName: Brian Rainville
+   AbbrevName: 
+   Initials: 
+   UserID: 9709
+   TeamID: 11
+   TeamName: Brian Rainville
+   CarNumber: "10"
+   CarNumberRaw: 10
+   CarPath: toyotagr86
+   CarClassID: 4012
+   CarID: 160
+   CarIsPaceCar: 0
+   CarIsAI: 1
+   CarIsElectric: 0
+   CarScreenName: Toyota GR86
+   CarScreenNameShort: Toyota GR86
+   CarCfg: -1
+   CarCfgName: 
+   CarCfgCustomPaintExt: 
+   CarClassShortName: 
+   CarClassRelSpeed: 36
+   CarClassLicenseLevel: 0
+   CarClassMaxFuelPct: 1.000 %
+   CarClassWeightPenalty: 0.000 kg
+   CarClassPowerAdjust: 0.000 %
+   CarClassDryTireSetLimit: 0 %
+   CarClassColor: 0xff5888
+   CarClassEstLapTime: 98.8390
+   IRating: 0
+   LicLevel: 1
+   LicSubLevel: 0
+   LicString: R 0.00
+   LicColor: 0x8800A0
+   IsSpectator: 0
+   CarDesignStr: 11,FFFFFF,EA0000,0052C9
+   HelmetDesignStr: 3,FFFFFF,EA0000,0052C9
+   SuitDesignStr: 8,FFFFFF,EA0000,0052C9
+   BodyType: 0
+   FaceType: 0
+   HelmetType: 0
+   CarNumberDesignStr: 0,0,000000,FFFFFF,FFFFFF
+   CarSponsor_1: 368
+   CarSponsor_2: 0
+   CurDriverIncidentCount: 0
+   TeamIncidentCount: 0
+ - CarIdx: 11
+   UserName: Jeff Rubin
+   AbbrevName: 
+   Initials: 
+   UserID: 9710
+   TeamID: 12
+   TeamName: Jeff Rubin
+   CarNumber: "11"
+   CarNumberRaw: 11
+   CarPath: toyotagr86
+   CarClassID: 4012
+   CarID: 160
+   CarIsPaceCar: 0
+   CarIsAI: 1
+   CarIsElectric: 0
+   CarScreenName: Toyota GR86
+   CarScreenNameShort: Toyota GR86
+   CarCfg: -1
+   CarCfgName: 
+   CarCfgCustomPaintExt: 
+   CarClassShortName: 
+   CarClassRelSpeed: 36
+   CarClassLicenseLevel: 0
+   CarClassMaxFuelPct: 1.000 %
+   CarClassWeightPenalty: 0.000 kg
+   CarClassPowerAdjust: 0.000 %
+   CarClassDryTireSetLimit: 0 %
+   CarClassColor: 0xff5888
+   CarClassEstLapTime: 98.8390
+   IRating: 0
+   LicLevel: 1
+   LicSubLevel: 0
+   LicString: R 0.00
+   LicColor: 0x8800A0
+   IsSpectator: 0
+   CarDesignStr: 21,ffffff,38a4fe,ffe700
+   HelmetDesignStr: 20,ffffff,38a4fe,ffe700
+   SuitDesignStr: 9,ffffff,38a4fe,ffe700
+   BodyType: 0
+   FaceType: 0
+   HelmetType: 0
+   CarNumberDesignStr: 46,0,171717,ffffff,38a4fe
+   CarSponsor_1: 253
+   CarSponsor_2: 323
+   CurDriverIncidentCount: 0
+   TeamIncidentCount: 0
+ - CarIdx: 12
+   UserName: Doug Hunt
+   AbbrevName: 
+   Initials: 
+   UserID: 9711
+   TeamID: 13
+   TeamName: Doug Hunt
+   CarNumber: "14"
+   CarNumberRaw: 14
+   CarPath: toyotagr86
+   CarClassID: 4012
+   CarID: 160
+   CarIsPaceCar: 0
+   CarIsAI: 1
+   CarIsElectric: 0
+   CarScreenName: Toyota GR86
+   CarScreenNameShort: Toyota GR86
+   CarCfg: -1
+   CarCfgName: 
+   CarCfgCustomPaintExt: 
+   CarClassShortName: 
+   CarClassRelSpeed: 36
+   CarClassLicenseLevel: 0
+   CarClassMaxFuelPct: 1.000 %
+   CarClassWeightPenalty: 0.000 kg
+   CarClassPowerAdjust: 0.000 %
+   CarClassDryTireSetLimit: 0 %
+   CarClassColor: 0xff5888
+   CarClassEstLapTime: 98.8390
+   IRating: 0
+   LicLevel: 1
+   LicSubLevel: 0
+   LicString: R 0.00
+   LicColor: 0x8800A0
+   IsSpectator: 0
+   CarDesignStr: 0,121212,D0D0D0,006BB7
+   HelmetDesignStr: 38,121212,D0D0D0,006BB7
+   SuitDesignStr: 15,121212,D0D0D0,006BB7
+   BodyType: 0
+   FaceType: 0
+   HelmetType: 0
+   CarNumberDesignStr: 48,0,FDB728,121212,006BB7
+   CarSponsor_1: 343
+   CarSponsor_2: 0
+   CurDriverIncidentCount: 0
+   TeamIncidentCount: 0
+ - CarIdx: 13
+   UserName: Kim Berry
+   AbbrevName: 
+   Initials: 
+   UserID: 9712
+   TeamID: 14
+   TeamName: Kim Berry
+   CarNumber: "15"
+   CarNumberRaw: 15
+   CarPath: toyotagr86
+   CarClassID: 4012
+   CarID: 160
+   CarIsPaceCar: 0
+   CarIsAI: 1
+   CarIsElectric: 0
+   CarScreenName: Toyota GR86
+   CarScreenNameShort: Toyota GR86
+   CarCfg: -1
+   CarCfgName: 
+   CarCfgCustomPaintExt: 
+   CarClassShortName: 
+   CarClassRelSpeed: 36
+   CarClassLicenseLevel: 0
+   CarClassMaxFuelPct: 1.000 %
+   CarClassWeightPenalty: 0.000 kg
+   CarClassPowerAdjust: 0.000 %
+   CarClassDryTireSetLimit: 0 %
+   CarClassColor: 0xff5888
+   CarClassEstLapTime: 98.8390
+   IRating: 0
+   LicLevel: 1
+   LicSubLevel: 0
+   LicString: R 0.00
+   LicColor: 0x8800A0
+   IsSpectator: 0
+   CarDesignStr: 2,DC8DD7,CCCCCC,00F0C4,00F0C4
+   HelmetDesignStr: 4,35c1af,e000f0,ffffff
+   SuitDesignStr: 19,981a9b,00f0e7,ffffff
+   BodyType: 0
+   FaceType: 0
+   HelmetType: 0
+   CarNumberDesignStr: 3,0,ffffff,222222,588eaa
+   CarSponsor_1: 0
+   CarSponsor_2: 0
+   CurDriverIncidentCount: 0
+   TeamIncidentCount: 0
+ - CarIdx: 14
+   UserName: Chris Lerch
+   AbbrevName: 
+   Initials: 
+   UserID: 9713
+   TeamID: 15
+   TeamName: Chris Lerch
+   CarNumber: "16"
+   CarNumberRaw: 16
+   CarPath: toyotagr86
+   CarClassID: 4012
+   CarID: 160
+   CarIsPaceCar: 0
+   CarIsAI: 1
+   CarIsElectric: 0
+   CarScreenName: Toyota GR86
+   CarScreenNameShort: Toyota GR86
+   CarCfg: -1
+   CarCfgName: 
+   CarCfgCustomPaintExt: 
+   CarClassShortName: 
+   CarClassRelSpeed: 36
+   CarClassLicenseLevel: 0
+   CarClassMaxFuelPct: 1.000 %
+   CarClassWeightPenalty: 0.000 kg
+   CarClassPowerAdjust: 0.000 %
+   CarClassDryTireSetLimit: 0 %
+   CarClassColor: 0xff5888
+   CarClassEstLapTime: 98.8390
+   IRating: 0
+   LicLevel: 1
+   LicSubLevel: 0
+   LicString: R 0.00
+   LicColor: 0x8800A0
+   IsSpectator: 0
+   CarDesignStr: 4,ed1c24,0a0a0a,ffd503
+   HelmetDesignStr: 22,ed1c24,0a0a0a,ffd503
+   SuitDesignStr: 23,ed1c24,0a0a0a,ffd503
+   BodyType: 0
+   FaceType: 0
+   HelmetType: 0
+   CarNumberDesignStr: 3,2,ffffff,0a0a0a,ed1c24
+   CarSponsor_1: 170
+   CarSponsor_2: 170
+   CurDriverIncidentCount: 0
+   TeamIncidentCount: 0
+ - CarIdx: 15
+   UserName: Dano Garrison
+   AbbrevName: 
+   Initials: 
+   UserID: 9714
+   TeamID: 16
+   TeamName: Dano Garrison
+   CarNumber: "18"
+   CarNumberRaw: 18
+   CarPath: renaultcliocup
+   CarClassID: 4015
+   CarID: 162
+   CarIsPaceCar: 0
+   CarIsAI: 1
+   CarIsElectric: 0
+   CarScreenName: Renault Clio R.S. V
+   CarScreenNameShort: Renault Clio R.S. V
+   CarCfg: -1
+   CarCfgName: 
+   CarCfgCustomPaintExt: 
+   CarClassShortName: 
+   CarClassRelSpeed: 37
+   CarClassLicenseLevel: 0
+   CarClassMaxFuelPct: 1.000 %
+   CarClassWeightPenalty: 0.000 kg
+   CarClassPowerAdjust: 0.000 %
+   CarClassDryTireSetLimit: 0 %
+   CarClassColor: 0x33ceff
+   CarClassEstLapTime: 98.6770
+   IRating: 0
+   LicLevel: 1
+   LicSubLevel: 0
+   LicString: R 0.00
+   LicColor: 0x8800A0
+   IsSpectator: 0
+   CarDesignStr: 0,1D3D76,0098CE,F36F28
+   HelmetDesignStr: 58,1D3D76,0098CE,F36F28
+   SuitDesignStr: 18,1D3D76,0098CE,F36F28
+   BodyType: 0
+   FaceType: 0
+   HelmetType: 0
+   CarNumberDesignStr: 48,2,E8E516,1D3D76,FFFFFF
+   CarSponsor_1: 326
+   CarSponsor_2: 0
+   CurDriverIncidentCount: 0
+   TeamIncidentCount: 0
+ - CarIdx: 16
+   UserName: Hieu Tran
+   AbbrevName: 
+   Initials: 
+   UserID: 9715
+   TeamID: 17
+   TeamName: Hieu Tran
+   CarNumber: "19"
+   CarNumberRaw: 19
+   CarPath: renaultcliocup
+   CarClassID: 4015
+   CarID: 162
+   CarIsPaceCar: 0
+   CarIsAI: 1
+   CarIsElectric: 0
+   CarScreenName: Renault Clio R.S. V
+   CarScreenNameShort: Renault Clio R.S. V
+   CarCfg: -1
+   CarCfgName: 
+   CarCfgCustomPaintExt: 
+   CarClassShortName: 
+   CarClassRelSpeed: 37
+   CarClassLicenseLevel: 0
+   CarClassMaxFuelPct: 1.000 %
+   CarClassWeightPenalty: 0.000 kg
+   CarClassPowerAdjust: 0.000 %
+   CarClassDryTireSetLimit: 0 %
+   CarClassColor: 0x33ceff
+   CarClassEstLapTime: 98.6770
+   IRating: 0
+   LicLevel: 1
+   LicSubLevel: 0
+   LicString: R 0.00
+   LicColor: 0x8800A0
+   IsSpectator: 0
+   CarDesignStr: 8,FFFFFF,0086D2,D50019
+   HelmetDesignStr: 6,FFFFFF,0086D2,D50019
+   SuitDesignStr: 18,FFFFFF,0086D2,D50019
+   BodyType: 0
+   FaceType: 0
+   HelmetType: 0
+   CarNumberDesignStr: 35,2,000000,FFFFFF,0086D2
+   CarSponsor_1: 364
+   CarSponsor_2: 0
+   CurDriverIncidentCount: 0
+   TeamIncidentCount: 0
+ - CarIdx: 17
+   UserName: Mike Bergh
+   AbbrevName: 
+   Initials: 
+   UserID: 9716
+   TeamID: 18
+   TeamName: Mike Bergh
+   CarNumber: "44"
+   CarNumberRaw: 44
+   CarPath: renaultcliocup
+   CarClassID: 4015
+   CarID: 162
+   CarIsPaceCar: 0
+   CarIsAI: 1
+   CarIsElectric: 0
+   CarScreenName: Renault Clio R.S. V
+   CarScreenNameShort: Renault Clio R.S. V
+   CarCfg: -1
+   CarCfgName: 
+   CarCfgCustomPaintExt: 
+   CarClassShortName: 
+   CarClassRelSpeed: 37
+   CarClassLicenseLevel: 0
+   CarClassMaxFuelPct: 1.000 %
+   CarClassWeightPenalty: 0.000 kg
+   CarClassPowerAdjust: 0.000 %
+   CarClassDryTireSetLimit: 0 %
+   CarClassColor: 0x33ceff
+   CarClassEstLapTime: 98.6770
+   IRating: 0
+   LicLevel: 1
+   LicSubLevel: 0
+   LicString: R 0.00
+   LicColor: 0x8800A0
+   IsSpectator: 0
+   CarDesignStr: 2,00ffe9,2d0059,000000-303030
+   HelmetDesignStr: 38,c83c2b,231f20,ffdd00
+   SuitDesignStr: 24,00ffe9,2d0059,000000
+   BodyType: 0
+   FaceType: 0
+   HelmetType: 0
+   CarNumberDesignStr: 3,0,ffdd00,231f20,c83c2b
+   CarSponsor_1: 0
+   CarSponsor_2: 0
+   CurDriverIncidentCount: 0
+   TeamIncidentCount: 0
+ - CarIdx: 18
+   UserName: Chris Page
+   AbbrevName: 
+   Initials: 
+   UserID: 9717
+   TeamID: 19
+   TeamName: Chris Page
+   CarNumber: "20"
+   CarNumberRaw: 20
+   CarPath: renaultcliocup
+   CarClassID: 4015
+   CarID: 162
+   CarIsPaceCar: 0
+   CarIsAI: 1
+   CarIsElectric: 0
+   CarScreenName: Renault Clio R.S. V
+   CarScreenNameShort: Renault Clio R.S. V
+   CarCfg: -1
+   CarCfgName: 
+   CarCfgCustomPaintExt: 
+   CarClassShortName: 
+   CarClassRelSpeed: 37
+   CarClassLicenseLevel: 0
+   CarClassMaxFuelPct: 1.000 %
+   CarClassWeightPenalty: 0.000 kg
+   CarClassPowerAdjust: 0.000 %
+   CarClassDryTireSetLimit: 0 %
+   CarClassColor: 0x33ceff
+   CarClassEstLapTime: 98.6770
+   IRating: 0
+   LicLevel: 1
+   LicSubLevel: 0
+   LicString: R 0.00
+   LicColor: 0x8800A0
+   IsSpectator: 0
+   CarDesignStr: 7,0f4d87,00619d,7ca1c2
+   HelmetDesignStr: 31,0f4d87,00619d,7ca1c2
+   SuitDesignStr: 5,0f4d87,00619d,7ca1c2
+   BodyType: 0
+   FaceType: 0
+   HelmetType: 0
+   CarNumberDesignStr: 56,2,eeff00,0a0a0a,0f4d87
+   CarSponsor_1: 194
+   CarSponsor_2: 0
+   CurDriverIncidentCount: 0
+   TeamIncidentCount: 0
+ - CarIdx: 19
+   UserName: Christopher Bell
+   AbbrevName: 
+   Initials: 
+   UserID: 9718
+   TeamID: 20
+   TeamName: Christopher Bell
+   CarNumber: "21"
+   CarNumberRaw: 21
+   CarPath: renaultcliocup
+   CarClassID: 4015
+   CarID: 162
+   CarIsPaceCar: 0
+   CarIsAI: 1
+   CarIsElectric: 0
+   CarScreenName: Renault Clio R.S. V
+   CarScreenNameShort: Renault Clio R.S. V
+   CarCfg: -1
+   CarCfgName: 
+   CarCfgCustomPaintExt: 
+   CarClassShortName: 
+   CarClassRelSpeed: 37
+   CarClassLicenseLevel: 0
+   CarClassMaxFuelPct: 1.000 %
+   CarClassWeightPenalty: 0.000 kg
+   CarClassPowerAdjust: 0.000 %
+   CarClassDryTireSetLimit: 0 %
+   CarClassColor: 0x33ceff
+   CarClassEstLapTime: 98.6770
+   IRating: 0
+   LicLevel: 1
+   LicSubLevel: 0
+   LicString: R 0.00
+   LicColor: 0x8800A0
+   IsSpectator: 0
+   CarDesignStr: 15,00050B,EE3A43,007AC3
+   HelmetDesignStr: 13,00050B,EE3A43,007AC3
+   SuitDesignStr: 31,00050B,EE3A43,007AC3
+   BodyType: 0
+   FaceType: 0
+   HelmetType: 0
+   CarNumberDesignStr: 7,3,FFFFFF,EE3A43,00050B
+   CarSponsor_1: 338
+   CarSponsor_2: 327
+   CurDriverIncidentCount: 0
+   TeamIncidentCount: 0
+ - CarIdx: 20
+   UserName: Nathan Wright
+   AbbrevName: 
+   Initials: 
+   UserID: 9719
+   TeamID: 21
+   TeamName: Nathan Wright
+   CarNumber: "22"
+   CarNumberRaw: 22
+   CarPath: renaultcliocup
+   CarClassID: 4015
+   CarID: 162
+   CarIsPaceCar: 0
+   CarIsAI: 1
+   CarIsElectric: 0
+   CarScreenName: Renault Clio R.S. V
+   CarScreenNameShort: Renault Clio R.S. V
+   CarCfg: -1
+   CarCfgName: 
+   CarCfgCustomPaintExt: 
+   CarClassShortName: 
+   CarClassRelSpeed: 37
+   CarClassLicenseLevel: 0
+   CarClassMaxFuelPct: 1.000 %
+   CarClassWeightPenalty: 0.000 kg
+   CarClassPowerAdjust: 0.000 %
+   CarClassDryTireSetLimit: 0 %
+   CarClassColor: 0x33ceff
+   CarClassEstLapTime: 98.6770
+   IRating: 0
+   LicLevel: 1
+   LicSubLevel: 0
+   LicString: R 0.00
+   LicColor: 0x8800A0
+   IsSpectator: 0
+   CarDesignStr: 14,7ca1c2,ffffff,eeff00
+   HelmetDesignStr: 46,7ca1c2,ffffff,eeff00
+   SuitDesignStr: 1,7ca1c2,ffffff,eeff00
+   BodyType: 0
+   FaceType: 0
+   HelmetType: 0
+   CarNumberDesignStr: 53,3,eeff00,0f4d87,7ca1c2
+   CarSponsor_1: 193
+   CarSponsor_2: 0
+   CurDriverIncidentCount: 0
+   TeamIncidentCount: 0
+ - CarIdx: 21
+   UserName: Nim Cross
+   AbbrevName: 
+   Initials: 
+   UserID: 9720
+   TeamID: 22
+   TeamName: Nim Cross
+   CarNumber: "07"
+   CarNumberRaw: 2007
+   CarPath: renaultcliocup
+   CarClassID: 4015
+   CarID: 162
+   CarIsPaceCar: 0
+   CarIsAI: 1
+   CarIsElectric: 0
+   CarScreenName: Renault Clio R.S. V
+   CarScreenNameShort: Renault Clio R.S. V
+   CarCfg: -1
+   CarCfgName: 
+   CarCfgCustomPaintExt: 
+   CarClassShortName: 
+   CarClassRelSpeed: 37
+   CarClassLicenseLevel: 0
+   CarClassMaxFuelPct: 1.000 %
+   CarClassWeightPenalty: 0.000 kg
+   CarClassPowerAdjust: 0.000 %
+   CarClassDryTireSetLimit: 0 %
+   CarClassColor: 0x33ceff
+   CarClassEstLapTime: 98.6770
+   IRating: 0
+   LicLevel: 1
+   LicSubLevel: 0
+   LicString: R 0.00
+   LicColor: 0x8800A0
+   IsSpectator: 0
+   CarDesignStr: 3,231f20,ffffff,e21f26
+   HelmetDesignStr: 19,231f20,ffffff,e21f26
+   SuitDesignStr: 23,231f20,ffffff,e21f26
+   BodyType: 0
+   FaceType: 0
+   HelmetType: 0
+   CarNumberDesignStr: 1,0,cecece,231f20,231f20
+   CarSponsor_1: 0
+   CarSponsor_2: 278
+   CurDriverIncidentCount: 0
+   TeamIncidentCount: 0
+ - CarIdx: 22
+   UserName: Jose Diaz Castillo
+   AbbrevName: 
+   Initials: 
+   UserID: 9721
+   TeamID: 23
+   TeamName: Jose Diaz Castillo
+   CarNumber: "17"
+   CarNumberRaw: 17
+   CarPath: bmwm2csr
+   CarClassID: 4073
+   CarID: 195
+   CarIsPaceCar: 0
+   CarIsAI: 1
+   CarIsElectric: 0
+   CarScreenName: BMW M2 CS Racing
+   CarScreenNameShort: BMW M2 CS Racing
+   CarCfg: -1
+   CarCfgName: 
+   CarCfgCustomPaintExt: 
+   CarClassShortName: 
+   CarClassRelSpeed: 42
    CarClassLicenseLevel: 0
    CarClassMaxFuelPct: 1.000 %
    CarClassWeightPenalty: 0.000 kg
    CarClassPowerAdjust: 0.000 %
    CarClassDryTireSetLimit: 0 %
    CarClassColor: 0xffda59
-   CarClassEstLapTime: 81.8808
+   CarClassEstLapTime: 92.8393
+   IRating: 0
+   LicLevel: 1
+   LicSubLevel: 0
+   LicString: R 0.00
+   LicColor: 0x8800A0
+   IsSpectator: 0
+   CarDesignStr: 14,231f20,9a989a,ffffff
+   HelmetDesignStr: 46,231f20,9a989a,ffffff
+   SuitDesignStr: 29,231f20,9a989a,ffffff
+   BodyType: 0
+   FaceType: 0
+   HelmetType: 0
+   CarNumberDesignStr: 44,4,ed1c2e,231f20,231f20
+   CarSponsor_1: 269
+   CarSponsor_2: 278
+   CurDriverIncidentCount: 0
+   TeamIncidentCount: 0
+ - CarIdx: 23
+   UserName: Jaime Baker
+   AbbrevName: 
+   Initials: 
+   UserID: 9722
+   TeamID: 24
+   TeamName: Jaime Baker
+   CarNumber: "23"
+   CarNumberRaw: 23
+   CarPath: bmwm2csr
+   CarClassID: 4073
+   CarID: 195
+   CarIsPaceCar: 0
+   CarIsAI: 1
+   CarIsElectric: 0
+   CarScreenName: BMW M2 CS Racing
+   CarScreenNameShort: BMW M2 CS Racing
+   CarCfg: -1
+   CarCfgName: 
+   CarCfgCustomPaintExt: 
+   CarClassShortName: 
+   CarClassRelSpeed: 42
+   CarClassLicenseLevel: 0
+   CarClassMaxFuelPct: 1.000 %
+   CarClassWeightPenalty: 0.000 kg
+   CarClassPowerAdjust: 0.000 %
+   CarClassDryTireSetLimit: 0 %
+   CarClassColor: 0xffda59
+   CarClassEstLapTime: 92.8393
+   IRating: 0
+   LicLevel: 1
+   LicSubLevel: 0
+   LicString: R 0.00
+   LicColor: 0x8800A0
+   IsSpectator: 0
+   CarDesignStr: 2,FF0000,00FF00,0000FF,fa7fed
+   HelmetDesignStr: 2,fa7fed,000000,ffffff
+   SuitDesignStr: 2,fa7fed,000000,ffffff
+   BodyType: 0
+   FaceType: 0
+   HelmetType: 0
+   CarNumberDesignStr: 48,2,FFFFFF,DB2129,040707
+   CarSponsor_1: 0
+   CarSponsor_2: 0
+   CurDriverIncidentCount: 0
+   TeamIncidentCount: 0
+ - CarIdx: 24
+   UserName: Tony Gardner
+   AbbrevName: 
+   Initials: 
+   UserID: 9723
+   TeamID: 25
+   TeamName: Tony Gardner
+   CarNumber: "24"
+   CarNumberRaw: 24
+   CarPath: bmwm2csr
+   CarClassID: 4073
+   CarID: 195
+   CarIsPaceCar: 0
+   CarIsAI: 1
+   CarIsElectric: 0
+   CarScreenName: BMW M2 CS Racing
+   CarScreenNameShort: BMW M2 CS Racing
+   CarCfg: -1
+   CarCfgName: 
+   CarCfgCustomPaintExt: 
+   CarClassShortName: 
+   CarClassRelSpeed: 42
+   CarClassLicenseLevel: 0
+   CarClassMaxFuelPct: 1.000 %
+   CarClassWeightPenalty: 0.000 kg
+   CarClassPowerAdjust: 0.000 %
+   CarClassDryTireSetLimit: 0 %
+   CarClassColor: 0xffda59
+   CarClassEstLapTime: 92.8393
+   IRating: 0
+   LicLevel: 1
+   LicSubLevel: 0
+   LicString: R 0.00
+   LicColor: 0x8800A0
+   IsSpectator: 0
+   CarDesignStr: 8,b82f37,284a94,111111
+   HelmetDesignStr: 32,b82f37,284a94,111111
+   SuitDesignStr: 20,b82f37,284a94,111111
+   BodyType: 0
+   FaceType: 0
+   HelmetType: 0
+   CarNumberDesignStr: 46,2,ffffff,111111,284a94
+   CarSponsor_1: 0
+   CarSponsor_2: 276
+   CurDriverIncidentCount: 0
+   TeamIncidentCount: 0
+ - CarIdx: 25
+   UserName: Matt Holden
+   AbbrevName: 
+   Initials: 
+   UserID: 9724
+   TeamID: 26
+   TeamName: Matt Holden
+   CarNumber: "25"
+   CarNumberRaw: 25
+   CarPath: bmwm2csr
+   CarClassID: 4073
+   CarID: 195
+   CarIsPaceCar: 0
+   CarIsAI: 1
+   CarIsElectric: 0
+   CarScreenName: BMW M2 CS Racing
+   CarScreenNameShort: BMW M2 CS Racing
+   CarCfg: -1
+   CarCfgName: 
+   CarCfgCustomPaintExt: 
+   CarClassShortName: 
+   CarClassRelSpeed: 42
+   CarClassLicenseLevel: 0
+   CarClassMaxFuelPct: 1.000 %
+   CarClassWeightPenalty: 0.000 kg
+   CarClassPowerAdjust: 0.000 %
+   CarClassDryTireSetLimit: 0 %
+   CarClassColor: 0xffda59
+   CarClassEstLapTime: 92.8393
+   IRating: 0
+   LicLevel: 1
+   LicSubLevel: 0
+   LicString: R 0.00
+   LicColor: 0x8800A0
+   IsSpectator: 0
+   CarDesignStr: 2,FF0000,00FF00,0000FF,000000
+   HelmetDesignStr: 43,000000,FC0706,000000
+   SuitDesignStr: 3,000000,000000,FC0706
+   BodyType: 0
+   FaceType: 0
+   HelmetType: 0
+   CarNumberDesignStr: 48,2,FDFF00,000000,FFFFFF
+   CarSponsor_1: 0
+   CarSponsor_2: 0
+   CurDriverIncidentCount: 0
+   TeamIncidentCount: 0
+ - CarIdx: 26
+   UserName: Cisco Scaramuzza
+   AbbrevName: 
+   Initials: 
+   UserID: 9725
+   TeamID: 27
+   TeamName: Cisco Scaramuzza
+   CarNumber: "85"
+   CarNumberRaw: 85
+   CarPath: bmwm2csr
+   CarClassID: 4073
+   CarID: 195
+   CarIsPaceCar: 0
+   CarIsAI: 1
+   CarIsElectric: 0
+   CarScreenName: BMW M2 CS Racing
+   CarScreenNameShort: BMW M2 CS Racing
+   CarCfg: -1
+   CarCfgName: 
+   CarCfgCustomPaintExt: 
+   CarClassShortName: 
+   CarClassRelSpeed: 42
+   CarClassLicenseLevel: 0
+   CarClassMaxFuelPct: 1.000 %
+   CarClassWeightPenalty: 0.000 kg
+   CarClassPowerAdjust: 0.000 %
+   CarClassDryTireSetLimit: 0 %
+   CarClassColor: 0xffda59
+   CarClassEstLapTime: 92.8393
    IRating: 0
    LicLevel: 1
    LicSubLevel: 0
@@ -1094,569 +1728,109 @@ DriverInfo:
    LicColor: 0x8800A0
    IsSpectator: 0
    CarDesignStr: 2,FF0000,00FF00,0000FF
-   HelmetDesignStr: 2,FFA62B,FFDD4A,FFFFFF
-   SuitDesignStr: 2,FFDD4A,000000,FFDD4A
+   HelmetDesignStr: 2,FFFFFF,0046AD,ED2129
+   SuitDesignStr: 2,FFFFFF,0046AD,ED2129
    BodyType: 0
    FaceType: 0
    HelmetType: 0
-   CarNumberDesignStr: 56,2,eeff00,0a0a0a,0f4d87
+   CarNumberDesignStr: 15,0,ffffff,231f20,e32726
    CarSponsor_1: 0
    CarSponsor_2: 0
    CurDriverIncidentCount: 0
    TeamIncidentCount: 0
- - CarIdx: 9
-   UserName: Chris Weidner
+ - CarIdx: 27
+   UserName: Alex Saunders
    AbbrevName: 
    Initials: 
-   UserID: 9708
-   TeamID: 10
-   TeamName: Chris Weidner
-   CarNumber: "37"
-   CarNumberRaw: 37
-   CarPath: porsche992rgt3
-   CarClassID: 2708
-   CarID: 169
+   UserID: 9726
+   TeamID: 28
+   TeamName: Alex Saunders
+   CarNumber: "27"
+   CarNumberRaw: 27
+   CarPath: bmwm2csr
+   CarClassID: 4073
+   CarID: 195
    CarIsPaceCar: 0
    CarIsAI: 1
    CarIsElectric: 0
-   CarScreenName: Porsche 911 GT3 R (992)
-   CarScreenNameShort: Porsche 911 GT3 R (992)
+   CarScreenName: BMW M2 CS Racing
+   CarScreenNameShort: BMW M2 CS Racing
    CarCfg: -1
    CarCfgName: 
    CarCfgCustomPaintExt: 
    CarClassShortName: 
-   CarClassRelSpeed: 52
+   CarClassRelSpeed: 42
    CarClassLicenseLevel: 0
    CarClassMaxFuelPct: 1.000 %
    CarClassWeightPenalty: 0.000 kg
    CarClassPowerAdjust: 0.000 %
    CarClassDryTireSetLimit: 0 %
    CarClassColor: 0xffda59
-   CarClassEstLapTime: 82.2637
+   CarClassEstLapTime: 92.8393
    IRating: 0
    LicLevel: 1
    LicSubLevel: 0
    LicString: R 0.00
    LicColor: 0x8800A0
    IsSpectator: 0
-   CarDesignStr: 24,1f2892,7de54c,ffffff
-   HelmetDesignStr: 55,1f2892,7de54c,ffffff
-   SuitDesignStr: 35,1f2892,7de54c,ffffff
+   CarDesignStr: 2,FF0000,00FF00,0000FF
+   HelmetDesignStr: 2,2F005F,000000,FFFFFF
+   SuitDesignStr: 2,2F005F,000000,FFFFFF
    BodyType: 0
    FaceType: 0
    HelmetType: 0
-   CarNumberDesignStr: 47,0,111111,7de54c,ffffff
+   CarNumberDesignStr: 43,2,ffffff,010101,010101
    CarSponsor_1: 0
-   CarSponsor_2: 278
-   CurDriverIncidentCount: 0
-   TeamIncidentCount: 0
- - CarIdx: 10
-   UserName: Alex Horn
-   AbbrevName: 
-   Initials: 
-   UserID: 9709
-   TeamID: 11
-   TeamName: Alex Horn
-   CarNumber: "10"
-   CarNumberRaw: 10
-   CarPath: fordmustanggt3
-   CarClassID: 2708
-   CarID: 185
-   CarIsPaceCar: 0
-   CarIsAI: 1
-   CarIsElectric: 0
-   CarScreenName: Ford Mustang GT3
-   CarScreenNameShort: Ford Mustang GT3
-   CarCfg: -1
-   CarCfgName: 
-   CarCfgCustomPaintExt: 
-   CarClassShortName: 
-   CarClassRelSpeed: 52
-   CarClassLicenseLevel: 0
-   CarClassMaxFuelPct: 1.000 %
-   CarClassWeightPenalty: 0.000 kg
-   CarClassPowerAdjust: 0.000 %
-   CarClassDryTireSetLimit: 0 %
-   CarClassColor: 0xffda59
-   CarClassEstLapTime: 81.6273
-   IRating: 0
-   LicLevel: 1
-   LicSubLevel: 0
-   LicString: R 0.00
-   LicColor: 0x8800A0
-   IsSpectator: 0
-   CarDesignStr: 17,0a0a0a,254192,016db8
-   HelmetDesignStr: 26,0a0a0a,254192,016db8
-   SuitDesignStr: 26,0a0a0a,254192,016db8
-   BodyType: 0
-   FaceType: 0
-   HelmetType: 0
-   CarNumberDesignStr: 41,1,ffffff,016db8,0a0a0a
-   CarSponsor_1: 103
    CarSponsor_2: 0
    CurDriverIncidentCount: 0
    TeamIncidentCount: 0
- - CarIdx: 11
-   UserName: Christopher Bell
-   AbbrevName: 
-   Initials: 
-   UserID: 9710
-   TeamID: 12
-   TeamName: Christopher Bell
-   CarNumber: "1"
-   CarNumberRaw: 1
-   CarPath: mercedesamggt4
-   CarClassID: 2268
-   CarID: 157
-   CarIsPaceCar: 0
-   CarIsAI: 1
-   CarIsElectric: 0
-   CarScreenName: Mercedes AMG GT4
-   CarScreenNameShort: Mercedes AMG GT4
-   CarCfg: -1
-   CarCfgName: 
-   CarCfgCustomPaintExt: 
-   CarClassShortName: 
-   CarClassRelSpeed: 49
-   CarClassLicenseLevel: 0
-   CarClassMaxFuelPct: 1.000 %
-   CarClassWeightPenalty: 0.000 kg
-   CarClassPowerAdjust: 0.000 %
-   CarClassDryTireSetLimit: 0 %
-   CarClassColor: 0x33ceff
-   CarClassEstLapTime: 89.0582
-   IRating: 0
-   LicLevel: 1
-   LicSubLevel: 0
-   LicString: R 0.00
-   LicColor: 0x8800A0
-   IsSpectator: 0
-   CarDesignStr: 23,111111,ffffff,cf232b
-   HelmetDesignStr: 14,111111,ffffff,cf232b
-   SuitDesignStr: 12,111111,ffffff,cf232b
-   BodyType: 0
-   FaceType: 0
-   HelmetType: 0
-   CarNumberDesignStr: 1,0,cf232b,111111,ffffff
-   CarSponsor_1: 163
-   CarSponsor_2: 0
-   CurDriverIncidentCount: 0
-   TeamIncidentCount: 0
- - CarIdx: 12
-   UserName: Hieu Tran
-   AbbrevName: 
-   Initials: 
-   UserID: 9711
-   TeamID: 13
-   TeamName: Hieu Tran
-   CarNumber: "2"
-   CarNumberRaw: 2
-   CarPath: bmwm4evogt4
-   CarClassID: 2268
-   CarID: 189
-   CarIsPaceCar: 0
-   CarIsAI: 1
-   CarIsElectric: 0
-   CarScreenName: BMW M4 G82 GT4 EVO
-   CarScreenNameShort: BMW M4 G82 GT4 EVO
-   CarCfg: -1
-   CarCfgName: 
-   CarCfgCustomPaintExt: 
-   CarClassShortName: 
-   CarClassRelSpeed: 49
-   CarClassLicenseLevel: 0
-   CarClassMaxFuelPct: 1.000 %
-   CarClassWeightPenalty: 0.000 kg
-   CarClassPowerAdjust: 0.000 %
-   CarClassDryTireSetLimit: 0 %
-   CarClassColor: 0x33ceff
-   CarClassEstLapTime: 88.0722
-   IRating: 0
-   LicLevel: 1
-   LicSubLevel: 0
-   LicString: R 0.00
-   LicColor: 0x8800A0
-   IsSpectator: 0
-   CarDesignStr: 17,FFFFFF,00A1E4,FFDE00
-   HelmetDesignStr: 34,FFFFFF,00A1E4,FFDE00
-   SuitDesignStr: 29,FFFFFF,00A1E4,FFDE00
-   BodyType: 0
-   FaceType: 0
-   HelmetType: 0
-   CarNumberDesignStr: 51,2,000000,FFFFFF,FFFFFF
-   CarSponsor_1: 290
-   CarSponsor_2: 0
-   CurDriverIncidentCount: 0
-   TeamIncidentCount: 0
- - CarIdx: 13
-   UserName: Brian Rainville
-   AbbrevName: 
-   Initials: 
-   UserID: 9712
-   TeamID: 14
-   TeamName: Brian Rainville
-   CarNumber: "8"
-   CarNumberRaw: 8
-   CarPath: amvantagegt4
-   CarClassID: 2268
-   CarID: 150
-   CarIsPaceCar: 0
-   CarIsAI: 1
-   CarIsElectric: 0
-   CarScreenName: Aston Martin Vantage GT4
-   CarScreenNameShort: Aston Martin Vantage GT4
-   CarCfg: -1
-   CarCfgName: 
-   CarCfgCustomPaintExt: 
-   CarClassShortName: 
-   CarClassRelSpeed: 49
-   CarClassLicenseLevel: 0
-   CarClassMaxFuelPct: 1.000 %
-   CarClassWeightPenalty: 0.000 kg
-   CarClassPowerAdjust: 0.000 %
-   CarClassDryTireSetLimit: 0 %
-   CarClassColor: 0x33ceff
-   CarClassEstLapTime: 88.8850
-   IRating: 0
-   LicLevel: 1
-   LicSubLevel: 0
-   LicString: R 0.00
-   LicColor: 0x8800A0
-   IsSpectator: 0
-   CarDesignStr: 17,FFFFFF,EBECF8,283583
-   HelmetDesignStr: 46,FFFFFF,EBECF8,283583
-   SuitDesignStr: 21,FFFFFF,EBECF8,283583
-   BodyType: 0
-   FaceType: 0
-   HelmetType: 0
-   CarNumberDesignStr: 0,0,231F20,FFFFFF,FFFFFF
-   CarSponsor_1: 301
-   CarSponsor_2: 301
-   CurDriverIncidentCount: 0
-   TeamIncidentCount: 0
- - CarIdx: 14
-   UserName: Kipling Knaus
-   AbbrevName: 
-   Initials: 
-   UserID: 9713
-   TeamID: 15
-   TeamName: Kipling Knaus
-   CarNumber: "9"
-   CarNumberRaw: 9
-   CarPath: porsche718gt4
-   CarClassID: 2268
-   CarID: 119
-   CarIsPaceCar: 0
-   CarIsAI: 1
-   CarIsElectric: 0
-   CarScreenName: Porsche 718 Cayman GT4
-   CarScreenNameShort: Porsche 718 Cayman GT4
-   CarCfg: -1
-   CarCfgName: 
-   CarCfgCustomPaintExt: 
-   CarClassShortName: 
-   CarClassRelSpeed: 49
-   CarClassLicenseLevel: 0
-   CarClassMaxFuelPct: 1.000 %
-   CarClassWeightPenalty: 0.000 kg
-   CarClassPowerAdjust: 0.000 %
-   CarClassDryTireSetLimit: 0 %
-   CarClassColor: 0x33ceff
-   CarClassEstLapTime: 89.6580
-   IRating: 0
-   LicLevel: 1
-   LicSubLevel: 0
-   LicString: R 0.00
-   LicColor: 0x8800A0
-   IsSpectator: 0
-   CarDesignStr: 15,7ca1c2,ffffff,eeff00
-   HelmetDesignStr: 35,7ca1c2,ffffff,eeff00
-   SuitDesignStr: 9,7ca1c2,ffffff,eeff00
-   BodyType: 0
-   FaceType: 0
-   HelmetType: 0
-   CarNumberDesignStr: 53,3,eeff00,0f4d87,7ca1c2
-   CarSponsor_1: 193
-   CarSponsor_2: 5
-   CurDriverIncidentCount: 0
-   TeamIncidentCount: 0
- - CarIdx: 15
-   UserName: David Carrillo
-   AbbrevName: 
-   Initials: 
-   UserID: 9714
-   TeamID: 16
-   TeamName: David Carrillo
-   CarNumber: "11"
-   CarNumberRaw: 11
-   CarPath: mclaren570sgt4
-   CarClassID: 2268
-   CarID: 135
-   CarIsPaceCar: 0
-   CarIsAI: 1
-   CarIsElectric: 0
-   CarScreenName: Mclaren 570s GT4
-   CarScreenNameShort: Mclaren 570s GT4
-   CarCfg: -1
-   CarCfgName: 
-   CarCfgCustomPaintExt: 
-   CarClassShortName: 
-   CarClassRelSpeed: 49
-   CarClassLicenseLevel: 0
-   CarClassMaxFuelPct: 1.000 %
-   CarClassWeightPenalty: 0.000 kg
-   CarClassPowerAdjust: 0.000 %
-   CarClassDryTireSetLimit: 0 %
-   CarClassColor: 0x33ceff
-   CarClassEstLapTime: 88.0734
-   IRating: 0
-   LicLevel: 1
-   LicSubLevel: 0
-   LicString: R 0.00
-   LicColor: 0x8800A0
-   IsSpectator: 0
-   CarDesignStr: 21,FFFFFF,FFFFFF,E72729
-   HelmetDesignStr: 66,FFFFFF,FFFFFF,E72729
-   SuitDesignStr: 22,FFFFFF,FFFFFF,E72729
-   BodyType: 0
-   FaceType: 0
-   HelmetType: 0
-   CarNumberDesignStr: 7,3,E72729,000000,FFFFFF
-   CarSponsor_1: 371
-   CarSponsor_2: 371
-   CurDriverIncidentCount: 0
-   TeamIncidentCount: 0
- - CarIdx: 16
-   UserName: Dean Marsh
-   AbbrevName: 
-   Initials: 
-   UserID: 9715
-   TeamID: 17
-   TeamName: Dean Marsh
-   CarNumber: "12"
-   CarNumberRaw: 12
-   CarPath: mercedesamggt4
-   CarClassID: 2268
-   CarID: 157
-   CarIsPaceCar: 0
-   CarIsAI: 1
-   CarIsElectric: 0
-   CarScreenName: Mercedes AMG GT4
-   CarScreenNameShort: Mercedes AMG GT4
-   CarCfg: -1
-   CarCfgName: 
-   CarCfgCustomPaintExt: 
-   CarClassShortName: 
-   CarClassRelSpeed: 49
-   CarClassLicenseLevel: 0
-   CarClassMaxFuelPct: 1.000 %
-   CarClassWeightPenalty: 0.000 kg
-   CarClassPowerAdjust: 0.000 %
-   CarClassDryTireSetLimit: 0 %
-   CarClassColor: 0x33ceff
-   CarClassEstLapTime: 89.0582
-   IRating: 0
-   LicLevel: 1
-   LicSubLevel: 0
-   LicString: R 0.00
-   LicColor: 0x8800A0
-   IsSpectator: 0
-   CarDesignStr: 14,ffffff,fc0706,111111
-   HelmetDesignStr: 35,ffffff,fc0706,111111
-   SuitDesignStr: 1,ffffff,fc0706,111111
-   BodyType: 0
-   FaceType: 0
-   HelmetType: 0
-   CarNumberDesignStr: 35,3,111111,fc0706,ffffff
-   CarSponsor_1: 0
-   CarSponsor_2: 276
-   CurDriverIncidentCount: 0
-   TeamIncidentCount: 0
- - CarIdx: 17
-   UserName: Lisa Hudson
-   AbbrevName: 
-   Initials: 
-   UserID: 9716
-   TeamID: 18
-   TeamName: Lisa Hudson
-   CarNumber: "13"
-   CarNumberRaw: 13
-   CarPath: bmwm4evogt4
-   CarClassID: 2268
-   CarID: 189
-   CarIsPaceCar: 0
-   CarIsAI: 1
-   CarIsElectric: 0
-   CarScreenName: BMW M4 G82 GT4 EVO
-   CarScreenNameShort: BMW M4 G82 GT4 EVO
-   CarCfg: -1
-   CarCfgName: 
-   CarCfgCustomPaintExt: 
-   CarClassShortName: 
-   CarClassRelSpeed: 49
-   CarClassLicenseLevel: 0
-   CarClassMaxFuelPct: 1.000 %
-   CarClassWeightPenalty: 0.000 kg
-   CarClassPowerAdjust: 0.000 %
-   CarClassDryTireSetLimit: 0 %
-   CarClassColor: 0x33ceff
-   CarClassEstLapTime: 88.0722
-   IRating: 0
-   LicLevel: 1
-   LicSubLevel: 0
-   LicString: R 0.00
-   LicColor: 0x8800A0
-   IsSpectator: 0
-   CarDesignStr: 21,135324,111111,535353
-   HelmetDesignStr: 35,135324,111111,535353
-   SuitDesignStr: 25,135324,111111,535353
-   BodyType: 0
-   FaceType: 0
-   HelmetType: 0
-   CarNumberDesignStr: 50,2,dff000,135324,111111
-   CarSponsor_1: 0
-   CarSponsor_2: 83
-   CurDriverIncidentCount: 0
-   TeamIncidentCount: 0
- - CarIdx: 18
-   UserName: Scottie Nash
-   AbbrevName: 
-   Initials: 
-   UserID: 9717
-   TeamID: 19
-   TeamName: Scottie Nash
-   CarNumber: "14"
-   CarNumberRaw: 14
-   CarPath: amvantagegt4
-   CarClassID: 2268
-   CarID: 150
-   CarIsPaceCar: 0
-   CarIsAI: 1
-   CarIsElectric: 0
-   CarScreenName: Aston Martin Vantage GT4
-   CarScreenNameShort: Aston Martin Vantage GT4
-   CarCfg: -1
-   CarCfgName: 
-   CarCfgCustomPaintExt: 
-   CarClassShortName: 
-   CarClassRelSpeed: 49
-   CarClassLicenseLevel: 0
-   CarClassMaxFuelPct: 1.000 %
-   CarClassWeightPenalty: 0.000 kg
-   CarClassPowerAdjust: 0.000 %
-   CarClassDryTireSetLimit: 0 %
-   CarClassColor: 0x33ceff
-   CarClassEstLapTime: 88.8850
-   IRating: 0
-   LicLevel: 1
-   LicSubLevel: 0
-   LicString: R 0.00
-   LicColor: 0x8800A0
-   IsSpectator: 0
-   CarDesignStr: 5,ABD779,104734,E22726
-   HelmetDesignStr: 16,ABD779,104734,E22726
-   SuitDesignStr: 11,ABD779,104734,E22726
-   BodyType: 0
-   FaceType: 0
-   HelmetType: 0
-   CarNumberDesignStr: 47,2,FFFFFF,ABD779,000000
-   CarSponsor_1: 356
-   CarSponsor_2: 329
-   CurDriverIncidentCount: 0
-   TeamIncidentCount: 0
- - CarIdx: 19
+ - CarIdx: 28
    UserName: Angela Sinopoli
    AbbrevName: 
    Initials: 
-   UserID: 9718
-   TeamID: 20
+   UserID: 9727
+   TeamID: 29
    TeamName: Angela Sinopoli
-   CarNumber: "15"
-   CarNumberRaw: 15
-   CarPath: porsche718gt4
-   CarClassID: 2268
-   CarID: 119
+   CarNumber: "28"
+   CarNumberRaw: 28
+   CarPath: bmwm2csr
+   CarClassID: 4073
+   CarID: 195
    CarIsPaceCar: 0
    CarIsAI: 1
    CarIsElectric: 0
-   CarScreenName: Porsche 718 Cayman GT4
-   CarScreenNameShort: Porsche 718 Cayman GT4
+   CarScreenName: BMW M2 CS Racing
+   CarScreenNameShort: BMW M2 CS Racing
    CarCfg: -1
    CarCfgName: 
    CarCfgCustomPaintExt: 
    CarClassShortName: 
-   CarClassRelSpeed: 49
+   CarClassRelSpeed: 42
    CarClassLicenseLevel: 0
    CarClassMaxFuelPct: 1.000 %
    CarClassWeightPenalty: 0.000 kg
    CarClassPowerAdjust: 0.000 %
    CarClassDryTireSetLimit: 0 %
-   CarClassColor: 0x33ceff
-   CarClassEstLapTime: 89.6580
+   CarClassColor: 0xffda59
+   CarClassEstLapTime: 92.8393
    IRating: 0
    LicLevel: 1
    LicSubLevel: 0
    LicString: R 0.00
    LicColor: 0x8800A0
    IsSpectator: 0
-   CarDesignStr: 10,FFFFFF,BCBDB0,FFD65A
-   HelmetDesignStr: 23,FFFFFF,BCBDB0,FFD65A
-   SuitDesignStr: 11,FFFFFF,BCBDB0,FFD65A
+   CarDesignStr: 21,00000c,ee312e,00000c
+   HelmetDesignStr: 12,00000c,ee312e,00000c
+   SuitDesignStr: 14,00000c,ee312e,00000c
    BodyType: 0
    FaceType: 0
    HelmetType: 0
-   CarNumberDesignStr: 40,1,EE3A43,FFFFFF,00050B
-   CarSponsor_1: 0
-   CarSponsor_2: 339
-   CurDriverIncidentCount: 0
-   TeamIncidentCount: 0
- - CarIdx: 20
-   UserName: Sam Roush
-   AbbrevName: 
-   Initials: 
-   UserID: 9719
-   TeamID: 21
-   TeamName: Sam Roush
-   CarNumber: "16"
-   CarNumberRaw: 16
-   CarPath: mclaren570sgt4
-   CarClassID: 2268
-   CarID: 135
-   CarIsPaceCar: 0
-   CarIsAI: 1
-   CarIsElectric: 0
-   CarScreenName: Mclaren 570s GT4
-   CarScreenNameShort: Mclaren 570s GT4
-   CarCfg: -1
-   CarCfgName: 
-   CarCfgCustomPaintExt: 
-   CarClassShortName: 
-   CarClassRelSpeed: 49
-   CarClassLicenseLevel: 0
-   CarClassMaxFuelPct: 1.000 %
-   CarClassWeightPenalty: 0.000 kg
-   CarClassPowerAdjust: 0.000 %
-   CarClassDryTireSetLimit: 0 %
-   CarClassColor: 0x33ceff
-   CarClassEstLapTime: 88.0734
-   IRating: 0
-   LicLevel: 1
-   LicSubLevel: 0
-   LicString: R 0.00
-   LicColor: 0x8800A0
-   IsSpectator: 0
-   CarDesignStr: 5,df7d3d,121212,a4a5a9
-   HelmetDesignStr: 32,df7d3d,121212,a4a5a9
-   SuitDesignStr: 33,df7d3d,121212,a4a5a9
-   BodyType: 0
-   FaceType: 0
-   HelmetType: 0
-   CarNumberDesignStr: 24,2,ffffff,df7d3d,121212
-   CarSponsor_1: 251
+   CarNumberDesignStr: 3,2,ee312e,ffffff,00000c
+   CarSponsor_1: 274
    CarSponsor_2: 0
    CurDriverIncidentCount: 0
    TeamIncidentCount: 0
- - CarIdx: 21
+ - CarIdx: 29
    UserName: Pace Car
    AbbrevName: 
    Initials: 
@@ -1716,102 +1890,83 @@ SplitTimeInfo:
 
 CarSetup:
  UpdateCount: 2
- TiresAero:
+ Tires:
   TireType:
    TireType: Dry
   LeftFront:
-   StartingPressure: 159 kPa
-   LastHotPressure: 159 kPa
-   LastTempsOMI: 35C, 35C, 35C
+   StartingPressure: 172 kPa
+   LastHotPressure: 172 kPa
+   LastTempsOMI: 47C, 47C, 47C
    TreadRemaining: 100%, 100%, 100%
   LeftRear:
-   StartingPressure: 159 kPa
-   LastHotPressure: 159 kPa
-   LastTempsOMI: 35C, 35C, 35C
+   StartingPressure: 172 kPa
+   LastHotPressure: 172 kPa
+   LastTempsOMI: 47C, 47C, 47C
    TreadRemaining: 100%, 100%, 100%
   RightFront:
-   StartingPressure: 159 kPa
-   LastHotPressure: 159 kPa
-   LastTempsIMO: 35C, 35C, 35C
+   StartingPressure: 172 kPa
+   LastHotPressure: 172 kPa
+   LastTempsIMO: 47C, 47C, 47C
    TreadRemaining: 100%, 100%, 100%
   RightRear:
-   StartingPressure: 159 kPa
-   LastHotPressure: 159 kPa
-   LastTempsIMO: 35C, 35C, 35C
+   StartingPressure: 172 kPa
+   LastHotPressure: 172 kPa
+   LastTempsIMO: 47C, 47C, 47C
    TreadRemaining: 100%, 100%, 100%
-  AeroBalanceCalc:
-   FrontRhAtSpeed: 49 mm
-   RearRhAtSpeed: 69 mm
-   WingSetting: 6 degrees
-   FrontDownforce: 43.70%
  Chassis:
-  FrontBrakes:
-   ArbBlades: D4-D4
-   TotalToeIn: -3.0 mm
-   FrontMasterCyl: 17.8 mm
-   RearMasterCyl: 17.8 mm
-   BrakePads: Medium friction
-   CenterFrontSplitterHeight: 50.1 mm
-  LeftFront:
-   CornerWeight: 3319 N
-   RideHeight: 56.7 mm
-   SpringPerchOffset: 30.25 mm
-   SpringRate: 230 N/mm
-   Camber: -4.0 deg
-  LeftRear:
-   CornerWeight: 3710 N
-   RideHeight: 82.2 mm
-   SpringPerchOffset: 110.00 mm
-   SpringRate: 190 N/mm
-   Camber: -3.2 deg
-   ToeIn: +1.5 mm
-  Rear:
-   FuelLevel: 50.0 L
-   ArbBlades: D3-D3
-   WingAngle: 6 degrees
-  InCarAdjustments:
-   BrakePressureBias: 52.25%
-   AbsSetting: 3 (ABS)
-   TcSetting: 3 (TC)
-   FWtdist: 47.2%
+  Front:
+   ArbSize: Stiff
+   ArbSetting: 1
+   ToeIn: -2.2 mm
+   BumpRubberLength: 0.030
    CrossWeight: 50.0%
-  RightFront:
-   CornerWeight: 3319 N
-   RideHeight: 56.7 mm
-   SpringPerchOffset: 30.25 mm
-   SpringRate: 230 N/mm
-   Camber: -4.0 deg
-  RightRear:
-   CornerWeight: 3710 N
-   RideHeight: 82.2 mm
-   SpringPerchOffset: 110.00 mm
-   SpringRate: 190 N/mm
+   NoseWeight: 53.2%
+  LeftFront:
+   CornerWeight: 3631 N
+   RideHeight: 112.8 mm
+   FenderHeight: 590.5 mm
+   SpringRate: 53 N/mm
+   SpringPerchOffset: 87.5 mm
+   BumpStiffness: +1 clicks
+   ReboundStiffness: +5 clicks
    Camber: -3.2 deg
-   ToeIn: +1.5 mm
-  Differential:
-   FrictionFaces: 8
-   DiffPreload: 50 Nm
- Dampers:
-  LeftFrontDamper:
-   LsCompDamping: 7 clicks
-   HsCompDamping: 2 clicks
-   LsRbdDamping: 5 clicks
-   HsRbdDamping: 2 clicks
-  LeftRearDamper:
-   LsCompDamping: 5 clicks
-   HsCompDamping: 2 clicks
-   LsRbdDamping: 7 clicks
-   HsRbdDamping: 2 clicks
-  RightFrontDamper:
-   LsCompDamping: 7 clicks
-   HsCompDamping: 2 clicks
-   LsRbdDamping: 5 clicks
-   HsRbdDamping: 2 clicks
-  RightRearDamper:
-   LsCompDamping: 5 clicks
-   HsCompDamping: 2 clicks
-   LsRbdDamping: 7 clicks
-   HsRbdDamping: 2 clicks
+  LeftRear:
+   CornerWeight: 3207 N
+   RideHeight: 115.7 mm
+   FenderHeight: 596.0 mm
+   SpringRate: 44 N/mm
+   SpringPerchOffset: 73.0 mm
+   BumpStiffness: +3 clicks
+   ReboundStiffness: +8 clicks
+   ToeIn: +0.5 mm
+  InCarDials:
+   BrakePressureBias: 50.0%
+   BrakePads: Medium friction
+   AbsSetting: 2 (ABS)
+   TcSetting: 1 (TC)
+  RightFront:
+   CornerWeight: 3459 N
+   RideHeight: 112.8 mm
+   FenderHeight: 590.0 mm
+   SpringRate: 53 N/mm
+   SpringPerchOffset: 92.0 mm
+   BumpStiffness: +1 clicks
+   ReboundStiffness: +5 clicks
+   Camber: -3.2 deg
+  RightRear:
+   CornerWeight: 3032 N
+   RideHeight: 115.7 mm
+   FenderHeight: 595.5 mm
+   SpringRate: 44 N/mm
+   SpringPerchOffset: 78.5 mm
+   BumpStiffness: +3 clicks
+   ReboundStiffness: +8 clicks
+   ToeIn: +0.5 mm
+  Rear:
+   FuelLevel: 83.3 L
+   ArbSize: Soft
+   ArbSetting: 2
+   WingSetting: 5
 
 ...
 

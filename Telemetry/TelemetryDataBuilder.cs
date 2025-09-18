@@ -116,11 +116,8 @@ namespace VISOR.Telemetry
 
         private void AddRadarData(Dictionary<string, object> dict, TelemetryData data)
         {
-            // Add radar-specific fields with safe access
-            // These fields may not be available in all versions of the TelemetryData struct
-
-            // CarLeftRight - lateral position array
-            dict["CarLeftRight"] = SafeGetFieldValue(data, "CarLeftRight", new float[64]);
+            // Store CarLeftRight enum directly without conversion
+            dict["CarLeftRight"] = SafeGetFieldValue<object>(data, "CarLeftRight", null);
 
             // CarIdxF2Time - gap to leader array  
             dict["CarIdxF2Time"] = SafeGetFieldValue(data, "CarIdxF2Time", new float[64]);
@@ -129,9 +126,16 @@ namespace VISOR.Telemetry
             dict["TrackLength"] = SafeGetFieldValue(data, "TrackLength", 0f);
 
             // DEBUG: Log when radar fields are available
-            var carLeftRight = dict["CarLeftRight"] as float[];
+            var carLeftRight = dict["CarLeftRight"];
+            var carIdxF2Time = dict["CarIdxF2Time"] as float[];
             var trackLength = (float)dict["TrackLength"];
-            if (carLeftRight != null && carLeftRight.Length > 0 && trackLength > 0)
+
+            if (carLeftRight != null)
+            {
+                System.Diagnostics.Debug.WriteLine($"[DataBuilder] CarLeftRight: {carLeftRight} ({carLeftRight.GetType().Name})");
+            }
+
+            if (carIdxF2Time != null && carIdxF2Time.Length > 0 && trackLength > 0)
             {
                 System.Diagnostics.Debug.WriteLine($"[DataBuilder] Radar data available - TrackLength: {trackLength:F1}m");
             }

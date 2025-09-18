@@ -57,8 +57,11 @@ namespace VISOR.Diagnostics
             {
                 if (_telemetryWriter != null)
                 {
-                    float lapDistDelta = playerLapDist - targetLapDist;
-                    _telemetryWriter.WriteLine($"{sessionTime:F3},{playerCarIdx},{targetCarIdx},{clrValue:F4},{playerLapDist:F4},{targetLapDist:F4},{lapDistDelta:F4}");
+                    // Handle single value case (when targetCarIdx is -1)
+                    string targetCarStr = targetCarIdx == -1 ? "SINGLE" : targetCarIdx.ToString();
+                    float lapDistDelta = targetCarIdx == -1 ? 0f : playerLapDist - targetLapDist;
+
+                    _telemetryWriter.WriteLine($"{sessionTime:F3},{playerCarIdx},{targetCarStr},{clrValue:F4},{playerLapDist:F4},{targetLapDist:F4},{lapDistDelta:F4}");
                     _telemetryWriter.Flush();
                 }
             }

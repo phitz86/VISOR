@@ -10,6 +10,15 @@ using VISOR.Telemetry;
 
 namespace VISOR.ViewModels
 {
+    public enum RadarZone
+    {
+        LeftFar = 0,    // Zone 0 (0-48px)
+        LeftNear = 1,   // Zone 1 (48-96px) 
+        Center = 2,     // Zone 2 (96-144px)
+        RightNear = 3,  // Zone 3 (144-192px)
+        RightFar = 4    // Zone 4 (192-240px)
+    }
+
     public class RadarViewModel : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -18,10 +27,14 @@ namespace VISOR.ViewModels
 
         // Constants for radar calculations
         private const float AVERAGE_CAR_LENGTH = 4.5f; // meters - average racing car length
-        private const float RADAR_RADIUS = 140f; // pixels from center to edge
-        private const float DETECTION_RANGE = 5.0f; // car lengths for outer boundary
-        private const float INNER_RING_RANGE = 2.0f; // car lengths for inner ring
-        private const float OUTER_RING_RANGE = 4.0f; // car lengths for outer ring
+        private const float DETECTION_RANGE = 5.0f; // car lengths for detection boundary
+        private const float RADAR_HEIGHT = 396f; // Total height of radar display
+        private const float RADAR_CENTER_Y = 198f; // Y position of player (center)
+        private const float CANVAS_CAR_POSITIONS = 11.0f; // Total positions: 5 ahead + 1 player + 5 behind
+        private const float CANVAS_HALF_RANGE = 5.5f; // Half the canvas in car lengths (from center to edge)
+
+        // Zone positioning constants
+        private readonly float[] ZONE_X_POSITIONS = { 24f, 72f, 120f, 168f, 216f }; // Center X for each zone
 
         // Car display elements cache
         private readonly Dictionary<int, RadarCarElement> _carElements = new();
@@ -30,6 +43,10 @@ namespace VISOR.ViewModels
             Brushes.Gold, Brushes.Silver, Brushes.White, Brushes.HotPink, Brushes.LightBlue
         };
         private int _nextColorIndex = 0;
+
+        // Zone assignment tracking
+        private readonly Dictionary<int, RadarZone> _carZoneAssignments = new();
+        private string _lastCarLeftRightState = "Off";
 
         // State tracking
         private float _trackLength = 0f;
@@ -52,7 +69,7 @@ namespace VISOR.ViewModels
             var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx", -1);
             if (playerCarIdx == -1) return;
 
-            // Get track length (from YAML or estimate if not available)
+            // Get track length
             _trackLength = GetTrackLength(snapshot, sessionDataProvider);
             if (_trackLength <= 0) return;
 
@@ -76,30 +93,156 @@ namespace VISOR.ViewModels
                 if (trackSurface[i] == (int)iRacingTrackSurface.NotInWorld) continue;
                 if (string.IsNullOrEmpty(carNumbers?[i])) continue;
 
-                // Calculate distance from player (for range checking only)
-                float carDistance = CalculateTrackDistance(playerLapDistPct, lapDistPct[i], _trackLength);
+                // Calculate proximity using RelativeDisplayCalculator logic
+                var proximityData = CalculateCarProximity(playerLapDistPct, lapDistPct[i], _trackLength);
 
                 // Check if car is within radar range
-                if (carDistance <= DETECTION_RANGE * AVERAGE_CAR_LENGTH)
+                if (proximityData.TrackDistance <= DETECTION_RANGE * AVERAGE_CAR_LENGTH)
                 {
                     var carData = new RadarCarData
                     {
                         CarIdx = i,
                         LapDistPct = lapDistPct[i],
-                        TrackDistance = carDistance,
+                        PlayerLapDistPct = playerLapDistPct, // Add player position for Y calculation
+                        TrackDistance = proximityData.TrackDistance,
+                        Proximity = proximityData.Proximity,
+                        IsAhead = proximityData.IsAhead,
                         CarNumber = carNumbers[i],
                         ClassID = carClassIDs[i],
-                        IsOnPitRoad = onPitRoad?[i] ?? false,
-                        LeftRight = 0f // CarLeftRight is non-functional, always zero
+                        IsOnPitRoad = onPitRoad?[i] ?? false
                     };
 
                     visibleCars.Add(carData);
                 }
             }
 
+            // Update zone assignments based on CarLeftRight state
+            var carLeftRightEnum = snapshot.GetValue<object>("CarLeftRight", null);
+            var carLeftRightState = carLeftRightEnum?.ToString() ?? "Off";
+            System.Diagnostics.Debug.WriteLine($"[Radar] CarLeftRight value from snapshot: {carLeftRightState}");
+            UpdateZoneAssignments(visibleCars, carLeftRightState);
+
             // Update radar display
-            UpdateRadarDisplay(carsContainer, visibleCars, playerLapDistPct);
+            UpdateRadarDisplay(carsContainer, visibleCars);
             VisibleCarCount = visibleCars.Count;
+        }
+
+        private (float TrackDistance, float Proximity, bool IsAhead) CalculateCarProximity(float playerDistPct, float carDistPct, float trackLength)
+        {
+            // Use original radar distance calculation for range checking
+            float directDistance = Math.Abs(carDistPct - playerDistPct) * trackLength;
+            float wrapAroundDistance = trackLength - directDistance;
+            float trackDistance = Math.Min(directDistance, wrapAroundDistance);
+
+            // Calculate proximity for positioning (borrowed from RelativeDisplayCalculator)
+            float distancePct = Math.Abs(carDistPct - playerDistPct);
+            float proximity = Math.Min(distancePct, 1.0f - distancePct);
+            bool isAhead = (carDistPct - playerDistPct + 1.5f) % 1.0f > 0.5f;
+
+            return (trackDistance, proximity, isAhead);
+        }
+
+        private void UpdateZoneAssignments(List<RadarCarData> visibleCars, string carLeftRightState)
+        {
+            // Always reassign when CarLeftRight is active (not just when state changes)
+            bool shouldReassign = carLeftRightState != _lastCarLeftRightState ||
+                                  (carLeftRightState != "Clear" && carLeftRightState != "Off");
+
+            if (!shouldReassign) return;
+
+            // Update state tracking
+            bool stateChanged = carLeftRightState != _lastCarLeftRightState;
+            _lastCarLeftRightState = carLeftRightState;
+
+            // Debug output only when state changes
+            if (stateChanged)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Radar] CarLeftRight state changed to {carLeftRightState}, {visibleCars.Count} visible cars");
+            }
+
+            // Reset all cars to center zone first
+            foreach (var car in visibleCars)
+            {
+                _carZoneAssignments[car.CarIdx] = RadarZone.Center;
+            }
+
+            // Sort cars by proximity for assignment priority (closest first)
+            visibleCars.Sort((a, b) => a.Proximity.CompareTo(b.Proximity));
+
+            // Assign zones based on CarLeftRight state
+            switch (carLeftRightState)
+            {
+                case "CarLeft": // CarLeft - assign closest car to left near zone
+                    if (visibleCars.Count > 0)
+                    {
+                        _carZoneAssignments[visibleCars[0].CarIdx] = RadarZone.LeftNear;
+                        if (stateChanged)
+                            System.Diagnostics.Debug.WriteLine($"[Radar] Assigned car {visibleCars[0].CarNumber} to LeftNear zone");
+                    }
+                    break;
+
+                case "CarRight": // CarRight - assign closest car to right near zone
+                    if (visibleCars.Count > 0)
+                    {
+                        _carZoneAssignments[visibleCars[0].CarIdx] = RadarZone.RightNear;
+                        if (stateChanged)
+                            System.Diagnostics.Debug.WriteLine($"[Radar] Assigned car {visibleCars[0].CarNumber} to RightNear zone");
+                    }
+                    break;
+
+                case "CarLeftRight": // CarLeftRight - assign two closest cars to both sides
+                    if (visibleCars.Count > 0)
+                    {
+                        _carZoneAssignments[visibleCars[0].CarIdx] = RadarZone.LeftNear;
+                        if (stateChanged)
+                            System.Diagnostics.Debug.WriteLine($"[Radar] Assigned car {visibleCars[0].CarNumber} to LeftNear zone (CarLeftRight)");
+                    }
+                    if (visibleCars.Count > 1)
+                    {
+                        _carZoneAssignments[visibleCars[1].CarIdx] = RadarZone.RightNear;
+                        if (stateChanged)
+                            System.Diagnostics.Debug.WriteLine($"[Radar] Assigned car {visibleCars[1].CarNumber} to RightNear zone (CarLeftRight)");
+                    }
+                    break;
+
+                case "TwoCarsLeft": // TwoCarsLeft - assign two closest to left zones
+                    if (visibleCars.Count > 0)
+                    {
+                        _carZoneAssignments[visibleCars[0].CarIdx] = RadarZone.LeftNear;
+                        if (stateChanged)
+                            System.Diagnostics.Debug.WriteLine($"[Radar] Assigned car {visibleCars[0].CarNumber} to LeftNear zone (TwoCarsLeft)");
+                    }
+                    if (visibleCars.Count > 1)
+                    {
+                        _carZoneAssignments[visibleCars[1].CarIdx] = RadarZone.LeftFar;
+                        if (stateChanged)
+                            System.Diagnostics.Debug.WriteLine($"[Radar] Assigned car {visibleCars[1].CarNumber} to LeftFar zone (TwoCarsLeft)");
+                    }
+                    break;
+
+                case "TwoCarsRight": // TwoCarsRight - assign two closest to right zones
+                    if (visibleCars.Count > 0)
+                    {
+                        _carZoneAssignments[visibleCars[0].CarIdx] = RadarZone.RightNear;
+                        if (stateChanged)
+                            System.Diagnostics.Debug.WriteLine($"[Radar] Assigned car {visibleCars[0].CarNumber} to RightNear zone (TwoCarsRight)");
+                    }
+                    if (visibleCars.Count > 1)
+                    {
+                        _carZoneAssignments[visibleCars[1].CarIdx] = RadarZone.RightFar;
+                        if (stateChanged)
+                            System.Diagnostics.Debug.WriteLine($"[Radar] Assigned car {visibleCars[1].CarNumber} to RightFar zone (TwoCarsRight)");
+                    }
+                    break;
+
+                case "Clear": // Clear
+                case "Off": // Off
+                default:
+                    // All cars stay in center zone (already set above)
+                    if (stateChanged)
+                        System.Diagnostics.Debug.WriteLine($"[Radar] All cars assigned to Center zone (state: {carLeftRightState})");
+                    break;
+            }
         }
 
         private float GetTrackLength(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
@@ -112,40 +255,22 @@ namespace VISOR.ViewModels
                     return trackLength;
             }
 
-            // Fallback: try to get from snapshot (though this is now less likely to work)
+            // Fallback: try to get from snapshot
             float trackLengthFromSnapshot = snapshot.GetValue<float>("TrackLength", 0f);
             if (trackLengthFromSnapshot > 0)
                 return trackLengthFromSnapshot;
 
-            // Final fallback: estimate based on known track lengths
-            // This could be expanded with a lookup table of known tracks
+            // Final fallback: estimate
             return 5000f; // 5km default for most road courses
         }
 
-        private float CalculateTrackDistance(float playerDistPct, float carDistPct, float trackLength)
-        {
-            // Calculate the shortest distance around the track (for range checking only)
-            float directDistance = Math.Abs(carDistPct - playerDistPct) * trackLength;
-            float wrapAroundDistance = trackLength - directDistance;
-
-            return Math.Min(directDistance, wrapAroundDistance);
-        }
-
-        private void UpdateRadarDisplay(Canvas carsContainer, List<RadarCarData> visibleCars, float playerLapDistPct)
+        private void UpdateRadarDisplay(Canvas carsContainer, List<RadarCarData> visibleCars)
         {
             // Clear existing car elements that are no longer visible
             var carsToRemove = new List<int>();
             foreach (var kvp in _carElements)
             {
-                bool found = false;
-                foreach (var car in visibleCars)
-                {
-                    if (car.CarIdx == kvp.Key)
-                    {
-                        found = true;
-                        break;
-                    }
-                }
+                bool found = visibleCars.Exists(car => car.CarIdx == kvp.Key);
                 if (!found)
                 {
                     carsToRemove.Add(kvp.Key);
@@ -165,7 +290,7 @@ namespace VISOR.ViewModels
             // Add or update visible cars
             foreach (var car in visibleCars)
             {
-                var position = CalculateRadarPosition(car, playerLapDistPct);
+                var position = CalculateRadarPosition(car);
 
                 if (!_carElements.ContainsKey(car.CarIdx))
                 {
@@ -182,36 +307,47 @@ namespace VISOR.ViewModels
             }
         }
 
-        private RadarPosition CalculateRadarPosition(RadarCarData car, float playerLapDistPct)
+        private RadarPosition CalculateRadarPosition(RadarCarData car)
         {
-            float relativeDistPct = car.LapDistPct - playerLapDistPct;
+            // Get zone assignment for this car
+            var zone = _carZoneAssignments.GetValueOrDefault(car.CarIdx, RadarZone.Center);
 
+            // X position based on zone
+            float x = ZONE_X_POSITIONS[(int)zone];
+
+            // Y position using proper canvas scaling
+            float relativeDistPct = car.LapDistPct - car.PlayerLapDistPct;
             if (relativeDistPct > 0.5f) relativeDistPct -= 1.0f;
             if (relativeDistPct < -0.5f) relativeDistPct += 1.0f;
 
             float aheadBehindMeters = relativeDistPct * _trackLength;
 
-            float distanceRatio = aheadBehindMeters / (DETECTION_RANGE * AVERAGE_CAR_LENGTH);
+            // Scale based on actual canvas dimensions: 396px represents 11 car lengths total
+            float maxDisplayDistance = CANVAS_HALF_RANGE * AVERAGE_CAR_LENGTH; // 5.5 * 4.5m = 24.75m
+            float distanceRatio = aheadBehindMeters / maxDisplayDistance;
             distanceRatio = Math.Clamp(distanceRatio, -1.0f, 1.0f);
 
-            float y = RADAR_RADIUS - (distanceRatio * RADAR_RADIUS);
-            float x = RADAR_RADIUS;
+            // Convert to Y coordinate (negative distanceRatio = ahead = smaller Y)
+            float y = RADAR_CENTER_Y - (distanceRatio * RADAR_CENTER_Y);
 
-            return new RadarPosition { X = x, Y = y, Angle = 0 };
+            // No additional clamping needed - let cars reach the actual canvas edges
+            // Cars will naturally be clamped by the distanceRatio clamp above
+
+            return new RadarPosition { X = x, Y = y };
         }
 
         private RadarCarElement CreateCarElement(RadarCarData car)
         {
-            // Create rectangle for car - larger size for 12pt font
+            // Create rectangle for car
             var rectangle = new Rectangle
             {
                 Width = 24,
-                Height = 32,
+                Height = 36,
                 Stroke = Brushes.Black,
                 StrokeThickness = 1
             };
 
-            // Create text for car number - 12pt font as requested
+            // Create text for car number
             var numberText = new TextBlock
             {
                 Width = 24,
@@ -241,19 +377,13 @@ namespace VISOR.ViewModels
 
         private void UpdateCarElement(RadarCarElement element, RadarCarData car, RadarPosition position)
         {
-            // Update position - adjust for rectangle size (18x32)
-            Canvas.SetLeft(element.Rectangle, position.X - element.Rectangle.Width / 2);
-            Canvas.SetTop(element.Rectangle, position.Y - element.Rectangle.Height / 2);
-
-            // Center text within the rectangle - properly centered
-            // The new half-width is 12 (24 / 2)
+            // Update position - center the 24x36 rectangle at the calculated position
             Canvas.SetLeft(element.Rectangle, position.X - 12);
-            Canvas.SetTop(element.Rectangle, position.Y - 16);
-
+            Canvas.SetTop(element.Rectangle, position.Y - 18);
             Canvas.SetLeft(element.NumberText, position.X - 12);
             Canvas.SetTop(element.NumberText, position.Y - 14);
 
-            // Update color based on class - use same logic as Relative display
+            // Update color based on class
             element.Rectangle.Fill = GetClassColor(car.ClassID);
 
             // Update appearance based on pit road status
@@ -289,7 +419,9 @@ namespace VISOR.ViewModels
         {
             _carElements.Clear();
             _classColorMap.Clear();
+            _carZoneAssignments.Clear();
             _nextColorIndex = 0;
+            _lastCarLeftRightState = "Off";
             VisibleCarCount = 0;
         }
 
@@ -298,18 +430,19 @@ namespace VISOR.ViewModels
         {
             public int CarIdx { get; set; }
             public float LapDistPct { get; set; }
+            public float PlayerLapDistPct { get; set; } // Add player position for Y calculation
             public float TrackDistance { get; set; }
+            public float Proximity { get; set; }
+            public bool IsAhead { get; set; }
             public string CarNumber { get; set; } = string.Empty;
             public int ClassID { get; set; }
             public bool IsOnPitRoad { get; set; }
-            public float LeftRight { get; set; }
         }
 
         private class RadarPosition
         {
             public float X { get; set; }
             public float Y { get; set; }
-            public float Angle { get; set; }
         }
 
         private class RadarCarElement

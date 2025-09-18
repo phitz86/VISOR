@@ -2,6 +2,8 @@ using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using VISOR.Diagnostics;
@@ -39,13 +41,12 @@ namespace VISOR.Telemetry
         private int _lastSessionNumForLog = -1;
 
         // Caches for efficient "log on change" logic
-        private float[] _lastCarLeftRight = new float[64];
+        private string _lastCarLeftRightString = null;  // CarLeftRight is an enum
         private float[] _lastF2Time = new float[64];
 
-        // Flags for one-time diagnostic logging
-        private static bool _clrFieldNotFoundLogged = false;
-        private static bool _clrValueIsNullLogged = false;
-        private static bool _clrTypeCastFailedLogged = false;
+        // Debug counters
+        private int _debugCounter = 0;
+        private bool _enumValuesDiscovered = false;
         #endregion
 
         #region Public Properties
@@ -119,13 +120,8 @@ namespace VISOR.Telemetry
                 StopYamlRetryTimer();
                 _sessionCoordinator.ClearCache();
                 _lastSessionNumForLog = -1;
-                Array.Clear(_lastCarLeftRight, 0, _lastCarLeftRight.Length);
+                _lastCarLeftRightString = null;
                 Array.Clear(_lastF2Time, 0, _lastF2Time.Length);
-
-                // Reset diagnostic flags for the next connection
-                _clrFieldNotFoundLogged = false;
-                _clrValueIsNullLogged = false;
-                _clrTypeCastFailedLogged = false;
             }
             CheckPrimedStateChange();
         }
@@ -186,68 +182,92 @@ namespace VISOR.Telemetry
 
         private void OnTelemetryUpdate(object sender, TelemetryData telemetryData)
         {
-            // --- CarLeftRight Logging Block ---
-            try
+            // Helper function to robustly get a value via reflection, checking for properties then fields
+            object GetValue(string name)
             {
-                var clrField = typeof(TelemetryData).GetField("CarLeftRight");
-                if (clrField == null)
-                {
-                    if (!_clrFieldNotFoundLogged)
-                    {
-                        System.Diagnostics.Debug.WriteLine("[DIAGNOSTIC] CarLeftRight field was NOT FOUND via reflection.");
-                        _clrFieldNotFoundLogged = true;
-                    }
-                }
-                else if (clrField.GetValue(telemetryData) is float[] carLeftRight)
-                {
-                    int playerCarIdx = telemetryData.PlayerCarIdx;
-                    var lapDistPct = telemetryData.CarIdxLapDistPct;
-                    for (int i = 0; i < carLeftRight.Length; i++)
-                    {
-                        if (i != playerCarIdx && carLeftRight[i] != _lastCarLeftRight[i])
-                        {
-                            if (carLeftRight[i] != 0f)
-                            {
-                                _sessionLogger.LogTelemetryFrame(
-                                    telemetryData.SessionTime, playerCarIdx, i, carLeftRight[i],
-                                    lapDistPct[playerCarIdx], lapDistPct[i]);
-                            }
-                            _lastCarLeftRight[i] = carLeftRight[i];
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Error during CarLeftRight logging: {ex.Message}");
+                PropertyInfo prop = typeof(TelemetryData).GetProperty(name);
+                if (prop != null) return prop.GetValue(telemetryData);
+
+                FieldInfo field = typeof(TelemetryData).GetField(name);
+                if (field != null) return field.GetValue(telemetryData);
+
+                return null;
             }
 
-            // --- F2Time Logging Block ---
+            // --- Enum Discovery (One-time) ---
+            if (!_enumValuesDiscovered)
+            {
+                try
+                {
+                    var carLeftRightValue = GetValue("CarLeftRight");
+                    if (carLeftRightValue != null)
+                    {
+                        Type enumType = carLeftRightValue.GetType();
+                        System.Diagnostics.Debug.WriteLine($"[CarLeftRight Enum Discovery] Type: {enumType.FullName}");
+
+                        // Get all possible enum values
+                        var enumValues = Enum.GetValues(enumType);
+                        System.Diagnostics.Debug.WriteLine($"[CarLeftRight Enum Discovery] Possible values:");
+
+                        foreach (var value in enumValues)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"  {value} = {Convert.ToInt32(value)}");
+                        }
+
+                        _enumValuesDiscovered = true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[CarLeftRight Enum Discovery] Error: {ex.Message}");
+                }
+            }
+
+            // --- CarLeftRight Logging Block (CORRECTED for Enum) ---
             try
             {
-                var f2Field = typeof(TelemetryData).GetField("CarIdxF2Time");
-                if (f2Field != null && f2Field.GetValue(telemetryData) is float[] f2Time)
+                var carLeftRightValue = GetValue("CarLeftRight");
+                if (carLeftRightValue != null)
                 {
-                    int playerCarIdx = telemetryData.PlayerCarIdx;
-                    var lapDistPct = telemetryData.CarIdxLapDistPct;
-                    for (int i = 0; i < f2Time.Length; i++)
+                    string currentValue = carLeftRightValue.ToString();
+                    string lastValue = _lastCarLeftRightString ?? "null";
+
+                    if (currentValue != lastValue)
                     {
-                        if (i != playerCarIdx && f2Time[i] != _lastF2Time[i])
+                        System.Diagnostics.Debug.WriteLine($"[CarLeftRight Change] {lastValue} -> {currentValue}");
+
+                        // Log any non-"Off" state 
+                        if (currentValue != "Off")
                         {
-                            if (f2Time[i] != 0f)
+                            int playerCarIdx = telemetryData.PlayerCarIdx;
+                            var lapDistPct = telemetryData.CarIdxLapDistPct;
+
+                            // Updated mapping with complete enum values
+                            int numericValue = currentValue switch
                             {
-                                _sessionLogger.LogF2TimeFrame(
-                                   telemetryData.SessionTime, playerCarIdx, i, f2Time[i],
-                                   lapDistPct[playerCarIdx], lapDistPct[i]);
-                            }
-                            _lastF2Time[i] = f2Time[i];
+                                "Clear" => 0,
+                                "CarLeft" => -2,
+                                "CarRight" => 2,
+                                "CarLeftRight" => 10,    // Cars on both sides
+                                "TwoCarsLeft" => -5,
+                                "TwoCarsRight" => 5,
+                                _ => 99                  // Unknown values
+                            };
+
+                            _sessionLogger.LogTelemetryFrame(
+                                telemetryData.SessionTime, playerCarIdx, -1,
+                                numericValue,
+                                lapDistPct[playerCarIdx], 0f);
+
+                            System.Diagnostics.Debug.WriteLine($"[CarLeftRight] Logged: {currentValue} ({numericValue})");
                         }
                     }
+                    _lastCarLeftRightString = currentValue;
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Error during F2Time logging: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[CarLeftRight] Error: {ex.Message}");
             }
 
             // --- Core Telemetry Processing ---
