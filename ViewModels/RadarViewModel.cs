@@ -84,6 +84,7 @@ namespace VISOR.ViewModels
             if (lapDistPct == null || trackSurface == null) return;
 
             var playerLapDistPct = lapDistPct[playerCarIdx];
+            var playerOnPitRoad = onPitRoad?[playerCarIdx] ?? false;
             var visibleCars = new List<RadarCarData>();
 
             // Process all cars and determine which are in radar range
@@ -92,6 +93,11 @@ namespace VISOR.ViewModels
                 if (i == playerCarIdx) continue; // Skip player car
                 if (trackSurface[i] == (int)iRacingTrackSurface.NotInWorld) continue;
                 if (string.IsNullOrEmpty(carNumbers?[i])) continue;
+
+                var carOnPitRoad = onPitRoad?[i] ?? false;
+
+                // Pit lane filtering: exclude pit road cars unless player is also on pit road
+                if (carOnPitRoad && !playerOnPitRoad) continue;
 
                 // Calculate proximity using RelativeDisplayCalculator logic
                 var proximityData = CalculateCarProximity(playerLapDistPct, lapDistPct[i], _trackLength);

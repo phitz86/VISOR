@@ -35,7 +35,7 @@ namespace VISOR.Views
             // Position in upper right quadrant with center-offset logic
             double centerX = SystemParameters.PrimaryScreenWidth / 2;
             double centerY = SystemParameters.PrimaryScreenHeight / 2;
-            double offsetX = 700; // Right side
+            double offsetX = 400; // Right side
             double offsetY = -200; // Upper portion
             Left = centerX + offsetX - (Width / 2);
             Top = centerY + offsetY - (Height / 2);
@@ -125,6 +125,17 @@ namespace VISOR.Views
             {
                 if (_sdk.IsSessionDataReady)
                 {
+                    // Check if we should hide radar (lone qualifying)
+                    if (ShouldHideRadar())
+                    {
+                        _viewModel.Reset();
+                        ResetZoneHighlights();
+                        FadeOut();
+                        DebugText.Text = "Radar: Hidden (Lone Qualifying)";
+                        CarLeftRightIndicator.Text = "Hidden";
+                        return;
+                    }
+
                     // Update player car display first
                     UpdatePlayerCarDisplay(snapshot);
 
@@ -300,6 +311,13 @@ namespace VISOR.Views
             };
 
             this.BeginAnimation(Window.OpacityProperty, fadeIn);
+        }
+
+        private bool ShouldHideRadar()
+        {
+            // Use the same session checking logic as the Relative display
+            int currentSession = _sdk.Coordinator.CurrentSessionNum;
+            return _sdk.Coordinator.IsLoneQualifying(currentSession);
         }
 
         protected override void OnClosed(EventArgs e)
