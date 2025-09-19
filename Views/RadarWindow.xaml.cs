@@ -2,6 +2,7 @@
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using VISOR.ViewModels;
 using VISOR.Telemetry;
 
@@ -11,6 +12,10 @@ namespace VISOR.Views
     {
         private readonly RadarViewModel _viewModel;
         private readonly SVappsLABSDKWrapper _sdk;
+
+        // Fade animation properties
+        private int _lastVisibleCarCount = 0;
+        private bool _isFadedOut = false;
 
         public RadarWindow(SVappsLABSDKWrapper sdkWrapper)
         {
@@ -30,7 +35,7 @@ namespace VISOR.Views
             // Position in upper right quadrant with center-offset logic
             double centerX = SystemParameters.PrimaryScreenWidth / 2;
             double centerY = SystemParameters.PrimaryScreenHeight / 2;
-            double offsetX = 400; // Right side
+            double offsetX = 700; // Right side
             double offsetY = -200; // Upper portion
             Left = centerX + offsetX - (Width / 2);
             Top = centerY + offsetY - (Height / 2);
@@ -82,6 +87,7 @@ namespace VISOR.Views
                     CarLeftRightIndicator.Text = "Offline";
                     ResetZoneHighlights();
                     UpdatePlayerCarDisplay();
+                    FadeOut(); // Fade out when disconnected
                 }
                 else
                 {
@@ -99,6 +105,7 @@ namespace VISOR.Views
                 {
                     DebugText.Text = "Radar: Active";
                     CarLeftRightIndicator.Text = "Ready";
+                    // Don't fade in here - let car count drive the fade state
                 }
                 else
                 {
@@ -107,6 +114,7 @@ namespace VISOR.Views
                     _viewModel.Reset();
                     ResetZoneHighlights();
                     UpdatePlayerCarDisplay();
+                    FadeOut(); // Fade out when not primed
                 }
             });
         }
@@ -126,6 +134,9 @@ namespace VISOR.Views
                     // Update zone highlights based on CarLeftRight state
                     UpdateZoneHighlights(snapshot);
 
+                    // Update fade state based on visible car count
+                    UpdateFadeState(_viewModel.VisibleCarCount);
+
                     // Update debug info
                     DebugText.Text = $"Cars: {_viewModel.VisibleCarCount}";
                 }
@@ -133,6 +144,7 @@ namespace VISOR.Views
                 {
                     _viewModel.Reset();
                     ResetZoneHighlights();
+                    FadeOut(); // Fade out when no session data
                     DebugText.Text = "Radar: No session data";
                     CarLeftRightIndicator.Text = "No Data";
                 }
@@ -228,15 +240,66 @@ namespace VISOR.Views
                 {
                     DebugText.Text = "Radar: Connected, waiting for session data";
                     CarLeftRightIndicator.Text = "Waiting";
+                    FadeOut(); // Fade out when waiting for data
                 }
                 else
                 {
                     DebugText.Text = "Radar: Waiting for iRacing";
                     CarLeftRightIndicator.Text = "Offline";
+                    FadeOut(); // Fade out when offline
                 }
 
                 UpdatePlayerCarDisplay();
             });
+        }
+
+        private void UpdateFadeState(int visibleCarCount)
+        {
+            // Only update fade state if car count actually changed
+            if (visibleCarCount == _lastVisibleCarCount) return;
+
+            _lastVisibleCarCount = visibleCarCount;
+
+            if (visibleCarCount == 0 && !_isFadedOut)
+            {
+                FadeOut();
+            }
+            else if (visibleCarCount > 0 && _isFadedOut)
+            {
+                FadeIn();
+            }
+        }
+
+        private void FadeOut()
+        {
+            if (_isFadedOut) return;
+            _isFadedOut = true;
+
+            var fadeOut = new DoubleAnimation
+            {
+                From = this.Opacity,
+                To = 0.0, // Fade to completely invisible
+                Duration = TimeSpan.FromMilliseconds(500),
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+
+            this.BeginAnimation(Window.OpacityProperty, fadeOut);
+        }
+
+        private void FadeIn()
+        {
+            if (!_isFadedOut) return;
+            _isFadedOut = false;
+
+            var fadeIn = new DoubleAnimation
+            {
+                From = this.Opacity,
+                To = 1.0, // Fade to full opacity
+                Duration = TimeSpan.FromMilliseconds(300),
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+
+            this.BeginAnimation(Window.OpacityProperty, fadeIn);
         }
 
         protected override void OnClosed(EventArgs e)

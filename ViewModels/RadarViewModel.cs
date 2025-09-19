@@ -358,13 +358,13 @@ namespace VISOR.ViewModels
                 TextAlignment = TextAlignment.Center
             };
 
-            // Apply outline effect to text
+            // Apply enhanced outline effect to text for better visibility
             numberText.Effect = new System.Windows.Media.Effects.DropShadowEffect
             {
                 Color = Colors.Black,
                 Direction = 0,
-                ShadowDepth = 1,
-                BlurRadius = 2
+                ShadowDepth = 2, // Increased from 1 to 2
+                BlurRadius = 4   // Increased from 2 to 4
             };
 
             return new RadarCarElement

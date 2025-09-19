@@ -223,52 +223,7 @@ namespace VISOR.Telemetry
                 }
             }
 
-            // --- CarLeftRight Logging Block (CORRECTED for Enum) ---
-            try
-            {
-                var carLeftRightValue = GetValue("CarLeftRight");
-                if (carLeftRightValue != null)
-                {
-                    string currentValue = carLeftRightValue.ToString();
-                    string lastValue = _lastCarLeftRightString ?? "null";
-
-                    if (currentValue != lastValue)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[CarLeftRight Change] {lastValue} -> {currentValue}");
-
-                        // Log any non-"Off" state 
-                        if (currentValue != "Off")
-                        {
-                            int playerCarIdx = telemetryData.PlayerCarIdx;
-                            var lapDistPct = telemetryData.CarIdxLapDistPct;
-
-                            // Updated mapping with complete enum values
-                            int numericValue = currentValue switch
-                            {
-                                "Clear" => 0,
-                                "CarLeft" => -2,
-                                "CarRight" => 2,
-                                "CarLeftRight" => 10,    // Cars on both sides
-                                "TwoCarsLeft" => -5,
-                                "TwoCarsRight" => 5,
-                                _ => 99                  // Unknown values
-                            };
-
-                            _sessionLogger.LogTelemetryFrame(
-                                telemetryData.SessionTime, playerCarIdx, -1,
-                                numericValue,
-                                lapDistPct[playerCarIdx], 0f);
-
-                            System.Diagnostics.Debug.WriteLine($"[CarLeftRight] Logged: {currentValue} ({numericValue})");
-                        }
-                    }
-                    _lastCarLeftRightString = currentValue;
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[CarLeftRight] Error: {ex.Message}");
-            }
+            // --- CarLeftRight logging removed for cleaner output ---
 
             // --- Core Telemetry Processing ---
             try
