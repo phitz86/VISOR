@@ -14,6 +14,7 @@ namespace VISOR.Views
         private readonly MainViewModel _viewModel;
         private readonly SVappsLABSDKWrapper _sdk;
         private static DateTime _lastSessionReadyLog = DateTime.MinValue;
+        public MainViewModel ViewModel => _viewModel;
 
         public MainWindow(SVappsLABSDKWrapper sdkWrapper)
         {

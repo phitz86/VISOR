@@ -14,20 +14,12 @@ namespace VISOR.ViewModels
     public class RelativeDisplayCalculator
     {
         private readonly Dictionary<int, RelativeRowViewModel> _carCache;
-        private readonly Dictionary<int, Brush> _classColorMap;
-        private readonly Brush[] _classColors = {
-            Brushes.Gold,
-            Brushes.Silver,
-            Brushes.White,
-            Brushes.HotPink,
-            Brushes.LightBlue
-        };
-        private int _nextColorIndex = 0;
+        private readonly ClassColorManager _classColorManager;
 
-        public RelativeDisplayCalculator(Dictionary<int, RelativeRowViewModel> carCache)
+        public RelativeDisplayCalculator(Dictionary<int, RelativeRowViewModel> carCache, ClassColorManager classColorManager)
         {
             _carCache = carCache;
-            _classColorMap = new Dictionary<int, Brush>();
+            _classColorManager = classColorManager;
         }
 
         public (List<RelativeRowViewModel> Rows, string PlayerPos, string PlayerPosNum) Calculate(SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider)
@@ -68,8 +60,8 @@ namespace VISOR.ViewModels
 
         public void Reset()
         {
-            _classColorMap.Clear();
-            _nextColorIndex = 0;
+            // Note: ClassColorManager reset is handled by MainViewModel
+            // No need to reset shared service here since other components may still be using it
         }
 
         #region Calculation Logic (Moved from RelativeViewModel)
@@ -263,17 +255,9 @@ namespace VISOR.ViewModels
         private void AssignClassBackgroundColor(RelativeRowViewModel row, RelativeRowViewModel playerRow)
         {
             if (row.ClassID == 0) return;
-            if (!_classColorMap.ContainsKey(playerRow.ClassID))
-            {
-                _classColorMap[playerRow.ClassID] = _classColors[0];
-                _nextColorIndex = 1;
-            }
-            if (!_classColorMap.ContainsKey(row.ClassID))
-            {
-                _classColorMap[row.ClassID] = _classColors[_nextColorIndex % _classColors.Length];
-                _nextColorIndex++;
-            }
-            row.ClassBackground = _classColorMap[row.ClassID];
+
+            // Use the shared ClassColorManager for consistent colors
+            row.ClassBackground = _classColorManager.GetClassColor(row.ClassID);
         }
 
         private void AssignFontStyle(RelativeRowViewModel row)

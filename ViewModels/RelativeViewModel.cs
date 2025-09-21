@@ -43,9 +43,9 @@ namespace VISOR.ViewModels
             private set { _livePlayerClassPositionNumber = value; OnPropertyChanged(); }
         }
 
-        public RelativeViewModel()
+        public RelativeViewModel(ClassColorManager classColorManager)
         {
-            _calculator = new RelativeDisplayCalculator(_carCache);
+            _calculator = new RelativeDisplayCalculator(_carCache, classColorManager);
         }
 
         public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)

@@ -38,11 +38,9 @@ namespace VISOR.ViewModels
 
         // Car display elements cache
         private readonly Dictionary<int, RadarCarElement> _carElements = new();
-        private readonly Dictionary<int, Brush> _classColorMap = new();
-        private readonly Brush[] _classColors = {
-            Brushes.Gold, Brushes.Silver, Brushes.White, Brushes.HotPink, Brushes.LightBlue
-        };
-        private int _nextColorIndex = 0;
+
+        // Shared color service
+        private readonly ClassColorManager _classColorManager;
 
         // Zone assignment tracking
         private readonly Dictionary<int, RadarZone> _carZoneAssignments = new();
@@ -56,6 +54,11 @@ namespace VISOR.ViewModels
         {
             get => _visibleCarCount;
             private set { _visibleCarCount = value; OnPropertyChanged(); }
+        }
+
+        public RadarViewModel(ClassColorManager classColorManager)
+        {
+            _classColorManager = classColorManager;
         }
 
         public void UpdateFromTelemetry(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider, Canvas carsContainer)
@@ -389,8 +392,8 @@ namespace VISOR.ViewModels
             Canvas.SetLeft(element.NumberText, position.X - 12);
             Canvas.SetTop(element.NumberText, position.Y - 14);
 
-            // Update color based on class
-            element.Rectangle.Fill = GetClassColor(car.ClassID);
+            // Update color using shared ClassColorManager
+            element.Rectangle.Fill = _classColorManager.GetClassColor(car.ClassID);
 
             // Update appearance based on pit road status
             if (car.IsOnPitRoad)
@@ -408,27 +411,13 @@ namespace VISOR.ViewModels
             element.NumberText.Text = car.CarNumber;
         }
 
-        private Brush GetClassColor(int classID)
-        {
-            if (classID == 0) return Brushes.White; // Default for unknown class
-
-            if (!_classColorMap.ContainsKey(classID))
-            {
-                _classColorMap[classID] = _classColors[_nextColorIndex % _classColors.Length];
-                _nextColorIndex++;
-            }
-
-            return _classColorMap[classID];
-        }
-
         public void Reset()
         {
             _carElements.Clear();
-            _classColorMap.Clear();
             _carZoneAssignments.Clear();
-            _nextColorIndex = 0;
             _lastCarLeftRightState = "Off";
             VisibleCarCount = 0;
+            // Note: ClassColorManager reset is handled by MainViewModel
         }
 
         // Helper classes

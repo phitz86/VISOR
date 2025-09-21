@@ -17,12 +17,12 @@ namespace VISOR.Views
         private int _lastVisibleCarCount = 0;
         private bool _isFadedOut = false;
 
-        public RadarWindow(SVappsLABSDKWrapper sdkWrapper)
+        public RadarWindow(SVappsLABSDKWrapper sdkWrapper, ClassColorManager classColorManager)
         {
             InitializeComponent();
 
             _sdk = sdkWrapper;
-            _viewModel = new RadarViewModel();
+            _viewModel = new RadarViewModel(classColorManager);
             DataContext = _viewModel;
 
             AllowsTransparency = true;

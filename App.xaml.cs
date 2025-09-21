@@ -76,9 +76,9 @@ namespace VISOR
                 mainWindow.Show();
                 System.Diagnostics.Debug.WriteLine("MainWindow shown successfully");
 
-                // Create and show radar window
-                System.Diagnostics.Debug.WriteLine("Creating RadarWindow...");
-                var radarWindow = new RadarWindow(_sdkWrapper);
+                // Create and show radar window with shared ClassColorManager from MainWindow
+                System.Diagnostics.Debug.WriteLine("Creating RadarWindow with shared ClassColorManager...");
+                var radarWindow = new RadarWindow(_sdkWrapper, mainWindow.ViewModel.ClassColorManager);
                 System.Diagnostics.Debug.WriteLine("RadarWindow created successfully");
 
                 System.Diagnostics.Debug.WriteLine("Showing RadarWindow...");
