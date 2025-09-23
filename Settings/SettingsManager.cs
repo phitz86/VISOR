@@ -6,6 +6,7 @@ namespace VISOR.Settings
     /// <summary>
     /// Manages application settings and provides window sizing calculations.
     /// Acts as a bridge between UserSettings and the application windows.
+    /// Singleton pattern ensures all windows share the same instance for proper event handling.
     /// </summary>
     public class SettingsManager
     {
@@ -25,6 +26,20 @@ namespace VISOR.Settings
         private const double WINDOW_PADDING = 20.0;               // Top/bottom margins
 
         private readonly UserSettings _settings;
+        private static SettingsManager _instance;
+
+        /// <summary>
+        /// Singleton instance of settings manager
+        /// </summary>
+        public static SettingsManager Instance
+        {
+            get
+            {
+                if (_instance == null)
+                    _instance = new SettingsManager();
+                return _instance;
+            }
+        }
 
         // Events for real-time updates
         public event EventHandler<SettingsChangedEventArgs> SettingsChanged;
@@ -32,7 +47,7 @@ namespace VISOR.Settings
         public event EventHandler<ElementVisibilityChangedEventArgs> ElementVisibilityChanged;
         public event EventHandler<RadarVisibilityChangedEventArgs> RadarVisibilityChanged;
 
-        public SettingsManager()
+        private SettingsManager()
         {
             _settings = UserSettings.Instance;
         }
@@ -53,7 +68,10 @@ namespace VISOR.Settings
             double scaleFactor = GetMainWindowScaleFactor(_settings.WindowSize);
             double scaledHeight = dynamicHeight * scaleFactor;
 
-            return new Size(baseSize.Width, scaledHeight);
+            var result = new Size(baseSize.Width, scaledHeight);
+            System.Diagnostics.Debug.WriteLine($"[SettingsManager] GetMainWindowSize: preset={_settings.WindowSize}, baseSize={baseSize.Width}x{baseSize.Height}, dynamicHeight={dynamicHeight}, scaleFactor={scaleFactor}, result={result.Width}x{result.Height}");
+
+            return result;
         }
 
         /// <summary>

@@ -21,13 +21,14 @@ namespace VISOR.Views
         // Fade animation properties
         private int _lastVisibleCarCount = 0;
         private bool _isFadedOut = false;
+        private bool _forceVisible = false;
 
         public RadarWindow(SVappsLABSDKWrapper sdkWrapper, ClassColorManager classColorManager)
         {
             InitializeComponent();
 
             _sdk = sdkWrapper;
-            _settingsManager = new SettingsManager();
+            _settingsManager = SettingsManager.Instance;
             _viewModel = new RadarViewModel(classColorManager);
             DataContext = _viewModel;
 
@@ -59,6 +60,19 @@ namespace VISOR.Views
 
             // Initialize player car number display
             UpdatePlayerCarDisplay();
+        }
+
+        /// <summary>
+        /// Force the radar window to remain visible (for config preview)
+        /// </summary>
+        public void SetForceVisible(bool forceVisible)
+        {
+            _forceVisible = forceVisible;
+
+            if (forceVisible && _isFadedOut)
+            {
+                FadeIn();
+            }
         }
 
         private void ApplyWindowSizing()
@@ -447,6 +461,10 @@ namespace VISOR.Views
 
         private void UpdateFadeState(int visibleCarCount)
         {
+            // Don't fade if we're forcing visibility
+            if (_forceVisible)
+                return;
+
             // Only update fade state if car count actually changed
             if (visibleCarCount == _lastVisibleCarCount) return;
 
@@ -464,7 +482,7 @@ namespace VISOR.Views
 
         private void FadeOut()
         {
-            if (_isFadedOut) return;
+            if (_isFadedOut || _forceVisible) return;
             _isFadedOut = true;
 
             var fadeOut = new DoubleAnimation

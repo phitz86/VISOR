@@ -59,7 +59,7 @@ namespace VISOR
                 System.Diagnostics.Debug.WriteLine("MainWindow created successfully");
 
                 // Create radar window (check if it should be visible)
-                var settingsManager = new SettingsManager();
+                var settingsManager = SettingsManager.Instance;
                 if (settingsManager.IsRadarVisible)
                 {
                     System.Diagnostics.Debug.WriteLine("Creating RadarWindow with shared ClassColorManager...");

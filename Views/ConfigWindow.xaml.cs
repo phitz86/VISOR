@@ -12,6 +12,7 @@ namespace VISOR.Views
         private readonly MainWindow _mainWindow;
         private readonly RadarWindow _radarWindow;
         private readonly SettingsManager _settingsManager;
+        private bool _isInitialized = false;
 
         // Events for communication with App.xaml.cs
         public event EventHandler ExitRequested;
@@ -23,10 +24,19 @@ namespace VISOR.Views
             _telemetry = telemetry;
             _mainWindow = mainWindow;
             _radarWindow = radarWindow;
-            _settingsManager = new SettingsManager();
+            _settingsManager = SettingsManager.Instance;
+
+            // Force radar window to stay visible for preview
+            if (_radarWindow != null)
+            {
+                _radarWindow.SetForceVisible(true);
+            }
 
             // Initialize UI with current settings
             LoadCurrentSettings();
+
+            // Mark as initialized to allow event handling
+            _isInitialized = true;
         }
 
         private void LoadCurrentSettings()
@@ -58,6 +68,10 @@ namespace VISOR.Views
 
         private void WindowSizeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            // Don't process events during initialization
+            if (!_isInitialized || _settingsManager == null)
+                return;
+
             if (WindowSizeCombo.SelectedItem is ComboBoxItem selectedItem && selectedItem.Tag is string sizeTag)
             {
                 var newSize = sizeTag switch
@@ -75,6 +89,10 @@ namespace VISOR.Views
 
         private void RowCheckBox_Changed(object sender, RoutedEventArgs e)
         {
+            // Don't process events during initialization
+            if (!_isInitialized || _settingsManager == null)
+                return;
+
             // Get current checkbox states
             bool showRow0 = Row0CheckBox.IsChecked ?? false;
             bool showRow1 = Row1CheckBox.IsChecked ?? false;
@@ -93,6 +111,10 @@ namespace VISOR.Views
 
         private void RadarCheckBox_Changed(object sender, RoutedEventArgs e)
         {
+            // Don't process events during initialization
+            if (!_isInitialized || _settingsManager == null)
+                return;
+
             bool showRadar = RadarCheckBox.IsChecked ?? false;
 
             System.Diagnostics.Debug.WriteLine($"[ConfigWindow] Radar visibility changed to {showRadar}");
@@ -145,6 +167,12 @@ namespace VISOR.Views
 
         protected override void OnClosed(EventArgs e)
         {
+            // Allow radar window to return to normal fade behavior
+            if (_radarWindow != null)
+            {
+                _radarWindow.SetForceVisible(false);
+            }
+
             System.Diagnostics.Debug.WriteLine("[ConfigWindow] Config window closed");
             base.OnClosed(e);
         }

@@ -27,7 +27,7 @@ namespace VISOR.Views
             InitializeComponent();
 
             _sdk = sdkWrapper;
-            _settingsManager = new SettingsManager();
+            _settingsManager = SettingsManager.Instance;
             _viewModel = new MainViewModel();
             DataContext = _viewModel;
 
@@ -92,12 +92,15 @@ namespace VISOR.Views
             Dispatcher.Invoke(() =>
             {
                 System.Diagnostics.Debug.WriteLine($"[MainWindow] Window size preset changed to {e.NewSize} - resizing");
+                System.Diagnostics.Debug.WriteLine($"[MainWindow] New dimensions: {e.NewMainWindowSize.Width}x{e.NewMainWindowSize.Height}");
 
                 // Update ViewModel to refresh ScaleFactor binding
                 _viewModel.RefreshElementVisibility();
 
                 // Apply new window dimensions
                 ApplyWindowSizing();
+
+                System.Diagnostics.Debug.WriteLine($"[MainWindow] Applied dimensions: {Width}x{Height}");
             });
         }
 

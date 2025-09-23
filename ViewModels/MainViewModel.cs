@@ -67,7 +67,7 @@ namespace VISOR.ViewModels
         {
             // Create shared services first
             _classColorManager = new ClassColorManager();
-            _settingsManager = new SettingsManager();
+            _settingsManager = SettingsManager.Instance;
 
             // Create child view models with shared services
             FuelVM = new FuelViewModel();
