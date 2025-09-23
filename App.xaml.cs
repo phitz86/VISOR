@@ -2,12 +2,16 @@
 using System.Windows;
 using VISOR.Telemetry;
 using VISOR.Views;
+using VISOR.Settings;
 
 namespace VISOR
 {
     public partial class App : Application
     {
         private SVappsLABSDKWrapper _sdkWrapper;
+        private MainWindow _mainWindow;
+        private RadarWindow _radarWindow;
+        private ConfigWindow _configWindow;
 
         protected override async void OnStartup(StartupEventArgs e)
         {
@@ -32,26 +36,8 @@ namespace VISOR
                     return;
                 }
 
-                // Show the ConfigWindow first
-                System.Diagnostics.Debug.WriteLine("Creating ConfigWindow...");
-                var configWindow = new ConfigWindow(_sdkWrapper);
-
-                System.Diagnostics.Debug.WriteLine("Showing ConfigWindow as dialog...");
-                var configResult = configWindow.ShowDialog();
-                System.Diagnostics.Debug.WriteLine($"ConfigWindow dialog result: {configResult}");
-
-                if (configResult == true)
-                {
-                    System.Diagnostics.Debug.WriteLine("ConfigWindow returned true - launching main application...");
-                    // Config window closed with OK - launch main application windows
-                    LaunchMainApplication();
-                }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine("ConfigWindow returned false/null - shutting down...");
-                    // Config window was cancelled - shutdown
-                    Shutdown();
-                }
+                // Launch all windows together
+                LaunchAllWindows();
             }
             catch (Exception ex)
             {
@@ -61,57 +47,115 @@ namespace VISOR
             }
         }
 
-        private void LaunchMainApplication()
+        private void LaunchAllWindows()
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine("=== LaunchMainApplication started ===");
+                System.Diagnostics.Debug.WriteLine("=== LaunchAllWindows started ===");
 
-                // Create and show main window
+                // Create main window first
                 System.Diagnostics.Debug.WriteLine("Creating MainWindow...");
-                var mainWindow = new MainWindow(_sdkWrapper);
+                _mainWindow = new MainWindow(_sdkWrapper);
                 System.Diagnostics.Debug.WriteLine("MainWindow created successfully");
 
+                // Create radar window (check if it should be visible)
+                var settingsManager = new SettingsManager();
+                if (settingsManager.IsRadarVisible)
+                {
+                    System.Diagnostics.Debug.WriteLine("Creating RadarWindow with shared ClassColorManager...");
+                    _radarWindow = new RadarWindow(_sdkWrapper, _mainWindow.ViewModel.ClassColorManager);
+                    System.Diagnostics.Debug.WriteLine("RadarWindow created successfully");
+                }
+
+                // Create config window with references to the other windows
+                System.Diagnostics.Debug.WriteLine("Creating ConfigWindow...");
+                _configWindow = new ConfigWindow(_sdkWrapper, _mainWindow, _radarWindow);
+                System.Diagnostics.Debug.WriteLine("ConfigWindow created successfully");
+
+                // Show all windows
                 System.Diagnostics.Debug.WriteLine("Showing MainWindow...");
-                mainWindow.Show();
-                System.Diagnostics.Debug.WriteLine("MainWindow shown successfully");
+                _mainWindow.Show();
 
-                // Create and show radar window with shared ClassColorManager from MainWindow
-                System.Diagnostics.Debug.WriteLine("Creating RadarWindow with shared ClassColorManager...");
-                var radarWindow = new RadarWindow(_sdkWrapper, mainWindow.ViewModel.ClassColorManager);
-                System.Diagnostics.Debug.WriteLine("RadarWindow created successfully");
+                if (_radarWindow != null)
+                {
+                    System.Diagnostics.Debug.WriteLine("Showing RadarWindow...");
+                    _radarWindow.Show();
+                }
 
-                System.Diagnostics.Debug.WriteLine("Showing RadarWindow...");
-                radarWindow.Show();
-                System.Diagnostics.Debug.WriteLine("RadarWindow shown successfully");
+                System.Diagnostics.Debug.WriteLine("Showing ConfigWindow...");
+                _configWindow.Show();
 
                 // Set main window as the primary window for shutdown behavior
                 System.Diagnostics.Debug.WriteLine("Setting MainWindow as primary...");
-                MainWindow = mainWindow;
+                MainWindow = _mainWindow;
 
-                // Ensure both windows close together
-                mainWindow.Closed += (s, e) =>
+                // Handle window closing events
+                _mainWindow.Closed += OnMainWindowClosed;
+
+                if (_radarWindow != null)
                 {
-                    System.Diagnostics.Debug.WriteLine("MainWindow closed - closing RadarWindow and shutting down");
-                    radarWindow?.Close();
-                    Shutdown();
-                };
+                    _radarWindow.Closed += OnRadarWindowClosed;
+                }
 
-                radarWindow.Closed += (s, e) =>
-                {
-                    System.Diagnostics.Debug.WriteLine("RadarWindow closed independently");
-                    // If radar window is closed but main window is still open, don't shutdown
-                    // This allows users to close just the radar if they want
-                };
+                _configWindow.Closed += OnConfigWindowClosed;
 
-                System.Diagnostics.Debug.WriteLine("=== LaunchMainApplication completed successfully ===");
+                // Handle config window requesting application exit
+                _configWindow.ExitRequested += OnConfigExitRequested;
+
+                System.Diagnostics.Debug.WriteLine("=== LaunchAllWindows completed successfully ===");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"=== EXCEPTION in LaunchMainApplication: {ex} ===");
+                System.Diagnostics.Debug.WriteLine($"=== EXCEPTION in LaunchAllWindows: {ex} ===");
                 MessageBox.Show($"Error launching application windows: {ex.Message}\n\nFull details:\n{ex}", "Launch Error");
                 Shutdown();
             }
+        }
+
+        private void OnMainWindowClosed(object sender, EventArgs e)
+        {
+            System.Diagnostics.Debug.WriteLine("MainWindow closed - shutting down application");
+            Shutdown();
+        }
+
+        private void OnRadarWindowClosed(object sender, EventArgs e)
+        {
+            System.Diagnostics.Debug.WriteLine("RadarWindow closed independently");
+            // If radar window is closed but main window is still open, don't shutdown
+            // This allows users to close just the radar if they want
+        }
+
+        private void OnConfigWindowClosed(object sender, EventArgs e)
+        {
+            System.Diagnostics.Debug.WriteLine("ConfigWindow closed independently");
+            // Config window can be closed without affecting main application
+        }
+
+        private void OnConfigExitRequested(object sender, EventArgs e)
+        {
+            System.Diagnostics.Debug.WriteLine("Config window requested application exit");
+            Shutdown();
+        }
+
+        public void ShowRadarWindow()
+        {
+            if (_radarWindow == null && _mainWindow != null)
+            {
+                System.Diagnostics.Debug.WriteLine("Creating RadarWindow on demand...");
+                _radarWindow = new RadarWindow(_sdkWrapper, _mainWindow.ViewModel.ClassColorManager);
+                _radarWindow.Closed += OnRadarWindowClosed;
+                _radarWindow.Show();
+            }
+            else if (_radarWindow != null)
+            {
+                _radarWindow.Show();
+                _radarWindow.Activate();
+            }
+        }
+
+        public void HideRadarWindow()
+        {
+            _radarWindow?.Hide();
         }
 
         protected override void OnExit(ExitEventArgs e)

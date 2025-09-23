@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using VISOR.Telemetry;
 using VISOR.Views;
+using VISOR.Settings;
 
 namespace VISOR.ViewModels
 {
@@ -22,6 +23,7 @@ namespace VISOR.ViewModels
 
         // --- Shared Services ---
         private readonly ClassColorManager _classColorManager;
+        private readonly SettingsManager _settingsManager;
 
         // --- Session Tracking ---
         private int _lastSessionNum = -1;
@@ -42,10 +44,30 @@ namespace VISOR.ViewModels
         public string TimeRemainingDisplay { get; private set; } = "--:--";
         public string TimeRemainingSymbol { get; private set; } = "⏳";
 
+        // --- Settings Bridge Properties (for XAML binding) ---
+        public bool ShowGear => _settingsManager.Settings.ShowRow0;
+        public bool ShowPosition => _settingsManager.Settings.ShowRow0;
+        public bool ShowTimeRemaining => _settingsManager.Settings.ShowRow1;
+        public bool ShowFuelRemaining => _settingsManager.Settings.ShowRow1;
+        public bool ShowLapDelta => _settingsManager.Settings.ShowRow2;
+        public bool ShowLapTimes => _settingsManager.Settings.ShowRow3;
+        public bool ShowRelative => _settingsManager.Settings.ShowRow4;
+        public bool ShowWarnings => _settingsManager.Settings.ShowRow5;
+
+        // Scale factor for LayoutTransform
+        public double ScaleFactor => _settingsManager.Settings.WindowSize switch
+        {
+            WindowSizePreset.Small => 0.6,
+            WindowSizePreset.Medium => 0.8,
+            WindowSizePreset.Large => 1.0,
+            _ => 1.0
+        };
+
         public MainViewModel()
         {
             // Create shared services first
             _classColorManager = new ClassColorManager();
+            _settingsManager = new SettingsManager();
 
             // Create child view models with shared services
             FuelVM = new FuelViewModel();
@@ -65,12 +87,28 @@ namespace VISOR.ViewModels
                 }
             };
         }
+
         private bool _isTelemetryConnected = false;
         public bool IsTelemetryConnected
         {
             get => _isTelemetryConnected;
             set { _isTelemetryConnected = value; OnPropertyChanged(); }
         }
+
+        // Method to refresh all visibility bindings when settings change
+        public void RefreshElementVisibility()
+        {
+            OnPropertyChanged(nameof(ShowGear));
+            OnPropertyChanged(nameof(ShowPosition));
+            OnPropertyChanged(nameof(ShowTimeRemaining));
+            OnPropertyChanged(nameof(ShowFuelRemaining));
+            OnPropertyChanged(nameof(ShowLapDelta));
+            OnPropertyChanged(nameof(ShowLapTimes));
+            OnPropertyChanged(nameof(ShowRelative));
+            OnPropertyChanged(nameof(ShowWarnings));
+            OnPropertyChanged(nameof(ScaleFactor));
+        }
+
         public void UpdateFromTelemetry(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
             CheckSessionStateTransitions(snapshot);

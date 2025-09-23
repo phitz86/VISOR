@@ -12,6 +12,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Raw outputs\**" />
+    <EmbeddedResource Remove="Raw outputs\**" />
+    <None Remove="Raw outputs\**" />
+    <Page Remove="Raw outputs\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="9.0.7" />
     <PackageReference Include="SVappsLAB.iRacingTelemetrySDK" Version="0.9.8.3" />
     <PackageReference Include="System.Management" Version="9.0.7" />
@@ -21,10 +28,6 @@
   <ItemGroup>
     <Resource Include="Resources\Fonts\digital-7.ttf" />
     <Resource Include="VISOR Logo.ico" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Raw outputs\" />
   </ItemGroup>
 
 </Project>

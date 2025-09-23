@@ -3,35 +3,39 @@ VISOR/
 │   ├── ConfigWindow.xaml
 │   ├── ConfigWindow.xaml.cs
 │   ├── RadarWindow.xaml
-│   ├── RadarWindow.xaml.cs
+│   ├── RadarWindow.xaml.cs (UPDATED: SettingsManager integration)
 │   ├── MainWindow.xaml
-│   └── MainWindow.xaml.cs
+│   └── MainWindow.xaml.cs (UPDATED: SettingsManager integration)
 ├── ViewModels/
-│   ├── MainViewModel.cs
+│   ├── MainViewModel.cs (UPDATED: Settings + ClassColorManager integration)
 │   ├── FuelViewModel.cs
-│   ├── RadarViewModel.cs
-│   ├── RelativeViewModel.cs
+│   ├── RadarViewModel.cs (UPDATED: ClassColorManager integration)
+│   ├── RelativeViewModel.cs (UPDATED: ClassColorManager integration)
 │   ├── RelativeRowViewModel.cs
-│   ├── RelativeDisplayCalculator.cs
+│   ├── RelativeDisplayCalculator.cs (UPDATED: ClassColorManager integration)
 │   ├── DeltaBarViewModel.cs
-│   └── WarningsViewModel.cs
+│   ├── WarningsViewModel.cs
+│   └── ClassColorManager.cs (NEW: Centralized color service)
+├── Settings/ (NEW FOLDER)
+│   ├── UserSettings.cs (NEW: Application Settings persistence)
+│   └── SettingsManager.cs (NEW: Window sizing and visibility logic)
 ├── Resources/
 │   ├── Converters/
 │   │   └── BoolToVisibilityConverter.cs
 │   └── Fonts/
 │       └── digital-7.ttf (position and gear displays)
 ├── Telemetry/
-│   ├── SVappsLABSDKWrapper.cs (implements ISessionDataProvider, session-aware logging, enhanced session methods)
+│   ├── SVappsLABSDKWrapper.cs (implements ISessionDataProvider, session-aware logging)
 │   ├── SVappsLABSnapshot.cs (telemetry data container)
-│   ├── SessionDataModels.cs (StaticEventData, SessionTransitionData, LiveSessionData classes)
-│   ├── SessionDataParsers.cs (StaticEventParser, SessionTransitionParser, LiveSessionParser classes)
+│   ├── SessionDataModels.cs (StaticEventData, SessionTransitionData, LiveSessionData)
+│   ├── SessionDataParsers.cs (StaticEventParser, SessionTransitionParser, LiveSessionParser)
 │   ├── SessionDataProvider.cs
-│   ├── SessionDataCoordinator.cs (implements ISessionDataProvider, session-aware helper methods, unified parsing)
+│   ├── SessionDataCoordinator.cs (implements ISessionDataProvider, unified parsing)
 │   ├── TelemetryDataBuilder.cs (YAML integration, field mapping)
 │   └── TelemetryFieldRegistry.cs (field definitions and validation)
 ├── Diagnostics/
-│   └── SessionDataLogger.cs (session-time-aware logging with multi-interval captures, consolidated file output)
+│   └── SessionDataLogger.cs (session-time-aware logging)
 ├── Visor Logo.ico (application icon for taskbar/explorer)
 ├── VISOR.csproj 
 ├── App.xaml
-└── App.xaml.cs
+└── App.xaml.cs (UPDATED: ClassColorManager sharing between windows)

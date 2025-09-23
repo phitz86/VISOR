@@ -1,11 +1,14 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using VISOR.ViewModels;
 using VISOR.Telemetry;
+using VISOR.Settings;
+using VISOR.Views;
 
 namespace VISOR.Views
 {
@@ -13,7 +16,10 @@ namespace VISOR.Views
     {
         private readonly MainViewModel _viewModel;
         private readonly SVappsLABSDKWrapper _sdk;
+        private readonly SettingsManager _settingsManager;
         private static DateTime _lastSessionReadyLog = DateTime.MinValue;
+
+        // Expose ViewModel for App.xaml.cs to access ClassColorManager
         public MainViewModel ViewModel => _viewModel;
 
         public MainWindow(SVappsLABSDKWrapper sdkWrapper)
@@ -21,6 +27,7 @@ namespace VISOR.Views
             InitializeComponent();
 
             _sdk = sdkWrapper;
+            _settingsManager = new SettingsManager();
             _viewModel = new MainViewModel();
             DataContext = _viewModel;
 
@@ -29,15 +36,20 @@ namespace VISOR.Views
             Background = new SolidColorBrush(Color.FromArgb(160, 32, 32, 32));
             Topmost = true;
 
+            // Initialize window positioning and sizing using SettingsManager
+            ApplyWindowSizing();
+            ApplyWindowPositioning();
+
+            System.Diagnostics.Debug.WriteLine($"[MainWindow] Initialized with size {Width}x{Height} at position ({Left}, {Top})");
+
+            // Subscribe to settings changes for real-time updates
+            _settingsManager.ElementVisibilityChanged += OnElementVisibilityChanged;
+            _settingsManager.WindowSizeChanged += OnWindowSizeChanged;
+
             Loaded += MainWindow_Loaded;
 
-            // Position near center with offset
-            double centerX = SystemParameters.PrimaryScreenWidth / 2;
-            double centerY = SystemParameters.PrimaryScreenHeight / 2;
-            double offsetX = 900;
-            double offsetY = 400;
-            Left = centerX + offsetX - (Width / 2);
-            Top = centerY + offsetY - (Height / 2);
+            // Save position when window is moved
+            this.LocationChanged += MainWindow_LocationChanged;
 
             // Drag anywhere
             MouseLeftButtonDown += (s, e) =>
@@ -45,6 +57,65 @@ namespace VISOR.Views
                 if (e.ButtonState == MouseButtonState.Pressed)
                     DragMove();
             };
+        }
+
+        private void ApplyWindowSizing()
+        {
+            var windowSize = _settingsManager.GetMainWindowSize();
+            Width = windowSize.Width;
+            Height = windowSize.Height;
+        }
+
+        private void ApplyWindowPositioning()
+        {
+            var windowPosition = _settingsManager.GetMainWindowPosition();
+            Left = windowPosition.X;
+            Top = windowPosition.Y;
+        }
+
+        private void OnElementVisibilityChanged(object sender, ElementVisibilityChangedEventArgs e)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                System.Diagnostics.Debug.WriteLine("[MainWindow] Element visibility changed - resizing window");
+
+                // Update ViewModel to refresh visibility bindings
+                _viewModel.RefreshElementVisibility();
+
+                // Resize window to fit new content
+                ApplyWindowSizing();
+            });
+        }
+
+        private void OnWindowSizeChanged(object sender, WindowSizeChangedEventArgs e)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainWindow] Window size preset changed to {e.NewSize} - resizing");
+
+                // Update ViewModel to refresh ScaleFactor binding
+                _viewModel.RefreshElementVisibility();
+
+                // Apply new window dimensions
+                ApplyWindowSizing();
+            });
+        }
+
+        private void MainWindow_LocationChanged(object sender, EventArgs e)
+        {
+            // Only save position if window is fully loaded and not during initialization
+            if (this.IsLoaded)
+            {
+                // Find radar window to save both positions together
+                var radarWindow = Application.Current.Windows.OfType<RadarWindow>().FirstOrDefault();
+                if (radarWindow != null)
+                {
+                    _settingsManager.SaveWindowPositions(
+                        new Point(this.Left, this.Top),
+                        new Point(radarWindow.Left, radarWindow.Top)
+                    );
+                }
+            }
         }
 
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -227,6 +298,15 @@ namespace VISOR.Views
         private void QuitButton_Click(object sender, RoutedEventArgs e)
         {
             Application.Current.Shutdown();
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            // Unsubscribe from settings events
+            _settingsManager.ElementVisibilityChanged -= OnElementVisibilityChanged;
+            _settingsManager.WindowSizeChanged -= OnWindowSizeChanged;
+
+            base.OnClosed(e);
         }
     }
 }

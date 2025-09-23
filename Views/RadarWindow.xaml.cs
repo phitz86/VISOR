@@ -1,10 +1,14 @@
 ﻿using System;
+using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using VISOR.ViewModels;
+using System.Windows.Shapes;
+using VISOR.Settings;
 using VISOR.Telemetry;
+using VISOR.ViewModels;
 
 namespace VISOR.Views
 {
@@ -12,6 +16,7 @@ namespace VISOR.Views
     {
         private readonly RadarViewModel _viewModel;
         private readonly SVappsLABSDKWrapper _sdk;
+        private readonly SettingsManager _settingsManager;
 
         // Fade animation properties
         private int _lastVisibleCarCount = 0;
@@ -22,6 +27,7 @@ namespace VISOR.Views
             InitializeComponent();
 
             _sdk = sdkWrapper;
+            _settingsManager = new SettingsManager();
             _viewModel = new RadarViewModel(classColorManager);
             DataContext = _viewModel;
 
@@ -30,21 +36,19 @@ namespace VISOR.Views
             Background = new SolidColorBrush(Color.FromArgb(160, 32, 32, 32));
             Topmost = true;
 
+            // Initialize window positioning and sizing using SettingsManager
+            ApplyWindowSizing();
+            ApplyWindowPositioning();
+
+            System.Diagnostics.Debug.WriteLine($"[RadarWindow] Initialized with size {Width}x{Height} at position ({Left}, {Top})");
+
+            // Subscribe to settings changes for real-time updates
+            _settingsManager.WindowSizeChanged += OnWindowSizeChanged;
+
             Loaded += RadarWindow_Loaded;
 
-            // Position in upper right quadrant with center-offset logic
-            double centerX = SystemParameters.PrimaryScreenWidth / 2;
-            double centerY = SystemParameters.PrimaryScreenHeight / 2;
-            double offsetX = 400; // Right side
-            double offsetY = -200; // Upper portion
-            Left = centerX + offsetX - (Width / 2);
-            Top = centerY + offsetY - (Height / 2);
-
-            // Ensure window stays on screen
-            if (Left + Width > SystemParameters.PrimaryScreenWidth)
-                Left = SystemParameters.PrimaryScreenWidth - Width - 20;
-            if (Top < 0)
-                Top = 20;
+            // Save position when window is moved
+            this.LocationChanged += RadarWindow_LocationChanged;
 
             // Drag anywhere
             MouseLeftButtonDown += (s, e) =>
@@ -55,6 +59,183 @@ namespace VISOR.Views
 
             // Initialize player car number display
             UpdatePlayerCarDisplay();
+        }
+
+        private void ApplyWindowSizing()
+        {
+            var windowSize = _settingsManager.GetRadarWindowSize();
+            Width = windowSize.Width;
+            Height = windowSize.Height;
+
+            // Update canvas size to match window
+            RadarCanvas.Width = windowSize.Width;
+            RadarCanvas.Height = windowSize.Height;
+
+            // Recalculate layout elements based on new size
+            UpdateLayoutForNewSize(windowSize);
+        }
+
+        private void ApplyWindowPositioning()
+        {
+            var windowPosition = _settingsManager.GetRadarWindowPosition();
+            Left = windowPosition.X;
+            Top = windowPosition.Y;
+        }
+
+        private void UpdateLayoutForNewSize(Size newSize)
+        {
+            double width = newSize.Width;
+            double height = newSize.Height;
+            double scaleFactor = width / 240.0; // Base width is 240
+
+            // Update canvas size to match window
+            RadarCanvas.Width = width;
+            RadarCanvas.Height = height;
+
+            // Calculate scaled dimensions
+            double zoneWidth = width / 5; // 5 zones
+            double centerY = height / 2;
+
+            // Update all hardcoded line elements in the XAML by finding them and updating
+            UpdateRadarLines(width, height, scaleFactor);
+
+            // Update zone highlights
+            UpdateZoneHighlights(width, height, zoneWidth);
+
+            // Update player car with proportional scaling
+            UpdatePlayerCar(width, height, scaleFactor, zoneWidth);
+
+            // Update zone labels grid
+            UpdateZoneLabelsGrid(width, height);
+        }
+
+        private void UpdateRadarLines(double width, double height, double scaleFactor)
+        {
+            // Find and update vertical zone separator lines
+            var lines = RadarCanvas.Children.OfType<Line>().ToList();
+
+            foreach (var line in lines)
+            {
+                // Vertical lines (zone separators)
+                if (Math.Abs(line.X1 - line.X2) < 0.1) // Vertical line
+                {
+                    double originalX = line.X1;
+                    double newX = 0;
+
+                    // Map original positions to new scaled positions
+                    if (Math.Abs(originalX - 48) < 0.1) newX = width * 0.2;      // Zone 1|2 boundary
+                    else if (Math.Abs(originalX - 96) < 0.1) newX = width * 0.4;  // Zone 2|3 boundary  
+                    else if (Math.Abs(originalX - 144) < 0.1) newX = width * 0.6; // Zone 3|4 boundary
+                    else if (Math.Abs(originalX - 192) < 0.1) newX = width * 0.8; // Zone 4|5 boundary
+
+                    line.X1 = line.X2 = newX;
+                    line.Y2 = height;
+                }
+                // Horizontal lines
+                else if (Math.Abs(line.Y1 - line.Y2) < 0.1) // Horizontal line
+                {
+                    double originalY = line.Y1;
+
+                    // Center line (player position)
+                    if (Math.Abs(originalY - 198) < 5) // Center line (around 198 for 396 height)
+                    {
+                        line.Y1 = line.Y2 = height / 2;
+                        line.X2 = width;
+                    }
+                    // Distance markers - scale proportionally
+                    else
+                    {
+                        double relativeY = originalY / 396.0; // Original height was 396
+                        line.Y1 = line.Y2 = relativeY * height;
+                        line.X2 = width;
+                    }
+                }
+            }
+        }
+
+        private void UpdateZoneHighlights(double width, double height, double zoneWidth)
+        {
+            // Update zone highlight rectangles
+            var highlights = new[] { LeftZone1Highlight, LeftZone2Highlight, CenterZoneHighlight, RightZone2Highlight, RightZone1Highlight };
+
+            for (int i = 0; i < highlights.Length; i++)
+            {
+                var highlight = highlights[i];
+                highlight.Width = zoneWidth;
+                highlight.Height = height;
+                Canvas.SetLeft(highlight, i * zoneWidth);
+                Canvas.SetTop(highlight, 0);
+            }
+        }
+
+        private void UpdatePlayerCar(double width, double height, double scaleFactor, double zoneWidth)
+        {
+            // Scale player car proportionally
+            double baseCarWidth = 24;
+            double baseCarHeight = 36;
+            double scaledCarWidth = baseCarWidth * scaleFactor;
+            double scaledCarHeight = baseCarHeight * scaleFactor;
+
+            // Position in center zone, middle of window
+            double centerZoneLeft = zoneWidth * 2; // Zone index 2 (center)
+            double carLeft = centerZoneLeft + (zoneWidth - scaledCarWidth) / 2;
+            double carTop = (height - scaledCarHeight) / 2;
+
+            PlayerCar.Width = scaledCarWidth;
+            PlayerCar.Height = scaledCarHeight;
+            Canvas.SetLeft(PlayerCar, carLeft);
+            Canvas.SetTop(PlayerCar, carTop);
+
+            // Update player car number text
+            Canvas.SetLeft(PlayerCarNumber, carLeft);
+            Canvas.SetTop(PlayerCarNumber, carTop + (scaledCarHeight * 0.1)); // Small offset from top
+            PlayerCarNumber.Width = scaledCarWidth;
+            PlayerCarNumber.Height = scaledCarHeight * 0.8;
+
+            // Scale font size proportionally
+            PlayerCarNumber.FontSize = Math.Max(8, 12 * scaleFactor); // Minimum 8px, scales from base 12px
+        }
+
+        private void UpdateZoneLabelsGrid(double width, double height)
+        {
+            // The zone labels grid should be updated if we can find it
+            // This might require finding the Grid by walking the visual tree
+            var grid = this.FindName("ZoneLabelsGrid") as Grid;
+            if (grid != null)
+            {
+                // Update column definitions to match new zone widths
+                double zoneWidth = width / 5;
+                for (int i = 0; i < grid.ColumnDefinitions.Count && i < 5; i++)
+                {
+                    grid.ColumnDefinitions[i].Width = new GridLength(zoneWidth);
+                }
+            }
+        }
+
+        private void OnWindowSizeChanged(object sender, WindowSizeChangedEventArgs e)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                System.Diagnostics.Debug.WriteLine($"[RadarWindow] Window size preset changed to {e.NewSize} - resizing");
+                ApplyWindowSizing();
+            });
+        }
+
+        private void RadarWindow_LocationChanged(object sender, EventArgs e)
+        {
+            // Only save position if window is fully loaded and not during initialization
+            if (this.IsLoaded)
+            {
+                // Find main window to save both positions together
+                var mainWindow = Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
+                if (mainWindow != null)
+                {
+                    _settingsManager.SaveWindowPositions(
+                        new Point(mainWindow.Left, mainWindow.Top),
+                        new Point(this.Left, this.Top)
+                    );
+                }
+            }
         }
 
         private async void RadarWindow_Loaded(object sender, RoutedEventArgs e)
@@ -329,6 +510,10 @@ namespace VISOR.Views
                 _sdk.ConnectionStateChanged -= OnConnectionStateChanged;
                 _sdk.PrimedStateChanged -= OnPrimedStateChanged;
             }
+
+            // Unsubscribe from settings events
+            _settingsManager.WindowSizeChanged -= OnWindowSizeChanged;
+
             base.OnClosed(e);
         }
     }

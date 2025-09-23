@@ -23,7 +23,12 @@
         </ResourceDictionary>
     </Window.Resources>
 
+    <!-- Apply scaling transform to entire content -->
     <Grid Margin="10">
+        <Grid.LayoutTransform>
+            <ScaleTransform ScaleX="{Binding ScaleFactor}" ScaleY="{Binding ScaleFactor}"/>
+        </Grid.LayoutTransform>
+
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -162,7 +167,7 @@
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <!-- MODIFIED: Row 5: Now includes the flashing PIT cue -->
+        <!-- Row 5: Warnings -->
         <Grid Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2"
       Visibility="{Binding ShowWarnings, Converter={StaticResource BoolToVisibilityConverter}}"
       Margin="0,5,0,0">
@@ -187,7 +192,7 @@
                    VerticalAlignment="Center"
                    Visibility="{Binding WarningsVM.IsPersistentDotVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
-                <!-- NEW: Flashing PIT cue -->
+                <!-- Flashing PIT cue -->
                 <TextBlock Text="{Binding WarningsVM.PitNowText}" FontSize="36" FontWeight="Bold" Foreground="Yellow" Margin="15,0,0,0">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
