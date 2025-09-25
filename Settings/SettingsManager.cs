@@ -12,17 +12,17 @@ namespace VISOR.Settings
     {
         // Base dimensions (Large size - current dimensions)
         private const double MAIN_WINDOW_WIDTH_LARGE = 750.0;
-        private const double MAIN_WINDOW_HEIGHT_LARGE = 580.0;
+        private const double MAIN_WINDOW_HEIGHT_LARGE = 640.0;
         private const double RADAR_WINDOW_WIDTH_LARGE = 240.0;
         private const double RADAR_WINDOW_HEIGHT_LARGE = 396.0;
 
-        // Row heights for dynamic sizing (approximate values based on MainWindow.xaml)
-        private const double ROW_HEIGHT_POSITION_GEAR = 90.0;      // Row 0: Large gear + position
-        private const double ROW_HEIGHT_TIME_FUEL = 50.0;         // Row 1: Time + Fuel
-        private const double ROW_HEIGHT_DELTA_BAR = 32.0;         // Row 2: Delta bar with margin
-        private const double ROW_HEIGHT_LAP_TIMES = 40.0;         // Row 3: Last + Best lap
-        private const double ROW_HEIGHT_RELATIVE = 200.0;         // Row 4: Relative table (variable)
-        private const double ROW_HEIGHT_WARNINGS = 50.0;          // Row 5: Warnings
+        // Row heights for dynamic sizing (generous estimates to prevent cutoff)
+        private const double ROW_HEIGHT_POSITION_GEAR = 100.0;     // Row 0: Large gear + position
+        private const double ROW_HEIGHT_TIME_FUEL = 60.0;         // Row 1: Time + Fuel
+        private const double ROW_HEIGHT_DELTA_BAR = 40.0;         // Row 2: Delta bar with margin
+        private const double ROW_HEIGHT_LAP_TIMES = 50.0;         // Row 3: Last + Best lap
+        private const double ROW_HEIGHT_RELATIVE = 250.0;         // Row 4: Relative table (7 cars)
+        private const double ROW_HEIGHT_WARNINGS = 60.0;          // Row 5: Warnings
         private const double WINDOW_PADDING = 20.0;               // Top/bottom margins
 
         private readonly UserSettings _settings;
@@ -59,17 +59,17 @@ namespace VISOR.Settings
         /// </summary>
         public Size GetMainWindowSize()
         {
-            var baseSize = GetBaseDimensions(_settings.WindowSize, isMainWindow: true);
-
-            // Calculate dynamic height based on visible elements
+            // Calculate base dimensions 
             double dynamicHeight = CalculateDynamicMainWindowHeight();
+            double baseWidth = MAIN_WINDOW_WIDTH_LARGE;
 
-            // Scale the dynamic height by the same factor as the base dimensions
+            // Scale both width and height by the preset factor
             double scaleFactor = GetMainWindowScaleFactor(_settings.WindowSize);
+            double scaledWidth = baseWidth * scaleFactor;
             double scaledHeight = dynamicHeight * scaleFactor;
 
-            var result = new Size(baseSize.Width, scaledHeight);
-            System.Diagnostics.Debug.WriteLine($"[SettingsManager] GetMainWindowSize: preset={_settings.WindowSize}, baseSize={baseSize.Width}x{baseSize.Height}, dynamicHeight={dynamicHeight}, scaleFactor={scaleFactor}, result={result.Width}x{result.Height}");
+            var result = new Size(scaledWidth, scaledHeight);
+            System.Diagnostics.Debug.WriteLine($"[SettingsManager] GetMainWindowSize: preset={_settings.WindowSize}, baseSize={baseWidth}x{dynamicHeight}, scaleFactor={scaleFactor}, result={result.Width}x{result.Height}");
 
             return result;
         }

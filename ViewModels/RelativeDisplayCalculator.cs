@@ -43,7 +43,7 @@ namespace VISOR.ViewModels
 
             if (!allValidCars.Any())
             {
-                return (new List<RelativeRowViewModel>(), "P--", "--");
+                return (new List<RelativeRowViewModel>(), "--", "--");
             }
 
             List<RelativeRowViewModel> finalRows;
@@ -160,7 +160,7 @@ namespace VISOR.ViewModels
         private (string PlayerPos, string PlayerPosNum) CalculatePlayerClassPosition(List<RelativeRowViewModel> allCars, int playerCarIdx, bool isFastestLapMode, ISessionDataProvider dataProvider)
         {
             var player = allCars.FirstOrDefault(c => c.CarIdx == playerCarIdx);
-            if (player == null) return ("P--", "--");
+            if (player == null) return ("--", "--");
 
             var carsInClass = allCars.Where(c => c.ClassID == player.ClassID).ToList();
 
@@ -169,13 +169,13 @@ namespace VISOR.ViewModels
                 var fastestLaps = dataProvider.GetFastestLapPositioning().ToDictionary(d => d.carIdx, d => d.position);
                 var sorted = carsInClass.OrderBy(c => fastestLaps.GetValueOrDefault(c.CarIdx, 999)).ToList();
                 int pos = sorted.FindIndex(c => c.IsPlayer) + 1;
-                return pos > 0 ? ($"P{pos}", pos.ToString()) : ("P--", "--");
+                return pos > 0 ? ($"{pos}", pos.ToString()) : ("--", "--");
             }
             else
             {
                 var sorted = carsInClass.OrderByDescending(c => c.CurrentLap + c.LapDistPct).ToList();
                 int pos = sorted.FindIndex(c => c.IsPlayer) + 1;
-                return pos > 0 ? ($"P{pos}", pos.ToString()) : ("P--", "--");
+                return pos > 0 ? ($"{pos}", pos.ToString()) : ("--", "--");
             }
         }
 
@@ -210,11 +210,11 @@ namespace VISOR.ViewModels
             {
                 var fastestLapData = dataProvider.GetFastestLapPositioning();
                 var carData = fastestLapData.FirstOrDefault(d => d.carIdx == row.CarIdx);
-                row.ClassPos = (carData.fastestTime > 0) ? $"P{carData.position}" : "P--";
+                row.ClassPos = (carData.fastestTime > 0) ? $"{carData.position}" : "--";
             }
             else
             {
-                row.ClassPos = (classPositions.TryGetValue(row.ClassID, out var positions) && positions.TryGetValue(row.CarIdx, out var classPos)) ? $"P{classPos}" : "P??";
+                row.ClassPos = (classPositions.TryGetValue(row.ClassID, out var positions) && positions.TryGetValue(row.CarIdx, out var classPos)) ? $"{classPos}" : "??";
             }
         }
 

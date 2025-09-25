@@ -29,7 +29,7 @@ namespace VISOR.ViewModels
         private readonly RelativeDisplayCalculator _calculator;
 
         // --- Live Player Position ---
-        private string _livePlayerClassPosition = "P--";
+        private string _livePlayerClassPosition = "--";
         public string LivePlayerClassPosition
         {
             get => _livePlayerClassPosition;
@@ -60,7 +60,7 @@ namespace VISOR.ViewModels
             if (sessionDataProvider.ShouldHideRelativeDisplay())
             {
                 if (RelativeRows.Count > 0) RelativeRows.Clear();
-                LivePlayerClassPosition = "P--";
+                LivePlayerClassPosition = "--";
                 LivePlayerClassPositionNumber = "--";
                 return;
             }
@@ -109,7 +109,7 @@ namespace VISOR.ViewModels
             }
             _carCache.Clear();
 
-            LivePlayerClassPosition = "P--";
+            LivePlayerClassPosition = "--";
             LivePlayerClassPositionNumber = "--";
         }
     }

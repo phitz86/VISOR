@@ -7,10 +7,9 @@
         Icon="/VISOR Logo.ico"
         WindowStyle="None"
         AllowsTransparency="True"
-        Background="#A0202020"
+        Background="Transparent"
         Topmost="True"
-        ResizeMode="NoResize"
-        Width="750" Height="580">
+        ResizeMode="NoResize">
 
     <Window.Resources>
         <ResourceDictionary>
@@ -23,200 +22,202 @@
         </ResourceDictionary>
     </Window.Resources>
 
-    <!-- Apply scaling transform to entire content -->
-    <Grid Margin="10">
-        <Grid.LayoutTransform>
-            <ScaleTransform ScaleX="{Binding ScaleFactor}" ScaleY="{Binding ScaleFactor}"/>
-        </Grid.LayoutTransform>
+    <!-- Rounded border with scaling transform -->
+    <Border CornerRadius="12" Margin="10" Background="#A0202020" ClipToBounds="True">
+        <Grid>
+            <Grid.LayoutTransform>
+                <ScaleTransform ScaleX="{Binding ScaleFactor}" ScaleY="{Binding ScaleFactor}"/>
+            </Grid.LayoutTransform>
 
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="*"/>
-        </Grid.ColumnDefinitions>
-
-        <StackPanel Grid.Row="0" Grid.Column="0"
-                    Orientation="Horizontal"
-                    Visibility="{Binding ShowGear, Converter={StaticResource BoolToVisibilityConverter}}"
-                    HorizontalAlignment="Center">
-            <TextBlock Text="⚙" FontSize="56" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,8,0"/>
-
-            <TextBlock Text="{Binding GearDisplay}"
-                       FontSize="80" FontWeight="Bold"
-                       FontFamily="pack://application:,,,/Resources/Fonts/#Digital-7"
-                       Foreground="White"
-                       HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
-        </StackPanel>
-
-        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" 
-                    HorizontalAlignment="Center" VerticalAlignment="Center"
-                    Visibility="{Binding ShowPosition, Converter={StaticResource BoolToVisibilityConverter}}">
-            <TextBlock Text="P"
-                       FontSize="60" 
-                       FontFamily="Segoe UI"
-                       FontWeight="Bold"
-                       Foreground="White"
-                       VerticalAlignment="Center" 
-                       Margin="0,0,8,0"/>
-
-            <TextBlock Text="{Binding ClassPositionNumber}"
-                       FontSize="72" 
-                       FontFamily="pack://application:,,,/Resources/Fonts/#Digital-7"
-                       Foreground="White"
-                       VerticalAlignment="Center"/>
-        </StackPanel>
-
-        <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal"
-                    Visibility="{Binding ShowTimeRemaining, Converter={StaticResource BoolToVisibilityConverter}}"
-                    HorizontalAlignment="Center">
-            <TextBlock Text="{Binding TimeRemainingSymbol}" FontSize="36" Margin="0,0,8,0" Foreground="White"/>
-
-            <TextBlock Text="{Binding TimeRemainingDisplay}" FontSize="36" Foreground="White"/>
-        </StackPanel>
-
-        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal"
-            Visibility="{Binding ShowFuelRemaining, Converter={StaticResource BoolToVisibilityConverter}}"
-            HorizontalAlignment="Center">
-            <TextBlock Text="⛽" FontSize="36" Margin="0,0,8,0" Foreground="Red"/>
-
-            <TextBlock Text="{Binding FuelVM.FuelDisplay}" FontSize="36" Foreground="White"/>
-        </StackPanel>
-
-        <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Height="12" Background="#333333"
-                Visibility="{Binding ShowLapDelta, Converter={StaticResource BoolToVisibilityConverter}}"
-                Margin="0,10,0,0" CornerRadius="6">
-
-            <Grid Name="DeltaBarContainer">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <Rectangle Grid.Column="0" 
-                           Fill="{Binding DeltaBarVM.LeftBarColor}"
-                           HorizontalAlignment="Right">
-                    <Rectangle.Width>
-                        <MultiBinding Converter="{StaticResource DeltaBarWidthConverter}">
-                            <Binding Path="DeltaBarVM.LeftBarWidth"/>
-                            <Binding Path="ActualWidth" ElementName="DeltaBarContainer"/>
-                        </MultiBinding>
-                    </Rectangle.Width>
-                </Rectangle>
-
-                <Rectangle Grid.Column="1" 
-                           Fill="{Binding DeltaBarVM.RightBarColor}"
-                           HorizontalAlignment="Left">
-                    <Rectangle.Width>
-                        <MultiBinding Converter="{StaticResource DeltaBarWidthConverter}">
-                            <Binding Path="DeltaBarVM.RightBarWidth"/>
-                            <Binding Path="ActualWidth" ElementName="DeltaBarContainer"/>
-                        </MultiBinding>
-                    </Rectangle.Width>
-                </Rectangle>
-
-                <Rectangle Grid.ColumnSpan="2" Width="2" Fill="White" HorizontalAlignment="Center"/>
-            </Grid>
-        </Border>
-
-        <StackPanel Grid.Row="3" Grid.Column="0" Orientation="Horizontal"
-            Visibility="{Binding ShowLapTimes, Converter={StaticResource BoolToVisibilityConverter}}"
-            HorizontalAlignment="Center">
-            <TextBlock Text="⏱" FontSize="30" Margin="0,0,8,0" Foreground="White"/>
-
-            <TextBlock Text="{Binding LastLapTime}" FontSize="30" Foreground="White"/>
-        </StackPanel>
-
-        <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal"
-            Visibility="{Binding ShowLapTimes, Converter={StaticResource BoolToVisibilityConverter}}"
-            HorizontalAlignment="Center">
-            <TextBlock Text="🏆" FontSize="30" Foreground="DarkGoldenrod" Margin="0,0,8,0"/>
-
-            <TextBlock Text="{Binding BestLapTime}" FontSize="30" Foreground="White"/>
-        </StackPanel>
-
-        <ItemsControl Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2"
-                      ItemsSource="{Binding RelativeVM.RelativeRows}"
-                      Visibility="{Binding ShowRelative, Converter={StaticResource BoolToVisibilityConverter}}"
-                      Margin="0,10,0,0">
-            <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                    <Grid Margin="4,2">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="50"/>
-                            <ColumnDefinition Width="70"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="80"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="{Binding ClassPos}" Grid.Column="0" FontSize="24" HorizontalAlignment="Center" Foreground="White" Margin="0,0,8,0"/>
-                        <Border Grid.Column="1" Background="{Binding ClassBackground}" Padding="4" CornerRadius="3" Margin="0,0,8,0">
-                            <TextBlock Text="{Binding CarNum}" FontSize="24" HorizontalAlignment="Center" FontWeight="Bold"/>
-                        </Border>
-                        <TextBlock Text="{Binding Name}" Grid.Column="2" FontSize="24" Foreground="{Binding NameColor}" FontStyle="{Binding FontStyle}" Margin="8,0"/>
-                        <TextBlock Text="{Binding Gap}" Grid.Column="3" FontSize="24" HorizontalAlignment="Right" Foreground="White" Margin="8,0,0,0"/>
-                    </Grid>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
-
-        <!-- Row 5: Warnings -->
-        <Grid Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2"
-      Visibility="{Binding ShowWarnings, Converter={StaticResource BoolToVisibilityConverter}}"
-      Margin="0,5,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Incident Points (Centered in column 0) -->
-            <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Center">
-                <TextBlock Text="⚠️" FontSize="36" Margin="0,0,10,0" Foreground="{Binding WarningsVM.IncidentColor}"/>
-                <TextBlock Text="{Binding WarningsVM.IncidentDisplay}" FontSize="36" Foreground="{Binding WarningsVM.IncidentColor}"/>
+            <StackPanel Grid.Row="0" Grid.Column="0"
+                        Orientation="Horizontal"
+                        Visibility="{Binding ShowGear, Converter={StaticResource BoolToVisibilityConverter}}"
+                        HorizontalAlignment="Center">
+                <TextBlock Text="⚙" FontSize="56" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,8,0"/>
+
+                <TextBlock Text="{Binding GearDisplay}"
+                           FontSize="80" FontWeight="Bold"
+                           FontFamily="pack://application:,,,/Resources/Fonts/#Digital-7"
+                           Foreground="White"
+                           HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
             </StackPanel>
 
-            <!-- Pace & Pit Warnings (Centered in column 1) -->
-            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <!-- Main, short-term warning icon -->
-                <TextBlock Text="📉" FontSize="36" Foreground="Red"
-                   Visibility="{Binding WarningsVM.IsPaceWarningVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                <!-- Persistent dot indicator -->
-                <TextBlock Text="•" FontSize="36" Foreground="Red" Margin="5,0,0,0"
-                   VerticalAlignment="Center"
-                   Visibility="{Binding WarningsVM.IsPersistentDotVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
+            <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" 
+                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Visibility="{Binding ShowPosition, Converter={StaticResource BoolToVisibilityConverter}}">
+                <TextBlock Text="P"
+                           FontSize="60" 
+                           FontFamily="Segoe UI"
+                           FontWeight="Bold"
+                           Foreground="White"
+                           VerticalAlignment="Center" 
+                           Margin="0,0,8,0"/>
 
-                <!-- Flashing PIT cue -->
-                <TextBlock Text="{Binding WarningsVM.PitNowText}" FontSize="36" FontWeight="Bold" Foreground="Yellow" Margin="15,0,0,0">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding WarningsVM.IsPitNowVisible}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                    <DataTrigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                         From="1.0" To="0.2" Duration="0:0:0.5"
-                                                         AutoReverse="True" RepeatBehavior="Forever"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </DataTrigger.EnterActions>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                </TextBlock>
+                <TextBlock Text="{Binding ClassPositionNumber}"
+                           FontSize="72" 
+                           FontFamily="pack://application:,,,/Resources/Fonts/#Digital-7"
+                           Foreground="White"
+                           VerticalAlignment="Center"/>
             </StackPanel>
+
+            <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal"
+                        Visibility="{Binding ShowTimeRemaining, Converter={StaticResource BoolToVisibilityConverter}}"
+                        HorizontalAlignment="Center">
+                <TextBlock Text="{Binding TimeRemainingSymbol}" FontSize="36" Margin="0,0,8,0" Foreground="White"/>
+
+                <TextBlock Text="{Binding TimeRemainingDisplay}" FontSize="36" Foreground="White"/>
+            </StackPanel>
+
+            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal"
+                Visibility="{Binding ShowFuelRemaining, Converter={StaticResource BoolToVisibilityConverter}}"
+                HorizontalAlignment="Center">
+                <TextBlock Text="⛽" FontSize="36" Margin="0,0,8,0" Foreground="Red"/>
+
+                <TextBlock Text="{Binding FuelVM.FuelDisplay}" FontSize="36" Foreground="White"/>
+            </StackPanel>
+
+            <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Height="12" Background="#333333"
+                    Visibility="{Binding ShowLapDelta, Converter={StaticResource BoolToVisibilityConverter}}"
+                    Margin="0,10,0,0" CornerRadius="6">
+
+                <Grid Name="DeltaBarContainer">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Rectangle Grid.Column="0" 
+                               Fill="{Binding DeltaBarVM.LeftBarColor}"
+                               HorizontalAlignment="Right">
+                        <Rectangle.Width>
+                            <MultiBinding Converter="{StaticResource DeltaBarWidthConverter}">
+                                <Binding Path="DeltaBarVM.LeftBarWidth"/>
+                                <Binding Path="ActualWidth" ElementName="DeltaBarContainer"/>
+                            </MultiBinding>
+                        </Rectangle.Width>
+                    </Rectangle>
+
+                    <Rectangle Grid.Column="1" 
+                               Fill="{Binding DeltaBarVM.RightBarColor}"
+                               HorizontalAlignment="Left">
+                        <Rectangle.Width>
+                            <MultiBinding Converter="{StaticResource DeltaBarWidthConverter}">
+                                <Binding Path="DeltaBarVM.RightBarWidth"/>
+                                <Binding Path="ActualWidth" ElementName="DeltaBarContainer"/>
+                            </MultiBinding>
+                        </Rectangle.Width>
+                    </Rectangle>
+
+                    <Rectangle Grid.ColumnSpan="2" Width="2" Fill="White" HorizontalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <StackPanel Grid.Row="3" Grid.Column="0" Orientation="Horizontal"
+                Visibility="{Binding ShowLapTimes, Converter={StaticResource BoolToVisibilityConverter}}"
+                HorizontalAlignment="Center">
+                <TextBlock Text="⏱" FontSize="30" Margin="0,0,8,0" Foreground="White"/>
+
+                <TextBlock Text="{Binding LastLapTime}" FontSize="30" Foreground="White"/>
+            </StackPanel>
+
+            <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal"
+                Visibility="{Binding ShowLapTimes, Converter={StaticResource BoolToVisibilityConverter}}"
+                HorizontalAlignment="Center">
+                <TextBlock Text="🏆" FontSize="30" Foreground="DarkGoldenrod" Margin="0,0,8,0"/>
+
+                <TextBlock Text="{Binding BestLapTime}" FontSize="30" Foreground="White"/>
+            </StackPanel>
+
+            <ItemsControl Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2"
+                          ItemsSource="{Binding RelativeVM.RelativeRows}"
+                          Visibility="{Binding ShowRelative, Converter={StaticResource BoolToVisibilityConverter}}"
+                          Margin="0,10,0,0">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="4,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="50"/>
+                                <ColumnDefinition Width="70"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="80"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding ClassPos}" Grid.Column="0" FontSize="24" HorizontalAlignment="Center" Foreground="White" Margin="0,0,8,0"/>
+                            <Border Grid.Column="1" Background="{Binding ClassBackground}" Padding="4" CornerRadius="3" Margin="0,0,8,0">
+                                <TextBlock Text="{Binding CarNum}" FontSize="24" HorizontalAlignment="Center" FontWeight="Bold"/>
+                            </Border>
+                            <TextBlock Text="{Binding Name}" Grid.Column="2" FontSize="24" Foreground="{Binding NameColor}" FontStyle="{Binding FontStyle}" Margin="8,0"/>
+                            <TextBlock Text="{Binding Gap}" Grid.Column="3" FontSize="24" HorizontalAlignment="Right" Foreground="White" Margin="8,0,0,0"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Row 5: Warnings -->
+            <Grid Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2"
+          Visibility="{Binding ShowWarnings, Converter={StaticResource BoolToVisibilityConverter}}"
+          Margin="0,5,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Incident Points (Centered in column 0) -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Center">
+                    <TextBlock Text="⚠️" FontSize="36" Margin="0,0,10,0" Foreground="{Binding WarningsVM.IncidentColor}"/>
+                    <TextBlock Text="{Binding WarningsVM.IncidentDisplay}" FontSize="36" Foreground="{Binding WarningsVM.IncidentColor}"/>
+                </StackPanel>
+
+                <!-- Pace & Pit Warnings (Centered in column 1) -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <!-- Main, short-term warning icon -->
+                    <TextBlock Text="📉" FontSize="36" Foreground="Red"
+                       Visibility="{Binding WarningsVM.IsPaceWarningVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                    <!-- Persistent dot indicator -->
+                    <TextBlock Text="•" FontSize="36" Foreground="Red" Margin="5,0,0,0"
+                       VerticalAlignment="Center"
+                       Visibility="{Binding WarningsVM.IsPersistentDotVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                    <!-- Flashing PIT cue -->
+                    <TextBlock Text="{Binding WarningsVM.PitNowText}" FontSize="36" FontWeight="Bold" Foreground="Yellow" Margin="15,0,0,0">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding WarningsVM.IsPitNowVisible}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <DataTrigger.EnterActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                             From="1.0" To="0.2" Duration="0:0:0.5"
+                                                             AutoReverse="True" RepeatBehavior="Forever"/>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </DataTrigger.EnterActions>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+            </Grid>
+
+            <TextBlock x:Name="StatusText" Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" Text="Status..." Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,10,0,10" Visibility="Collapsed"/>
         </Grid>
-
-        <TextBlock x:Name="StatusText" Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" Text="Status..." Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,10,0,10" Visibility="Collapsed"/>
-    </Grid>
+    </Border>
 </Window>

@@ -33,7 +33,7 @@ namespace VISOR.Views
 
             AllowsTransparency = true;
             WindowStyle = WindowStyle.None;
-            Background = new SolidColorBrush(Color.FromArgb(160, 32, 32, 32));
+            Background = Brushes.Transparent;
             Topmost = true;
 
             // Initialize window positioning and sizing using SettingsManager
@@ -204,7 +204,6 @@ namespace VISOR.Views
                     var now = DateTime.Now;
                     if ((now - _lastSessionReadyLog).TotalSeconds > 10)
                     {
-                        System.Diagnostics.Debug.WriteLine("[MainWindow] Session data ready - passing SDK's Coordinator");
                         _lastSessionReadyLog = now;
                     }
 
@@ -212,7 +211,6 @@ namespace VISOR.Views
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine("[MainWindow] Session data not ready - passing null");
                     _viewModel.UpdateFromTelemetry(snapshot, null);
                 }
             });

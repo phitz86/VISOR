@@ -5,133 +5,134 @@
         Icon="/VISOR Logo.ico"
         WindowStyle="None"
         AllowsTransparency="True"
-        Background="#A0202020"
+        Background="Transparent"
         Topmost="True"
         ResizeMode="NoResize"
         Width="240" Height="396">
 
-    <Grid>
-        <!-- Main radar container -->
-        <Canvas x:Name="RadarCanvas"
-                Width="240" Height="396"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center"
-                ClipToBounds="True">
-
-            <!-- Background grid lines for zones -->
-            <!-- Vertical zone separators -->
-            <Line X1="48" Y1="0" X2="48" Y2="396"
-                  Stroke="#333333" StrokeThickness="1" />
-            <Line X1="96" Y1="0" X2="96" Y2="396"
-                  Stroke="#333333" StrokeThickness="1" />
-            <Line X1="144" Y1="0" X2="144" Y2="396"
-                  Stroke="#333333" StrokeThickness="1" />
-            <Line X1="192" Y1="0" X2="192" Y2="396"
-                  Stroke="#333333" StrokeThickness="1" />
-
-            <!-- Horizontal center line (player position) -->
-            <Line X1="0" Y1="198" X2="240" Y2="198"
-                  Stroke="#777777" StrokeThickness="2" />
-
-            <!-- Distance markers (every car length ~79px) -->
-            <Line X1="0" Y1="119" X2="240" Y2="119"
-                  Stroke="#555555" StrokeThickness="1" />
-            <Line X1="0" Y1="40" X2="240" Y2="40"
-                  Stroke="#555555" StrokeThickness="1" />
-            <Line X1="0" Y1="277" X2="240" Y2="277"
-                  Stroke="#555555" StrokeThickness="1" />
-            <Line X1="0" Y1="356" X2="240" Y2="356"
-                  Stroke="#555555" StrokeThickness="1" />
-
-            <!-- Zone highlight backgrounds (invisible by default) -->
-            <Rectangle x:Name="LeftZone1Highlight"
-                       Canvas.Left="0" Canvas.Top="0"
-                       Width="48" Height="396"
-                       Fill="Red" Opacity="0" />
-            <Rectangle x:Name="LeftZone2Highlight"
-                       Canvas.Left="48" Canvas.Top="0"
-                       Width="48" Height="396"
-                       Fill="Orange" Opacity="0" />
-            <Rectangle x:Name="CenterZoneHighlight"
-                       Canvas.Left="96" Canvas.Top="0"
-                       Width="48" Height="396"
-                       Fill="Yellow" Opacity="0" />
-            <Rectangle x:Name="RightZone2Highlight"
-                       Canvas.Left="144" Canvas.Top="0"
-                       Width="48" Height="396"
-                       Fill="Orange" Opacity="0" />
-            <Rectangle x:Name="RightZone1Highlight"
-                       Canvas.Left="192" Canvas.Top="0"
-                       Width="48" Height="396"
-                       Fill="Red" Opacity="0" />
-
-            <!-- Container for car elements -->
-            <Canvas x:Name="CarsContainer" />
-
-            <!-- Player car indicator (center zone, middle) -->
-            <Rectangle x:Name="PlayerCar"
-                       Canvas.Left="108" Canvas.Top="180"
-                       Width="24" Height="36"
-                       Fill="Lime"
-                       Stroke="DarkGreen" StrokeThickness="2">
-                <Rectangle.Effect>
-                    <DropShadowEffect Color="Black" Direction="0" 
-                                      ShadowDepth="2" BlurRadius="3" />
-                </Rectangle.Effect>
-            </Rectangle>
-
-            <!-- Player car number -->
-            <TextBlock x:Name="PlayerCarNumber"
-                       Canvas.Left="108" Canvas.Top="184"
-                       Width="24" Height="28"
-                       Text="92"
-                       FontSize="12" FontWeight="Bold"
-                       Foreground="White"
-                       TextAlignment="Center"
-                       VerticalAlignment="Center">
-                <TextBlock.Effect>
-                    <DropShadowEffect Color="Black" Direction="0" 
-                                      ShadowDepth="1" BlurRadius="2" />
-                </TextBlock.Effect>
-            </TextBlock>
-
-        </Canvas>
-
-        <!-- Zone labels (for debugging/reference) -->
+    <!-- Rounded border container -->
+    <Border CornerRadius="12" Background="#A0202020" ClipToBounds="True">
         <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="48"/>
-                <ColumnDefinition Width="48"/>
-                <ColumnDefinition Width="48"/>
-                <ColumnDefinition Width="48"/>
-                <ColumnDefinition Width="48"/>
-            </Grid.ColumnDefinitions>
+            <!-- Main radar container -->
+            <Canvas x:Name="RadarCanvas"
+                    Width="240" Height="396"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
 
-            <TextBlock Grid.Column="0" Text="L2" FontSize="8" Foreground="#666666"
-                       HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,2,0,0"/>
-            <TextBlock Grid.Column="1" Text="L1" FontSize="8" Foreground="#666666"
-                       HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,2,0,0"/>
-            <TextBlock Grid.Column="2" Text="C" FontSize="8" Foreground="#666666"
-                       HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,2,0,0"/>
-            <TextBlock Grid.Column="3" Text="R1" FontSize="8" Foreground="#666666"
-                       HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,2,0,0"/>
-            <TextBlock Grid.Column="4" Text="R2" FontSize="8" Foreground="#666666"
-                       HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                <!-- Background grid lines for zones -->
+                <!-- Vertical zone separators -->
+                <Line X1="48" Y1="0" X2="48" Y2="396"
+                      Stroke="#333333" StrokeThickness="1" />
+                <Line X1="96" Y1="0" X2="96" Y2="396"
+                      Stroke="#333333" StrokeThickness="1" />
+                <Line X1="144" Y1="0" X2="144" Y2="396"
+                      Stroke="#333333" StrokeThickness="1" />
+                <Line X1="192" Y1="0" X2="192" Y2="396"
+                      Stroke="#333333" StrokeThickness="1" />
+
+                <!-- Horizontal center line (player position) -->
+                <Line X1="0" Y1="198" X2="240" Y2="198"
+                      Stroke="#777777" StrokeThickness="2" />
+
+                <!-- Distance markers (every car length ~79px) -->
+                <Line X1="0" Y1="119" X2="240" Y2="119"
+                      Stroke="#555555" StrokeThickness="1" />
+                <Line X1="0" Y1="40" X2="240" Y2="40"
+                      Stroke="#555555" StrokeThickness="1" />
+                <Line X1="0" Y1="277" X2="240" Y2="277"
+                      Stroke="#555555" StrokeThickness="1" />
+                <Line X1="0" Y1="356" X2="240" Y2="356"
+                      Stroke="#555555" StrokeThickness="1" />
+
+                <!-- Zone highlight backgrounds (invisible by default) -->
+                <Rectangle x:Name="LeftZone1Highlight"
+                           Canvas.Left="0" Canvas.Top="0"
+                           Width="48" Height="396"
+                           Fill="Red" Opacity="0" />
+                <Rectangle x:Name="LeftZone2Highlight"
+                           Canvas.Left="48" Canvas.Top="0"
+                           Width="48" Height="396"
+                           Fill="Orange" Opacity="0" />
+                <Rectangle x:Name="CenterZoneHighlight"
+                           Canvas.Left="96" Canvas.Top="0"
+                           Width="48" Height="396"
+                           Fill="Yellow" Opacity="0" />
+                <Rectangle x:Name="RightZone2Highlight"
+                           Canvas.Left="144" Canvas.Top="0"
+                           Width="48" Height="396"
+                           Fill="Orange" Opacity="0" />
+                <Rectangle x:Name="RightZone1Highlight"
+                           Canvas.Left="192" Canvas.Top="0"
+                           Width="48" Height="396"
+                           Fill="Red" Opacity="0" />
+
+                <!-- Container for car elements -->
+                <Canvas x:Name="CarsContainer" />
+
+                <!-- Player car indicator (center zone, middle) -->
+                <Rectangle x:Name="PlayerCar"
+                           Canvas.Left="108" Canvas.Top="180"
+                           Width="24" Height="36"
+                           Fill="Lime"
+                           Stroke="DarkGreen" StrokeThickness="2">
+                    <Rectangle.Effect>
+                        <DropShadowEffect Color="Black" Direction="0" 
+                                          ShadowDepth="2" BlurRadius="3" />
+                    </Rectangle.Effect>
+                </Rectangle>
+
+                <!-- Player car number -->
+                <TextBlock x:Name="PlayerCarNumber"
+                           Canvas.Left="108" Canvas.Top="184"
+                           Width="24" Height="28"
+                           Text="92"
+                           FontSize="12" FontWeight="Bold"
+                           Foreground="White"
+                           TextAlignment="Center"
+                           VerticalAlignment="Center">
+                    <TextBlock.Effect>
+                        <DropShadowEffect Color="Black" Direction="0" 
+                                          ShadowDepth="1" BlurRadius="2" />
+                    </TextBlock.Effect>
+                </TextBlock>
+
+                <!-- Zone labels (for debugging/reference) positioned within canvas -->
+                <Grid Canvas.Left="0" Canvas.Top="0" Width="240" Height="20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="48"/>
+                        <ColumnDefinition Width="48"/>
+                        <ColumnDefinition Width="48"/>
+                        <ColumnDefinition Width="48"/>
+                        <ColumnDefinition Width="48"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Text="L2" FontSize="8" Foreground="#666666"
+                               HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                    <TextBlock Grid.Column="1" Text="L1" FontSize="8" Foreground="#666666"
+                               HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                    <TextBlock Grid.Column="2" Text="C" FontSize="8" Foreground="#666666"
+                               HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                    <TextBlock Grid.Column="3" Text="R1" FontSize="8" Foreground="#666666"
+                               HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                    <TextBlock Grid.Column="4" Text="R2" FontSize="8" Foreground="#666666"
+                               HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                </Grid>
+
+            </Canvas>
+
+            <!-- Debug info positioned outside canvas using Grid -->
+            <TextBlock x:Name="DebugText"
+                       Text="Radar: Waiting for data..."
+                       Foreground="White" FontSize="10"
+                       HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                       Margin="5" Background="#80000000" Padding="2"/>
+
+            <!-- CarLeftRight state indicator positioned outside canvas using Grid -->
+            <TextBlock x:Name="CarLeftRightIndicator"
+                       Text="Clear"
+                       Foreground="Cyan" FontSize="10" FontWeight="Bold"
+                       HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                       Margin="5" Background="#80000000" Padding="2"/>
         </Grid>
-
-        <!-- Debug info -->
-        <TextBlock x:Name="DebugText"
-                   Text="Radar: Waiting for data..."
-                   Foreground="White" FontSize="10"
-                   HorizontalAlignment="Left" VerticalAlignment="Bottom"
-                   Margin="5" Background="#80000000" Padding="2"/>
-
-        <!-- CarLeftRight state indicator -->
-        <TextBlock x:Name="CarLeftRightIndicator"
-                   Text="Clear"
-                   Foreground="Cyan" FontSize="10" FontWeight="Bold"
-                   HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                   Margin="5" Background="#80000000" Padding="2"/>
-
-    </Grid>
+    </Border>
 </Window>

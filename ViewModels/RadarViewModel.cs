@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using VISOR.Telemetry;
+using VISOR.Settings;
 
 namespace VISOR.ViewModels
 {
@@ -33,14 +34,32 @@ namespace VISOR.ViewModels
         private const float CANVAS_CAR_POSITIONS = 11.0f; // Total positions: 5 ahead + 1 player + 5 behind
         private const float CANVAS_HALF_RANGE = 5.5f; // Half the canvas in car lengths (from center to edge)
 
-        // Zone positioning constants
-        private readonly float[] ZONE_X_POSITIONS = { 24f, 72f, 120f, 168f, 216f }; // Center X for each zone
+        // Base dimensions for scaling
+        private const double BASE_CAR_WIDTH = 24.0;
+        private const double BASE_CAR_HEIGHT = 36.0;
+        private const double BASE_FONT_SIZE = 12.0;
+        private const double BASE_CANVAS_WIDTH = 240.0;
+
+        // Zone positioning - calculated dynamically based on canvas size
+        private float[] GetZoneXPositions(double canvasWidth)
+        {
+            double zoneWidth = canvasWidth / 5.0; // 5 equal zones
+            return new float[]
+            {
+                (float)(zoneWidth * 0.5), // Center of zone 0
+                (float)(zoneWidth * 1.5), // Center of zone 1  
+                (float)(zoneWidth * 2.5), // Center of zone 2
+                (float)(zoneWidth * 3.5), // Center of zone 3
+                (float)(zoneWidth * 4.5)  // Center of zone 4
+            };
+        }
 
         // Car display elements cache
         private readonly Dictionary<int, RadarCarElement> _carElements = new();
 
-        // Shared color service
+        // Shared services
         private readonly ClassColorManager _classColorManager;
+        private readonly SettingsManager _settingsManager;
 
         // Zone assignment tracking
         private readonly Dictionary<int, RadarZone> _carZoneAssignments = new();
@@ -59,6 +78,21 @@ namespace VISOR.ViewModels
         public RadarViewModel(ClassColorManager classColorManager)
         {
             _classColorManager = classColorManager;
+            _settingsManager = SettingsManager.Instance;
+        }
+
+        /// <summary>
+        /// Calculate current scale factor based on window size preset
+        /// </summary>
+        private double GetScaleFactor()
+        {
+            return _settingsManager.Settings.WindowSize switch
+            {
+                WindowSizePreset.Small => 0.8,   // 80% of base size
+                WindowSizePreset.Medium => 0.9,  // 90% of base size  
+                WindowSizePreset.Large => 1.0,   // 100% of base size
+                _ => 1.0
+            };
         }
 
         public void UpdateFromTelemetry(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider, Canvas carsContainer)
@@ -128,7 +162,6 @@ namespace VISOR.ViewModels
             // Update zone assignments based on CarLeftRight state
             var carLeftRightEnum = snapshot.GetValue<object>("CarLeftRight", null);
             var carLeftRightState = carLeftRightEnum?.ToString() ?? "Off";
-            System.Diagnostics.Debug.WriteLine($"[Radar] CarLeftRight value from snapshot: {carLeftRightState}");
             UpdateZoneAssignments(visibleCars, carLeftRightState);
 
             // Update radar display
@@ -318,11 +351,18 @@ namespace VISOR.ViewModels
 
         private RadarPosition CalculateRadarPosition(RadarCarData car)
         {
+            // Get current canvas dimensions for zone calculation
+            var scaleFactor = GetScaleFactor();
+            double canvasWidth = BASE_CANVAS_WIDTH * scaleFactor;
+
+            // Calculate zone positions based on current canvas size
+            var zonePositions = GetZoneXPositions(canvasWidth);
+
             // Get zone assignment for this car
             var zone = _carZoneAssignments.GetValueOrDefault(car.CarIdx, RadarZone.Center);
 
-            // X position based on zone
-            float x = ZONE_X_POSITIONS[(int)zone];
+            // X position based on dynamically calculated zone
+            float x = zonePositions[(int)zone];
 
             // Y position using proper canvas scaling
             float relativeDistPct = car.LapDistPct - car.PlayerLapDistPct;
@@ -337,30 +377,30 @@ namespace VISOR.ViewModels
             distanceRatio = Math.Clamp(distanceRatio, -1.0f, 1.0f);
 
             // Convert to Y coordinate (negative distanceRatio = ahead = smaller Y)
-            float y = RADAR_CENTER_Y - (distanceRatio * RADAR_CENTER_Y);
-
-            // No additional clamping needed - let cars reach the actual canvas edges
-            // Cars will naturally be clamped by the distanceRatio clamp above
+            float scaledCenterY = RADAR_CENTER_Y * (float)scaleFactor;
+            float y = scaledCenterY - (distanceRatio * scaledCenterY);
 
             return new RadarPosition { X = x, Y = y };
         }
 
         private RadarCarElement CreateCarElement(RadarCarData car)
         {
-            // Create rectangle for car
+            var scaleFactor = GetScaleFactor();
+
+            // Create rectangle for car with scaled dimensions
             var rectangle = new Rectangle
             {
-                Width = 24,
-                Height = 36,
+                Width = BASE_CAR_WIDTH * scaleFactor,
+                Height = BASE_CAR_HEIGHT * scaleFactor,
                 Stroke = Brushes.Black,
-                StrokeThickness = 1
+                StrokeThickness = 1 * scaleFactor
             };
 
-            // Create text for car number
+            // Create text for car number with scaled font
             var numberText = new TextBlock
             {
-                Width = 24,
-                FontSize = 12,
+                Width = BASE_CAR_WIDTH * scaleFactor,
+                FontSize = BASE_FONT_SIZE * scaleFactor,
                 FontWeight = FontWeights.Bold,
                 Foreground = Brushes.White,
                 Text = car.CarNumber,
@@ -372,8 +412,8 @@ namespace VISOR.ViewModels
             {
                 Color = Colors.Black,
                 Direction = 0,
-                ShadowDepth = 2, // Increased from 1 to 2
-                BlurRadius = 4   // Increased from 2 to 4
+                ShadowDepth = 2 * scaleFactor, // Scale shadow depth
+                BlurRadius = 4 * scaleFactor   // Scale blur radius
             };
 
             return new RadarCarElement
@@ -386,11 +426,15 @@ namespace VISOR.ViewModels
 
         private void UpdateCarElement(RadarCarElement element, RadarCarData car, RadarPosition position)
         {
-            // Update position - center the 24x36 rectangle at the calculated position
-            Canvas.SetLeft(element.Rectangle, position.X - 12);
-            Canvas.SetTop(element.Rectangle, position.Y - 18);
-            Canvas.SetLeft(element.NumberText, position.X - 12);
-            Canvas.SetTop(element.NumberText, position.Y - 14);
+            var scaleFactor = GetScaleFactor();
+            var halfWidth = (BASE_CAR_WIDTH * scaleFactor) / 2;
+            var halfHeight = (BASE_CAR_HEIGHT * scaleFactor) / 2;
+
+            // Update position - center the scaled rectangle at the calculated position
+            Canvas.SetLeft(element.Rectangle, position.X - halfWidth);
+            Canvas.SetTop(element.Rectangle, position.Y - halfHeight);
+            Canvas.SetLeft(element.NumberText, position.X - halfWidth);
+            Canvas.SetTop(element.NumberText, position.Y - halfHeight + (4 * scaleFactor)); // Slight text offset
 
             // Update color using shared ClassColorManager
             element.Rectangle.Fill = _classColorManager.GetClassColor(car.ClassID);

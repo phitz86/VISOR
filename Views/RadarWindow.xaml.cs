@@ -34,7 +34,7 @@ namespace VISOR.Views
 
             AllowsTransparency = true;
             WindowStyle = WindowStyle.None;
-            Background = new SolidColorBrush(Color.FromArgb(160, 32, 32, 32));
+            Background = Brushes.Transparent;
             Topmost = true;
 
             // Initialize window positioning and sizing using SettingsManager

@@ -214,7 +214,6 @@ namespace VISOR.ViewModels
             // Only log display changes
             if (newTimeRemainingDisplay != _lastTimeRemainingDisplay)
             {
-                System.Diagnostics.Debug.WriteLine($"[SessionTimer] Display changed to: {newTimeRemainingDisplay}");
                 _lastTimeRemainingDisplay = newTimeRemainingDisplay;
             }
 
