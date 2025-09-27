@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Windows;
+using VISOR.Telemetry;
 
 namespace VISOR.Settings
 {
@@ -23,7 +24,7 @@ namespace VISOR.Settings
         private const double ROW_HEIGHT_LAP_TIMES = 50.0;         // Row 3: Last + Best lap
         private const double ROW_HEIGHT_RELATIVE = 250.0;         // Row 4: Relative table (7 cars)
         private const double ROW_HEIGHT_WARNINGS = 60.0;          // Row 5: Warnings
-        private const double WINDOW_PADDING = 20.0;               // Top/bottom margins
+        private const double WINDOW_PADDING = 40.0;               // Top/bottom margins
 
         private readonly UserSettings _settings;
         private static SettingsManager _instance;
@@ -57,10 +58,11 @@ namespace VISOR.Settings
         /// <summary>
         /// Get main window dimensions based on current size preset and visible elements
         /// </summary>
-        public Size GetMainWindowSize()
+        /// <param name="sessionDataProvider">Optional session data for dynamic visibility checks</param>
+        public Size GetMainWindowSize(ISessionDataProvider sessionDataProvider = null)
         {
             // Calculate base dimensions 
-            double dynamicHeight = CalculateDynamicMainWindowHeight();
+            double dynamicHeight = CalculateDynamicMainWindowHeight(sessionDataProvider);
             double baseWidth = MAIN_WINDOW_WIDTH_LARGE;
 
             // Scale both width and height by the preset factor
@@ -69,7 +71,6 @@ namespace VISOR.Settings
             double scaledHeight = dynamicHeight * scaleFactor;
 
             var result = new Size(scaledWidth, scaledHeight);
-            System.Diagnostics.Debug.WriteLine($"[SettingsManager] GetMainWindowSize: preset={_settings.WindowSize}, baseSize={baseWidth}x{dynamicHeight}, scaleFactor={scaleFactor}, result={result.Width}x{result.Height}");
 
             return result;
         }
@@ -85,7 +86,8 @@ namespace VISOR.Settings
         /// <summary>
         /// Calculate the dynamic height of main window based on visible elements
         /// </summary>
-        private double CalculateDynamicMainWindowHeight()
+        /// <param name="sessionDataProvider">Optional session data for lone qualifying detection</param>
+        private double CalculateDynamicMainWindowHeight(ISessionDataProvider sessionDataProvider = null)
         {
             double totalHeight = WINDOW_PADDING; // Start with base padding
 
@@ -101,7 +103,24 @@ namespace VISOR.Settings
             if (_settings.ShowRow3)
                 totalHeight += ROW_HEIGHT_LAP_TIMES;
 
-            if (_settings.ShowRow4)
+            // Check if Relative should be shown (setting enabled AND not in lone qualifying)
+            bool showRelativeEffectively = _settings.ShowRow4;
+            if (showRelativeEffectively && sessionDataProvider != null)
+            {
+                // Check for lone qualifying to hide relative display
+                var coordinator = sessionDataProvider as SessionDataCoordinator;
+                if (coordinator != null)
+                {
+                    int currentSession = coordinator.CurrentSessionNum;
+                    bool isLoneQualifying = coordinator.IsLoneQualifying(currentSession);
+                    if (isLoneQualifying)
+                    {
+                        showRelativeEffectively = false;
+                    }
+                }
+            }
+
+            if (showRelativeEffectively)
                 totalHeight += ROW_HEIGHT_RELATIVE;
 
             if (_settings.ShowRow5)

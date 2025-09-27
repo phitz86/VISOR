@@ -7,7 +7,6 @@ using VISOR.Telemetry;
 
 namespace VISOR.ViewModels
 {
-    // MODIFIED: Moved the enum outside the class to be accessible by other classes in the namespace.
     public enum iRacingTrackSurface
     {
         OnTrack,
@@ -28,20 +27,7 @@ namespace VISOR.ViewModels
         // --- Child Services ---
         private readonly RelativeDisplayCalculator _calculator;
 
-        // --- Live Player Position ---
-        private string _livePlayerClassPosition = "--";
-        public string LivePlayerClassPosition
-        {
-            get => _livePlayerClassPosition;
-            private set { _livePlayerClassPosition = value; OnPropertyChanged(); }
-        }
-
-        private string _livePlayerClassPositionNumber = "--";
-        public string LivePlayerClassPositionNumber
-        {
-            get => _livePlayerClassPositionNumber;
-            private set { _livePlayerClassPositionNumber = value; OnPropertyChanged(); }
-        }
+        // --- Live Player Position properties have been REMOVED ---
 
         public RelativeViewModel(ClassColorManager classColorManager)
         {
@@ -50,28 +36,22 @@ namespace VISOR.ViewModels
 
         public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
-            // --- Data Readiness Checks ---
             if (snapshot.GetValue<int>("PlayerCarIdx", -1) == -1 || sessionDataProvider == null || !sessionDataProvider.IsDataReady)
             {
                 return;
             }
 
-            // Hide for lone qualifying
             if (sessionDataProvider.ShouldHideRelativeDisplay())
             {
                 if (RelativeRows.Count > 0) RelativeRows.Clear();
-                LivePlayerClassPosition = "--";
-                LivePlayerClassPositionNumber = "--";
                 return;
             }
 
             // --- Delegate to Calculator ---
-            var result = _calculator.Calculate(snapshot, sessionDataProvider);
+            var newRows = _calculator.Calculate(snapshot, sessionDataProvider); // Simplified call
 
             // --- Update State from Result ---
-            LivePlayerClassPosition = result.PlayerPos;
-            LivePlayerClassPositionNumber = result.PlayerPosNum;
-            UpdateCollection(result.Rows);
+            UpdateCollection(newRows);
         }
 
         private void UpdateCollection(List<RelativeRowViewModel> newRows)
@@ -108,9 +88,6 @@ namespace VISOR.ViewModels
                 row.ResetSmoothing();
             }
             _carCache.Clear();
-
-            LivePlayerClassPosition = "--";
-            LivePlayerClassPositionNumber = "--";
         }
     }
 }

@@ -19,10 +19,10 @@
 
             <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
             <viewModels:DeltaBarWidthConverter x:Key="DeltaBarWidthConverter"/>
+            <converters:ProximityToWidthConverter x:Key="ProximityToWidthConverter"/>
         </ResourceDictionary>
     </Window.Resources>
 
-    <!-- Rounded border with scaling transform -->
     <Border CornerRadius="12" Margin="10" Background="#A0202020" ClipToBounds="True">
         <Grid>
             <Grid.LayoutTransform>
@@ -44,12 +44,48 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
+            <Button x:Name="ExitButton" 
+                    Grid.Row="0" Grid.Column="1"
+                    Content="✕"
+                    Width="24" Height="24"
+                    HorizontalAlignment="Right" VerticalAlignment="Top"
+                    Margin="0,8,8,0"
+                    Foreground="White"
+                    BorderThickness="0"
+                    FontSize="14" FontWeight="Bold"
+                    Cursor="Hand"
+                    Click="ExitButton_Click">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Setter Property="Background" Value="#80808080"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}" 
+                                            CornerRadius="3">
+                                        <ContentPresenter HorizontalAlignment="Center" 
+                                                          VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#CCFF0000"/>
+                                        </Trigger>
+                                        <Trigger Property="IsPressed" Value="True">
+                                            <Setter Property="Background" Value="#FFFF0000"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Button.Style>
+            </Button>
+
             <StackPanel Grid.Row="0" Grid.Column="0"
                         Orientation="Horizontal"
                         Visibility="{Binding ShowGear, Converter={StaticResource BoolToVisibilityConverter}}"
                         HorizontalAlignment="Center">
                 <TextBlock Text="⚙" FontSize="56" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,8,0"/>
-
                 <TextBlock Text="{Binding GearDisplay}"
                            FontSize="80" FontWeight="Bold"
                            FontFamily="pack://application:,,,/Resources/Fonts/#Digital-7"
@@ -67,7 +103,6 @@
                            Foreground="White"
                            VerticalAlignment="Center" 
                            Margin="0,0,8,0"/>
-
                 <TextBlock Text="{Binding ClassPositionNumber}"
                            FontSize="72" 
                            FontFamily="pack://application:,,,/Resources/Fonts/#Digital-7"
@@ -79,28 +114,24 @@
                         Visibility="{Binding ShowTimeRemaining, Converter={StaticResource BoolToVisibilityConverter}}"
                         HorizontalAlignment="Center">
                 <TextBlock Text="{Binding TimeRemainingSymbol}" FontSize="36" Margin="0,0,8,0" Foreground="White"/>
-
                 <TextBlock Text="{Binding TimeRemainingDisplay}" FontSize="36" Foreground="White"/>
             </StackPanel>
 
             <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal"
-                Visibility="{Binding ShowFuelRemaining, Converter={StaticResource BoolToVisibilityConverter}}"
-                HorizontalAlignment="Center">
+                        Visibility="{Binding ShowFuelRemaining, Converter={StaticResource BoolToVisibilityConverter}}"
+                        HorizontalAlignment="Center">
                 <TextBlock Text="⛽" FontSize="36" Margin="0,0,8,0" Foreground="Red"/>
-
                 <TextBlock Text="{Binding FuelVM.FuelDisplay}" FontSize="36" Foreground="White"/>
             </StackPanel>
 
             <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Height="12" Background="#333333"
                     Visibility="{Binding ShowLapDelta, Converter={StaticResource BoolToVisibilityConverter}}"
                     Margin="0,10,0,0" CornerRadius="6">
-
                 <Grid Name="DeltaBarContainer">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-
                     <Rectangle Grid.Column="0" 
                                Fill="{Binding DeltaBarVM.LeftBarColor}"
                                HorizontalAlignment="Right">
@@ -111,7 +142,6 @@
                             </MultiBinding>
                         </Rectangle.Width>
                     </Rectangle>
-
                     <Rectangle Grid.Column="1" 
                                Fill="{Binding DeltaBarVM.RightBarColor}"
                                HorizontalAlignment="Left">
@@ -122,24 +152,21 @@
                             </MultiBinding>
                         </Rectangle.Width>
                     </Rectangle>
-
                     <Rectangle Grid.ColumnSpan="2" Width="2" Fill="White" HorizontalAlignment="Center"/>
                 </Grid>
             </Border>
 
             <StackPanel Grid.Row="3" Grid.Column="0" Orientation="Horizontal"
-                Visibility="{Binding ShowLapTimes, Converter={StaticResource BoolToVisibilityConverter}}"
-                HorizontalAlignment="Center">
+                        Visibility="{Binding ShowLapTimes, Converter={StaticResource BoolToVisibilityConverter}}"
+                        HorizontalAlignment="Center">
                 <TextBlock Text="⏱" FontSize="30" Margin="0,0,8,0" Foreground="White"/>
-
                 <TextBlock Text="{Binding LastLapTime}" FontSize="30" Foreground="White"/>
             </StackPanel>
 
             <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal"
-                Visibility="{Binding ShowLapTimes, Converter={StaticResource BoolToVisibilityConverter}}"
-                HorizontalAlignment="Center">
+                        Visibility="{Binding ShowLapTimes, Converter={StaticResource BoolToVisibilityConverter}}"
+                        HorizontalAlignment="Center">
                 <TextBlock Text="🏆" FontSize="30" Foreground="DarkGoldenrod" Margin="0,0,8,0"/>
-
                 <TextBlock Text="{Binding BestLapTime}" FontSize="30" Foreground="White"/>
             </StackPanel>
 
@@ -154,45 +181,61 @@
                                 <ColumnDefinition Width="50"/>
                                 <ColumnDefinition Width="70"/>
                                 <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="80"/>
                             </Grid.ColumnDefinitions>
+
                             <TextBlock Text="{Binding ClassPos}" Grid.Column="0" FontSize="24" HorizontalAlignment="Center" Foreground="White" Margin="0,0,8,0"/>
+
                             <Border Grid.Column="1" Background="{Binding ClassBackground}" Padding="4" CornerRadius="3" Margin="0,0,8,0">
                                 <TextBlock Text="{Binding CarNum}" FontSize="24" HorizontalAlignment="Center" FontWeight="Bold"/>
                             </Border>
-                            <TextBlock Text="{Binding Name}" Grid.Column="2" FontSize="24" Foreground="{Binding NameColor}" FontStyle="{Binding FontStyle}" Margin="8,0"/>
-                            <TextBlock Text="{Binding Gap}" Grid.Column="3" FontSize="24" HorizontalAlignment="Right" Foreground="White" Margin="8,0,0,0"/>
+
+                            <Grid Grid.Column="2" x:Name="NameContainer">
+                                <Border x:Name="ProximityBar"
+                                        HorizontalAlignment="Left"
+                                        Opacity="0.7"
+                                        CornerRadius="3">
+                                    <Border.Width>
+                                        <MultiBinding Converter="{StaticResource ProximityToWidthConverter}">
+                                            <Binding Path="BarWidthRatio"/>
+                                            <Binding Path="ActualWidth" ElementName="NameContainer"/>
+                                        </MultiBinding>
+                                    </Border.Width>
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                                            <GradientStop Color="{Binding BarStartColor.Color}" Offset="0.0" />
+                                            <GradientStop Color="{Binding BarEndColor.Color}" Offset="1.0" />
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+
+                                <TextBlock Text="{Binding Name}" 
+                                           FontSize="24" 
+                                           Foreground="{Binding NameColor}" 
+                                           FontStyle="{Binding FontStyle}" 
+                                           Margin="8,0"/>
+                            </Grid>
                         </Grid>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <!-- Row 5: Warnings -->
             <Grid Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2"
-          Visibility="{Binding ShowWarnings, Converter={StaticResource BoolToVisibilityConverter}}"
-          Margin="0,5,0,0">
+                  Visibility="{Binding ShowWarnings, Converter={StaticResource BoolToVisibilityConverter}}"
+                  Margin="0,5,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-
-                <!-- Incident Points (Centered in column 0) -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Center">
                     <TextBlock Text="⚠️" FontSize="36" Margin="0,0,10,0" Foreground="{Binding WarningsVM.IncidentColor}"/>
                     <TextBlock Text="{Binding WarningsVM.IncidentDisplay}" FontSize="36" Foreground="{Binding WarningsVM.IncidentColor}"/>
                 </StackPanel>
-
-                <!-- Pace & Pit Warnings (Centered in column 1) -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <!-- Main, short-term warning icon -->
                     <TextBlock Text="📉" FontSize="36" Foreground="Red"
-                       Visibility="{Binding WarningsVM.IsPaceWarningVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                    <!-- Persistent dot indicator -->
+                               Visibility="{Binding WarningsVM.IsPaceWarningVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
                     <TextBlock Text="•" FontSize="36" Foreground="Red" Margin="5,0,0,0"
-                       VerticalAlignment="Center"
-                       Visibility="{Binding WarningsVM.IsPersistentDotVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
-
-                    <!-- Flashing PIT cue -->
+                               VerticalAlignment="Center"
+                               Visibility="{Binding WarningsVM.IsPersistentDotVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
                     <TextBlock Text="{Binding WarningsVM.PitNowText}" FontSize="36" FontWeight="Bold" Foreground="Yellow" Margin="15,0,0,0">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
@@ -204,8 +247,8 @@
                                             <BeginStoryboard>
                                                 <Storyboard>
                                                     <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                             From="1.0" To="0.2" Duration="0:0:0.5"
-                                                             AutoReverse="True" RepeatBehavior="Forever"/>
+                                                                     From="1.0" To="0.2" Duration="0:0:0.5"
+                                                                     AutoReverse="True" RepeatBehavior="Forever"/>
                                                 </Storyboard>
                                             </BeginStoryboard>
                                         </DataTrigger.EnterActions>
@@ -216,7 +259,6 @@
                     </TextBlock>
                 </StackPanel>
             </Grid>
-
             <TextBlock x:Name="StatusText" Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" Text="Status..." Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,10,0,10" Visibility="Collapsed"/>
         </Grid>
     </Border>

@@ -43,7 +43,7 @@ namespace VISOR.ViewModels
             }
         }
 
-        public void CheckPace(float lastLapTime, float topSpeed, float topSpeedBaseline, int lapsRemaining, bool isOnPitRoad)
+        public void CheckPace(float lastLapTime, float lastLapTopSpeed, float topSpeedBaseline, int lapsRemaining, bool isOnPitRoad)
         {
             if (lastLapTime <= 0 || isOnPitRoad || _rollingPaceLapTimes.Count < 2)
             {
@@ -52,7 +52,6 @@ namespace VISOR.ViewModels
                 return;
             }
 
-            // --- Update Baselines ---
             _rollingPaceLapTimes.Add(lastLapTime);
             while (_rollingPaceLapTimes.Count > PaceLapWindow) _rollingPaceLapTimes.RemoveAt(0);
 
@@ -64,13 +63,11 @@ namespace VISOR.ViewModels
             float rollingAverage = _rollingPaceLapTimes.Take(_rollingPaceLapTimes.Count - 1).Average();
             float bestPaceAverage = _bestPaceLapTimes.Average();
 
-            // --- Tier 2 Trigger ---
-            bool isTier2Active = (topSpeed < (topSpeedBaseline * 0.96f)) && (lastLapTime > (rollingAverage * 1.04f));
+            bool isTier2Active = (lastLapTopSpeed < (topSpeedBaseline * 0.96f)) && (lastLapTime > (rollingAverage * 1.04f));
 
             IsPaceWarningVisible = isTier2Active;
             if (isTier2Active) IsPersistentDotVisible = true;
 
-            // --- Tier 3 Trigger ---
             if (isTier2Active && lapsRemaining > 0)
             {
                 float timeLostPerLap = lastLapTime - rollingAverage;
@@ -92,7 +89,6 @@ namespace VISOR.ViewModels
                 IsPitNowVisible = false;
             }
 
-            // --- Persistent Dot Reset Logic ---
             if (IsPersistentDotVisible && lastLapTime < (bestPaceAverage * 1.01f))
             {
                 IsPersistentDotVisible = false;
@@ -101,16 +97,15 @@ namespace VISOR.ViewModels
 
         private float CalculateDynamicRepairTime(float paceLossPercent)
         {
-            if (paceLossPercent <= 0.04f) return 60f;      // 2-4% loss -> 1 min repair
-            if (paceLossPercent <= 0.08f) return 150f;     // 5-8% loss -> 2.5 min repair
-            return 300f;                                   // >9% loss -> 5 min repair
+            if (paceLossPercent <= 0.04f) return 60f;
+            if (paceLossPercent <= 0.08f) return 150f;
+            return 300f;
         }
 
         private void ClearPaceWarnings()
         {
             IsPaceWarningVisible = false;
             IsPitNowVisible = false;
-            // Persistent dot is not cleared here.
         }
 
         private Brush GetIncidentColor(int count)

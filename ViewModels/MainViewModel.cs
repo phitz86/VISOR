@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using VISOR.Telemetry;
@@ -11,6 +12,8 @@ namespace VISOR.ViewModels
 {
     public sealed class MainViewModel : INotifyPropertyChanged
     {
+        private record CarData(int CarIdx, int ClassID, bool IsPlayer, int CurrentLap, float LapDistPct);
+
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string? name = null) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
@@ -28,7 +31,9 @@ namespace VISOR.ViewModels
         // --- Session Tracking ---
         private int _lastSessionNum = -1;
         private int _lastSessionState = -999;
-        private float _topSpeedBaseline = 0f; // For car health monitor
+        private float _topSpeedBaseline = 0f;
+        private float _currentLapTopSpeed = 0f;
+        private float _lastLapTopSpeed = 0f;
 
         // --- Debug Tracking for Session Timer ---
         private int _lastSessionLapsRemainOld = -1;
@@ -36,8 +41,7 @@ namespace VISOR.ViewModels
         private string _lastTimeRemainingDisplay = string.Empty;
 
         // --- Public Properties ---
-        public string ClassPosition => RelativeVM.LivePlayerClassPosition;
-        public string ClassPositionNumber => RelativeVM.LivePlayerClassPositionNumber;
+        public string ClassPositionNumber { get; private set; } = "--";
         public string GearDisplay { get; private set; } = "N";
         public string LastLapTime { get; private set; } = "-:--.---";
         public string BestLapTime { get; private set; } = "-:--.---";
@@ -54,7 +58,6 @@ namespace VISOR.ViewModels
         public bool ShowRelative => _settingsManager.Settings.ShowRow4;
         public bool ShowWarnings => _settingsManager.Settings.ShowRow5;
 
-        // Scale factor for LayoutTransform
         public double ScaleFactor => _settingsManager.Settings.WindowSize switch
         {
             WindowSizePreset.Small => 0.6,
@@ -65,27 +68,12 @@ namespace VISOR.ViewModels
 
         public MainViewModel()
         {
-            // Create shared services first
             _classColorManager = new ClassColorManager();
             _settingsManager = SettingsManager.Instance;
-
-            // Create child view models with shared services
             FuelVM = new FuelViewModel();
             RelativeVM = new RelativeViewModel(_classColorManager);
             DeltaBarVM = new DeltaBarViewModel();
             WarningsVM = new WarningsViewModel();
-
-            RelativeVM.PropertyChanged += (sender, args) =>
-            {
-                if (args.PropertyName == nameof(RelativeViewModel.LivePlayerClassPosition))
-                {
-                    OnPropertyChanged(nameof(ClassPosition));
-                }
-                if (args.PropertyName == nameof(RelativeViewModel.LivePlayerClassPositionNumber))
-                {
-                    OnPropertyChanged(nameof(ClassPositionNumber));
-                }
-            };
         }
 
         private bool _isTelemetryConnected = false;
@@ -95,7 +83,6 @@ namespace VISOR.ViewModels
             set { _isTelemetryConnected = value; OnPropertyChanged(); }
         }
 
-        // Method to refresh all visibility bindings when settings change
         public void RefreshElementVisibility()
         {
             OnPropertyChanged(nameof(ShowGear));
@@ -114,7 +101,6 @@ namespace VISOR.ViewModels
             CheckSessionStateTransitions(snapshot);
             CheckForSessionTransition(snapshot);
 
-            // Update child view models
             FuelVM.Update(snapshot.GetValue<float>("FuelLevel"), snapshot.GetValue<int>("Lap"));
             RelativeVM.Update(snapshot, sessionDataProvider);
             DeltaBarVM.Update(snapshot);
@@ -130,6 +116,13 @@ namespace VISOR.ViewModels
                         WarningsVM.UpdateIncidentCount(incidentCounts[playerCarIdx], sessionDataProvider.IncidentLimit);
                     }
                 }
+
+                UpdatePlayerPosition(snapshot, sessionDataProvider);
+            }
+            else
+            {
+                ClassPositionNumber = "--";
+                OnPropertyChanged(nameof(ClassPositionNumber));
             }
 
             // --- Car Health & Lap Time Logic ---
@@ -138,6 +131,10 @@ namespace VISOR.ViewModels
             {
                 _topSpeedBaseline = currentSpeed;
             }
+            if (currentSpeed > _currentLapTopSpeed)
+            {
+                _currentLapTopSpeed = currentSpeed;
+            }
 
             float lastLap = snapshot.GetValue<float>("LapLastLapTime");
             if (lastLap > 0)
@@ -145,10 +142,13 @@ namespace VISOR.ViewModels
                 LastLapTime = FormatLapTime(lastLap);
                 OnPropertyChanged(nameof(LastLapTime));
 
+                _lastLapTopSpeed = _currentLapTopSpeed;
+                _currentLapTopSpeed = 0f;
+
                 bool onPitRoad = snapshot.GetValue<bool[]>("CarIdxOnPitRoad")?[snapshot.GetValue<int>("PlayerCarIdx")] ?? false;
                 int lapsRemaining = snapshot.GetValue<int>("SessionLapsRemainEx");
 
-                WarningsVM.CheckPace(lastLap, currentSpeed, _topSpeedBaseline, lapsRemaining, onPitRoad);
+                WarningsVM.CheckPace(lastLap, _lastLapTopSpeed, _topSpeedBaseline, lapsRemaining, onPitRoad);
             }
 
             float bestLap = snapshot.GetValue<float>("LapBestLapTime");
@@ -162,6 +162,84 @@ namespace VISOR.ViewModels
             UpdateSessionTimer(snapshot);
         }
 
+        #region --- Player Position Calculation ---
+
+        private void UpdatePlayerPosition(SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider)
+        {
+            var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx");
+
+            var carClassIDs = dataProvider.CarClassIDs;
+            var userNames = dataProvider.UserNames;
+            var carNumbers = dataProvider.CarNumbers;
+            var trackSurface = snapshot.GetValue<int[]>("CarIdxTrackSurface");
+            var lapDistPct = snapshot.GetValue<float[]>("CarIdxLapDistPct");
+            var currentLap = snapshot.GetValue<int[]>("CarIdxLap");
+
+            var allValidCars = BuildValidCarsList(trackSurface, carNumbers, userNames,
+                carClassIDs, currentLap, lapDistPct, playerCarIdx);
+
+            if (!allValidCars.Any())
+            {
+                ClassPositionNumber = "--";
+                OnPropertyChanged(nameof(ClassPositionNumber));
+                return;
+            }
+
+            bool useFastestLap = dataProvider.ShouldUseFastestLapPositioning();
+            var newPosition = CalculatePlayerClassPosition(allValidCars, playerCarIdx, useFastestLap, dataProvider);
+
+            if (ClassPositionNumber != newPosition)
+            {
+                ClassPositionNumber = newPosition;
+                OnPropertyChanged(nameof(ClassPositionNumber));
+            }
+        }
+
+        private List<CarData> BuildValidCarsList(int[] trackSurface, string[] carNumbers, string[] userNames,
+                                                  int[] carClassIDs, int[] currentLap, float[] lapDistPct, int playerCarIdx)
+        {
+            var allValidCars = new List<CarData>();
+            for (int i = 0; i < trackSurface.Length; i++)
+            {
+                if (trackSurface[i] != -1 &&
+                    !string.IsNullOrEmpty(carNumbers[i]) &&
+                    !string.IsNullOrEmpty(userNames[i]))
+                {
+                    allValidCars.Add(new CarData(
+                        CarIdx: i,
+                        ClassID: carClassIDs[i],
+                        IsPlayer: (i == playerCarIdx),
+                        CurrentLap: currentLap[i],
+                        LapDistPct: lapDistPct[i]
+                    ));
+                }
+            }
+            return allValidCars;
+        }
+
+        private string CalculatePlayerClassPosition(List<CarData> allCars, int playerCarIdx, bool isFastestLapMode, ISessionDataProvider dataProvider)
+        {
+            var player = allCars.FirstOrDefault(c => c.CarIdx == playerCarIdx);
+            if (player == null) return "--";
+
+            var carsInClass = allCars.Where(c => c.ClassID == player.ClassID).ToList();
+
+            if (isFastestLapMode)
+            {
+                var fastestLaps = dataProvider.GetFastestLapPositioning().ToDictionary(d => d.carIdx, d => d.position);
+                var sorted = carsInClass.OrderBy(c => fastestLaps.GetValueOrDefault(c.CarIdx, 999)).ToList();
+                int pos = sorted.FindIndex(c => c.IsPlayer) + 1;
+                return pos > 0 ? pos.ToString() : "--";
+            }
+            else
+            {
+                var sorted = carsInClass.OrderByDescending(c => c.CurrentLap + c.LapDistPct).ToList();
+                int pos = sorted.FindIndex(c => c.IsPlayer) + 1;
+                return pos > 0 ? pos.ToString() : "--";
+            }
+        }
+        #endregion
+
         private void UpdateGearDisplay(SVappsLABSnapshot snapshot)
         {
             int gear = snapshot.GetValue<int>("Gear");
@@ -173,6 +251,7 @@ namespace VISOR.ViewModels
             }
         }
 
+        // In MainViewModel.cs, replace the entire UpdateSessionTimer method
         private void UpdateSessionTimer(SVappsLABSnapshot snapshot)
         {
             int sessionLapsRemainOld = snapshot.GetValue<int>("SessionLapsRemain", 0);
@@ -180,7 +259,10 @@ namespace VISOR.ViewModels
             double timeRemain = snapshot.GetValue<double>("SessionTimeRemain", 0.0);
             int sessionNum = snapshot.GetValue<int>("SessionNum", -1);
 
-            // Debug logging only when values change
+            // --- LOGIC REVERTED: Use the old, reliable variable for display ---
+            int lapsRemaining = sessionLapsRemainOld;
+
+            // Keep logging both variables to gather data on when SessionLapsRemainEx is active.
             if (sessionLapsRemainOld != _lastSessionLapsRemainOld ||
                 sessionLapsRemainEx != _lastSessionLapsRemainEx)
             {
@@ -191,11 +273,11 @@ namespace VISOR.ViewModels
 
             string newTimeRemainingDisplay;
 
-            // Use the new SessionLapsRemainEx and remove qualifying exclusion
-            if (sessionLapsRemainEx > 0 && sessionLapsRemainEx < 10000)
+            // Display logic now driven by the old variable
+            if (lapsRemaining > 0 && lapsRemaining < 10000)
             {
                 TimeRemainingSymbol = "🏁";
-                newTimeRemainingDisplay = (sessionLapsRemainEx == 1) ? "Final Lap" : $"{sessionLapsRemainEx} Laps";
+                newTimeRemainingDisplay = (lapsRemaining == 1) ? "Final Lap" : $"{lapsRemaining} Laps";
             }
             else if (timeRemain > 0)
             {
@@ -211,7 +293,6 @@ namespace VISOR.ViewModels
                 newTimeRemainingDisplay = "--:--";
             }
 
-            // Only log display changes
             if (newTimeRemainingDisplay != _lastTimeRemainingDisplay)
             {
                 _lastTimeRemainingDisplay = newTimeRemainingDisplay;
@@ -227,7 +308,7 @@ namespace VISOR.ViewModels
             int currentSessionState = snapshot.GetValue<int>("SessionState", -1);
             if (currentSessionState != _lastSessionState)
             {
-                if (_lastSessionState == 6 && currentSessionState == 1) // CoolDown -> GetInCar
+                if (_lastSessionState == 6 && currentSessionState == 1)
                 {
                     ClearSessionUI();
                 }
@@ -246,16 +327,15 @@ namespace VISOR.ViewModels
             GearDisplay = "N";
             TimeRemainingDisplay = "--:--";
             TimeRemainingSymbol = "⏳";
+            ClassPositionNumber = "--";
 
-            // Reset shared services
             _classColorManager.Reset();
 
-            // Reset debug tracking
             _lastSessionLapsRemainOld = -1;
             _lastSessionLapsRemainEx = -1;
             _lastTimeRemainingDisplay = string.Empty;
 
-            OnPropertyChanged(string.Empty); // Update all properties
+            OnPropertyChanged(string.Empty);
         }
 
         private void CheckForSessionTransition(SVappsLABSnapshot snapshot)
@@ -276,7 +356,7 @@ namespace VISOR.ViewModels
             DeltaBarVM.Reset();
             FuelVM.Reset();
             WarningsVM.Reset();
-            OnPropertyChanged(string.Empty); // Update all properties
+            OnPropertyChanged(string.Empty);
         }
 
         public void Reset()
@@ -285,13 +365,8 @@ namespace VISOR.ViewModels
             _lastSessionState = -999;
             ClearSessionUI();
             WarningsVM.Reset();
-            // ClassColorManager reset is handled in ClearSessionUI()
         }
 
-        /// <summary>
-        /// Provides access to the shared ClassColorManager for other components.
-        /// Used by RadarWindow to get the same color manager instance.
-        /// </summary>
         public ClassColorManager ClassColorManager => _classColorManager;
 
         private string FormatLapTime(float timeInSeconds)

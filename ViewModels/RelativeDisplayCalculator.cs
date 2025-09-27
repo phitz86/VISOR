@@ -7,12 +7,15 @@ using VISOR.Telemetry;
 
 namespace VISOR.ViewModels
 {
-    /// <summary>
-    /// Performs all complex calculations for the relative drivers display.
-    /// This class is stateful and should be instantiated once per RelativeViewModel.
-    /// </summary>
     public class RelativeDisplayCalculator
     {
+        // --- NEW: Constants for Proximity Bar ---
+        private const double PROXIMITY_MAX_DISTANCE = 0.25; // 25% of a lap
+        private const double PROXIMITY_ALERT_DISTANCE = 0.15; // 15% of a lap
+        private static readonly Brush NeutralColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#80404040"));
+        private static readonly Brush AheadAlertColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FF00FFFF")); // Teal
+        private static readonly Brush BehindAlertColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFFF9900")); // Orange
+
         private readonly Dictionary<int, RelativeRowViewModel> _carCache;
         private readonly ClassColorManager _classColorManager;
 
@@ -22,11 +25,10 @@ namespace VISOR.ViewModels
             _classColorManager = classColorManager;
         }
 
-        public (List<RelativeRowViewModel> Rows, string PlayerPos, string PlayerPosNum) Calculate(SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider)
+        public List<RelativeRowViewModel> Calculate(SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider)
         {
             var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx");
 
-            // --- Get all data arrays from snapshot and provider ---
             var carClassIDs = dataProvider.CarClassIDs;
             var userNames = dataProvider.UserNames;
             var carNumbers = dataProvider.CarNumbers;
@@ -35,36 +37,28 @@ namespace VISOR.ViewModels
             var lapDistPct = snapshot.GetValue<float[]>("CarIdxLapDistPct");
             var currentLap = snapshot.GetValue<int[]>("CarIdxLap");
             var trackSurface = snapshot.GetValue<int[]>("CarIdxTrackSurface");
-            var onPitRoad = snapshot.GetValue<bool[]>("CarIdxOnPitRoad"); // Get pit road data
+            var onPitRoad = snapshot.GetValue<bool[]>("CarIdxOnPitRoad");
             var playerLastLapTime = snapshot.GetValue<float>("LapLastLapTime");
 
             var allValidCars = BuildValidCarsList(trackSurface, carNumbers, userNames, carIsAI,
-                carClassIDs, incidentCounts, currentLap, lapDistPct, onPitRoad, playerCarIdx); // Pass pit road data
+                carClassIDs, incidentCounts, currentLap, lapDistPct, onPitRoad, playerCarIdx);
 
             if (!allValidCars.Any())
             {
-                return (new List<RelativeRowViewModel>(), "--", "--");
+                return new List<RelativeRowViewModel>();
             }
 
-            List<RelativeRowViewModel> finalRows;
+            List<RelativeRowViewModel> finalRows = BuildProximityBasedRows(allValidCars, playerLastLapTime);
+
             bool useFastestLap = dataProvider.ShouldUseFastestLapPositioning();
-
-            // ALWAYS build the list of cars shown in the relative display based on physical proximity on track.
-            finalRows = BuildProximityBasedRows(allValidCars, playerLastLapTime);
-
-            var playerPos = CalculatePlayerClassPosition(allValidCars, playerCarIdx, useFastestLap, dataProvider);
             ApplyDisplayLogic(finalRows, allValidCars, playerLastLapTime, useFastestLap, dataProvider);
 
-            return (finalRows, playerPos.PlayerPos, playerPos.PlayerPosNum);
+            return finalRows;
         }
 
-        public void Reset()
-        {
-            // Note: ClassColorManager reset is handled by MainViewModel
-            // No need to reset shared service here since other components may still be using it
-        }
+        public void Reset() { }
 
-        #region Calculation Logic (Moved from RelativeViewModel)
+        #region Calculation Logic
 
         private List<RelativeRowViewModel> BuildValidCarsList(int[] trackSurface, string[] carNumbers, string[] userNames,
             bool[] carIsAI, int[] carClassIDs, int[] incidentCounts, int[] currentLap, float[] lapDistPct, bool[] onPitRoad, int playerCarIdx)
@@ -91,45 +85,11 @@ namespace VISOR.ViewModels
                     row.CarNum = carNumbers[i];
                     row.ClassID = carClassIDs[i];
                     row.IncidentCount = incidentCounts[i];
-                    row.IsOnPitRoad = (onPitRoad != null && i < onPitRoad.Length) && onPitRoad[i]; // Set pit road status
+                    row.IsOnPitRoad = (onPitRoad != null && i < onPitRoad.Length) && onPitRoad[i];
                     allValidCars.Add(row);
                 }
             }
             return allValidCars;
-        }
-
-        private List<RelativeRowViewModel> BuildFastestLapBasedRows(List<RelativeRowViewModel> allCars,
-            int playerCarIdx, ISessionDataProvider sessionDataProvider)
-        {
-            var playerRow = allCars.FirstOrDefault(r => r.IsPlayer);
-            if (playerRow == null) return new List<RelativeRowViewModel>();
-
-            var fastestLapData = sessionDataProvider.GetFastestLapPositioning();
-            var allCarsWithPositions = new List<(RelativeRowViewModel car, int position)>();
-
-            if (fastestLapData.Any())
-            {
-                var fastestLapLookup = fastestLapData.ToDictionary(x => x.carIdx, x => x.position);
-                foreach (var car in allCars)
-                {
-                    int pos = fastestLapLookup.TryGetValue(car.CarIdx, out var p) ? p : 999 + car.CarIdx;
-                    allCarsWithPositions.Add((car, pos));
-                }
-            }
-            else
-            {
-                foreach (var car in allCars) allCarsWithPositions.Add((car, 999 + car.CarIdx));
-            }
-
-            var sortedByFastestLap = allCarsWithPositions.OrderBy(x => x.position).Select(x => x.car).ToList();
-            int playerFastestLapIndex = sortedByFastestLap.FindIndex(c => c.IsPlayer);
-            if (playerFastestLapIndex == -1) return new List<RelativeRowViewModel> { playerRow };
-
-            var result = new List<RelativeRowViewModel>();
-            for (int i = Math.Max(0, playerFastestLapIndex - 3); i < playerFastestLapIndex; i++) result.Add(sortedByFastestLap[i]);
-            result.Add(playerRow);
-            for (int i = playerFastestLapIndex + 1; i < Math.Min(sortedByFastestLap.Count, playerFastestLapIndex + 4); i++) result.Add(sortedByFastestLap[i]);
-            return result;
         }
 
         private List<RelativeRowViewModel> BuildProximityBasedRows(List<RelativeRowViewModel> allCars, float playerLastLapTime)
@@ -157,28 +117,6 @@ namespace VISOR.ViewModels
             return result;
         }
 
-        private (string PlayerPos, string PlayerPosNum) CalculatePlayerClassPosition(List<RelativeRowViewModel> allCars, int playerCarIdx, bool isFastestLapMode, ISessionDataProvider dataProvider)
-        {
-            var player = allCars.FirstOrDefault(c => c.CarIdx == playerCarIdx);
-            if (player == null) return ("--", "--");
-
-            var carsInClass = allCars.Where(c => c.ClassID == player.ClassID).ToList();
-
-            if (isFastestLapMode)
-            {
-                var fastestLaps = dataProvider.GetFastestLapPositioning().ToDictionary(d => d.carIdx, d => d.position);
-                var sorted = carsInClass.OrderBy(c => fastestLaps.GetValueOrDefault(c.CarIdx, 999)).ToList();
-                int pos = sorted.FindIndex(c => c.IsPlayer) + 1;
-                return pos > 0 ? ($"{pos}", pos.ToString()) : ("--", "--");
-            }
-            else
-            {
-                var sorted = carsInClass.OrderByDescending(c => c.CurrentLap + c.LapDistPct).ToList();
-                int pos = sorted.FindIndex(c => c.IsPlayer) + 1;
-                return pos > 0 ? ($"{pos}", pos.ToString()) : ("--", "--");
-            }
-        }
-
         private void ApplyDisplayLogic(List<RelativeRowViewModel> displayRows, List<RelativeRowViewModel> allCars,
             float playerLastLapTime, bool isFastestLapMode, ISessionDataProvider dataProvider)
         {
@@ -189,10 +127,10 @@ namespace VISOR.ViewModels
             foreach (var row in displayRows)
             {
                 AssignClassPositionDisplay(row, isFastestLapMode, dataProvider, classPositions);
-                AssignGapDisplay(row, playerRow, displayRows, playerLastLapTime, isFastestLapMode);
                 AssignNameColor(row, playerRow);
                 AssignClassBackgroundColor(row, playerRow);
                 AssignFontStyle(row);
+                AssignProximityBar(row, playerRow); // Call to new proximity logic
             }
         }
 
@@ -218,32 +156,6 @@ namespace VISOR.ViewModels
             }
         }
 
-        private void AssignGapDisplay(RelativeRowViewModel row, RelativeRowViewModel playerRow, List<RelativeRowViewModel> displayRows, float playerLastLapTime, bool isFastestLapMode)
-        {
-            if (row.IsPlayer)
-            {
-                row.Gap = "0.0";
-                return;
-            }
-
-            if (playerLastLapTime <= 0)
-            {
-                row.Gap = "0.0";
-                return;
-            }
-
-            // This logic now runs for all session types.
-            float proximityDistance = Math.Min(Math.Abs(row.LapDistPct - playerRow.LapDistPct), 1.0f - Math.Abs(row.LapDistPct - playerRow.LapDistPct));
-            float rawTimeGap = proximityDistance * playerLastLapTime;
-            row.UpdateSmoothedGap(rawTimeGap);
-
-            int playerDisplayIndex = displayRows.IndexOf(playerRow);
-            int rowDisplayIndex = displayRows.IndexOf(row);
-            string sign = (rowDisplayIndex < playerDisplayIndex) ? "+" : "-";
-
-            row.Gap = $"{sign}{row.SmoothedGap:F1}";
-        }
-
         private void AssignNameColor(RelativeRowViewModel row, RelativeRowViewModel playerRow)
         {
             if (row.IsPlayer) row.NameColor = Brushes.Yellow;
@@ -255,8 +167,6 @@ namespace VISOR.ViewModels
         private void AssignClassBackgroundColor(RelativeRowViewModel row, RelativeRowViewModel playerRow)
         {
             if (row.ClassID == 0) return;
-
-            // Use the shared ClassColorManager for consistent colors
             row.ClassBackground = _classColorManager.GetClassColor(row.ClassID);
         }
 
@@ -265,6 +175,35 @@ namespace VISOR.ViewModels
             row.FontStyle = row.IsOnPitRoad ? FontStyles.Italic : FontStyles.Normal;
         }
 
+        // --- NEW METHOD: AssignProximityBar ---
+        private void AssignProximityBar(RelativeRowViewModel row, RelativeRowViewModel playerRow)
+        {
+            row.BarWidthRatio = 0.0;
+            row.BarStartColor = Brushes.Transparent;
+            row.BarEndColor = Brushes.Transparent;
+
+            if (row.IsPlayer) return;
+
+            float proximityDistance = Math.Min(Math.Abs(row.LapDistPct - playerRow.LapDistPct), 1.0f - Math.Abs(row.LapDistPct - playerRow.LapDistPct));
+
+            if (proximityDistance <= PROXIMITY_MAX_DISTANCE)
+            {
+                row.BarWidthRatio = 1.0 - (proximityDistance / PROXIMITY_MAX_DISTANCE);
+
+                bool isAhead = (row.LapDistPct - playerRow.LapDistPct + 1.5f) % 1.0f > 0.5f;
+
+                if (proximityDistance > PROXIMITY_ALERT_DISTANCE)
+                {
+                    row.BarStartColor = NeutralColor;
+                    row.BarEndColor = NeutralColor;
+                }
+                else
+                {
+                    row.BarStartColor = NeutralColor;
+                    row.BarEndColor = isAhead ? AheadAlertColor : BehindAlertColor;
+                }
+            }
+        }
         #endregion
     }
 }

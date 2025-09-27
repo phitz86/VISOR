@@ -61,7 +61,14 @@ namespace VISOR.Views
 
         private void ApplyWindowSizing()
         {
-            var windowSize = _settingsManager.GetMainWindowSize();
+            // Pass current session data provider if available for dynamic height calculation
+            ISessionDataProvider sessionProvider = null;
+            if (_sdk?.IsSessionDataReady == true)
+            {
+                sessionProvider = _sdk.Coordinator;
+            }
+
+            var windowSize = _settingsManager.GetMainWindowSize(sessionProvider);
             Width = windowSize.Width;
             Height = windowSize.Height;
         }
@@ -204,13 +211,19 @@ namespace VISOR.Views
                     var now = DateTime.Now;
                     if ((now - _lastSessionReadyLog).TotalSeconds > 10)
                     {
+                        System.Diagnostics.Debug.WriteLine("[MainWindow] Session data ready - passing SDK's Coordinator");
                         _lastSessionReadyLog = now;
                     }
 
                     _viewModel.UpdateFromTelemetry(snapshot, _sdk.Coordinator);
+
+                    // Check if window needs resizing due to session state changes (like lone qualifying)
+                    // This ensures the window shrinks/expands when relative display is hidden/shown
+                    ApplyWindowSizing();
                 }
                 else
                 {
+                    System.Diagnostics.Debug.WriteLine("[MainWindow] Session data not ready - passing null");
                     _viewModel.UpdateFromTelemetry(snapshot, null);
                 }
             });
@@ -297,6 +310,11 @@ namespace VISOR.Views
         }
 
         private void QuitButton_Click(object sender, RoutedEventArgs e)
+        {
+            Application.Current.Shutdown();
+        }
+
+        private void ExitButton_Click(object sender, RoutedEventArgs e)
         {
             Application.Current.Shutdown();
         }
