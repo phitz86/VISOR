@@ -44,6 +44,41 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
+            <Button x:Name="ConfigButton" 
+        Grid.Row="0" Grid.Column="1"
+        Content="⚙"
+        Width="24" Height="24"
+        HorizontalAlignment="Right" VerticalAlignment="Top"
+        Margin="0,8,36,0"
+        Foreground="White"
+        BorderThickness="0"
+        FontSize="16"
+        Cursor="Hand"
+        Click="ConfigButton_Click">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Setter Property="Background" Value="#80808080"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}" CornerRadius="3">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#800080FF"/>
+                                        </Trigger>
+                                        <Trigger Property="IsPressed" Value="True">
+                                            <Setter Property="Background" Value="#FF0080FF"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Button.Style>
+            </Button>
+
             <Button x:Name="ExitButton" 
                     Grid.Row="0" Grid.Column="1"
                     Content="✕"

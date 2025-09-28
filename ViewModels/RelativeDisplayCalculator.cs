@@ -10,8 +10,8 @@ namespace VISOR.ViewModels
     public class RelativeDisplayCalculator
     {
         // --- NEW: Constants for Proximity Bar ---
-        private const double PROXIMITY_MAX_DISTANCE = 0.25; // 25% of a lap
-        private const double PROXIMITY_ALERT_DISTANCE = 0.15; // 15% of a lap
+        private const double PROXIMITY_MAX_DISTANCE = 0.20; // 25% of a lap
+        private const double PROXIMITY_ALERT_DISTANCE = 0.10; // 15% of a lap
         private static readonly Brush NeutralColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#80404040"));
         private static readonly Brush AheadAlertColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FF00FFFF")); // Teal
         private static readonly Brush BehindAlertColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFFF9900")); // Orange

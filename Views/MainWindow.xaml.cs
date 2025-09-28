@@ -318,6 +318,23 @@ namespace VISOR.Views
         {
             Application.Current.Shutdown();
         }
+        private void ConfigButton_Click(object sender, RoutedEventArgs e)
+        {
+            // Check if a ConfigWindow is already open to prevent duplicates
+            foreach (Window window in Application.Current.Windows)
+            {
+                if (window is ConfigWindow)
+                {
+                    // If it is, just bring it to the front and exit the method
+                    window.Activate();
+                    return;
+                }
+            }
+
+            // If no ConfigWindow was found, create and show a new one.
+            ConfigWindow configWindow = new ConfigWindow();
+            configWindow.Show();
+        }
 
         protected override void OnClosed(EventArgs e)
         {
