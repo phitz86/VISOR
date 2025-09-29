@@ -331,8 +331,12 @@ namespace VISOR.Views
                 }
             }
 
-            // If no ConfigWindow was found, create and show a new one.
-            ConfigWindow configWindow = new ConfigWindow();
+            // Find the RadarWindow instance
+            var radarWindow = Application.Current.Windows.OfType<RadarWindow>().FirstOrDefault();
+
+            // If no ConfigWindow was found, create a new one with the required parameters.
+            // Note: This assumes _sdk is the name of your SVappsLABSDKWrapper field.
+            ConfigWindow configWindow = new ConfigWindow(_sdk, this, radarWindow);
             configWindow.Show();
         }
 
