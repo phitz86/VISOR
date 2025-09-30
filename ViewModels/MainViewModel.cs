@@ -31,6 +31,8 @@ namespace VISOR.ViewModels
         // --- Session Tracking ---
         private int _lastSessionNum = -1;
         private int _lastSessionState = -999;
+        private bool _greenFlagSeen = false;
+        private int _lastLap = -1;
         private float _topSpeedBaseline = 0f;
         private float _currentLapTopSpeed = 0f;
         private float _lastLapTopSpeed = 0f;
@@ -251,56 +253,85 @@ namespace VISOR.ViewModels
             }
         }
 
-        // In MainViewModel.cs, replace the entire UpdateSessionTimer method
         private void UpdateSessionTimer(SVappsLABSnapshot snapshot)
         {
-            int sessionLapsRemainOld = snapshot.GetValue<int>("SessionLapsRemain", 0);
-            int sessionLapsRemainEx = snapshot.GetValue<int>("SessionLapsRemainEx", 0);
+            // --- Get raw telemetry data ---
+            int lapsRemaining = snapshot.GetValue<int>("SessionLapsRemain", 0);
             double timeRemain = snapshot.GetValue<double>("SessionTimeRemain", 0.0);
-            int sessionNum = snapshot.GetValue<int>("SessionNum", -1);
+            int currentLap = snapshot.GetValue<int>("Lap", 0);
+            // --- UPDATED: Get SessionFlags as a raw integer to prevent casting errors ---
+            int sessionFlagsValue = snapshot.GetValue<int>("SessionFlags", 0);
 
-            // --- LOGIC REVERTED: Use the old, reliable variable for display ---
-            int lapsRemaining = sessionLapsRemainOld;
-
-            // Keep logging both variables to gather data on when SessionLapsRemainEx is active.
-            if (sessionLapsRemainOld != _lastSessionLapsRemainOld ||
-                sessionLapsRemainEx != _lastSessionLapsRemainEx)
+            // --- State Management ---
+            if (currentLap < _lastLap)
             {
-                System.Diagnostics.Debug.WriteLine($"[SessionTimer] SessionNum: {sessionNum}, LapsRemainOld: {sessionLapsRemainOld}, LapsRemainEx: {sessionLapsRemainEx}, TimeRemain: {timeRemain:F1}s");
-                _lastSessionLapsRemainOld = sessionLapsRemainOld;
+                _greenFlagSeen = false;
+            }
+
+            // --- UPDATED: Compare integers directly with the integer values of our enum ---
+            if ((sessionFlagsValue & (int)Telemetry.SessionFlags.Green) == (int)Telemetry.SessionFlags.Green)
+            {
+                _greenFlagSeen = true;
+            }
+
+            // Only update the display when a new lap starts AFTER the green flag has been seen
+            if (_greenFlagSeen && currentLap != _lastLap)
+            {
+                string newLapDisplay;
+
+                // --- UPDATED: Prioritize flags using integer comparison ---
+                if ((sessionFlagsValue & (int)Telemetry.SessionFlags.Checkered) == (int)Telemetry.SessionFlags.Checkered)
+                {
+                    TimeRemainingSymbol = "🏁";
+                    newLapDisplay = "FINISHED";
+                }
+                else if ((sessionFlagsValue & (int)Telemetry.SessionFlags.White) == (int)Telemetry.SessionFlags.White)
+                {
+                    TimeRemainingSymbol = "🏁";
+                    newLapDisplay = "Final Lap";
+                }
+                else if (lapsRemaining >= 0 && lapsRemaining < 10000)
+                {
+                    TimeRemainingSymbol = "🏁";
+                    if (lapsRemaining == 0)
+                    {
+                        newLapDisplay = "Final Lap";
+                    }
+                    else
+                    {
+                        newLapDisplay = $"{lapsRemaining + 1} Laps";
+                    }
+                }
+                else if (timeRemain > 0)
+                {
+                    TimeRemainingSymbol = "⏳";
+                    TimeSpan remaining = TimeSpan.FromSeconds(timeRemain);
+                    if (remaining.TotalHours >= 1.0)
+                        newLapDisplay = $"{(int)remaining.TotalHours}:{remaining.Minutes:D2}:{remaining.Seconds:D2}";
+                    else
+                        newLapDisplay = $"{(int)remaining.TotalMinutes}:{remaining.Seconds:D2}";
+                }
+                else
+                {
+                    newLapDisplay = "--:--";
+                }
+
+                TimeRemainingDisplay = newLapDisplay;
+                OnPropertyChanged(nameof(TimeRemainingDisplay));
+                OnPropertyChanged(nameof(TimeRemainingSymbol));
+            }
+
+            _lastLap = currentLap;
+
+            var sessionLapsRemainEx = snapshot.GetValue<int>("SessionLapsRemainEx", 0);
+            if (lapsRemaining != _lastSessionLapsRemainOld || sessionLapsRemainEx != _lastSessionLapsRemainEx)
+            {
+                // For debug, we can cast the int to see the flag names
+                var flagsEnum = (Telemetry.SessionFlags)sessionFlagsValue;
+                System.Diagnostics.Debug.WriteLine($"[SessionTimer] Laps: {lapsRemaining}, LapsEx: {sessionLapsRemainEx}, Time: {timeRemain:F1}s, Flags: {flagsEnum}");
+                _lastSessionLapsRemainOld = lapsRemaining;
                 _lastSessionLapsRemainEx = sessionLapsRemainEx;
             }
-
-            string newTimeRemainingDisplay;
-
-            // Display logic now driven by the old variable
-            if (lapsRemaining > 0 && lapsRemaining < 10000)
-            {
-                TimeRemainingSymbol = "🏁";
-                newTimeRemainingDisplay = (lapsRemaining == 1) ? "Final Lap" : $"{lapsRemaining} Laps";
-            }
-            else if (timeRemain > 0)
-            {
-                TimeRemainingSymbol = "⏳";
-                TimeSpan remaining = TimeSpan.FromSeconds(timeRemain);
-                if (remaining.TotalHours >= 1.0)
-                    newTimeRemainingDisplay = $"{(int)remaining.TotalHours}:{remaining.Minutes:D2}:{remaining.Seconds:D2}";
-                else
-                    newTimeRemainingDisplay = $"{(int)remaining.TotalMinutes}:{remaining.Seconds:D2}";
-            }
-            else
-            {
-                newTimeRemainingDisplay = "--:--";
-            }
-
-            if (newTimeRemainingDisplay != _lastTimeRemainingDisplay)
-            {
-                _lastTimeRemainingDisplay = newTimeRemainingDisplay;
-            }
-
-            TimeRemainingDisplay = newTimeRemainingDisplay;
-            OnPropertyChanged(nameof(TimeRemainingDisplay));
-            OnPropertyChanged(nameof(TimeRemainingSymbol));
         }
 
         private void CheckSessionStateTransitions(SVappsLABSnapshot snapshot)

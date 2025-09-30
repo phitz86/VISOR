@@ -211,7 +211,6 @@ namespace VISOR.Views
                     var now = DateTime.Now;
                     if ((now - _lastSessionReadyLog).TotalSeconds > 10)
                     {
-                        System.Diagnostics.Debug.WriteLine("[MainWindow] Session data ready - passing SDK's Coordinator");
                         _lastSessionReadyLog = now;
                     }
 

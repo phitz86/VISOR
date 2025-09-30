@@ -9,12 +9,11 @@ namespace VISOR.ViewModels
 {
     public class RelativeDisplayCalculator
     {
-        // --- NEW: Constants for Proximity Bar ---
-        private const double PROXIMITY_MAX_DISTANCE = 0.20; // 25% of a lap
-        private const double PROXIMITY_ALERT_DISTANCE = 0.10; // 15% of a lap
-        private static readonly Brush NeutralColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#80404040"));
-        private static readonly Brush AheadAlertColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FF00FFFF")); // Teal
-        private static readonly Brush BehindAlertColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFFF9900")); // Orange
+        private const double PROXIMITY_MAX_DISTANCE = 0.15;
+        private const double PROXIMITY_ALERT_DISTANCE = 0.05;
+        private static readonly Color NeutralColor = (Color)ColorConverter.ConvertFromString("#80404040");
+        private static readonly Color AheadAlertColor = (Color)ColorConverter.ConvertFromString("#FF00FFFF"); // Teal
+        private static readonly Color BehindAlertColor = (Color)ColorConverter.ConvertFromString("#FFFF9900"); // Orange
 
         private readonly Dictionary<int, RelativeRowViewModel> _carCache;
         private readonly ClassColorManager _classColorManager;
@@ -130,7 +129,7 @@ namespace VISOR.ViewModels
                 AssignNameColor(row, playerRow);
                 AssignClassBackgroundColor(row, playerRow);
                 AssignFontStyle(row);
-                AssignProximityBar(row, playerRow); // Call to new proximity logic
+                AssignProximityBar(row, playerRow);
             }
         }
 
@@ -175,12 +174,12 @@ namespace VISOR.ViewModels
             row.FontStyle = row.IsOnPitRoad ? FontStyles.Italic : FontStyles.Normal;
         }
 
-        // --- NEW METHOD: AssignProximityBar ---
         private void AssignProximityBar(RelativeRowViewModel row, RelativeRowViewModel playerRow)
         {
+            // Reset defaults
             row.BarWidthRatio = 0.0;
-            row.BarStartColor = Brushes.Transparent;
-            row.BarEndColor = Brushes.Transparent;
+            row.BarStartColor = Colors.Transparent; // <-- CORRECTED
+            row.BarEndColor = Colors.Transparent;   // <-- CORRECTED
 
             if (row.IsPlayer) return;
 

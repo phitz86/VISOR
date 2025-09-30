@@ -120,7 +120,7 @@
                         Orientation="Horizontal"
                         Visibility="{Binding ShowGear, Converter={StaticResource BoolToVisibilityConverter}}"
                         HorizontalAlignment="Center">
-                <TextBlock Text="⚙" FontSize="56" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,8,0"/>
+                <TextBlock Text="⚙" FontSize="54" Foreground="DimGray" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,8,0"/>
                 <TextBlock Text="{Binding GearDisplay}"
                            FontSize="80" FontWeight="Bold"
                            FontFamily="pack://application:,,,/Resources/Fonts/#Digital-7"
@@ -237,8 +237,8 @@
                                     </Border.Width>
                                     <Border.Background>
                                         <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
-                                            <GradientStop Color="{Binding BarStartColor.Color}" Offset="0.0" />
-                                            <GradientStop Color="{Binding BarEndColor.Color}" Offset="1.0" />
+                                            <GradientStop Color="{Binding BarStartColor}" Offset="0.0" />
+                                            <GradientStop Color="{Binding BarEndColor}" Offset="1.0" />
                                         </LinearGradientBrush>
                                     </Border.Background>
                                 </Border>

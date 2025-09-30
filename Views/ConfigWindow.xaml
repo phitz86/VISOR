@@ -3,15 +3,24 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="VISOR Configuration" Height="750" Width="450"
         WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+        <Style TargetType="GroupBox">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="TextElement.FontFamily" Value="/Resources/Fonts/#Segoe UI"/>
+        </Style>
+
+        <Style TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="/Resources/Fonts/#Segoe UI" />
+        </Style>
+    </Window.Resources>
+
     <Grid Margin="15">
         <StackPanel>
-            <!-- Header -->
             <TextBlock Text="VISOR Configuration" FontWeight="Bold" FontSize="18" Margin="0,0,0,15" HorizontalAlignment="Center"/>
 
-            <!-- Instructions -->
-            <TextBlock Text="Configure which overlay elements to display:" FontWeight="SemiBold" Margin="0,0,0,15"/>
+            <TextBlock Text="Configure which overlay elements to display:" Margin="0,0,0,15"/>
 
-            <!-- Window Size Selection -->
             <GroupBox Header="Window Size" Margin="0,0,0,15">
                 <StackPanel Margin="10">
                     <TextBlock Text="Choose size preset for all windows:" Margin="0,0,0,8"/>
@@ -23,38 +32,23 @@
                 </StackPanel>
             </GroupBox>
 
-            <!-- Row Visibility Controls -->
             <GroupBox Header="Display Elements" Margin="0,0,0,15">
                 <StackPanel Margin="10">
-
-                    <!-- Row 0: Position and Gear -->
                     <CheckBox x:Name="Row0CheckBox" Content="Row 0: Gear Indicator + Class Position" 
                               IsChecked="True" Margin="0,0,0,8" Checked="RowCheckBox_Changed" Unchecked="RowCheckBox_Changed"/>
-
-                    <!-- Row 1: Time and Fuel -->
                     <CheckBox x:Name="Row1CheckBox" Content="Row 1: Time Remaining + Fuel Remaining" 
                               IsChecked="True" Margin="0,0,0,8" Checked="RowCheckBox_Changed" Unchecked="RowCheckBox_Changed"/>
-
-                    <!-- Row 2: Delta Bar -->
                     <CheckBox x:Name="Row2CheckBox" Content="Row 2: Lap Delta Bar" 
                               IsChecked="True" Margin="0,0,0,8" Checked="RowCheckBox_Changed" Unchecked="RowCheckBox_Changed"/>
-
-                    <!-- Row 3: Lap Times -->
                     <CheckBox x:Name="Row3CheckBox" Content="Row 3: Last Lap Time + Best Lap Time" 
                               IsChecked="True" Margin="0,0,0,8" Checked="RowCheckBox_Changed" Unchecked="RowCheckBox_Changed"/>
-
-                    <!-- Row 4: Relative Positioning -->
                     <CheckBox x:Name="Row4CheckBox" Content="Row 4: Relative Positioning Table" 
                               IsChecked="True" Margin="0,0,0,8" Checked="RowCheckBox_Changed" Unchecked="RowCheckBox_Changed"/>
-
-                    <!-- Row 5: Warnings -->
                     <CheckBox x:Name="Row5CheckBox" Content="Row 5: Warnings (Incidents, Pace, Pit Cue)" 
                               IsChecked="True" Margin="0,0,0,8" Checked="RowCheckBox_Changed" Unchecked="RowCheckBox_Changed"/>
-
                 </StackPanel>
             </GroupBox>
 
-            <!-- Radar Window Control -->
             <GroupBox Header="Radar Window" Margin="0,0,0,15">
                 <StackPanel Margin="10">
                     <CheckBox x:Name="RadarCheckBox" Content="Show Radar Window" 
@@ -64,21 +58,19 @@
                 </StackPanel>
             </GroupBox>
 
-            <!-- Important Note -->
-            <Border Background="#FFF3CD" BorderBrush="#FFEAA7" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,0,15">
+            <Border Background="#FFF3CD" BorderBrush="#FFEAA7" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,0,15"
+                    TextElement.FontWeight="Bold">
                 <StackPanel>
-                    <TextBlock Text="⚠️ Important:" FontWeight="Bold" Foreground="#856404"/>
+                    <TextBlock Text="⚠️ Important:" Foreground="#856404" HorizontalAlignment="Center"/>
                     <TextBlock TextWrapping="Wrap" Foreground="#856404" FontSize="11">
                         VISOR will only display over iRacing if the simulator is running in borderless windowed mode.
                     </TextBlock>
                 </StackPanel>
             </Border>
 
-            <!-- Preview Info -->
-            <TextBlock Text="Changes are applied in real-time to preview windows. Drag windows to reposition them." 
+            <TextBlock Text="Changes are applied in real-time to preview windows. Drag windows to reposition them."
                        FontStyle="Italic" Foreground="Gray" FontSize="11" TextAlignment="Center" Margin="0,0,0,15"/>
 
-            <!-- Action Buttons -->
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                 <Button Content="Done" Click="DoneButton_Click" Width="80" Margin="0,0,10,0" IsDefault="True"/>
                 <Button Content="Exit VISOR" Click="ExitButton_Click" Width="80"/>

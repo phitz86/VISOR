@@ -1,7 +1,30 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace VISOR.Telemetry
 {
+    [Flags]
+    public enum SessionFlags
+    {
+        None = 0,
+        Checkered = 0x00000001,
+        White = 0x00000002,
+        Green = 0x00000004,
+        Yellow = 0x00000008,
+        Red = 0x00000010,
+        Blue = 0x00000020,
+        Debris = 0x00000040,
+        Crossed = 0x00000080,
+        YellowWaving = 0x00000100,
+        OneLapToGreen = 0x00000200,
+        GreenHeld = 0x00000400,
+        TenToGo = 0x00000800,
+        FiveToGo = 0x00001000,
+        RandomWaving = 0x00002000,
+        Caution = 0x00004000,
+        CautionWaving = 0x00008000,
+    }
+
     /// <summary>
     /// Static event data that never changes during an event
     /// </summary>
@@ -9,7 +32,7 @@ namespace VISOR.Telemetry
     {
         public readonly Dictionary<int, DriverInfo> Drivers = new();
         public readonly SessionSchedule Schedule = new();
-        public readonly WeekendInfo Weekend = new(); // NEW: Weekend information including track data
+        public readonly WeekendInfo Weekend = new();
         public int IncidentLimit { get; set; }
 
         public class DriverInfo
@@ -30,17 +53,16 @@ namespace VISOR.Telemetry
                 public int SessionNum { get; set; }
                 public string SessionType { get; set; } = string.Empty;
                 public string SessionName { get; set; } = string.Empty;
-                public int SessionLaps { get; set; } = -1; // -1 = unlimited
+                public int SessionLaps { get; set; } = -1;
                 public double SessionTimeSeconds { get; set; }
             }
         }
 
-        // NEW: Weekend/Track information
         public class WeekendInfo
         {
             public string TrackName { get; set; } = string.Empty;
             public string TrackConfig { get; set; } = string.Empty;
-            public float TrackLength { get; set; } = 0f; // Track length in meters
+            public float TrackLength { get; set; } = 0f;
             public string TrackDisplayName { get; set; } = string.Empty;
             public string TrackDisplayShortName { get; set; } = string.Empty;
         }
@@ -52,9 +74,8 @@ namespace VISOR.Telemetry
     public class SessionTransitionData
     {
         public int CurrentSessionNum { get; set; } = -1;
-        public readonly Dictionary<int, int> DriverIncidentCounts = new(); // CarIdx -> Count
+        public readonly Dictionary<int, int> DriverIncidentCounts = new();
 
-        // Legacy compatibility
         public string CurrentSessionType { get; set; } = string.Empty;
         public string CurrentSessionName { get; set; } = string.Empty;
     }
@@ -64,13 +85,11 @@ namespace VISOR.Telemetry
     /// </summary>
     public class LiveSessionData
     {
-        // Results by session number
         public readonly Dictionary<int, List<ResultPosition>> SessionResultsPositions = new();
         public readonly Dictionary<int, List<FastestLapResult>> SessionFastestLaps = new();
 
-        // Qualifying results (legacy)
-        public readonly Dictionary<int, int> QualifyPositions = new(); // CarIdx -> Position
-        public readonly Dictionary<int, float> QualifyFastestTimes = new(); // CarIdx -> Time
+        public readonly Dictionary<int, int> QualifyPositions = new();
+        public readonly Dictionary<int, float> QualifyFastestTimes = new();
 
         public class ResultPosition
         {

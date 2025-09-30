@@ -25,7 +25,7 @@
 
             <!-- Global Style for TextBlocks -->
             <Style TargetType="TextBlock">
-                <Setter Property="FontFamily" Value="Segoe UI"/>
+                <Setter Property="TextElement.FontFamily" Value="/Resources/Fonts/#Segoe UI Semibold" />
                 <Setter Property="FontSize" Value="14"/>
             </Style>
 

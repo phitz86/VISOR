@@ -20,10 +20,10 @@ namespace VISOR.ViewModels
         private FontStyle _fontStyle = FontStyles.Normal;
         private bool _isOnPitRoad;
 
-        // --- Proximity Bar Properties ---
+        // --- CORRECTED: Backing fields for the proximity bar properties ---
         private double _barWidthRatio;
-        private Brush _barStartColor = Brushes.Transparent;
-        private Brush _barEndColor = Brushes.Transparent;
+        private Color _barStartColor = Colors.Transparent;
+        private Color _barEndColor = Colors.Transparent;
 
 
         // --- Public Properties for UI Binding ---
@@ -44,18 +44,16 @@ namespace VISOR.ViewModels
             set { _isOnPitRoad = value; OnPropertyChanged(); }
         }
 
-        // --- NEW Properties for Proximity Bar ---
+        // --- CORRECTED: Single, correct definitions for proximity bar properties ---
         public double BarWidthRatio { get => _barWidthRatio; set { _barWidthRatio = value; OnPropertyChanged(); } }
-        public Brush BarStartColor { get => _barStartColor; set { _barStartColor = value; OnPropertyChanged(); } }
-        public Brush BarEndColor { get => _barEndColor; set { _barEndColor = value; OnPropertyChanged(); } }
+        public Color BarStartColor { get => _barStartColor; set { _barStartColor = value; OnPropertyChanged(); } }
+        public Color BarEndColor { get => _barEndColor; set { _barEndColor = value; OnPropertyChanged(); } }
 
 
         // --- Properties for Internal Logic ---
         public float LapDistPct { get; set; }
         public int CurrentLap { get; set; }
 
-        // NOTE: The 'Gap' property and smoothing logic are no longer used by the UI
-        // but can be kept for other potential uses or removed if desired.
         internal float _smoothedGap = 0f;
         internal bool _hasInitializedGap = false;
 

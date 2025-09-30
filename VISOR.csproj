@@ -19,6 +19,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Remove="Resources\Fonts\segoeui.ttf" />
+    <None Remove="Resources\Fonts\seguiemj.ttf" />
+    <None Remove="Resources\Fonts\seguisb.ttf" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="9.0.7" />
     <PackageReference Include="SVappsLAB.iRacingTelemetrySDK" Version="0.9.8.3" />
     <PackageReference Include="System.Management" Version="9.0.7" />
@@ -27,6 +33,9 @@
   <!-- ADDED THIS ITEM GROUP TO INCLUDE THE FONT AS A RESOURCE -->
   <ItemGroup>
     <Resource Include="Resources\Fonts\digital-7.ttf" />
+    <Resource Include="Resources\Fonts\segoeui.ttf" />
+    <Resource Include="Resources\Fonts\seguiemj.ttf" />
+    <Resource Include="Resources\Fonts\seguisb.ttf" />
     <Resource Include="VISOR Logo.ico" />
   </ItemGroup>
 
