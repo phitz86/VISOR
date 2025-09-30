@@ -1,29 +1,29 @@
-Thread: VISOR Overlay Radar Feature & Relative improvement
+Thread: VISOR Overlay Beta Release Prep
 
 Context:
 Good afternoon Claude,
 
 I'm building an overlay UI for iRacing called VISOR (Virtual Intelligence Simulator Overlay & Radar). VISOR is a C# application, built in Visual Studio with .NET 8.0 and WPF. I've set AnyCPU for now, but can pivot if needed. We're targeting a MVVM architecture with discrete classes/files to handle individual tasks.
 
-I'm using this project to evaluate the coding and project management capabilities of various LLMs, including you, Gemini, Grok, and ChatGPT. Gemini just completed a significant refactor and code cleanup, resulting in more files, but shorter lengths per file, and Grok found a couple key telemetry variables that will enable our next big effort.
+I'm not a coder, but I work in tech, so I have a general understanding of how things work. I'm using this project to evaluate the coding and project management capabilities of various LLMs, including you, Gemini, Grok, and ChatGPT. Gemini just finished a final round of bug fixes, and now I would like your help with some final polishing steps before we create a sharable beta.
 
 Our SDK wrapper for ingesting the telemetry is the SVappsLAB iRacing SDK, installed via NuGet. The repo for the SDK is here: https://github.com/SVappsLAB/iRacingTelemetrySDK/tree/main
 
 Goals for this thread:
 
-Refactor Relative view models
- - We've been calculating time gaps for our Relative display block based on some smoothed estimations using CarIdxLapDistPct. There is another variable called CarIdxF2Time that may provide a more accurate calculation straight from the game, that we might want to use instead for our time gaps, while keeping the existing logic for ordering etc. unaltered.
- - I'd like you to research how F2Time works and figure out if and how we should use it for our Relative display.
+Config Window Font Issue
+ - Gem and I were trying to get the Config window to have the Semibold font for the headings, and regular Segoe UI for the rest. Try as we might, almost the whole window stayed Semibold. 
 
-Prototype Radar Display
- - It's time to take a stab at the "R" in VISOR. A radar display should be a separate window from MainWindow, but with the same translucent style and drag to reposition feature, and the same launch behavior (i.e. after ConfigWindow closes). After we've got it working the way we want, we will want the window to auto-hide when there are no cars close to us.
- - The size of the window should be 300x300 pixels, and it should be positioned in the upper right quadrant of the display, with similar center-offset logic as we used on the MainWindow.
- - The Radar window should be a simple target-style UI with two concentric rings and a crosshair, with the user's car in the center as a green rectangle, and other cars depicted as class-colored rectangles, positioned according to the logic we'll develop.
- - The concentric rings should be calculated to be 2 and 4 car lengths, respectively. To calculate these rings and the car positions within them, we should use CarIdxLapDistPct and the TrackLength variable from the session data. The outer boundary of the display (i.e. when we start or stop displaying cars) should be 5 car lengths.
- - The variables we need to use to position other cars in the display are CarLeftRight and CarIdxLapDistPct.
- - Other car blips should be colored according to their class, using the same scheme we developed for the Relative display. 
- - We also need to overlay the blips with the car's number, which we also already parsed for the Relative display. The sizes of the blips and car numbers should be selected so that the car number fits within the blip. The font should be white with a slight black outline so that it stands out, but it can be the default font.
- 
+Code Cleanup
+  - I'd like to take a pass through the whole code base and clean up any code that's leftover from things we abandoned, get rid of explanatory comments that don't matter any more, and ditch any logging statements that are about issues we've resolved.
+ - If you spot any architectural inefficiencies, like function duplication or file arrangements that could be better optimized for size or performance, say so.
+
+Potential Issue Identification:
+ - The app is testing nicely now, but as you do your code review, point out any places where you suspect we'll run into problems.
+
+Installer packaging:
+ - I'm interested in your feedback on what would be the best practice to get this app into a sharable export for some friends/testers.
+
  Rules & Methods:
  - Let's talk about what you see, understand, and want to do before we make any modifications to the code.
  - If you need more context or have decisions you want more information to support, say so. 

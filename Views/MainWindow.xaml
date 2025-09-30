@@ -20,6 +20,13 @@
             <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
             <viewModels:DeltaBarWidthConverter x:Key="DeltaBarWidthConverter"/>
             <converters:ProximityToWidthConverter x:Key="ProximityToWidthConverter"/>
+
+            <!-- Local style for MainWindow TextBlocks - Semibold -->
+            <Style TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="Segoe UI"/>
+                <Setter Property="FontWeight" Value="Semibold"/>
+                <Setter Property="FontSize" Value="14"/>
+            </Style>
         </ResourceDictionary>
     </Window.Resources>
 

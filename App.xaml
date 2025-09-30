@@ -23,13 +23,14 @@
                 <Setter Property="Margin" Value="0,0,0,6"/>
             </Style>
 
-            <!-- Global Style for TextBlocks -->
+            <!-- Global Style for TextBlocks - default to Normal -->
             <Style TargetType="TextBlock">
-                <Setter Property="TextElement.FontFamily" Value="/Resources/Fonts/#Segoe UI Semibold" />
+                <Setter Property="FontFamily" Value="Segoe UI"/>
+                <Setter Property="FontWeight" Value="Normal"/>
                 <Setter Property="FontSize" Value="14"/>
             </Style>
 
-            <!-- Global Style for Window Backgrounds (Optional overlay styling) -->
+            <!-- Global Style for Window Backgrounds -->
             <Style TargetType="Window">
                 <Setter Property="Background" Value="#FFEEEEEE"/>
             </Style>
