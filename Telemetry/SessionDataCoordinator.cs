@@ -4,9 +4,6 @@ using System.Linq;
 
 namespace VISOR.Telemetry
 {
-    /// <summary>
-    /// Coordinates all parsing and provides unified access to session data
-    /// </summary>
     public class SessionDataCoordinator : ISessionDataProvider
     {
         private readonly StaticEventParser _staticParser = new();
@@ -22,7 +19,6 @@ namespace VISOR.Telemetry
 
         public bool IsDataReady { get; private set; }
 
-        // Private backing fields for cached arrays to improve performance
         private readonly string[] _userNamesCache = new string[64];
         private readonly string[] _carNumbersCache = new string[64];
         private readonly int[] _carNumberRawCache = new int[64];
@@ -30,62 +26,40 @@ namespace VISOR.Telemetry
         private readonly bool[] _carIsAICache = new bool[64];
         private readonly int[] _curDriverIncidentCountCache = new int[64];
 
-        // ========== ISessionDataProvider Implementation ==========
-
         public string[] UserNames
         {
-            get
-            {
-                lock (_parseLock) { return _userNamesCache; }
-            }
+            get { lock (_parseLock) { return _userNamesCache; } }
         }
 
         public string[] CarNumbers
         {
-            get
-            {
-                lock (_parseLock) { return _carNumbersCache; }
-            }
+            get { lock (_parseLock) { return _carNumbersCache; } }
         }
 
         public int[] CarNumberRaw
         {
-            get
-            {
-                lock (_parseLock) { return _carNumberRawCache; }
-            }
+            get { lock (_parseLock) { return _carNumberRawCache; } }
         }
 
         public int[] CarClassIDs
         {
-            get
-            {
-                lock (_parseLock) { return _carClassIDsCache; }
-            }
+            get { lock (_parseLock) { return _carClassIDsCache; } }
         }
 
         public bool[] CarIsAI
         {
-            get
-            {
-                lock (_parseLock) { return _carIsAICache; }
-            }
+            get { lock (_parseLock) { return _carIsAICache; } }
         }
 
         public int[] CurDriverIncidentCount
         {
-            get
-            {
-                lock (_parseLock) { return _curDriverIncidentCountCache; }
-            }
+            get { lock (_parseLock) { return _curDriverIncidentCountCache; } }
         }
 
         public int IncidentLimit
         {
             get { lock (_parseLock) { return _staticData.IncidentLimit; } }
         }
-
-        // ========== Session-Aware Methods ==========
 
         public int CurrentSessionNum
         {
@@ -177,11 +151,6 @@ namespace VISOR.Telemetry
             }
         }
 
-        // ========== Track Information Access ==========
-
-        /// <summary>
-        /// Get track length in meters from YAML data
-        /// </summary>
         public float GetTrackLength()
         {
             lock (_parseLock)
@@ -190,9 +159,6 @@ namespace VISOR.Telemetry
             }
         }
 
-        /// <summary>
-        /// Get track name from YAML data
-        /// </summary>
         public string GetTrackName()
         {
             lock (_parseLock)
@@ -201,9 +167,6 @@ namespace VISOR.Telemetry
             }
         }
 
-        /// <summary>
-        /// Get track configuration name from YAML data
-        /// </summary>
         public string GetTrackConfig()
         {
             lock (_parseLock)
@@ -212,9 +175,6 @@ namespace VISOR.Telemetry
             }
         }
 
-        /// <summary>
-        /// Get track display name from YAML data
-        /// </summary>
         public string GetTrackDisplayName()
         {
             lock (_parseLock)
@@ -223,9 +183,6 @@ namespace VISOR.Telemetry
             }
         }
 
-        /// <summary>
-        /// Get track display short name from YAML data
-        /// </summary>
         public string GetTrackDisplayShortName()
         {
             lock (_parseLock)
@@ -233,8 +190,6 @@ namespace VISOR.Telemetry
                 return _staticData.Weekend.TrackDisplayShortName;
             }
         }
-
-        // ========== Live Results Access ==========
 
         public List<LiveSessionData.ResultPosition> GetCurrentSessionResultsPositions()
         {
@@ -272,7 +227,6 @@ namespace VISOR.Telemetry
             }
         }
 
-        // Legacy qualify results (backward compatibility)
         public int[] GetQualifyResultsPositions()
         {
             lock (_parseLock)
@@ -295,46 +249,31 @@ namespace VISOR.Telemetry
             }
         }
 
-        // ========== Helper Methods for RelativeViewModel (fulfilling ISessionDataProvider contract) ==========
-
-        /// <summary>
-        /// Determines if the current session should use fastest lap positioning
-        /// </summary>
         public bool ShouldUseFastestLapPositioning()
         {
             int currentSession = CurrentSessionNum;
 
-            // Practice sessions always use fastest lap positioning if data is available
             if (IsPracticeSession(currentSession))
             {
                 var resultsPositions = GetCurrentSessionResultsPositions();
                 return resultsPositions.Count > 0;
             }
 
-            // Non-lone qualifying sessions use fastest lap positioning
             if (IsQualifyingSession(currentSession) && !IsLoneQualifying(currentSession))
             {
                 var fastestLaps = GetCurrentSessionFastestLaps();
                 return fastestLaps.Count > 0;
             }
 
-            // Race sessions always use race position
             return false;
         }
 
-        /// <summary>
-        /// Determines if the relative display should be hidden (e.g., lone qualifying)
-        /// </summary>
         public bool ShouldHideRelativeDisplay()
         {
             int currentSession = CurrentSessionNum;
             return IsLoneQualifying(currentSession);
         }
 
-        /// <summary>
-        /// Gets fastest lap based positioning data for the current session
-        /// Returns cars sorted by fastest lap time (fastest first)
-        /// </summary>
         public List<(int carIdx, float fastestTime, int position)> GetFastestLapPositioning()
         {
             var result = new List<(int carIdx, float fastestTime, int position)>();
@@ -342,30 +281,26 @@ namespace VISOR.Telemetry
 
             if (IsPracticeSession(currentSession))
             {
-                // Use ResultsPositions data (already sorted by fastest lap in practice)
                 var resultsPositions = GetCurrentSessionResultsPositions();
                 foreach (var pos in resultsPositions)
                 {
-                    if (pos.FastestTime > 0) // Only include cars with valid times
+                    if (pos.FastestTime > 0)
                         result.Add((pos.CarIdx, pos.FastestTime, pos.Position));
                 }
             }
             else if (IsQualifyingSession(currentSession))
             {
-                // Use ResultsFastestLap data and sort manually
                 var fastestLaps = GetCurrentSessionFastestLaps();
                 var validTimes = new List<(int carIdx, float time)>();
 
                 foreach (var lap in fastestLaps)
                 {
-                    if (lap.FastestTime > 0) // Only include valid times
+                    if (lap.FastestTime > 0)
                         validTimes.Add((lap.CarIdx, lap.FastestTime));
                 }
 
-                // Sort by fastest time (ascending - fastest first)
                 validTimes.Sort((a, b) => a.time.CompareTo(b.time));
 
-                // Assign positions
                 for (int i = 0; i < validTimes.Count; i++)
                 {
                     result.Add((validTimes[i].carIdx, validTimes[i].time, i + 1));
@@ -374,8 +309,6 @@ namespace VISOR.Telemetry
 
             return result;
         }
-
-        // ========== Core Parsing Methods ==========
 
         public bool ParseSessionData(string sessionData)
         {
@@ -386,14 +319,12 @@ namespace VISOR.Telemetry
             {
                 lock (_parseLock)
                 {
-                    // Check if data has changed
                     var currentHash = sessionData.GetHashCode().ToString();
                     if (currentHash == _lastDataHash)
                         return false;
 
                     var lines = sessionData.Split('\n');
 
-                    // Parse in order: static first, then transition, then live
                     bool staticSuccess = _staticParser.ParseStaticData(lines, _staticData);
                     bool transitionSuccess = _transitionParser.ParseTransitionData(lines, _transitionData, _staticData);
                     bool liveSuccess = _liveParser.ParseLiveData(lines, _liveData, _transitionData.CurrentSessionNum);
@@ -401,15 +332,13 @@ namespace VISOR.Telemetry
                     if (staticSuccess && transitionSuccess)
                     {
                         _lastDataHash = currentHash;
-                        _cachedSessionYaml = sessionData; // Cache the raw YAML
+                        _cachedSessionYaml = sessionData;
 
-                        // Update cached arrays now that new data has been parsed
                         UpdateDriverDataCaches();
 
                         IsDataReady = true;
 
-                        // Debug output
-                        Console.WriteLine($"[SessionCoordinator] Parsed: {_staticData.Drivers.Count} drivers, " +
+                        System.Diagnostics.Debug.WriteLine($"[SessionCoordinator] Parsed: {_staticData.Drivers.Count} drivers, " +
                                         $"Session {_transitionData.CurrentSessionNum} ({GetCurrentSessionType()}), " +
                                         $"Track: {GetTrackDisplayName()} ({GetTrackLength():F1}m), " +
                                         $"ShouldUseFastestLap: {ShouldUseFastestLapPositioning()}");
@@ -420,18 +349,14 @@ namespace VISOR.Telemetry
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[SessionCoordinator] Parse error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[SessionCoordinator] Parse error: {ex.Message}");
             }
 
             return false;
         }
 
-        /// <summary>
-        /// Updates the cached driver data arrays. Called only when session data changes.
-        /// </summary>
         private void UpdateDriverDataCaches()
         {
-            // Clear old data to handle drivers leaving the session
             Array.Fill(_userNamesCache, null);
             Array.Fill(_carNumbersCache, null);
             Array.Fill(_carNumberRawCache, 0);
@@ -439,7 +364,6 @@ namespace VISOR.Telemetry
             Array.Fill(_carIsAICache, false);
             Array.Fill(_curDriverIncidentCountCache, 0);
 
-            // Populate static data from the parsed models
             foreach (var kvp in _staticData.Drivers)
             {
                 if (kvp.Key >= 0 && kvp.Key < 64)
@@ -452,7 +376,6 @@ namespace VISOR.Telemetry
                 }
             }
 
-            // Populate transition data from the parsed models
             foreach (var kvp in _transitionData.DriverIncidentCounts)
             {
                 if (kvp.Key >= 0 && kvp.Key < 64)
@@ -470,7 +393,6 @@ namespace VISOR.Telemetry
                 _staticData.Schedule.Sessions.Clear();
                 _staticData.IncidentLimit = 0;
 
-                // Clear weekend/track info
                 _staticData.Weekend.TrackName = string.Empty;
                 _staticData.Weekend.TrackConfig = string.Empty;
                 _staticData.Weekend.TrackLength = 0f;
@@ -488,7 +410,6 @@ namespace VISOR.Telemetry
                 _lastDataHash = string.Empty;
                 IsDataReady = false;
 
-                // Clear the cached arrays as well
                 UpdateDriverDataCaches();
             }
         }

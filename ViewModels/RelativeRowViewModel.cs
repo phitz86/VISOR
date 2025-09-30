@@ -11,7 +11,6 @@ namespace VISOR.ViewModels
         private void OnPropertyChanged([CallerMemberName] string? name = null) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
-        // --- Backing Fields ---
         private string _classPos = string.Empty;
         private string _carNum = string.Empty;
         private string _name = string.Empty;
@@ -19,14 +18,10 @@ namespace VISOR.ViewModels
         private Brush _nameColor = Brushes.White;
         private FontStyle _fontStyle = FontStyles.Normal;
         private bool _isOnPitRoad;
-
-        // --- CORRECTED: Backing fields for the proximity bar properties ---
         private double _barWidthRatio;
         private Color _barStartColor = Colors.Transparent;
         private Color _barEndColor = Colors.Transparent;
 
-
-        // --- Public Properties for UI Binding ---
         public int CarIdx { get; set; }
         public string ClassPos { get => _classPos; set { _classPos = value; OnPropertyChanged(); } }
         public string CarNum { get => _carNum; set { _carNum = value; OnPropertyChanged(); } }
@@ -44,13 +39,10 @@ namespace VISOR.ViewModels
             set { _isOnPitRoad = value; OnPropertyChanged(); }
         }
 
-        // --- CORRECTED: Single, correct definitions for proximity bar properties ---
         public double BarWidthRatio { get => _barWidthRatio; set { _barWidthRatio = value; OnPropertyChanged(); } }
         public Color BarStartColor { get => _barStartColor; set { _barStartColor = value; OnPropertyChanged(); } }
         public Color BarEndColor { get => _barEndColor; set { _barEndColor = value; OnPropertyChanged(); } }
 
-
-        // --- Properties for Internal Logic ---
         public float LapDistPct { get; set; }
         public int CurrentLap { get; set; }
 

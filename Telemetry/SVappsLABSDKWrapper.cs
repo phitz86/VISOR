@@ -2,7 +2,6 @@ using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,7 +17,6 @@ namespace VISOR.Telemetry
         "CarIdxLap", "CarIdxLastLapTime", "CarIdxOnPitRoad",
         "SessionState", "SessionTime", "SessionTimeRemain", "SessionLapsRemain",
         "SessionLapsTotal", "SessionNum", "PlayerCarIdx", "SessionFlags",
-        // Radar and F2 support fields
         "CarLeftRight", "CarIdxF2Time"
     ])]
     public class SVappsLABSDKWrapper : IDisposable
@@ -39,14 +37,6 @@ namespace VISOR.Telemetry
         private bool _isRetryingYaml = false;
 
         private int _lastSessionNumForLog = -1;
-
-        // Caches for efficient "log on change" logic
-        private string _lastCarLeftRightString = null;  // CarLeftRight is an enum
-        private float[] _lastF2Time = new float[64];
-
-        // Debug counters
-        private int _debugCounter = 0;
-        private bool _enumValuesDiscovered = false;
         #endregion
 
         #region Public Properties
@@ -83,6 +73,8 @@ namespace VISOR.Telemetry
         {
             try
             {
+                System.Diagnostics.Debug.WriteLine("=== App OnStartup started ===");
+
                 _client = TelemetryClient<TelemetryData>.Create(_logger);
                 _client.OnSessionInfoUpdate += OnSessionInfoUpdate;
                 _client.OnTelemetryUpdate += OnTelemetryUpdate;
@@ -120,8 +112,6 @@ namespace VISOR.Telemetry
                 StopYamlRetryTimer();
                 _sessionCoordinator.ClearCache();
                 _lastSessionNumForLog = -1;
-                _lastCarLeftRightString = null;
-                Array.Clear(_lastF2Time, 0, _lastF2Time.Length);
             }
             CheckPrimedStateChange();
         }
@@ -182,50 +172,6 @@ namespace VISOR.Telemetry
 
         private void OnTelemetryUpdate(object sender, TelemetryData telemetryData)
         {
-            // Helper function to robustly get a value via reflection, checking for properties then fields
-            object GetValue(string name)
-            {
-                PropertyInfo prop = typeof(TelemetryData).GetProperty(name);
-                if (prop != null) return prop.GetValue(telemetryData);
-
-                FieldInfo field = typeof(TelemetryData).GetField(name);
-                if (field != null) return field.GetValue(telemetryData);
-
-                return null;
-            }
-
-            // --- Enum Discovery (One-time) ---
-            if (!_enumValuesDiscovered)
-            {
-                try
-                {
-                    var carLeftRightValue = GetValue("CarLeftRight");
-                    if (carLeftRightValue != null)
-                    {
-                        Type enumType = carLeftRightValue.GetType();
-                        System.Diagnostics.Debug.WriteLine($"[CarLeftRight Enum Discovery] Type: {enumType.FullName}");
-
-                        // Get all possible enum values
-                        var enumValues = Enum.GetValues(enumType);
-                        System.Diagnostics.Debug.WriteLine($"[CarLeftRight Enum Discovery] Possible values:");
-
-                        foreach (var value in enumValues)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"  {value} = {Convert.ToInt32(value)}");
-                        }
-
-                        _enumValuesDiscovered = true;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[CarLeftRight Enum Discovery] Error: {ex.Message}");
-                }
-            }
-
-            // --- CarLeftRight logging removed for cleaner output ---
-
-            // --- Core Telemetry Processing ---
             try
             {
                 var telemetryDict = _dataBuilder.BuildTelemetryDictionary(telemetryData);

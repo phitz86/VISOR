@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using SVappsLAB.iRacingTelemetrySDK;
 
 namespace VISOR.Telemetry
@@ -7,9 +8,8 @@ namespace VISOR.Telemetry
     public class TelemetryDataBuilder
     {
         private readonly SessionDataCoordinator _coordinator;
-        private static int _lastSessionState = -1;
-        private static int _lastSessionFlags = -1;
-        private static string _lastSessionInfo = "";
+        private int _lastSessionState = -1;
+        private string _lastSessionInfo = "";
 
         public TelemetryDataBuilder(SessionDataCoordinator coordinator)
         {
@@ -31,7 +31,7 @@ namespace VISOR.Telemetry
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[DataBuilder] Error building telemetry dictionary: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[DataBuilder] Error building telemetry dictionary: {ex.Message}");
             }
             return dict;
         }
@@ -75,14 +75,11 @@ namespace VISOR.Telemetry
             dict["SessionLapsRemain"] = data.SessionLapsRemain;
             dict["SessionLapsTotal"] = data.SessionLapsTotal;
             dict["SessionNum"] = data.SessionNum;
-
-            // --- UPDATED: Convert the SDK's enum to a standard integer ---
             dict["SessionFlags"] = Convert.ToInt32(SafeGetFieldValue<object>(data, "SessionFlags", 0));
 
             int currentSessionState = (int)data.SessionState;
             if (currentSessionState != _lastSessionState)
             {
-                Console.WriteLine($"[DataBuilder DEBUG] SessionState changed: {_lastSessionState} -> {currentSessionState}");
                 System.Diagnostics.Debug.WriteLine($"[DataBuilder] SessionState: {_lastSessionState} -> {currentSessionState}");
                 _lastSessionState = currentSessionState;
             }
@@ -98,11 +95,6 @@ namespace VISOR.Telemetry
             dict["CarLeftRight"] = SafeGetFieldValue<object>(data, "CarLeftRight", null);
             dict["CarIdxF2Time"] = SafeGetFieldValue(data, "CarIdxF2Time", new float[64]);
             dict["TrackLength"] = SafeGetFieldValue(data, "TrackLength", 0f);
-
-            if (dict["CarIdxF2Time"] is float[] carIdxF2Time && carIdxF2Time.Length > 0 && (float)dict["TrackLength"] > 0)
-            {
-                System.Diagnostics.Debug.WriteLine($"[DataBuilder] Radar data available - TrackLength: {(float)dict["TrackLength"]:F1}m");
-            }
         }
 
         private void AddYamlData(Dictionary<string, object> dict)
@@ -125,20 +117,17 @@ namespace VISOR.Telemetry
                 string currentSessionInfo = $"{sessionType}({_coordinator.GetCurrentSessionName()})";
                 if (currentSessionInfo != _lastSessionInfo)
                 {
-                    Console.WriteLine($"[DataBuilder DEBUG] Session Info: {currentSessionInfo}");
                     System.Diagnostics.Debug.WriteLine($"[DataBuilder] Session Info: {currentSessionInfo}");
 
                     var trackLength = _coordinator.GetTrackLength();
                     if (trackLength > 0)
                     {
-                        Console.WriteLine($"[DataBuilder DEBUG] Track Length: {trackLength:F1}m");
                         System.Diagnostics.Debug.WriteLine($"[DataBuilder] Track Length: {trackLength:F1}m");
                     }
 
                     var carIsAI = _coordinator.CarIsAI;
                     int humanCount = carIsAI.Count(isAI => !isAI);
                     int aiCount = carIsAI.Count(isAI => isAI);
-                    Console.WriteLine($"[DataBuilder DEBUG] Driver counts - Human: {humanCount}, AI: {aiCount}");
                     System.Diagnostics.Debug.WriteLine($"[DataBuilder] Drivers: {humanCount} human, {aiCount} AI");
 
                     _lastSessionInfo = currentSessionInfo;
@@ -174,13 +163,6 @@ namespace VISOR.Telemetry
             return defaultValue;
         }
 
-        private bool HasField(TelemetryData data, string fieldName)
-        {
-            var field = data.GetType().GetField(fieldName);
-            var property = data.GetType().GetProperty(fieldName);
-            return field != null || property != null;
-        }
-
         public bool ValidateSnapshot(Dictionary<string, object> data)
         {
             if (!data.ContainsKey("PlayerCarIdx") || (int)data["PlayerCarIdx"] == -1)
@@ -190,24 +172,6 @@ namespace VISOR.Telemetry
                 return false;
 
             return true;
-        }
-
-        public string GetAvailableFieldsDebugInfo(TelemetryData data)
-        {
-            var fields = new List<string>();
-            var type = data.GetType();
-
-            foreach (var field in type.GetFields())
-            {
-                fields.Add($"Field: {field.Name} ({field.FieldType.Name})");
-            }
-
-            foreach (var property in type.GetProperties())
-            {
-                fields.Add($"Property: {property.Name} ({property.PropertyType.Name})");
-            }
-
-            return string.Join("\n", fields);
         }
     }
 }

@@ -4,34 +4,24 @@ using VISOR.Telemetry;
 
 namespace VISOR.Settings
 {
-    /// <summary>
-    /// Manages application settings and provides window sizing calculations.
-    /// Acts as a bridge between UserSettings and the application windows.
-    /// Singleton pattern ensures all windows share the same instance for proper event handling.
-    /// </summary>
     public class SettingsManager
     {
-        // Base dimensions (Large size - current dimensions)
         private const double MAIN_WINDOW_WIDTH_LARGE = 750.0;
         private const double MAIN_WINDOW_HEIGHT_LARGE = 640.0;
         private const double RADAR_WINDOW_WIDTH_LARGE = 240.0;
         private const double RADAR_WINDOW_HEIGHT_LARGE = 396.0;
 
-        // Row heights for dynamic sizing (generous estimates to prevent cutoff)
-        private const double ROW_HEIGHT_POSITION_GEAR = 100.0;     // Row 0: Large gear + position
-        private const double ROW_HEIGHT_TIME_FUEL = 60.0;         // Row 1: Time + Fuel
-        private const double ROW_HEIGHT_DELTA_BAR = 40.0;         // Row 2: Delta bar with margin
-        private const double ROW_HEIGHT_LAP_TIMES = 50.0;         // Row 3: Last + Best lap
-        private const double ROW_HEIGHT_RELATIVE = 250.0;         // Row 4: Relative table (7 cars)
-        private const double ROW_HEIGHT_WARNINGS = 60.0;          // Row 5: Warnings
-        private const double WINDOW_PADDING = 40.0;               // Top/bottom margins
+        private const double ROW_HEIGHT_POSITION_GEAR = 100.0;
+        private const double ROW_HEIGHT_TIME_FUEL = 60.0;
+        private const double ROW_HEIGHT_DELTA_BAR = 40.0;
+        private const double ROW_HEIGHT_LAP_TIMES = 50.0;
+        private const double ROW_HEIGHT_RELATIVE = 250.0;
+        private const double ROW_HEIGHT_WARNINGS = 60.0;
+        private const double WINDOW_PADDING = 40.0;
 
         private readonly UserSettings _settings;
         private static SettingsManager _instance;
 
-        /// <summary>
-        /// Singleton instance of settings manager
-        /// </summary>
         public static SettingsManager Instance
         {
             get
@@ -42,7 +32,6 @@ namespace VISOR.Settings
             }
         }
 
-        // Events for real-time updates
         public event EventHandler<SettingsChangedEventArgs> SettingsChanged;
         public event EventHandler<WindowSizeChangedEventArgs> WindowSizeChanged;
         public event EventHandler<ElementVisibilityChangedEventArgs> ElementVisibilityChanged;
@@ -55,41 +44,26 @@ namespace VISOR.Settings
 
         #region Window Dimensions
 
-        /// <summary>
-        /// Get main window dimensions based on current size preset and visible elements
-        /// </summary>
-        /// <param name="sessionDataProvider">Optional session data for dynamic visibility checks</param>
         public Size GetMainWindowSize(ISessionDataProvider sessionDataProvider = null)
         {
-            // Calculate base dimensions 
             double dynamicHeight = CalculateDynamicMainWindowHeight(sessionDataProvider);
             double baseWidth = MAIN_WINDOW_WIDTH_LARGE;
 
-            // Scale both width and height by the preset factor
             double scaleFactor = GetMainWindowScaleFactor(_settings.WindowSize);
             double scaledWidth = baseWidth * scaleFactor;
             double scaledHeight = dynamicHeight * scaleFactor;
 
-            var result = new Size(scaledWidth, scaledHeight);
-
-            return result;
+            return new Size(scaledWidth, scaledHeight);
         }
 
-        /// <summary>
-        /// Get radar window dimensions based on current size preset
-        /// </summary>
         public Size GetRadarWindowSize()
         {
             return GetBaseDimensions(_settings.WindowSize, isMainWindow: false);
         }
 
-        /// <summary>
-        /// Calculate the dynamic height of main window based on visible elements
-        /// </summary>
-        /// <param name="sessionDataProvider">Optional session data for lone qualifying detection</param>
         private double CalculateDynamicMainWindowHeight(ISessionDataProvider sessionDataProvider = null)
         {
-            double totalHeight = WINDOW_PADDING; // Start with base padding
+            double totalHeight = WINDOW_PADDING;
 
             if (_settings.ShowRow0)
                 totalHeight += ROW_HEIGHT_POSITION_GEAR;
@@ -103,11 +77,9 @@ namespace VISOR.Settings
             if (_settings.ShowRow3)
                 totalHeight += ROW_HEIGHT_LAP_TIMES;
 
-            // Check if Relative should be shown (setting enabled AND not in lone qualifying)
             bool showRelativeEffectively = _settings.ShowRow4;
             if (showRelativeEffectively && sessionDataProvider != null)
             {
-                // Check for lone qualifying to hide relative display
                 var coordinator = sessionDataProvider as SessionDataCoordinator;
                 if (coordinator != null)
                 {
@@ -126,15 +98,11 @@ namespace VISOR.Settings
             if (_settings.ShowRow5)
                 totalHeight += ROW_HEIGHT_WARNINGS;
 
-            totalHeight += WINDOW_PADDING; // Bottom padding
+            totalHeight += WINDOW_PADDING;
 
-            // Ensure minimum height
             return Math.Max(totalHeight, 200.0);
         }
 
-        /// <summary>
-        /// Get base window dimensions for the specified size preset
-        /// </summary>
         private Size GetBaseDimensions(WindowSizePreset sizePreset, bool isMainWindow)
         {
             if (isMainWindow)
@@ -147,7 +115,7 @@ namespace VISOR.Settings
                     _ => new Size(MAIN_WINDOW_WIDTH_LARGE, MAIN_WINDOW_HEIGHT_LARGE)
                 };
             }
-            else // Radar window
+            else
             {
                 return sizePreset switch
                 {
@@ -159,9 +127,6 @@ namespace VISOR.Settings
             }
         }
 
-        /// <summary>
-        /// Get the scale factor for main window based on size preset
-        /// </summary>
         private double GetMainWindowScaleFactor(WindowSizePreset sizePreset)
         {
             return sizePreset switch
@@ -177,9 +142,6 @@ namespace VISOR.Settings
 
         #region Window Positioning
 
-        /// <summary>
-        /// Get main window position, using saved position or calculating default
-        /// </summary>
         public Point GetMainWindowPosition()
         {
             if (_settings.MainWindowX >= 0 && _settings.MainWindowY >= 0)
@@ -187,7 +149,6 @@ namespace VISOR.Settings
                 return new Point(_settings.MainWindowX, _settings.MainWindowY);
             }
 
-            // Calculate default position (current logic from MainWindow.xaml.cs)
             double centerX = SystemParameters.PrimaryScreenWidth / 2;
             double centerY = SystemParameters.PrimaryScreenHeight / 2;
             double offsetX = 900;
@@ -200,9 +161,6 @@ namespace VISOR.Settings
             return new Point(left, top);
         }
 
-        /// <summary>
-        /// Get radar window position, using saved position or calculating default
-        /// </summary>
         public Point GetRadarWindowPosition()
         {
             if (_settings.RadarWindowX >= 0 && _settings.RadarWindowY >= 0)
@@ -210,17 +168,15 @@ namespace VISOR.Settings
                 return new Point(_settings.RadarWindowX, _settings.RadarWindowY);
             }
 
-            // Calculate default position (current logic from RadarWindow.xaml.cs)
             double centerX = SystemParameters.PrimaryScreenWidth / 2;
             double centerY = SystemParameters.PrimaryScreenHeight / 2;
-            double offsetX = 400; // Right side
-            double offsetY = -200; // Upper portion
+            double offsetX = 400;
+            double offsetY = -200;
 
             var windowSize = GetRadarWindowSize();
             double left = centerX + offsetX - (windowSize.Width / 2);
             double top = centerY + offsetY - (windowSize.Height / 2);
 
-            // Ensure window stays on screen
             if (left + windowSize.Width > SystemParameters.PrimaryScreenWidth)
                 left = SystemParameters.PrimaryScreenWidth - windowSize.Width - 20;
             if (top < 0)
@@ -229,9 +185,6 @@ namespace VISOR.Settings
             return new Point(left, top);
         }
 
-        /// <summary>
-        /// Save current window positions
-        /// </summary>
         public void SaveWindowPositions(Point mainWindowPos, Point radarWindowPos)
         {
             _settings.MainWindowX = (int)mainWindowPos.X;
@@ -239,22 +192,14 @@ namespace VISOR.Settings
             _settings.RadarWindowX = (int)radarWindowPos.X;
             _settings.RadarWindowY = (int)radarWindowPos.Y;
             _settings.SaveSettings();
-
-            System.Diagnostics.Debug.WriteLine($"[SettingsManager] Saved window positions - Main: ({mainWindowPos.X}, {mainWindowPos.Y}), Radar: ({radarWindowPos.X}, {radarWindowPos.Y})");
         }
 
         #endregion
 
         #region Element Visibility
 
-        /// <summary>
-        /// Check if radar window should be visible
-        /// </summary>
         public bool IsRadarVisible => _settings.ShowRadar;
 
-        /// <summary>
-        /// Update element visibility settings with real-time notifications
-        /// </summary>
         public void UpdateElementVisibility(bool showRow0, bool showRow1, bool showRow2,
             bool showRow3, bool showRow4, bool showRow5, bool showRadar)
         {
@@ -269,9 +214,6 @@ namespace VISOR.Settings
             _settings.ShowRadar = showRadar;
             _settings.SaveSettings();
 
-            System.Diagnostics.Debug.WriteLine("[SettingsManager] Element visibility updated");
-
-            // Fire events for real-time updates
             ElementVisibilityChanged?.Invoke(this, new ElementVisibilityChangedEventArgs
             {
                 ShowPositionAndGear = showRow0,
@@ -282,28 +224,20 @@ namespace VISOR.Settings
                 ShowWarnings = showRow5
             });
 
-            // Handle radar visibility changes
             if (oldRadarVisible != showRadar)
             {
                 RadarVisibilityChanged?.Invoke(this, new RadarVisibilityChangedEventArgs { IsVisible = showRadar });
             }
 
-            // Fire general settings changed event
             SettingsChanged?.Invoke(this, new SettingsChangedEventArgs { ChangeType = SettingsChangeType.ElementVisibility });
         }
 
-        /// <summary>
-        /// Update window size preset with real-time notifications
-        /// </summary>
         public void UpdateWindowSize(WindowSizePreset newSize)
         {
             var oldSize = _settings.WindowSize;
             _settings.WindowSize = newSize;
             _settings.SaveSettings();
 
-            System.Diagnostics.Debug.WriteLine($"[SettingsManager] Window size updated to {newSize}");
-
-            // Fire events for real-time updates
             if (oldSize != newSize)
             {
                 WindowSizeChanged?.Invoke(this, new WindowSizeChangedEventArgs
@@ -321,9 +255,6 @@ namespace VISOR.Settings
 
         #region Settings Access
 
-        /// <summary>
-        /// Direct access to UserSettings for advanced scenarios
-        /// </summary>
         public UserSettings Settings => _settings;
 
         #endregion

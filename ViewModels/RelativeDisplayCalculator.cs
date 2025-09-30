@@ -12,8 +12,8 @@ namespace VISOR.ViewModels
         private const double PROXIMITY_MAX_DISTANCE = 0.15;
         private const double PROXIMITY_ALERT_DISTANCE = 0.05;
         private static readonly Color NeutralColor = (Color)ColorConverter.ConvertFromString("#80404040");
-        private static readonly Color AheadAlertColor = (Color)ColorConverter.ConvertFromString("#FF00FFFF"); // Teal
-        private static readonly Color BehindAlertColor = (Color)ColorConverter.ConvertFromString("#FFFF9900"); // Orange
+        private static readonly Color AheadAlertColor = (Color)ColorConverter.ConvertFromString("#FF00FFFF");
+        private static readonly Color BehindAlertColor = (Color)ColorConverter.ConvertFromString("#FFFF9900");
 
         private readonly Dictionary<int, RelativeRowViewModel> _carCache;
         private readonly ClassColorManager _classColorManager;
@@ -176,10 +176,9 @@ namespace VISOR.ViewModels
 
         private void AssignProximityBar(RelativeRowViewModel row, RelativeRowViewModel playerRow)
         {
-            // Reset defaults
             row.BarWidthRatio = 0.0;
-            row.BarStartColor = Colors.Transparent; // <-- CORRECTED
-            row.BarEndColor = Colors.Transparent;   // <-- CORRECTED
+            row.BarStartColor = Colors.Transparent;
+            row.BarEndColor = Colors.Transparent;
 
             if (row.IsPlayer) return;
 

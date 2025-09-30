@@ -13,7 +13,6 @@ namespace VISOR.ViewModels
         private void OnPropertyChanged([CallerMemberName] string? name = null) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
-        // --- Private Fields ---
         private int _incidentCount = 0;
         private string _incidentDisplay = "0x";
         private Brush _incidentColor = Brushes.White;
@@ -25,7 +24,6 @@ namespace VISOR.ViewModels
         private bool _isPersistentDotVisible = false;
         private bool _isPitNowVisible = false;
 
-        // --- Public Properties ---
         public string IncidentDisplay { get => _incidentDisplay; private set { _incidentDisplay = value; OnPropertyChanged(); } }
         public Brush IncidentColor { get => _incidentColor; private set { _incidentColor = value; OnPropertyChanged(); } }
         public bool IsPaceWarningVisible { get => _isPaceWarningVisible; private set { _isPaceWarningVisible = value; OnPropertyChanged(); } }
@@ -125,10 +123,6 @@ namespace VISOR.ViewModels
             _bestPaceLapTimes.Clear();
             ClearPaceWarnings();
             IsPersistentDotVisible = false;
-        }
-        public void InitializePerformanceCounters()
-        {
-            System.Diagnostics.Debug.WriteLine("[WarningsViewModel] Performance counters initialized");
         }
     }
 }
