@@ -33,7 +33,7 @@ namespace VISOR.Telemetry
                     inWeekendInfo = true;
                     inDriverInfo = false;
                     inSessionInfo = false;
-                    inSessionsArray = false; // Add this
+                    inSessionsArray = false;
                 }
                 // Enter driver info section
                 else if (trimmed.StartsWith("DriverInfo:"))
@@ -41,7 +41,7 @@ namespace VISOR.Telemetry
                     inDriverInfo = true;
                     inWeekendInfo = false;
                     inSessionInfo = false;
-                    inSessionsArray = false; // Add this
+                    inSessionsArray = false;
                 }
                 // Parse session schedule
                 else if (trimmed.StartsWith("SessionInfo:"))
@@ -49,7 +49,7 @@ namespace VISOR.Telemetry
                     inSessionInfo = true;
                     inDriverInfo = false;
                     inWeekendInfo = false;
-                    inSessionsArray = false; // Add this - reset when entering SessionInfo
+                    inSessionsArray = false;
                 }
                 // Parse weekend/track information
                 else if (inWeekendInfo)
@@ -74,13 +74,6 @@ namespace VISOR.Telemetry
                     else if (trimmed.StartsWith("TrackDisplayShortName:"))
                         eventData.Weekend.TrackDisplayShortName = ParseStringValue(trimmed);
                 }
-                // Enter driver info section
-                else if (trimmed.StartsWith("DriverInfo:"))
-                {
-                    inDriverInfo = true;
-                    inWeekendInfo = false;
-                    inSessionInfo = false;
-                }
                 // Parse individual drivers
                 else if (inDriverInfo && trimmed.StartsWith("- CarIdx:"))
                 {
@@ -102,15 +95,10 @@ namespace VISOR.Telemetry
                         driver.CarNumberRaw = carNumRaw;
                     else if (trimmed.StartsWith("CarClassID:") && TryParseIntValue(trimmed, out int classId))
                         driver.CarClassID = classId;
+                    else if (trimmed.StartsWith("CarClassColor:") && TryParseHexValue(trimmed, out int classColor))
+                        driver.CarClassColor = classColor;
                     else if (trimmed.StartsWith("CarIsAI:"))
                         driver.IsAI = ParseBoolValue(trimmed);
-                }
-                // Parse session schedule
-                else if (trimmed.StartsWith("SessionInfo:"))
-                {
-                    inSessionInfo = true;
-                    inDriverInfo = false;
-                    inWeekendInfo = false;
                 }
                 else if (inSessionInfo && trimmed.StartsWith("Sessions:"))
                 {
@@ -159,6 +147,20 @@ namespace VISOR.Telemetry
             var parts = line.Split(':', 2);
             value = 0;
             return parts.Length >= 2 && int.TryParse(parts[1].Trim(), out value);
+        }
+
+        private bool TryParseHexValue(string line, out int value)
+        {
+            var parts = line.Split(':', 2);
+            value = 0;
+            if (parts.Length < 2) return false;
+
+            var hexString = parts[1].Trim();
+            // Remove "0x" prefix if present
+            if (hexString.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                hexString = hexString.Substring(2);
+
+            return int.TryParse(hexString, System.Globalization.NumberStyles.HexNumber, null, out value);
         }
 
         private string ParseStringValue(string line)

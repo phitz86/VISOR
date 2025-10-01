@@ -6,7 +6,7 @@ namespace VISOR.Settings
 {
     public class SettingsManager
     {
-        private const double MAIN_WINDOW_WIDTH_LARGE = 750.0;
+        private const double MAIN_WINDOW_WIDTH_LARGE = 640.0;
         private const double MAIN_WINDOW_HEIGHT_LARGE = 640.0;
         private const double RADAR_WINDOW_WIDTH_LARGE = 240.0;
         private const double RADAR_WINDOW_HEIGHT_LARGE = 396.0;
@@ -17,7 +17,7 @@ namespace VISOR.Settings
         private const double ROW_HEIGHT_LAP_TIMES = 50.0;
         private const double ROW_HEIGHT_RELATIVE = 250.0;
         private const double ROW_HEIGHT_WARNINGS = 60.0;
-        private const double WINDOW_PADDING = 40.0;
+        private const double WINDOW_PADDING = 20.0;
 
         private readonly UserSettings _settings;
         private static SettingsManager _instance;

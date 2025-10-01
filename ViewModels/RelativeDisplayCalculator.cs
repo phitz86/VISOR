@@ -29,6 +29,7 @@ namespace VISOR.ViewModels
             var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx");
 
             var carClassIDs = dataProvider.CarClassIDs;
+            var carClassColors = dataProvider.CarClassColors;
             var userNames = dataProvider.UserNames;
             var carNumbers = dataProvider.CarNumbers;
             var carIsAI = dataProvider.CarIsAI;
@@ -50,7 +51,7 @@ namespace VISOR.ViewModels
             List<RelativeRowViewModel> finalRows = BuildProximityBasedRows(allValidCars, playerLastLapTime);
 
             bool useFastestLap = dataProvider.ShouldUseFastestLapPositioning();
-            ApplyDisplayLogic(finalRows, allValidCars, playerLastLapTime, useFastestLap, dataProvider);
+            ApplyDisplayLogic(finalRows, allValidCars, playerLastLapTime, useFastestLap, dataProvider, carClassColors, carClassIDs);
 
             return finalRows;
         }
@@ -117,7 +118,7 @@ namespace VISOR.ViewModels
         }
 
         private void ApplyDisplayLogic(List<RelativeRowViewModel> displayRows, List<RelativeRowViewModel> allCars,
-            float playerLastLapTime, bool isFastestLapMode, ISessionDataProvider dataProvider)
+            float playerLastLapTime, bool isFastestLapMode, ISessionDataProvider dataProvider, int[] carClassColors, int[] carClassIDs)
         {
             var playerRow = displayRows.FirstOrDefault(r => r.IsPlayer);
             if (playerRow == null) return;
@@ -127,7 +128,7 @@ namespace VISOR.ViewModels
             {
                 AssignClassPositionDisplay(row, isFastestLapMode, dataProvider, classPositions);
                 AssignNameColor(row, playerRow);
-                AssignClassBackgroundColor(row, playerRow);
+                AssignClassBackgroundColor(row, playerRow, carClassColors, carClassIDs);
                 AssignFontStyle(row);
                 AssignProximityBar(row, playerRow);
             }
@@ -145,12 +146,14 @@ namespace VISOR.ViewModels
         {
             if (isFastestLapMode)
             {
+                // Use pre-sorted position data directly from YAML
                 var fastestLapData = dataProvider.GetFastestLapPositioning();
                 var carData = fastestLapData.FirstOrDefault(d => d.carIdx == row.CarIdx);
                 row.ClassPos = (carData.fastestTime > 0) ? $"{carData.position}" : "--";
             }
             else
             {
+                // Race mode - use calculated positions based on current lap distance
                 row.ClassPos = (classPositions.TryGetValue(row.ClassID, out var positions) && positions.TryGetValue(row.CarIdx, out var classPos)) ? $"{classPos}" : "??";
             }
         }
@@ -163,10 +166,10 @@ namespace VISOR.ViewModels
             else row.NameColor = Brushes.White;
         }
 
-        private void AssignClassBackgroundColor(RelativeRowViewModel row, RelativeRowViewModel playerRow)
+        private void AssignClassBackgroundColor(RelativeRowViewModel row, RelativeRowViewModel playerRow, int[] carClassColors, int[] carClassIDs)
         {
             if (row.ClassID == 0) return;
-            row.ClassBackground = _classColorManager.GetClassColor(row.ClassID);
+            row.ClassBackground = _classColorManager.GetClassColor(row.ClassID, carClassColors, carClassIDs);
         }
 
         private void AssignFontStyle(RelativeRowViewModel row)

@@ -26,7 +26,9 @@ namespace VISOR.Telemetry
         private readonly ILogger _logger;
         private readonly TelemetryDataBuilder _dataBuilder;
         private readonly SessionDataCoordinator _sessionCoordinator;
+#if DEBUG
         private readonly SessionDataLogger _sessionLogger;
+#endif
         private SVappsLABSnapshot _latestSnapshot;
         private CancellationTokenSource _cancellationTokenSource;
         private Task _monitoringTask;
@@ -60,10 +62,13 @@ namespace VISOR.Telemetry
             _logger = new NullLogger<SVappsLABSDKWrapper>();
             _sessionCoordinator = new SessionDataCoordinator();
             _dataBuilder = new TelemetryDataBuilder(_sessionCoordinator);
+
+#if DEBUG
             _sessionLogger = new SessionDataLogger(
                 () => _sessionCoordinator.GetCachedSessionYaml(),
                 () => GetFieldTypes()
             );
+#endif
 
             _yamlRetryTimer = new System.Timers.Timer(1000) { AutoReset = true };
             _yamlRetryTimer.Elapsed += OnYamlRetryTimer;
@@ -165,7 +170,9 @@ namespace VISOR.Telemetry
                 string sessionName = _sessionCoordinator.GetSessionName(currentSessionNum);
                 double sessionTimeSeconds = _sessionCoordinator.GetSessionTimeSeconds(currentSessionNum);
 
-                _sessionLogger.ScheduleSessionAwareLogs(currentSessionNum, sessionName, sessionTimeSeconds);
+#if DEBUG
+                _sessionLogger?.ScheduleSessionAwareLogs(currentSessionNum, sessionName, sessionTimeSeconds);
+#endif
                 _lastSessionNumForLog = currentSessionNum;
             }
         }
@@ -228,7 +235,11 @@ namespace VISOR.Telemetry
             {
                 StopYamlRetryTimer();
                 _yamlRetryTimer?.Dispose();
+
+#if DEBUG
                 _sessionLogger?.Dispose();
+#endif
+
                 _cancellationTokenSource?.Cancel();
 
                 if (_monitoringTask != null && !_monitoringTask.Wait(TimeSpan.FromSeconds(2)))

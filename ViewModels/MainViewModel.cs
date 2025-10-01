@@ -18,17 +18,14 @@ namespace VISOR.ViewModels
         private void OnPropertyChanged([CallerMemberName] string? name = null) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
-        // --- Child ViewModels ---
         public FuelViewModel FuelVM { get; private set; }
         public RelativeViewModel RelativeVM { get; private set; }
         public DeltaBarViewModel DeltaBarVM { get; private set; }
         public WarningsViewModel WarningsVM { get; private set; }
 
-        // --- Shared Services ---
         private readonly ClassColorManager _classColorManager;
         private readonly SettingsManager _settingsManager;
 
-        // --- Session Tracking ---
         private int _lastSessionNum = -1;
         private int _lastSessionState = -999;
         private bool _greenFlagSeen = false;
@@ -37,12 +34,10 @@ namespace VISOR.ViewModels
         private float _currentLapTopSpeed = 0f;
         private float _lastLapTopSpeed = 0f;
 
-        // --- Debug Tracking for Session Timer ---
-        private int _lastSessionLapsRemainOld = -1;
-        private int _lastSessionLapsRemainEx = -1;
-        private string _lastTimeRemainingDisplay = string.Empty;
+        // Debug tracking for car count (throttled logging)
+        private int _lastValidCarCount = -1;
+        private int _lastClassCarCount = -1;
 
-        // --- Public Properties ---
         public string ClassPositionNumber { get; private set; } = "--";
         public string GearDisplay { get; private set; } = "N";
         public string LastLapTime { get; private set; } = "-:--.---";
@@ -50,7 +45,6 @@ namespace VISOR.ViewModels
         public string TimeRemainingDisplay { get; private set; } = "--:--";
         public string TimeRemainingSymbol { get; private set; } = "⏳";
 
-        // --- Settings Bridge Properties (for XAML binding) ---
         public bool ShowGear => _settingsManager.Settings.ShowRow0;
         public bool ShowPosition => _settingsManager.Settings.ShowRow0;
         public bool ShowTimeRemaining => _settingsManager.Settings.ShowRow1;
@@ -127,7 +121,6 @@ namespace VISOR.ViewModels
                 OnPropertyChanged(nameof(ClassPositionNumber));
             }
 
-            // --- Car Health & Lap Time Logic ---
             float currentSpeed = snapshot.GetValue<float>("Speed");
             if (currentSpeed > _topSpeedBaseline)
             {
@@ -187,6 +180,23 @@ namespace VISOR.ViewModels
                 return;
             }
 
+            // Throttled debug logging - only log when car counts change
+            if (allValidCars.Count != _lastValidCarCount)
+            {
+                var player = allValidCars.FirstOrDefault(c => c.IsPlayer);
+                if (player != null)
+                {
+                    var carsInPlayerClass = allValidCars.Count(c => c.ClassID == player.ClassID);
+                    if (carsInPlayerClass != _lastClassCarCount)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[MainViewModel Position] Total valid cars: {allValidCars.Count}, " +
+                            $"In player's class (ID {player.ClassID}): {carsInPlayerClass}");
+                        _lastClassCarCount = carsInPlayerClass;
+                    }
+                }
+                _lastValidCarCount = allValidCars.Count;
+            }
+
             bool useFastestLap = dataProvider.ShouldUseFastestLapPositioning();
             var newPosition = CalculatePlayerClassPosition(allValidCars, playerCarIdx, useFastestLap, dataProvider);
 
@@ -224,17 +234,15 @@ namespace VISOR.ViewModels
             var player = allCars.FirstOrDefault(c => c.CarIdx == playerCarIdx);
             if (player == null) return "--";
 
-            var carsInClass = allCars.Where(c => c.ClassID == player.ClassID).ToList();
-
             if (isFastestLapMode)
             {
-                var fastestLaps = dataProvider.GetFastestLapPositioning().ToDictionary(d => d.carIdx, d => d.position);
-                var sorted = carsInClass.OrderBy(c => fastestLaps.GetValueOrDefault(c.CarIdx, 999)).ToList();
-                int pos = sorted.FindIndex(c => c.IsPlayer) + 1;
-                return pos > 0 ? pos.ToString() : "--";
+                var fastestLapData = dataProvider.GetFastestLapPositioning();
+                var playerData = fastestLapData.FirstOrDefault(d => d.carIdx == playerCarIdx);
+                return playerData.position > 0 ? playerData.position.ToString() : "--";
             }
             else
             {
+                var carsInClass = allCars.Where(c => c.ClassID == player.ClassID).ToList();
                 var sorted = carsInClass.OrderByDescending(c => c.CurrentLap + c.LapDistPct).ToList();
                 int pos = sorted.FindIndex(c => c.IsPlayer) + 1;
                 return pos > 0 ? pos.ToString() : "--";
@@ -255,44 +263,39 @@ namespace VISOR.ViewModels
 
         private void UpdateSessionTimer(SVappsLABSnapshot snapshot)
         {
-            // --- Get raw telemetry data ---
             int lapsRemaining = snapshot.GetValue<int>("SessionLapsRemain", 0);
             double timeRemain = snapshot.GetValue<double>("SessionTimeRemain", 0.0);
             int currentLap = snapshot.GetValue<int>("Lap", 0);
-            // --- UPDATED: Get SessionFlags as a raw integer to prevent casting errors ---
             int sessionFlagsValue = snapshot.GetValue<int>("SessionFlags", 0);
 
-            // --- State Management ---
             if (currentLap < _lastLap)
             {
                 _greenFlagSeen = false;
             }
 
-            // --- UPDATED: Compare integers directly with the integer values of our enum ---
             if ((sessionFlagsValue & (int)Telemetry.SessionFlags.Green) == (int)Telemetry.SessionFlags.Green)
             {
                 _greenFlagSeen = true;
             }
 
-            // Only update the display when a new lap starts AFTER the green flag has been seen
-            if (_greenFlagSeen && currentLap != _lastLap)
+            if (_greenFlagSeen)
             {
                 string newLapDisplay;
+                string newSymbol = TimeRemainingSymbol;
 
-                // --- UPDATED: Prioritize flags using integer comparison ---
                 if ((sessionFlagsValue & (int)Telemetry.SessionFlags.Checkered) == (int)Telemetry.SessionFlags.Checkered)
                 {
-                    TimeRemainingSymbol = "🏁";
+                    newSymbol = "🏁";
                     newLapDisplay = "FINISHED";
                 }
                 else if ((sessionFlagsValue & (int)Telemetry.SessionFlags.White) == (int)Telemetry.SessionFlags.White)
                 {
-                    TimeRemainingSymbol = "🏁";
+                    newSymbol = "🏁";
                     newLapDisplay = "Final Lap";
                 }
                 else if (lapsRemaining >= 0 && lapsRemaining < 10000)
                 {
-                    TimeRemainingSymbol = "🏁";
+                    newSymbol = "🏁";
                     if (lapsRemaining == 0)
                     {
                         newLapDisplay = "Final Lap";
@@ -304,7 +307,7 @@ namespace VISOR.ViewModels
                 }
                 else if (timeRemain > 0)
                 {
-                    TimeRemainingSymbol = "⏳";
+                    newSymbol = "⏳";
                     TimeSpan remaining = TimeSpan.FromSeconds(timeRemain);
                     if (remaining.TotalHours >= 1.0)
                         newLapDisplay = $"{(int)remaining.TotalHours}:{remaining.Minutes:D2}:{remaining.Seconds:D2}";
@@ -316,22 +319,16 @@ namespace VISOR.ViewModels
                     newLapDisplay = "--:--";
                 }
 
-                TimeRemainingDisplay = newLapDisplay;
-                OnPropertyChanged(nameof(TimeRemainingDisplay));
-                OnPropertyChanged(nameof(TimeRemainingSymbol));
+                if (TimeRemainingDisplay != newLapDisplay || TimeRemainingSymbol != newSymbol)
+                {
+                    TimeRemainingDisplay = newLapDisplay;
+                    TimeRemainingSymbol = newSymbol;
+                    OnPropertyChanged(nameof(TimeRemainingDisplay));
+                    OnPropertyChanged(nameof(TimeRemainingSymbol));
+                }
             }
 
             _lastLap = currentLap;
-
-            var sessionLapsRemainEx = snapshot.GetValue<int>("SessionLapsRemainEx", 0);
-            if (lapsRemaining != _lastSessionLapsRemainOld || sessionLapsRemainEx != _lastSessionLapsRemainEx)
-            {
-                // For debug, we can cast the int to see the flag names
-                var flagsEnum = (Telemetry.SessionFlags)sessionFlagsValue;
-                System.Diagnostics.Debug.WriteLine($"[SessionTimer] Laps: {lapsRemaining}, LapsEx: {sessionLapsRemainEx}, Time: {timeRemain:F1}s, Flags: {flagsEnum}");
-                _lastSessionLapsRemainOld = lapsRemaining;
-                _lastSessionLapsRemainEx = sessionLapsRemainEx;
-            }
         }
 
         private void CheckSessionStateTransitions(SVappsLABSnapshot snapshot)
@@ -362,9 +359,9 @@ namespace VISOR.ViewModels
 
             _classColorManager.Reset();
 
-            _lastSessionLapsRemainOld = -1;
-            _lastSessionLapsRemainEx = -1;
-            _lastTimeRemainingDisplay = string.Empty;
+            // Reset debug counters
+            _lastValidCarCount = -1;
+            _lastClassCarCount = -1;
 
             OnPropertyChanged(string.Empty);
         }

@@ -23,6 +23,7 @@ namespace VISOR.Telemetry
         private readonly string[] _carNumbersCache = new string[64];
         private readonly int[] _carNumberRawCache = new int[64];
         private readonly int[] _carClassIDsCache = new int[64];
+        private readonly int[] _carClassColorsCache = new int[64];
         private readonly bool[] _carIsAICache = new bool[64];
         private readonly int[] _curDriverIncidentCountCache = new int[64];
 
@@ -44,6 +45,11 @@ namespace VISOR.Telemetry
         public int[] CarClassIDs
         {
             get { lock (_parseLock) { return _carClassIDsCache; } }
+        }
+
+        public int[] CarClassColors
+        {
+            get { lock (_parseLock) { return _carClassColorsCache; } }
         }
 
         public bool[] CarIsAI
@@ -253,18 +259,19 @@ namespace VISOR.Telemetry
         {
             int currentSession = CurrentSessionNum;
 
-            if (IsPracticeSession(currentSession))
+            // Early exit for races - always use track position
+            if (IsRaceSession(currentSession))
+                return false;
+
+            // Practice and non-lone qualifying use fastest lap positioning when data is available
+            if (IsPracticeSession(currentSession) || (IsQualifyingSession(currentSession) && !IsLoneQualifying(currentSession)))
             {
                 var resultsPositions = GetCurrentSessionResultsPositions();
-                return resultsPositions.Count > 0;
+                bool hasData = resultsPositions.Count > 0 && resultsPositions.Any(r => r.FastestTime > 0);
+                return hasData;
             }
 
-            if (IsQualifyingSession(currentSession) && !IsLoneQualifying(currentSession))
-            {
-                var fastestLaps = GetCurrentSessionFastestLaps();
-                return fastestLaps.Count > 0;
-            }
-
+            // Lone qualifying and everything else
             return false;
         }
 
@@ -279,31 +286,14 @@ namespace VISOR.Telemetry
             var result = new List<(int carIdx, float fastestTime, int position)>();
             int currentSession = CurrentSessionNum;
 
-            if (IsPracticeSession(currentSession))
+            // Both Practice and Qualifying use ResultsPositions - it contains pre-sorted position data
+            if (IsPracticeSession(currentSession) || IsQualifyingSession(currentSession))
             {
                 var resultsPositions = GetCurrentSessionResultsPositions();
                 foreach (var pos in resultsPositions)
                 {
-                    if (pos.FastestTime > 0)
+                    if (pos.FastestTime > 0) // Only include cars with valid times
                         result.Add((pos.CarIdx, pos.FastestTime, pos.Position));
-                }
-            }
-            else if (IsQualifyingSession(currentSession))
-            {
-                var fastestLaps = GetCurrentSessionFastestLaps();
-                var validTimes = new List<(int carIdx, float time)>();
-
-                foreach (var lap in fastestLaps)
-                {
-                    if (lap.FastestTime > 0)
-                        validTimes.Add((lap.CarIdx, lap.FastestTime));
-                }
-
-                validTimes.Sort((a, b) => a.time.CompareTo(b.time));
-
-                for (int i = 0; i < validTimes.Count; i++)
-                {
-                    result.Add((validTimes[i].carIdx, validTimes[i].time, i + 1));
                 }
             }
 
@@ -338,10 +328,10 @@ namespace VISOR.Telemetry
 
                         IsDataReady = true;
 
-                        System.Diagnostics.Debug.WriteLine($"[SessionCoordinator] Parsed: {_staticData.Drivers.Count} drivers, " +
-                                        $"Session {_transitionData.CurrentSessionNum} ({GetCurrentSessionType()}), " +
+                        bool useFastestLap = ShouldUseFastestLapPositioning();
+                        System.Diagnostics.Debug.WriteLine($"[SessionCoordinator] Session {_transitionData.CurrentSessionNum} ({GetCurrentSessionType()}), " +
                                         $"Track: {GetTrackDisplayName()} ({GetTrackLength():F1}m), " +
-                                        $"ShouldUseFastestLap: {ShouldUseFastestLapPositioning()}");
+                                        $"FastestLapMode: {useFastestLap}");
 
                         return true;
                     }
@@ -361,6 +351,7 @@ namespace VISOR.Telemetry
             Array.Fill(_carNumbersCache, null);
             Array.Fill(_carNumberRawCache, 0);
             Array.Fill(_carClassIDsCache, 0);
+            Array.Fill(_carClassColorsCache, 0);
             Array.Fill(_carIsAICache, false);
             Array.Fill(_curDriverIncidentCountCache, 0);
 
@@ -372,6 +363,7 @@ namespace VISOR.Telemetry
                     _carNumbersCache[kvp.Key] = kvp.Value.CarNumber;
                     _carNumberRawCache[kvp.Key] = kvp.Value.CarNumberRaw;
                     _carClassIDsCache[kvp.Key] = kvp.Value.CarClassID;
+                    _carClassColorsCache[kvp.Key] = kvp.Value.CarClassColor;
                     _carIsAICache[kvp.Key] = kvp.Value.IsAI;
                 }
             }

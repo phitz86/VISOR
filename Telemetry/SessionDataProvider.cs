@@ -12,6 +12,7 @@ namespace VISOR.Telemetry
         string[] CarNumbers { get; }
         int[] CarNumberRaw { get; }
         int[] CarClassIDs { get; }
+        int[] CarClassColors { get; }
         bool[] CarIsAI { get; }
         int[] CurDriverIncidentCount { get; }
         int IncidentLimit { get; }

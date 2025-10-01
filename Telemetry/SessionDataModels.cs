@@ -41,6 +41,7 @@ namespace VISOR.Telemetry
             public string CarNumber { get; set; } = string.Empty;
             public int CarNumberRaw { get; set; }
             public int CarClassID { get; set; }
+            public int CarClassColor { get; set; }
             public bool IsAI { get; set; }
         }
 

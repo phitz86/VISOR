@@ -116,6 +116,7 @@ namespace VISOR.ViewModels
             var carNumbers = sessionDataProvider.CarNumbers;
             var userNames = sessionDataProvider.UserNames;
             var carClassIDs = sessionDataProvider.CarClassIDs;
+            var carClassColors = sessionDataProvider.CarClassColors;
             var onPitRoad = snapshot.GetValue<bool[]>("CarIdxOnPitRoad");
 
             if (lapDistPct == null || trackSurface == null) return;
@@ -164,8 +165,8 @@ namespace VISOR.ViewModels
             var carLeftRightState = carLeftRightEnum?.ToString() ?? "Off";
             UpdateZoneAssignments(visibleCars, carLeftRightState);
 
-            // Update radar display
-            UpdateRadarDisplay(carsContainer, visibleCars);
+            // Update radar display - pass color arrays to UpdateRadarDisplay
+            UpdateRadarDisplay(carsContainer, visibleCars, carClassColors, carClassIDs);
             VisibleCarCount = visibleCars.Count;
         }
 
@@ -306,7 +307,7 @@ namespace VISOR.ViewModels
             return 5000f; // 5km default for most road courses
         }
 
-        private void UpdateRadarDisplay(Canvas carsContainer, List<RadarCarData> visibleCars)
+        private void UpdateRadarDisplay(Canvas carsContainer, List<RadarCarData> visibleCars, int[] carClassColors, int[] carClassIDs)
         {
             // Clear existing car elements that are no longer visible
             var carsToRemove = new List<int>();
@@ -343,9 +344,9 @@ namespace VISOR.ViewModels
                     carsContainer.Children.Add(element.NumberText);
                 }
 
-                // Update position and appearance
+                // Update position and appearance - pass color arrays
                 var carElement = _carElements[car.CarIdx];
-                UpdateCarElement(carElement, car, position);
+                UpdateCarElement(carElement, car, position, carClassColors, carClassIDs);
             }
         }
 
@@ -424,7 +425,7 @@ namespace VISOR.ViewModels
             };
         }
 
-        private void UpdateCarElement(RadarCarElement element, RadarCarData car, RadarPosition position)
+        private void UpdateCarElement(RadarCarElement element, RadarCarData car, RadarPosition position, int[] carClassColors, int[] carClassIDs)
         {
             var scaleFactor = GetScaleFactor();
             var halfWidth = (BASE_CAR_WIDTH * scaleFactor) / 2;
@@ -436,8 +437,8 @@ namespace VISOR.ViewModels
             Canvas.SetLeft(element.NumberText, position.X - halfWidth);
             Canvas.SetTop(element.NumberText, position.Y - halfHeight + (4 * scaleFactor)); // Slight text offset
 
-            // Update color using shared ClassColorManager
-            element.Rectangle.Fill = _classColorManager.GetClassColor(car.ClassID);
+            // Update color using shared ClassColorManager - pass color arrays
+            element.Rectangle.Fill = _classColorManager.GetClassColor(car.ClassID, carClassColors, carClassIDs);
 
             // Update appearance based on pit road status
             if (car.IsOnPitRoad)
