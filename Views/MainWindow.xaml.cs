@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using VISOR.ViewModels;
@@ -17,7 +18,9 @@ namespace VISOR.Views
         private readonly MainViewModel _viewModel;
         private readonly SVappsLABSDKWrapper _sdk;
         private readonly SettingsManager _settingsManager;
+        private readonly ConfigModeManager _configModeManager;
         private static DateTime _lastSessionReadyLog = DateTime.MinValue;
+        private bool _isDragging = false;
 
         // Expose ViewModel for App.xaml.cs to access ClassColorManager
         public MainViewModel ViewModel => _viewModel;
@@ -28,6 +31,7 @@ namespace VISOR.Views
 
             _sdk = sdkWrapper;
             _settingsManager = SettingsManager.Instance;
+            _configModeManager = ConfigModeManager.Instance;
             _viewModel = new MainViewModel();
             DataContext = _viewModel;
 
@@ -46,17 +50,10 @@ namespace VISOR.Views
             _settingsManager.ElementVisibilityChanged += OnElementVisibilityChanged;
             _settingsManager.WindowSizeChanged += OnWindowSizeChanged;
 
+            // Subscribe to config mode changes
+            _configModeManager.ConfigModeChanged += OnConfigModeChanged;
+
             Loaded += MainWindow_Loaded;
-
-            // Save position when window is moved
-            this.LocationChanged += MainWindow_LocationChanged;
-
-            // Drag anywhere
-            MouseLeftButtonDown += (s, e) =>
-            {
-                if (e.ButtonState == MouseButtonState.Pressed)
-                    DragMove();
-            };
         }
 
         private void ApplyWindowSizing()
@@ -111,12 +108,33 @@ namespace VISOR.Views
             });
         }
 
-        private void MainWindow_LocationChanged(object sender, EventArgs e)
+        private void OnConfigModeChanged(object sender, ConfigModeChangedEventArgs e)
         {
-            // Only save position if window is fully loaded and not during initialization
-            if (this.IsLoaded)
+            Dispatcher.Invoke(() =>
             {
-                // Find radar window to save both positions together
+                System.Diagnostics.Debug.WriteLine($"[MainWindow] Config mode changed to: {e.IsInConfigMode}");
+
+                // Simply show/hide the drag handle based on config mode
+                DragHandle.Visibility = e.IsInConfigMode ? Visibility.Visible : Visibility.Collapsed;
+            });
+        }
+
+        private void DragHandle_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (_configModeManager.IsInConfigMode)
+            {
+                _isDragging = true;
+                DragMove();
+            }
+        }
+
+        private void DragHandle_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_isDragging)
+            {
+                _isDragging = false;
+
+                // Save position now that drag is complete
                 var radarWindow = Application.Current.Windows.OfType<RadarWindow>().FirstOrDefault();
                 if (radarWindow != null)
                 {
@@ -124,6 +142,7 @@ namespace VISOR.Views
                         new Point(this.Left, this.Top),
                         new Point(radarWindow.Left, radarWindow.Top)
                     );
+                    System.Diagnostics.Debug.WriteLine($"[MainWindow] Position saved after drag: ({this.Left}, {this.Top})");
                 }
             }
         }
@@ -207,7 +226,7 @@ namespace VISOR.Views
             {
                 if (_sdk.IsSessionDataReady)
                 {
-                    // Throttle debug output to once per second
+                    // Throttle debug output to once per 10 seconds
                     var now = DateTime.Now;
                     if ((now - _lastSessionReadyLog).TotalSeconds > 10)
                     {
@@ -317,6 +336,7 @@ namespace VISOR.Views
         {
             Application.Current.Shutdown();
         }
+
         private void ConfigButton_Click(object sender, RoutedEventArgs e)
         {
             // Check if a ConfigWindow is already open to prevent duplicates
@@ -334,7 +354,6 @@ namespace VISOR.Views
             var radarWindow = Application.Current.Windows.OfType<RadarWindow>().FirstOrDefault();
 
             // If no ConfigWindow was found, create a new one with the required parameters.
-            // Note: This assumes _sdk is the name of your SVappsLABSDKWrapper field.
             ConfigWindow configWindow = new ConfigWindow(_sdk, this, radarWindow);
             configWindow.Show();
         }
@@ -344,6 +363,7 @@ namespace VISOR.Views
             // Unsubscribe from settings events
             _settingsManager.ElementVisibilityChanged -= OnElementVisibilityChanged;
             _settingsManager.WindowSizeChanged -= OnWindowSizeChanged;
+            _configModeManager.ConfigModeChanged -= OnConfigModeChanged;
 
             base.OnClosed(e);
         }

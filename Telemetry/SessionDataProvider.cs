@@ -16,6 +16,11 @@ namespace VISOR.Telemetry
         bool[] CarIsAI { get; }
         int[] CurDriverIncidentCount { get; }
         int IncidentLimit { get; }
+        int CurrentSessionNum { get; }
+
+        // Session definition queries
+        int GetSessionLaps(int sessionNum);
+        double GetSessionTimeSeconds(int sessionNum);
 
         // Session-aware helper methods for positioning logic
         bool ShouldUseFastestLapPositioning();

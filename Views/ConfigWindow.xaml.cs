@@ -12,6 +12,7 @@ namespace VISOR.Views
         private readonly MainWindow _mainWindow;
         private readonly RadarWindow _radarWindow;
         private readonly SettingsManager _settingsManager;
+        private readonly ConfigModeManager _configModeManager;
         private bool _isInitialized = false;
 
         // Events for communication with App.xaml.cs
@@ -25,6 +26,10 @@ namespace VISOR.Views
             _mainWindow = mainWindow;
             _radarWindow = radarWindow;
             _settingsManager = SettingsManager.Instance;
+            _configModeManager = ConfigModeManager.Instance;
+
+            // Enter config mode - this will show drag handles and enable dragging
+            _configModeManager.EnterConfigMode();
 
             // Force radar window to stay visible for preview
             if (_radarWindow != null)
@@ -37,6 +42,8 @@ namespace VISOR.Views
 
             // Mark as initialized to allow event handling
             _isInitialized = true;
+
+            System.Diagnostics.Debug.WriteLine("[ConfigWindow] Opened - config mode enabled");
         }
 
         private void LoadCurrentSettings()
@@ -165,14 +172,24 @@ namespace VISOR.Views
             ExitRequested?.Invoke(this, EventArgs.Empty);
         }
 
-        protected override void OnClosed(EventArgs e)
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
+            System.Diagnostics.Debug.WriteLine("[ConfigWindow] Closing - exiting config mode");
+
+            // Exit config mode - this will hide drag handles and disable dragging
+            _configModeManager.ExitConfigMode();
+
             // Allow radar window to return to normal fade behavior
             if (_radarWindow != null)
             {
                 _radarWindow.SetForceVisible(false);
             }
 
+            base.OnClosing(e);
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
             System.Diagnostics.Debug.WriteLine("[ConfigWindow] Config window closed");
             base.OnClosed(e);
         }

@@ -34,6 +34,10 @@ namespace VISOR.ViewModels
         private float _currentLapTopSpeed = 0f;
         private float _lastLapTopSpeed = 0f;
 
+        // Pending flag state - don't update display until lap completes
+        private bool _pendingWhiteFlag = false;
+        private bool _pendingCheckeredFlag = false;
+
         // Debug tracking for car count (throttled logging)
         private int _lastValidCarCount = -1;
         private int _lastClassCarCount = -1;
@@ -154,7 +158,7 @@ namespace VISOR.ViewModels
             }
 
             UpdateGearDisplay(snapshot);
-            UpdateSessionTimer(snapshot);
+            UpdateSessionTimer(snapshot, sessionDataProvider);
         }
 
         #region --- Player Position Calculation ---
@@ -261,16 +265,31 @@ namespace VISOR.ViewModels
             }
         }
 
-        private void UpdateSessionTimer(SVappsLABSnapshot snapshot)
+        private void UpdateSessionTimer(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
             int lapsRemaining = snapshot.GetValue<int>("SessionLapsRemain", 0);
             double timeRemain = snapshot.GetValue<double>("SessionTimeRemain", 0.0);
             int currentLap = snapshot.GetValue<int>("Lap", 0);
             int sessionFlagsValue = snapshot.GetValue<int>("SessionFlags", 0);
 
+            // Determine session type from YAML definition
+            bool isTimedSession = false;
+            if (sessionDataProvider != null && sessionDataProvider.IsDataReady)
+            {
+                int currentSessionNum = sessionDataProvider.CurrentSessionNum;
+                int sessionLaps = sessionDataProvider.GetSessionLaps(currentSessionNum);
+                // SessionLaps == -1 means "unlimited" in YAML, indicating a timed session
+                isTimedSession = (sessionLaps == -1);
+            }
+
+            // Detect lap completion (start/finish crossing)
+            bool lapCompleted = currentLap > _lastLap;
+
             if (currentLap < _lastLap)
             {
                 _greenFlagSeen = false;
+                _pendingWhiteFlag = false;
+                _pendingCheckeredFlag = false;
             }
 
             if ((sessionFlagsValue & (int)Telemetry.SessionFlags.Green) == (int)Telemetry.SessionFlags.Green)
@@ -278,22 +297,39 @@ namespace VISOR.ViewModels
                 _greenFlagSeen = true;
             }
 
-            if (_greenFlagSeen)
+            // Check for white and checkered flags - mark as pending until lap completes
+            if ((sessionFlagsValue & (int)Telemetry.SessionFlags.White) == (int)Telemetry.SessionFlags.White)
+            {
+                _pendingWhiteFlag = true;
+            }
+
+            if ((sessionFlagsValue & (int)Telemetry.SessionFlags.Checkered) == (int)Telemetry.SessionFlags.Checkered)
+            {
+                _pendingCheckeredFlag = true;
+            }
+
+            // Show timer if racing has started OR if there's session time remaining (pre-race/qualifying)
+            bool shouldShowTimer = _greenFlagSeen || timeRemain > 0;
+
+            if (shouldShowTimer)
             {
                 string newLapDisplay;
                 string newSymbol = TimeRemainingSymbol;
 
-                if ((sessionFlagsValue & (int)Telemetry.SessionFlags.Checkered) == (int)Telemetry.SessionFlags.Checkered)
+                // Priority 1: Checkered flag (after lap completion) - always show FINISHED
+                if (_pendingCheckeredFlag && lapCompleted)
                 {
                     newSymbol = "🏁";
                     newLapDisplay = "FINISHED";
                 }
-                else if ((sessionFlagsValue & (int)Telemetry.SessionFlags.White) == (int)Telemetry.SessionFlags.White)
+                // Priority 2: White flag (after lap completion) - always show Final Lap
+                else if (_pendingWhiteFlag && lapCompleted)
                 {
                     newSymbol = "🏁";
                     newLapDisplay = "Final Lap";
                 }
-                else if (lapsRemaining >= 0 && lapsRemaining < 10000)
+                // Priority 3a: Lap-based countdown (only for lap-based sessions and no pending flags)
+                else if (!isTimedSession && lapsRemaining >= 0 && lapsRemaining < 10000 && !_pendingCheckeredFlag && !_pendingWhiteFlag)
                 {
                     newSymbol = "🏁";
                     if (lapsRemaining == 0)
@@ -305,6 +341,7 @@ namespace VISOR.ViewModels
                         newLapDisplay = $"{lapsRemaining + 1} Laps";
                     }
                 }
+                // Priority 3b: Time remaining (for timed sessions or fallback)
                 else if (timeRemain > 0)
                 {
                     newSymbol = "⏳";
@@ -358,6 +395,10 @@ namespace VISOR.ViewModels
             ClassPositionNumber = "--";
 
             _classColorManager.Reset();
+
+            // Reset pending flag states
+            _pendingWhiteFlag = false;
+            _pendingCheckeredFlag = false;
 
             // Reset debug counters
             _lastValidCarCount = -1;

@@ -17,11 +17,13 @@ namespace VISOR.Views
         private readonly RadarViewModel _viewModel;
         private readonly SVappsLABSDKWrapper _sdk;
         private readonly SettingsManager _settingsManager;
+        private readonly ConfigModeManager _configModeManager;
 
         // Fade animation properties
         private int _lastVisibleCarCount = 0;
         private bool _isFadedOut = false;
         private bool _forceVisible = false;
+        private bool _isDragging = false;
 
         public RadarWindow(SVappsLABSDKWrapper sdkWrapper, ClassColorManager classColorManager)
         {
@@ -29,6 +31,7 @@ namespace VISOR.Views
 
             _sdk = sdkWrapper;
             _settingsManager = SettingsManager.Instance;
+            _configModeManager = ConfigModeManager.Instance;
             _viewModel = new RadarViewModel(classColorManager);
             DataContext = _viewModel;
 
@@ -46,17 +49,10 @@ namespace VISOR.Views
             // Subscribe to settings changes for real-time updates
             _settingsManager.WindowSizeChanged += OnWindowSizeChanged;
 
+            // Subscribe to config mode changes
+            _configModeManager.ConfigModeChanged += OnConfigModeChanged;
+
             Loaded += RadarWindow_Loaded;
-
-            // Save position when window is moved
-            this.LocationChanged += RadarWindow_LocationChanged;
-
-            // Drag anywhere
-            MouseLeftButtonDown += (s, e) =>
-            {
-                if (e.ButtonState == MouseButtonState.Pressed)
-                    DragMove();
-            };
 
             // Initialize player car number display
             UpdatePlayerCarDisplay();
@@ -80,6 +76,10 @@ namespace VISOR.Views
             var windowSize = _settingsManager.GetRadarWindowSize();
             Width = windowSize.Width;
             Height = windowSize.Height;
+
+            // Update main content container size to match window
+            MainContentContainer.Width = windowSize.Width;
+            MainContentContainer.Height = windowSize.Height;
 
             // Update canvas size to match window
             RadarCanvas.Width = windowSize.Width;
@@ -212,11 +212,13 @@ namespace VISOR.Views
 
         private void UpdateZoneLabelsGrid(double width, double height)
         {
-            // The zone labels grid should be updated if we can find it
-            // This might require finding the Grid by walking the visual tree
-            var grid = this.FindName("ZoneLabelsGrid") as Grid;
+            // Find the zone labels grid within the canvas
+            var grid = RadarCanvas.Children.OfType<Grid>().FirstOrDefault();
             if (grid != null)
             {
+                // Update grid dimensions
+                grid.Width = width;
+
                 // Update column definitions to match new zone widths
                 double zoneWidth = width / 5;
                 for (int i = 0; i < grid.ColumnDefinitions.Count && i < 5; i++)
@@ -235,12 +237,33 @@ namespace VISOR.Views
             });
         }
 
-        private void RadarWindow_LocationChanged(object sender, EventArgs e)
+        private void OnConfigModeChanged(object sender, ConfigModeChangedEventArgs e)
         {
-            // Only save position if window is fully loaded and not during initialization
-            if (this.IsLoaded)
+            Dispatcher.Invoke(() =>
             {
-                // Find main window to save both positions together
+                System.Diagnostics.Debug.WriteLine($"[RadarWindow] Config mode changed to: {e.IsInConfigMode}");
+
+                // Simply show/hide the drag handle based on config mode
+                DragHandle.Visibility = e.IsInConfigMode ? Visibility.Visible : Visibility.Collapsed;
+            });
+        }
+
+        private void DragHandle_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (_configModeManager.IsInConfigMode)
+            {
+                _isDragging = true;
+                DragMove();
+            }
+        }
+
+        private void DragHandle_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_isDragging)
+            {
+                _isDragging = false;
+
+                // Save position now that drag is complete
                 var mainWindow = Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
                 if (mainWindow != null)
                 {
@@ -248,6 +271,7 @@ namespace VISOR.Views
                         new Point(mainWindow.Left, mainWindow.Top),
                         new Point(this.Left, this.Top)
                     );
+                    System.Diagnostics.Debug.WriteLine($"[RadarWindow] Position saved after drag: ({this.Left}, {this.Top})");
                 }
             }
         }
@@ -531,6 +555,7 @@ namespace VISOR.Views
 
             // Unsubscribe from settings events
             _settingsManager.WindowSizeChanged -= OnWindowSizeChanged;
+            _configModeManager.ConfigModeChanged -= OnConfigModeChanged;
 
             base.OnClosed(e);
         }

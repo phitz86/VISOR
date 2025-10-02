@@ -263,12 +263,11 @@ namespace VISOR.Telemetry
             if (IsRaceSession(currentSession))
                 return false;
 
-            // Practice and non-lone qualifying use fastest lap positioning when data is available
+            // Practice and non-lone qualifying always use fastest lap positioning
+            // Don't wait for data to be available - the session type is sufficient
             if (IsPracticeSession(currentSession) || (IsQualifyingSession(currentSession) && !IsLoneQualifying(currentSession)))
             {
-                var resultsPositions = GetCurrentSessionResultsPositions();
-                bool hasData = resultsPositions.Count > 0 && resultsPositions.Any(r => r.FastestTime > 0);
-                return hasData;
+                return true;
             }
 
             // Lone qualifying and everything else

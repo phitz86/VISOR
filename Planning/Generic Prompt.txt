@@ -1,34 +1,27 @@
-Thread: VISOR Overlay Beta Release Prep
+Thread: VISOR Overlay Feature Improvement Thread
 
 Context:
 Good afternoon Claude,
 
 I'm building an overlay UI for iRacing called VISOR (Virtual Intelligence Simulator Overlay & Radar). VISOR is a C# application, built in Visual Studio with .NET 8.0 and WPF. I've set AnyCPU for now, but can pivot if needed. We're targeting a MVVM architecture with discrete classes/files to handle individual tasks.
 
-I'm not a coder, but I work in tech, so I have a general understanding of how things work. I'm using this project to evaluate the coding and project management capabilities of various LLMs, including you, Gemini, Grok, and ChatGPT. Gemini just finished a final round of bug fixes, and now I would like your help with some final polishing steps before we create a sharable beta.
+I'm not a coder, but I work in tech, so I have a general understanding of how things work. I'm using this project to evaluate the coding and project management capabilities of various LLMs, including you, Gemini, Grok, and ChatGPT. We're doing our last few bug fixes and feature improvements before our Beta release.
 
 Our SDK wrapper for ingesting the telemetry is the SVappsLAB iRacing SDK, installed via NuGet. The repo for the SDK is here: https://github.com/SVappsLAB/iRacingTelemetrySDK/tree/main
 
 Goals for this thread:
 
-Config Window Font Issue
- - Gem and I were trying to get the Config window to have the Semibold font for the headings, and regular Segoe UI for the rest. Try as we might, almost the whole window stayed Semibold. 
-
-Code Cleanup
-  - I'd like to take a pass through the whole code base and clean up any code that's leftover from things we abandoned, get rid of explanatory comments that don't matter any more, and ditch any logging statements that are about issues we've resolved.
- - If you spot any architectural inefficiencies, like function duplication or file arrangements that could be better optimized for size or performance, say so.
+Improve Window Drag and Drop
+ - Currently, the Main and Radar windows can be dragged and dropped by clicking anywhere in the windows while they're open. This works fine, and the window position saves live. But I'd like to change that functionality to only be available while the Config window is open, and only by clicking in a small button area in the top left of each window. When the Config window is dismissed, both windows should continue to display on top, but should be transparent to clicks.
 
 Potential Issue Identification:
- - The app is testing nicely now, but as you do your code review, point out any places where you suspect we'll run into problems.
-
-Installer packaging:
- - I'm interested in your feedback on what would be the best practice to get this app into a sharable export for some friends/testers.
+ - The app is testing nicely now, but as you see the code we're working on, point out any places where you suspect we'll run into problems, or places we could make things cleaner or more efficient.
 
  Rules & Methods:
  - Let's talk about what you see, understand, and want to do before we make any modifications to the code.
  - If you need more context or have decisions you want more information to support, say so. 
  - If you see something that makes you think you need to see another file, let me know and I'll upload it.
- - Let me know if we're approaching limits of your context window.
+ - Suggest we start a new thread if this one is getting too big and I make a big ask.
  - I prefer complete new versions of files instead of code snippets or diffs. Exceptions to this can be short snippets that only need inserted one place in a file, single-line changes, or syntax corrections.
  - We need to keep our files under 500 lines of code each. If we're getting close to breaking that, we need to investigate breaking out functions into separate files.
  
