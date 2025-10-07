@@ -38,9 +38,12 @@ namespace VISOR.ViewModels
         private string _currentLapDisplay = "-- Laps";
         private int _totalQualifyingLaps = 0;
         private int _qualifyingLapsCompleted = 0;
-        private bool _isFirstQualiLap = false; // Flag to ignore the quali out-lap
+        private bool _isFirstQualiLap = false;
         private bool _finalLapLatched = false;
         private bool _finishedLatched = false;
+
+        // --- Field for throttled position logging ---
+        private int _lastLoggedPlayerPosition = -1;
 
         // Pending flag state
         private bool _pendingWhiteFlag = false;
@@ -111,12 +114,10 @@ namespace VISOR.ViewModels
             {
                 if (_isFirstQualiLap)
                 {
-                    // This is the out-lap, so we just flip the flag and don't count the lap.
                     _isFirstQualiLap = false;
                 }
                 else
                 {
-                    // This is a true flying lap, so we count it.
                     _qualifyingLapsCompleted++;
                 }
             }
@@ -188,14 +189,13 @@ namespace VISOR.ViewModels
 
         private void UpdatePlayerPosition(SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider)
         {
-            var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx");
-
             var carClassIDs = dataProvider.CarClassIDs;
             var userNames = dataProvider.UserNames;
             var carNumbers = dataProvider.CarNumbers;
             var trackSurface = snapshot.GetValue<int[]>("CarIdxTrackSurface");
             var lapDistPct = snapshot.GetValue<float[]>("CarIdxLapDistPct");
             var currentLap = snapshot.GetValue<int[]>("CarIdxLap");
+            var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx");
 
             var allValidCars = BuildValidCarsList(trackSurface, carNumbers, userNames,
                 carClassIDs, currentLap, lapDistPct, playerCarIdx);
@@ -224,7 +224,7 @@ namespace VISOR.ViewModels
             }
 
             bool useFastestLap = dataProvider.ShouldUseFastestLapPositioning();
-            var newPosition = CalculatePlayerClassPosition(allValidCars, playerCarIdx, useFastestLap, dataProvider);
+            var newPosition = CalculatePlayerClassPosition(snapshot, allValidCars, playerCarIdx, useFastestLap, dataProvider);
 
             if (ClassPositionNumber != newPosition)
             {
@@ -251,13 +251,23 @@ namespace VISOR.ViewModels
                         LapDistPct: lapDistPct[i]
                     ));
                 }
+                else
+                {
+                    if (!string.IsNullOrEmpty(userNames[i]))
+                    {
+                        if (trackSurface[i] == -1)
+                            System.Diagnostics.Debug.WriteLine($"[Position Debug] CarIdx {i} ({userNames[i]}) REJECTED: Not in world.");
+                        else if (string.IsNullOrEmpty(carNumbers[i]))
+                            System.Diagnostics.Debug.WriteLine($"[Position Debug] CarIdx {i} ({userNames[i]}) REJECTED: Null or empty car number.");
+                    }
+                }
             }
             return allValidCars;
         }
 
-        private string CalculatePlayerClassPosition(List<CarData> allCars, int playerCarIdx, bool isFastestLapMode, ISessionDataProvider dataProvider)
+        private string CalculatePlayerClassPosition(SVappsLABSnapshot snapshot, List<CarData> allCars, int playerCarIdx, bool isFastestLapMode, ISessionDataProvider dataProvider)
         {
-            var player = allCars.FirstOrDefault(c => c.CarIdx == playerCarIdx);
+            var player = allCars.FirstOrDefault(c => c.IsPlayer);
             if (player == null) return "--";
 
             if (isFastestLapMode)
@@ -271,6 +281,27 @@ namespace VISOR.ViewModels
                 var carsInClass = allCars.Where(c => c.ClassID == player.ClassID).ToList();
                 var sorted = carsInClass.OrderByDescending(c => c.CurrentLap + c.LapDistPct).ToList();
                 int pos = sorted.FindIndex(c => c.IsPlayer) + 1;
+
+                if (pos != _lastLoggedPlayerPosition)
+                {
+                    var tick = snapshot.GetValue<int>("SessionTick", 0);
+                    System.Diagnostics.Debug.WriteLine($"--- POS DATA [Tick:{tick}] --- POSITION CHANGED: {_lastLoggedPlayerPosition} -> {pos} ---");
+                    foreach (var car in carsInClass)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[Unsorted] CarIdx: {car.CarIdx,2}, Lap: {car.CurrentLap,3}, Dist: {car.LapDistPct:F4}");
+                    }
+
+                    System.Diagnostics.Debug.WriteLine("--- SORTED RESULTS ---");
+                    for (int i = 0; i < sorted.Count; i++)
+                    {
+                        var car = sorted[i];
+                        string isPlayerMarker = car.IsPlayer ? "<- (PLAYER)" : "";
+                        System.Diagnostics.Debug.WriteLine($"P{i + 1,2}: CarIdx: {car.CarIdx,2}, Lap: {car.CurrentLap,3}, Dist: {car.LapDistPct:F4} {isPlayerMarker}");
+                    }
+
+                    _lastLoggedPlayerPosition = pos;
+                }
+
                 return pos > 0 ? pos.ToString() : "--";
             }
         }
@@ -330,7 +361,6 @@ namespace VISOR.ViewModels
 
             if (shouldShowTimer)
             {
-                // --- Latching Logic ---
                 if (_pendingWhiteFlag && lapCompleted)
                 {
                     _finalLapLatched = true;
@@ -340,30 +370,25 @@ namespace VISOR.ViewModels
                     _finishedLatched = true;
                 }
 
-                // --- Display Logic ---
                 string newLapDisplay;
                 string newSymbol = TimeRemainingSymbol;
 
-                // Priority 1: Finished state is latched.
                 if (_finishedLatched)
                 {
                     newSymbol = "🏁";
                     newLapDisplay = "FINISHED";
                 }
-                // Priority 2: Final Lap state is latched.
                 else if (_finalLapLatched)
                 {
                     newSymbol = "🏁";
                     newLapDisplay = "Final Lap";
                 }
-                // Priority 3: Lap-limited qualifying logic.
                 else if (_totalQualifyingLaps > 0 && _qualifyingLapsCompleted < _totalQualifyingLaps)
                 {
                     newSymbol = "🏁";
                     int lapsToGo = _totalQualifyingLaps - _qualifyingLapsCompleted;
                     newLapDisplay = $"{lapsToGo} Laps";
                 }
-                // Priority 4: Lap-based race logic.
                 else if (!isTimedSession && lapsRemaining >= 0 && lapsRemaining < 10000)
                 {
                     newSymbol = "🏁";
@@ -374,7 +399,6 @@ namespace VISOR.ViewModels
                     }
                     newLapDisplay = _currentLapDisplay;
                 }
-                // Priority 5: Timed session logic.
                 else if (timeRemain > 0)
                 {
                     newSymbol = "⏳";
@@ -384,7 +408,6 @@ namespace VISOR.ViewModels
                     else
                         newLapDisplay = $"{(int)remaining.TotalMinutes}:{remaining.Seconds:D2}";
                 }
-                // Fallback display.
                 else
                 {
                     newLapDisplay = "--:--";
@@ -436,6 +459,7 @@ namespace VISOR.ViewModels
             _finalLapLatched = false;
             _finishedLatched = false;
             _isFirstQualiLap = false;
+            _lastLoggedPlayerPosition = -1;
 
             _lastValidCarCount = -1;
             _lastClassCarCount = -1;
@@ -483,6 +507,7 @@ namespace VISOR.ViewModels
             _finalLapLatched = false;
             _finishedLatched = false;
             _isFirstQualiLap = false;
+            _lastLoggedPlayerPosition = -1;
             OnPropertyChanged(string.Empty);
         }
 
