@@ -10,6 +10,7 @@ namespace VISOR.Telemetry
     {
         public bool ParseStaticData(string[] lines, StaticEventData eventData)
         {
+            eventData.Drivers.Clear();
             int currentCarIdx = -1;
             bool inDriverInfo = false;
             bool inSessionInfo = false;

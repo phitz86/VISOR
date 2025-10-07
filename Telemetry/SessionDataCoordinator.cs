@@ -263,9 +263,9 @@ namespace VISOR.Telemetry
             if (IsRaceSession(currentSession))
                 return false;
 
-            // Practice and non-lone qualifying always use fastest lap positioning
+            // Practice and qualifying always use fastest lap positioning
             // Don't wait for data to be available - the session type is sufficient
-            if (IsPracticeSession(currentSession) || (IsQualifyingSession(currentSession) && !IsLoneQualifying(currentSession)))
+            if (IsPracticeSession(currentSession) || (IsQualifyingSession(currentSession)))
             {
                 return true;
             }
@@ -328,10 +328,7 @@ namespace VISOR.Telemetry
                         IsDataReady = true;
 
                         bool useFastestLap = ShouldUseFastestLapPositioning();
-                        System.Diagnostics.Debug.WriteLine($"[SessionCoordinator] Session {_transitionData.CurrentSessionNum} ({GetCurrentSessionType()}), " +
-                                        $"Track: {GetTrackDisplayName()} ({GetTrackLength():F1}m), " +
-                                        $"FastestLapMode: {useFastestLap}");
-
+                        
                         return true;
                     }
                 }

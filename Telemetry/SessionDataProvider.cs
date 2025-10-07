@@ -22,6 +22,9 @@ namespace VISOR.Telemetry
         int GetSessionLaps(int sessionNum);
         double GetSessionTimeSeconds(int sessionNum);
 
+        // ADD THIS LINE
+        bool IsQualifyingSession(int sessionNum);
+
         // Session-aware helper methods for positioning logic
         bool ShouldUseFastestLapPositioning();
         bool ShouldHideRelativeDisplay();

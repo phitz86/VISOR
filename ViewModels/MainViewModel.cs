@@ -34,11 +34,19 @@ namespace VISOR.ViewModels
         private float _currentLapTopSpeed = 0f;
         private float _lastLapTopSpeed = 0f;
 
-        // Pending flag state - don't update display until lap completes
+        // --- Fields for Lap/Time Remaining logic ---
+        private string _currentLapDisplay = "-- Laps";
+        private int _totalQualifyingLaps = 0;
+        private int _qualifyingLapsCompleted = 0;
+        private bool _isFirstQualiLap = false; // Flag to ignore the quali out-lap
+        private bool _finalLapLatched = false;
+        private bool _finishedLatched = false;
+
+        // Pending flag state
         private bool _pendingWhiteFlag = false;
         private bool _pendingCheckeredFlag = false;
 
-        // Debug tracking for car count (throttled logging)
+        // Debug tracking for car count
         private int _lastValidCarCount = -1;
         private int _lastClassCarCount = -1;
 
@@ -98,8 +106,23 @@ namespace VISOR.ViewModels
 
         public void UpdateFromTelemetry(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
+            int currentLap = snapshot.GetValue<int>("Lap", 0);
+            if (_totalQualifyingLaps > 0 && currentLap > _lastLap && _greenFlagSeen)
+            {
+                if (_isFirstQualiLap)
+                {
+                    // This is the out-lap, so we just flip the flag and don't count the lap.
+                    _isFirstQualiLap = false;
+                }
+                else
+                {
+                    // This is a true flying lap, so we count it.
+                    _qualifyingLapsCompleted++;
+                }
+            }
+
             CheckSessionStateTransitions(snapshot);
-            CheckForSessionTransition(snapshot);
+            CheckForSessionTransition(snapshot, sessionDataProvider);
 
             FuelVM.Update(snapshot.GetValue<float>("FuelLevel"), snapshot.GetValue<int>("Lap"));
             RelativeVM.Update(snapshot, sessionDataProvider);
@@ -145,7 +168,7 @@ namespace VISOR.ViewModels
                 _currentLapTopSpeed = 0f;
 
                 bool onPitRoad = snapshot.GetValue<bool[]>("CarIdxOnPitRoad")?[snapshot.GetValue<int>("PlayerCarIdx")] ?? false;
-                int lapsRemaining = snapshot.GetValue<int>("SessionLapsRemainEx");
+                int lapsRemaining = snapshot.GetValue<int>("SessionLapsRemain");
 
                 WarningsVM.CheckPace(lastLap, _lastLapTopSpeed, _topSpeedBaseline, lapsRemaining, onPitRoad);
             }
@@ -184,7 +207,6 @@ namespace VISOR.ViewModels
                 return;
             }
 
-            // Throttled debug logging - only log when car counts change
             if (allValidCars.Count != _lastValidCarCount)
             {
                 var player = allValidCars.FirstOrDefault(c => c.IsPlayer);
@@ -272,17 +294,14 @@ namespace VISOR.ViewModels
             int currentLap = snapshot.GetValue<int>("Lap", 0);
             int sessionFlagsValue = snapshot.GetValue<int>("SessionFlags", 0);
 
-            // Determine session type from YAML definition
             bool isTimedSession = false;
             if (sessionDataProvider != null && sessionDataProvider.IsDataReady)
             {
                 int currentSessionNum = sessionDataProvider.CurrentSessionNum;
                 int sessionLaps = sessionDataProvider.GetSessionLaps(currentSessionNum);
-                // SessionLaps == -1 means "unlimited" in YAML, indicating a timed session
                 isTimedSession = (sessionLaps == -1);
             }
 
-            // Detect lap completion (start/finish crossing)
             bool lapCompleted = currentLap > _lastLap;
 
             if (currentLap < _lastLap)
@@ -297,7 +316,6 @@ namespace VISOR.ViewModels
                 _greenFlagSeen = true;
             }
 
-            // Check for white and checkered flags - mark as pending until lap completes
             if ((sessionFlagsValue & (int)Telemetry.SessionFlags.White) == (int)Telemetry.SessionFlags.White)
             {
                 _pendingWhiteFlag = true;
@@ -308,40 +326,55 @@ namespace VISOR.ViewModels
                 _pendingCheckeredFlag = true;
             }
 
-            // Show timer if racing has started OR if there's session time remaining (pre-race/qualifying)
             bool shouldShowTimer = _greenFlagSeen || timeRemain > 0;
 
             if (shouldShowTimer)
             {
+                // --- Latching Logic ---
+                if (_pendingWhiteFlag && lapCompleted)
+                {
+                    _finalLapLatched = true;
+                }
+                if (_pendingCheckeredFlag && lapCompleted)
+                {
+                    _finishedLatched = true;
+                }
+
+                // --- Display Logic ---
                 string newLapDisplay;
                 string newSymbol = TimeRemainingSymbol;
 
-                // Priority 1: Checkered flag (after lap completion) - always show FINISHED
-                if (_pendingCheckeredFlag && lapCompleted)
+                // Priority 1: Finished state is latched.
+                if (_finishedLatched)
                 {
                     newSymbol = "🏁";
                     newLapDisplay = "FINISHED";
                 }
-                // Priority 2: White flag (after lap completion) - always show Final Lap
-                else if (_pendingWhiteFlag && lapCompleted)
+                // Priority 2: Final Lap state is latched.
+                else if (_finalLapLatched)
                 {
                     newSymbol = "🏁";
                     newLapDisplay = "Final Lap";
                 }
-                // Priority 3a: Lap-based countdown (only for lap-based sessions and no pending flags)
-                else if (!isTimedSession && lapsRemaining >= 0 && lapsRemaining < 10000 && !_pendingCheckeredFlag && !_pendingWhiteFlag)
+                // Priority 3: Lap-limited qualifying logic.
+                else if (_totalQualifyingLaps > 0 && _qualifyingLapsCompleted < _totalQualifyingLaps)
                 {
                     newSymbol = "🏁";
-                    if (lapsRemaining == 0)
-                    {
-                        newLapDisplay = "Final Lap";
-                    }
-                    else
-                    {
-                        newLapDisplay = $"{lapsRemaining + 1} Laps";
-                    }
+                    int lapsToGo = _totalQualifyingLaps - _qualifyingLapsCompleted;
+                    newLapDisplay = $"{lapsToGo} Laps";
                 }
-                // Priority 3b: Time remaining (for timed sessions or fallback)
+                // Priority 4: Lap-based race logic.
+                else if (!isTimedSession && lapsRemaining >= 0 && lapsRemaining < 10000)
+                {
+                    newSymbol = "🏁";
+                    string latestLapDisplay = $"{lapsRemaining + 1} Laps";
+                    if (lapCompleted)
+                    {
+                        _currentLapDisplay = latestLapDisplay;
+                    }
+                    newLapDisplay = _currentLapDisplay;
+                }
+                // Priority 5: Timed session logic.
                 else if (timeRemain > 0)
                 {
                     newSymbol = "⏳";
@@ -351,6 +384,7 @@ namespace VISOR.ViewModels
                     else
                         newLapDisplay = $"{(int)remaining.TotalMinutes}:{remaining.Seconds:D2}";
                 }
+                // Fallback display.
                 else
                 {
                     newLapDisplay = "--:--";
@@ -396,23 +430,43 @@ namespace VISOR.ViewModels
 
             _classColorManager.Reset();
 
-            // Reset pending flag states
             _pendingWhiteFlag = false;
             _pendingCheckeredFlag = false;
 
-            // Reset debug counters
+            _finalLapLatched = false;
+            _finishedLatched = false;
+            _isFirstQualiLap = false;
+
             _lastValidCarCount = -1;
             _lastClassCarCount = -1;
 
             OnPropertyChanged(string.Empty);
         }
 
-        private void CheckForSessionTransition(SVappsLABSnapshot snapshot)
+        private void CheckForSessionTransition(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
             int currentSessionNum = snapshot.GetValue<int>("SessionNum", -1);
             if (currentSessionNum != _lastSessionNum && _lastSessionNum != -1)
             {
                 ResetSessionData();
+
+                if (sessionDataProvider != null && sessionDataProvider.IsDataReady)
+                {
+                    if (sessionDataProvider.IsQualifyingSession(currentSessionNum))
+                    {
+                        _totalQualifyingLaps = sessionDataProvider.GetSessionLaps(currentSessionNum);
+                        _qualifyingLapsCompleted = 0;
+                        if (_totalQualifyingLaps > 0)
+                        {
+                            _isFirstQualiLap = true;
+                        }
+                    }
+                    else
+                    {
+                        _totalQualifyingLaps = 0;
+                        _isFirstQualiLap = false;
+                    }
+                }
             }
             _lastSessionNum = currentSessionNum;
         }
@@ -425,6 +479,10 @@ namespace VISOR.ViewModels
             DeltaBarVM.Reset();
             FuelVM.Reset();
             WarningsVM.Reset();
+            _currentLapDisplay = "-- Laps";
+            _finalLapLatched = false;
+            _finishedLatched = false;
+            _isFirstQualiLap = false;
             OnPropertyChanged(string.Empty);
         }
 
