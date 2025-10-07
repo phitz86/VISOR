@@ -63,6 +63,7 @@ namespace VISOR.Telemetry
             dict["CarIdxClassPosition"] = data.CarIdxClassPosition;
             dict["CarIdxTrackSurface"] = data.CarIdxTrackSurface;
             dict["CarIdxLap"] = data.CarIdxLap;
+            dict["CarIdxLapCompleted"] = data.CarIdxLapCompleted;
             dict["CarIdxLastLapTime"] = data.CarIdxLastLapTime;
             dict["CarIdxOnPitRoad"] = SafeGetFieldValue(data, "CarIdxOnPitRoad", new bool[64]);
         }

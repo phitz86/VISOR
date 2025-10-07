@@ -17,7 +17,7 @@ namespace VISOR.Telemetry
         "CarIdxLap", "CarIdxLastLapTime", "CarIdxOnPitRoad",
         "SessionState", "SessionTime", "SessionTimeRemain", "SessionLapsRemain",
         "SessionLapsTotal", "SessionNum", "PlayerCarIdx", "SessionFlags",
-        "CarLeftRight", "CarIdxF2Time"
+        "CarLeftRight", "CarIdxF2Time", "CarIdxLapCompleted"
     ])]
     public class SVappsLABSDKWrapper : IDisposable
     {

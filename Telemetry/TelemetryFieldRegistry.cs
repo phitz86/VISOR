@@ -158,7 +158,7 @@ namespace VISOR.Telemetry
             {
                 "CarIdxLapDistPct", "CarIdxPosition", "CarIdxClassPosition",
                 "CarIdxTrackSurface", "CarIdxLap", "CarIdxLastLapTime", "CarIdxOnPitRoad",
-                "CarIdxUserName", "CarIdxCarNumber", "CarIdxCarNumberRaw",
+                "CarIdxUserName", "CarIdxCarNumber", "CarIdxCarNumberRaw", "CarIdxLapCompleted",
                 "CarIdxClassID", "CarIdxIsAI", "CarIdxIncidentCount"
             };
         }

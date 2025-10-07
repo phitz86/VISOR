@@ -22,34 +22,20 @@ namespace VISOR.ViewModels
         public RelativeViewModel RelativeVM { get; private set; }
         public DeltaBarViewModel DeltaBarVM { get; private set; }
         public WarningsViewModel WarningsVM { get; private set; }
+        public CountdownViewModel CountdownVM { get; private set; }
 
         private readonly ClassColorManager _classColorManager;
         private readonly SettingsManager _settingsManager;
 
         private int _lastSessionNum = -1;
         private int _lastSessionState = -999;
-        private bool _greenFlagSeen = false;
-        private int _lastLap = -1;
         private float _topSpeedBaseline = 0f;
         private float _currentLapTopSpeed = 0f;
         private float _lastLapTopSpeed = 0f;
 
-        // --- Fields for Lap/Time Remaining logic ---
-        private string _currentLapDisplay = "-- Laps";
-        private int _totalQualifyingLaps = 0;
-        private int _qualifyingLapsCompleted = 0;
-        private bool _isFirstQualiLap = false;
-        private bool _finalLapLatched = false;
-        private bool _finishedLatched = false;
-
-        // --- Field for throttled position logging ---
         private int _lastLoggedPlayerPosition = -1;
+        private bool[] _carWasValid = new bool[64];
 
-        // Pending flag state
-        private bool _pendingWhiteFlag = false;
-        private bool _pendingCheckeredFlag = false;
-
-        // Debug tracking for car count
         private int _lastValidCarCount = -1;
         private int _lastClassCarCount = -1;
 
@@ -57,8 +43,6 @@ namespace VISOR.ViewModels
         public string GearDisplay { get; private set; } = "N";
         public string LastLapTime { get; private set; } = "-:--.---";
         public string BestLapTime { get; private set; } = "-:--.---";
-        public string TimeRemainingDisplay { get; private set; } = "--:--";
-        public string TimeRemainingSymbol { get; private set; } = "⏳";
 
         public bool ShowGear => _settingsManager.Settings.ShowRow0;
         public bool ShowPosition => _settingsManager.Settings.ShowRow0;
@@ -85,6 +69,7 @@ namespace VISOR.ViewModels
             RelativeVM = new RelativeViewModel(_classColorManager);
             DeltaBarVM = new DeltaBarViewModel();
             WarningsVM = new WarningsViewModel();
+            CountdownVM = new CountdownViewModel();
         }
 
         private bool _isTelemetryConnected = false;
@@ -109,25 +94,13 @@ namespace VISOR.ViewModels
 
         public void UpdateFromTelemetry(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
-            int currentLap = snapshot.GetValue<int>("Lap", 0);
-            if (_totalQualifyingLaps > 0 && currentLap > _lastLap && _greenFlagSeen)
-            {
-                if (_isFirstQualiLap)
-                {
-                    _isFirstQualiLap = false;
-                }
-                else
-                {
-                    _qualifyingLapsCompleted++;
-                }
-            }
-
             CheckSessionStateTransitions(snapshot);
             CheckForSessionTransition(snapshot, sessionDataProvider);
 
             FuelVM.Update(snapshot.GetValue<float>("FuelLevel"), snapshot.GetValue<int>("Lap"));
             RelativeVM.Update(snapshot, sessionDataProvider);
             DeltaBarVM.Update(snapshot);
+            CountdownVM.Update(snapshot, sessionDataProvider);
 
             if (sessionDataProvider != null && sessionDataProvider.IsDataReady)
             {
@@ -182,7 +155,6 @@ namespace VISOR.ViewModels
             }
 
             UpdateGearDisplay(snapshot);
-            UpdateSessionTimer(snapshot, sessionDataProvider);
         }
 
         #region --- Player Position Calculation ---
@@ -192,12 +164,17 @@ namespace VISOR.ViewModels
             var carClassIDs = dataProvider.CarClassIDs;
             var userNames = dataProvider.UserNames;
             var carNumbers = dataProvider.CarNumbers;
-            var trackSurface = snapshot.GetValue<int[]>("CarIdxTrackSurface");
+            // --- MODIFIED: Get CarIdxLapCompleted from the snapshot ---
+            var lapCompleted = snapshot.GetValue<int[]>("CarIdxLapCompleted");
             var lapDistPct = snapshot.GetValue<float[]>("CarIdxLapDistPct");
             var currentLap = snapshot.GetValue<int[]>("CarIdxLap");
             var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx");
 
-            var allValidCars = BuildValidCarsList(trackSurface, carNumbers, userNames,
+            // Ensure we have the new data before proceeding
+            if (lapCompleted == null) return;
+
+            // --- MODIFIED: Pass the new data into the method ---
+            var allValidCars = BuildValidCarsList(lapCompleted, carNumbers, userNames,
                 carClassIDs, currentLap, lapDistPct, playerCarIdx);
 
             if (!allValidCars.Any())
@@ -233,13 +210,16 @@ namespace VISOR.ViewModels
             }
         }
 
-        private List<CarData> BuildValidCarsList(int[] trackSurface, string[] carNumbers, string[] userNames,
+        private List<CarData> BuildValidCarsList(int[] lapCompleted, string[] carNumbers, string[] userNames,
                                                   int[] carClassIDs, int[] currentLap, float[] lapDistPct, int playerCarIdx)
         {
             var allValidCars = new List<CarData>();
-            for (int i = 0; i < trackSurface.Length; i++)
+            for (int i = 0; i < lapCompleted.Length; i++)
             {
-                if (trackSurface[i] != -1 &&
+                // --- MODIFIED: The core filtering logic is now based on CarIdxLapCompleted ---
+                // A car is considered active if it has a valid lap count (>= -1).
+                // A value of -1 indicates the car is on the grid and has not completed a lap yet.
+                if (lapCompleted[i] >= -1 &&
                     !string.IsNullOrEmpty(carNumbers[i]) &&
                     !string.IsNullOrEmpty(userNames[i]))
                 {
@@ -250,16 +230,6 @@ namespace VISOR.ViewModels
                         CurrentLap: currentLap[i],
                         LapDistPct: lapDistPct[i]
                     ));
-                }
-                else
-                {
-                    if (!string.IsNullOrEmpty(userNames[i]))
-                    {
-                        if (trackSurface[i] == -1)
-                            System.Diagnostics.Debug.WriteLine($"[Position Debug] CarIdx {i} ({userNames[i]}) REJECTED: Not in world.");
-                        else if (string.IsNullOrEmpty(carNumbers[i]))
-                            System.Diagnostics.Debug.WriteLine($"[Position Debug] CarIdx {i} ({userNames[i]}) REJECTED: Null or empty car number.");
-                    }
                 }
             }
             return allValidCars;
@@ -318,113 +288,6 @@ namespace VISOR.ViewModels
             }
         }
 
-        private void UpdateSessionTimer(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
-        {
-            int lapsRemaining = snapshot.GetValue<int>("SessionLapsRemain", 0);
-            double timeRemain = snapshot.GetValue<double>("SessionTimeRemain", 0.0);
-            int currentLap = snapshot.GetValue<int>("Lap", 0);
-            int sessionFlagsValue = snapshot.GetValue<int>("SessionFlags", 0);
-
-            bool isTimedSession = false;
-            if (sessionDataProvider != null && sessionDataProvider.IsDataReady)
-            {
-                int currentSessionNum = sessionDataProvider.CurrentSessionNum;
-                int sessionLaps = sessionDataProvider.GetSessionLaps(currentSessionNum);
-                isTimedSession = (sessionLaps == -1);
-            }
-
-            bool lapCompleted = currentLap > _lastLap;
-
-            if (currentLap < _lastLap)
-            {
-                _greenFlagSeen = false;
-                _pendingWhiteFlag = false;
-                _pendingCheckeredFlag = false;
-            }
-
-            if ((sessionFlagsValue & (int)Telemetry.SessionFlags.Green) == (int)Telemetry.SessionFlags.Green)
-            {
-                _greenFlagSeen = true;
-            }
-
-            if ((sessionFlagsValue & (int)Telemetry.SessionFlags.White) == (int)Telemetry.SessionFlags.White)
-            {
-                _pendingWhiteFlag = true;
-            }
-
-            if ((sessionFlagsValue & (int)Telemetry.SessionFlags.Checkered) == (int)Telemetry.SessionFlags.Checkered)
-            {
-                _pendingCheckeredFlag = true;
-            }
-
-            bool shouldShowTimer = _greenFlagSeen || timeRemain > 0;
-
-            if (shouldShowTimer)
-            {
-                if (_pendingWhiteFlag && lapCompleted)
-                {
-                    _finalLapLatched = true;
-                }
-                if (_pendingCheckeredFlag && lapCompleted)
-                {
-                    _finishedLatched = true;
-                }
-
-                string newLapDisplay;
-                string newSymbol = TimeRemainingSymbol;
-
-                if (_finishedLatched)
-                {
-                    newSymbol = "🏁";
-                    newLapDisplay = "FINISHED";
-                }
-                else if (_finalLapLatched)
-                {
-                    newSymbol = "🏁";
-                    newLapDisplay = "Final Lap";
-                }
-                else if (_totalQualifyingLaps > 0 && _qualifyingLapsCompleted < _totalQualifyingLaps)
-                {
-                    newSymbol = "🏁";
-                    int lapsToGo = _totalQualifyingLaps - _qualifyingLapsCompleted;
-                    newLapDisplay = $"{lapsToGo} Laps";
-                }
-                else if (!isTimedSession && lapsRemaining >= 0 && lapsRemaining < 10000)
-                {
-                    newSymbol = "🏁";
-                    string latestLapDisplay = $"{lapsRemaining + 1} Laps";
-                    if (lapCompleted)
-                    {
-                        _currentLapDisplay = latestLapDisplay;
-                    }
-                    newLapDisplay = _currentLapDisplay;
-                }
-                else if (timeRemain > 0)
-                {
-                    newSymbol = "⏳";
-                    TimeSpan remaining = TimeSpan.FromSeconds(timeRemain);
-                    if (remaining.TotalHours >= 1.0)
-                        newLapDisplay = $"{(int)remaining.TotalHours}:{remaining.Minutes:D2}:{remaining.Seconds:D2}";
-                    else
-                        newLapDisplay = $"{(int)remaining.TotalMinutes}:{remaining.Seconds:D2}";
-                }
-                else
-                {
-                    newLapDisplay = "--:--";
-                }
-
-                if (TimeRemainingDisplay != newLapDisplay || TimeRemainingSymbol != newSymbol)
-                {
-                    TimeRemainingDisplay = newLapDisplay;
-                    TimeRemainingSymbol = newSymbol;
-                    OnPropertyChanged(nameof(TimeRemainingDisplay));
-                    OnPropertyChanged(nameof(TimeRemainingSymbol));
-                }
-            }
-
-            _lastLap = currentLap;
-        }
-
         private void CheckSessionStateTransitions(SVappsLABSnapshot snapshot)
         {
             int currentSessionState = snapshot.GetValue<int>("SessionState", -1);
@@ -446,20 +309,14 @@ namespace VISOR.ViewModels
             FuelVM.Reset();
             DeltaBarVM.Reset();
             RelativeVM.Reset();
+            CountdownVM.Reset();
             GearDisplay = "N";
-            TimeRemainingDisplay = "--:--";
-            TimeRemainingSymbol = "⏳";
             ClassPositionNumber = "--";
 
             _classColorManager.Reset();
 
-            _pendingWhiteFlag = false;
-            _pendingCheckeredFlag = false;
-
-            _finalLapLatched = false;
-            _finishedLatched = false;
-            _isFirstQualiLap = false;
             _lastLoggedPlayerPosition = -1;
+            Array.Fill(_carWasValid, false);
 
             _lastValidCarCount = -1;
             _lastClassCarCount = -1;
@@ -476,20 +333,7 @@ namespace VISOR.ViewModels
 
                 if (sessionDataProvider != null && sessionDataProvider.IsDataReady)
                 {
-                    if (sessionDataProvider.IsQualifyingSession(currentSessionNum))
-                    {
-                        _totalQualifyingLaps = sessionDataProvider.GetSessionLaps(currentSessionNum);
-                        _qualifyingLapsCompleted = 0;
-                        if (_totalQualifyingLaps > 0)
-                        {
-                            _isFirstQualiLap = true;
-                        }
-                    }
-                    else
-                    {
-                        _totalQualifyingLaps = 0;
-                        _isFirstQualiLap = false;
-                    }
+                    CountdownVM.OnSessionTransition(sessionDataProvider, currentSessionNum);
                 }
             }
             _lastSessionNum = currentSessionNum;
@@ -503,11 +347,9 @@ namespace VISOR.ViewModels
             DeltaBarVM.Reset();
             FuelVM.Reset();
             WarningsVM.Reset();
-            _currentLapDisplay = "-- Laps";
-            _finalLapLatched = false;
-            _finishedLatched = false;
-            _isFirstQualiLap = false;
+            CountdownVM.Reset();
             _lastLoggedPlayerPosition = -1;
+            Array.Fill(_carWasValid, false);
             OnPropertyChanged(string.Empty);
         }
 

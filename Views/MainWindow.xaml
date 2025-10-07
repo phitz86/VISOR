@@ -21,17 +21,29 @@
             <viewModels:DeltaBarWidthConverter x:Key="DeltaBarWidthConverter"/>
             <converters:ProximityToWidthConverter x:Key="ProximityToWidthConverter"/>
 
-            <!-- Local style for MainWindow TextBlocks - Semibold -->
-            <Style TargetType="TextBlock">
+            <Style x:Key="BaseTextBlock" TargetType="TextBlock">
                 <Setter Property="FontFamily" Value="Segoe UI"/>
-                <Setter Property="FontWeight" Value="Semibold"/>
-                <Setter Property="FontSize" Value="14"/>
             </Style>
+
+            <Style x:Key="SemiboldText" TargetType="TextBlock" BasedOn="{StaticResource BaseTextBlock}">
+                <Setter Property="FontWeight" Value="Semibold"/>
+                <Setter Property="Foreground" Value="White"/>
+            </Style>
+
+            <Style x:Key="NormalWeightSymbol" TargetType="TextBlock" BasedOn="{StaticResource BaseTextBlock}">
+                <Setter Property="FontWeight" Value="Normal"/>
+            </Style>
+
+            <Style x:Key="DigitalIndicator" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="pack://application:,,,/Resources/Fonts/#Digital-7"/>
+                <Setter Property="FontWeight" Value="Normal"/>
+                <Setter Property="Foreground" Value="White"/>
+            </Style>
+
         </ResourceDictionary>
     </Window.Resources>
 
     <Grid>
-        <!-- Main Content - Base layer -->
         <Border x:Name="MainContentContainer" 
                 Panel.ZIndex="0"
                 CornerRadius="12" 
@@ -62,43 +74,29 @@
                             Orientation="Horizontal"
                             Visibility="{Binding ShowGear, Converter={StaticResource BoolToVisibilityConverter}}"
                             HorizontalAlignment="Center">
-                    <TextBlock Text="⚙" FontSize="54" Foreground="DimGray" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,8,0"/>
-                    <TextBlock Text="{Binding GearDisplay}"
-                               FontSize="80" FontWeight="Bold"
-                               FontFamily="pack://application:,,,/Resources/Fonts/#Digital-7"
-                               Foreground="White"
-                               HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
+                    <TextBlock Text="⚙" FontSize="54" Foreground="LightGray" VerticalAlignment="Bottom" Margin="0,0,8,0" Style="{StaticResource NormalWeightSymbol}"/>
+                    <TextBlock Text="{Binding GearDisplay}" FontSize="80" VerticalAlignment="Bottom" Style="{StaticResource DigitalIndicator}"/>
                 </StackPanel>
 
                 <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" 
                             HorizontalAlignment="Center" VerticalAlignment="Center"
                             Visibility="{Binding ShowPosition, Converter={StaticResource BoolToVisibilityConverter}}">
-                    <TextBlock Text="P"
-                               FontSize="60" 
-                               FontFamily="Segoe UI"
-                               FontWeight="Bold"
-                               Foreground="White"
-                               VerticalAlignment="Center" 
-                               Margin="0,0,8,0"/>
-                    <TextBlock Text="{Binding ClassPositionNumber}"
-                               FontSize="72" 
-                               FontFamily="pack://application:,,,/Resources/Fonts/#Digital-7"
-                               Foreground="White"
-                               VerticalAlignment="Center"/>
+                    <TextBlock Text="P" FontSize="60" Foreground="White" VerticalAlignment="Center" Margin="0,0,8,0" Style="{StaticResource NormalWeightSymbol}" FontWeight="Bold"/>
+                    <TextBlock Text="{Binding ClassPositionNumber}" FontSize="72" VerticalAlignment="Center" Style="{StaticResource DigitalIndicator}"/>
                 </StackPanel>
 
                 <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal"
                             Visibility="{Binding ShowTimeRemaining, Converter={StaticResource BoolToVisibilityConverter}}"
                             HorizontalAlignment="Center">
-                    <TextBlock Text="{Binding TimeRemainingSymbol}" FontSize="36" Margin="0,0,8,0" Foreground="White"/>
-                    <TextBlock Text="{Binding TimeRemainingDisplay}" FontSize="36" Foreground="White"/>
+                    <TextBlock Text="{Binding CountdownVM.TimeRemainingSymbol}" FontSize="36" Margin="0,0,8,0" Style="{StaticResource NormalWeightSymbol}" Foreground="White"/>
+                    <TextBlock Text="{Binding CountdownVM.TimeRemainingDisplay}" FontSize="36" Style="{StaticResource SemiboldText}"/>
                 </StackPanel>
 
                 <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal"
                             Visibility="{Binding ShowFuelRemaining, Converter={StaticResource BoolToVisibilityConverter}}"
                             HorizontalAlignment="Center">
-                    <TextBlock Text="⛽" FontSize="36" Margin="0,0,8,0" Foreground="Red"/>
-                    <TextBlock Text="{Binding FuelVM.FuelDisplay}" FontSize="36" Foreground="White"/>
+                    <TextBlock Text="⛽" FontSize="36" Margin="0,0,8,0" Foreground="Red" Style="{StaticResource NormalWeightSymbol}"/>
+                    <TextBlock Text="{Binding FuelVM.FuelDisplay}" FontSize="36" Style="{StaticResource SemiboldText}"/>
                 </StackPanel>
 
                 <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Height="12" Background="#333333"
@@ -136,15 +134,15 @@
                 <StackPanel Grid.Row="3" Grid.Column="0" Orientation="Horizontal"
                             Visibility="{Binding ShowLapTimes, Converter={StaticResource BoolToVisibilityConverter}}"
                             HorizontalAlignment="Center">
-                    <TextBlock Text="⏱" FontSize="30" Margin="0,0,8,0" Foreground="White"/>
-                    <TextBlock Text="{Binding LastLapTime}" FontSize="30" Foreground="White"/>
+                    <TextBlock Text="⏱" FontSize="30" Margin="0,0,8,0" Foreground="White" Style="{StaticResource NormalWeightSymbol}"/>
+                    <TextBlock Text="{Binding LastLapTime}" FontSize="30" Style="{StaticResource SemiboldText}"/>
                 </StackPanel>
 
                 <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal"
                             Visibility="{Binding ShowLapTimes, Converter={StaticResource BoolToVisibilityConverter}}"
                             HorizontalAlignment="Center">
-                    <TextBlock Text="🏆" FontSize="30" Foreground="DarkGoldenrod" Margin="0,0,8,0"/>
-                    <TextBlock Text="{Binding BestLapTime}" FontSize="30" Foreground="White"/>
+                    <TextBlock Text="🏆" FontSize="30" Foreground="DarkGoldenrod" Margin="0,0,8,0" Style="{StaticResource NormalWeightSymbol}"/>
+                    <TextBlock Text="{Binding BestLapTime}" FontSize="30" Style="{StaticResource SemiboldText}"/>
                 </StackPanel>
 
                 <ItemsControl Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2"
@@ -160,10 +158,10 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
 
-                                <TextBlock Text="{Binding ClassPos}" Grid.Column="0" FontSize="24" HorizontalAlignment="Center" Foreground="White" Margin="0,0,8,0"/>
+                                <TextBlock Text="{Binding ClassPos}" Grid.Column="0" FontSize="24" HorizontalAlignment="Center" Margin="0,0,8,0" Style="{StaticResource SemiboldText}"/>
 
                                 <Border Grid.Column="1" Background="{Binding ClassBackground}" Padding="4" CornerRadius="3" Margin="0,0,8,0">
-                                    <TextBlock Text="{Binding CarNum}" FontSize="24" HorizontalAlignment="Center" FontWeight="Bold"/>
+                                    <TextBlock Text="{Binding CarNum}" FontSize="24" HorizontalAlignment="Center" FontWeight="Bold" FontFamily="Segoe UI"/>
                                 </Border>
 
                                 <Grid Grid.Column="2" x:Name="NameContainer">
@@ -189,7 +187,8 @@
                                                FontSize="24" 
                                                Foreground="{Binding NameColor}" 
                                                FontStyle="{Binding FontStyle}" 
-                                               Margin="8,0"/>
+                                               Margin="8,0"
+                                               Style="{StaticResource SemiboldText}"/>
                                 </Grid>
                             </Grid>
                         </DataTemplate>
@@ -204,15 +203,17 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Center">
-                        <TextBlock Text="⚠️" FontSize="36" Margin="0,0,10,0" Foreground="{Binding WarningsVM.IncidentColor}"/>
-                        <TextBlock Text="{Binding WarningsVM.IncidentDisplay}" FontSize="36" Foreground="{Binding WarningsVM.IncidentColor}"/>
+                        <TextBlock Text="⚠️" FontSize="36" Margin="0,0,10,0" Foreground="{Binding WarningsVM.IncidentColor}" Style="{StaticResource NormalWeightSymbol}"/>
+                        <TextBlock Text="{Binding WarningsVM.IncidentDisplay}" FontSize="36" Foreground="{Binding WarningsVM.IncidentColor}" Style="{StaticResource SemiboldText}"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <TextBlock Text="📉" FontSize="36" Foreground="Red"
-                                   Visibility="{Binding WarningsVM.IsPaceWarningVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                   Visibility="{Binding WarningsVM.IsPaceWarningVisible, Converter={StaticResource BoolToVisibilityConverter}}"
+                                   Style="{StaticResource NormalWeightSymbol}"/>
                         <TextBlock Text="•" FontSize="36" Foreground="Red" Margin="5,0,0,0"
                                    VerticalAlignment="Center"
-                                   Visibility="{Binding WarningsVM.IsPersistentDotVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                   Visibility="{Binding WarningsVM.IsPersistentDotVisible, Converter={StaticResource BoolToVisibilityConverter}}"
+                                   Style="{StaticResource NormalWeightSymbol}"/>
                         <TextBlock Text="{Binding WarningsVM.PitNowText}" FontSize="36" FontWeight="Bold" Foreground="Yellow" Margin="15,0,0,0">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
@@ -240,7 +241,6 @@
             </Grid>
         </Border>
 
-        <!-- Drag Handle - Top layer, only visible in config mode -->
         <Border x:Name="DragHandle"
                 Panel.ZIndex="100"
                 CornerRadius="4" 
@@ -280,7 +280,6 @@
             </Grid>
         </Border>
 
-        <!-- Config and Exit buttons - Always on top layer -->
         <Button x:Name="ConfigButton"
                 Panel.ZIndex="100"
                 Content="⚙"
