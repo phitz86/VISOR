@@ -12,8 +12,6 @@ namespace VISOR.ViewModels
 {
     public sealed class MainViewModel : INotifyPropertyChanged
     {
-        private record CarData(int CarIdx, int ClassID, bool IsPlayer, int CurrentLap, float LapDistPct);
-
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string? name = null) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
@@ -32,12 +30,6 @@ namespace VISOR.ViewModels
         private float _topSpeedBaseline = 0f;
         private float _currentLapTopSpeed = 0f;
         private float _lastLapTopSpeed = 0f;
-
-        private int _lastLoggedPlayerPosition = -1;
-        private bool[] _carWasValid = new bool[64];
-
-        private int _lastValidCarCount = -1;
-        private int _lastClassCarCount = -1;
 
         public string ClassPositionNumber { get; private set; } = "--";
         public string GearDisplay { get; private set; } = "N";
@@ -161,47 +153,26 @@ namespace VISOR.ViewModels
 
         private void UpdatePlayerPosition(SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider)
         {
-            var carClassIDs = dataProvider.CarClassIDs;
-            var userNames = dataProvider.UserNames;
-            var carNumbers = dataProvider.CarNumbers;
-            // --- MODIFIED: Get CarIdxLapCompleted from the snapshot ---
-            var lapCompleted = snapshot.GetValue<int[]>("CarIdxLapCompleted");
-            var lapDistPct = snapshot.GetValue<float[]>("CarIdxLapDistPct");
-            var currentLap = snapshot.GetValue<int[]>("CarIdxLap");
-            var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx");
+            // Position display logic depends on session type:
+            // - Practice/Qualifying: Use fastest lap position from YAML
+            // - Race: Use calculated real-time position from RelativeVM
 
-            // Ensure we have the new data before proceeding
-            if (lapCompleted == null) return;
+            string newPosition;
 
-            // --- MODIFIED: Pass the new data into the method ---
-            var allValidCars = BuildValidCarsList(lapCompleted, carNumbers, userNames,
-                carClassIDs, currentLap, lapDistPct, playerCarIdx);
-
-            if (!allValidCars.Any())
+            if (dataProvider.ShouldUseFastestLapPositioning())
             {
-                ClassPositionNumber = "--";
-                OnPropertyChanged(nameof(ClassPositionNumber));
-                return;
+                // Practice/Qualifying - get position from YAML fastest lap data
+                var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx", -1);
+                var fastestLapData = dataProvider.GetFastestLapPositioning();
+                var playerData = fastestLapData.FirstOrDefault(d => d.carIdx == playerCarIdx);
+                newPosition = playerData.position > 0 ? playerData.position.ToString() : "--";
             }
-
-            if (allValidCars.Count != _lastValidCarCount)
+            else
             {
-                var player = allValidCars.FirstOrDefault(c => c.IsPlayer);
-                if (player != null)
-                {
-                    var carsInPlayerClass = allValidCars.Count(c => c.ClassID == player.ClassID);
-                    if (carsInPlayerClass != _lastClassCarCount)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[MainViewModel Position] Total valid cars: {allValidCars.Count}, " +
-                            $"In player's class (ID {player.ClassID}): {carsInPlayerClass}");
-                        _lastClassCarCount = carsInPlayerClass;
-                    }
-                }
-                _lastValidCarCount = allValidCars.Count;
+                // Race - use calculated position from RelativeVM
+                var playerRow = RelativeVM.RelativeRows.FirstOrDefault(r => r.IsPlayer);
+                newPosition = playerRow?.ClassPos ?? "--";
             }
-
-            bool useFastestLap = dataProvider.ShouldUseFastestLapPositioning();
-            var newPosition = CalculatePlayerClassPosition(snapshot, allValidCars, playerCarIdx, useFastestLap, dataProvider);
 
             if (ClassPositionNumber != newPosition)
             {
@@ -210,71 +181,6 @@ namespace VISOR.ViewModels
             }
         }
 
-        private List<CarData> BuildValidCarsList(int[] lapCompleted, string[] carNumbers, string[] userNames,
-                                                  int[] carClassIDs, int[] currentLap, float[] lapDistPct, int playerCarIdx)
-        {
-            var allValidCars = new List<CarData>();
-            for (int i = 0; i < lapCompleted.Length; i++)
-            {
-                // --- MODIFIED: The core filtering logic is now based on CarIdxLapCompleted ---
-                // A car is considered active if it has a valid lap count (>= -1).
-                // A value of -1 indicates the car is on the grid and has not completed a lap yet.
-                if (lapCompleted[i] >= -1 &&
-                    !string.IsNullOrEmpty(carNumbers[i]) &&
-                    !string.IsNullOrEmpty(userNames[i]))
-                {
-                    allValidCars.Add(new CarData(
-                        CarIdx: i,
-                        ClassID: carClassIDs[i],
-                        IsPlayer: (i == playerCarIdx),
-                        CurrentLap: currentLap[i],
-                        LapDistPct: lapDistPct[i]
-                    ));
-                }
-            }
-            return allValidCars;
-        }
-
-        private string CalculatePlayerClassPosition(SVappsLABSnapshot snapshot, List<CarData> allCars, int playerCarIdx, bool isFastestLapMode, ISessionDataProvider dataProvider)
-        {
-            var player = allCars.FirstOrDefault(c => c.IsPlayer);
-            if (player == null) return "--";
-
-            if (isFastestLapMode)
-            {
-                var fastestLapData = dataProvider.GetFastestLapPositioning();
-                var playerData = fastestLapData.FirstOrDefault(d => d.carIdx == playerCarIdx);
-                return playerData.position > 0 ? playerData.position.ToString() : "--";
-            }
-            else
-            {
-                var carsInClass = allCars.Where(c => c.ClassID == player.ClassID).ToList();
-                var sorted = carsInClass.OrderByDescending(c => c.CurrentLap + c.LapDistPct).ToList();
-                int pos = sorted.FindIndex(c => c.IsPlayer) + 1;
-
-                if (pos != _lastLoggedPlayerPosition)
-                {
-                    var tick = snapshot.GetValue<int>("SessionTick", 0);
-                    System.Diagnostics.Debug.WriteLine($"--- POS DATA [Tick:{tick}] --- POSITION CHANGED: {_lastLoggedPlayerPosition} -> {pos} ---");
-                    foreach (var car in carsInClass)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[Unsorted] CarIdx: {car.CarIdx,2}, Lap: {car.CurrentLap,3}, Dist: {car.LapDistPct:F4}");
-                    }
-
-                    System.Diagnostics.Debug.WriteLine("--- SORTED RESULTS ---");
-                    for (int i = 0; i < sorted.Count; i++)
-                    {
-                        var car = sorted[i];
-                        string isPlayerMarker = car.IsPlayer ? "<- (PLAYER)" : "";
-                        System.Diagnostics.Debug.WriteLine($"P{i + 1,2}: CarIdx: {car.CarIdx,2}, Lap: {car.CurrentLap,3}, Dist: {car.LapDistPct:F4} {isPlayerMarker}");
-                    }
-
-                    _lastLoggedPlayerPosition = pos;
-                }
-
-                return pos > 0 ? pos.ToString() : "--";
-            }
-        }
         #endregion
 
         private void UpdateGearDisplay(SVappsLABSnapshot snapshot)
@@ -315,12 +221,6 @@ namespace VISOR.ViewModels
 
             _classColorManager.Reset();
 
-            _lastLoggedPlayerPosition = -1;
-            Array.Fill(_carWasValid, false);
-
-            _lastValidCarCount = -1;
-            _lastClassCarCount = -1;
-
             OnPropertyChanged(string.Empty);
         }
 
@@ -348,8 +248,6 @@ namespace VISOR.ViewModels
             FuelVM.Reset();
             WarningsVM.Reset();
             CountdownVM.Reset();
-            _lastLoggedPlayerPosition = -1;
-            Array.Fill(_carWasValid, false);
             OnPropertyChanged(string.Empty);
         }
 

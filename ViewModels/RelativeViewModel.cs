@@ -27,7 +27,8 @@ namespace VISOR.ViewModels
         // --- Child Services ---
         private readonly RelativeDisplayCalculator _calculator;
 
-        // --- Live Player Position properties have been REMOVED ---
+        // --- Expose calculator for MainViewModel to access position data ---
+        public RelativeDisplayCalculator Calculator => _calculator;
 
         public RelativeViewModel(ClassColorManager classColorManager)
         {
@@ -48,7 +49,7 @@ namespace VISOR.ViewModels
             }
 
             // --- Delegate to Calculator ---
-            var newRows = _calculator.Calculate(snapshot, sessionDataProvider); // Simplified call
+            var newRows = _calculator.Calculate(snapshot, sessionDataProvider);
 
             // --- Update State from Result ---
             UpdateCollection(newRows);

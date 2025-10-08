@@ -40,7 +40,7 @@ namespace VISOR.ViewModels
             var onPitRoad = snapshot.GetValue<bool[]>("CarIdxOnPitRoad");
             var playerLastLapTime = snapshot.GetValue<float>("LapLastLapTime");
 
-            var allValidCars = BuildValidCarsList(trackSurface, carNumbers, userNames, carIsAI,
+            var allValidCars = BuildValidCarsList(carNumbers, userNames, carIsAI,
                 carClassIDs, incidentCounts, currentLap, lapDistPct, onPitRoad, playerCarIdx);
 
             if (!allValidCars.Any())
@@ -60,14 +60,16 @@ namespace VISOR.ViewModels
 
         #region Calculation Logic
 
-        private List<RelativeRowViewModel> BuildValidCarsList(int[] trackSurface, string[] carNumbers, string[] userNames,
+        private List<RelativeRowViewModel> BuildValidCarsList(string[] carNumbers, string[] userNames,
             bool[] carIsAI, int[] carClassIDs, int[] incidentCounts, int[] currentLap, float[] lapDistPct, bool[] onPitRoad, int playerCarIdx)
         {
             var allValidCars = new List<RelativeRowViewModel>();
-            for (int i = 0; i < trackSurface.Length; i++)
+
+            // Use minimal filtering - only exclude cars with no data
+            // This allows disconnected cars to naturally fall down the order based on their frozen position
+            for (int i = 0; i < carNumbers.Length; i++)
             {
-                if (trackSurface[i] != (int)iRacingTrackSurface.NotInWorld &&
-                    !string.IsNullOrEmpty(carNumbers[i]) &&
+                if (!string.IsNullOrEmpty(carNumbers[i]) &&
                     !string.IsNullOrEmpty(userNames[i]))
                 {
                     string displayName = carIsAI[i] ? $"🤖 {userNames[i]}" : userNames[i];

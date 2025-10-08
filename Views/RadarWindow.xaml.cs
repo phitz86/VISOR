@@ -263,16 +263,18 @@ namespace VISOR.Views
             {
                 _isDragging = false;
 
-                // Save position now that drag is complete
+                // Always save radar window position
                 var mainWindow = Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
-                if (mainWindow != null)
-                {
-                    _settingsManager.SaveWindowPositions(
-                        new Point(mainWindow.Left, mainWindow.Top),
-                        new Point(this.Left, this.Top)
-                    );
-                    System.Diagnostics.Debug.WriteLine($"[RadarWindow] Position saved after drag: ({this.Left}, {this.Top})");
-                }
+                Point mainPos = mainWindow != null
+                    ? new Point(mainWindow.Left, mainWindow.Top)
+                    : _settingsManager.GetMainWindowPosition(); // Use last known position
+
+                _settingsManager.SaveWindowPositions(
+                    mainPos,
+                    new Point(this.Left, this.Top)
+                );
+
+                System.Diagnostics.Debug.WriteLine($"[RadarWindow] Position saved after drag: ({this.Left}, {this.Top})");
             }
         }
 

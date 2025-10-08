@@ -32,7 +32,6 @@ namespace VISOR.ViewModels
         public bool IsPlayer { get; set; }
         public int ClassID { get; set; }
         public int IncidentCount { get; set; }
-
         public bool IsOnPitRoad
         {
             get => _isOnPitRoad;

@@ -11,8 +11,12 @@ Our SDK wrapper for ingesting the telemetry is the SVappsLAB iRacing SDK, instal
 
 Goals for this thread:
 
-Improve Window Drag and Drop
- - Currently, the Main and Radar windows can be dragged and dropped by clicking anywhere in the windows while they're open. This works fine, and the window position saves live. But I'd like to change that functionality to only be available while the Config window is open, and only by clicking in a small button area in the top left of each window. When the Config window is dismissed, both windows should continue to display on top, but should be transparent to clicks.
+Window location save
+ - One of our recent updates accidentally broke the ability to save the window location after it's moved.
+
+Position data calculations
+ - Our Main Window position indicator and Relative display fields are supposed to calculate real-time class position based on LapDistPct, rather than waiting on the once-a-lap updates provided by iRacing's position fields. We discovered through extensive testing and logging that many frames contain invalid data for cars that are still actively competing. Our old logic was dumping those cars from our calculations entirely, resutling in our Position display showing us much further up the order than we were. We need to update the logic to see and dump values of -1, and see if the remaining valid data is good enough to do our position calculations.
+ - We had been using TrackSurface to exclude invalid cars from our sorting and ranking, then we tried LapComplete. I'm now questioning whether there's value to excluding cars during races at all.
 
 Potential Issue Identification:
  - The app is testing nicely now, but as you see the code we're working on, point out any places where you suspect we'll run into problems, or places we could make things cleaner or more efficient.

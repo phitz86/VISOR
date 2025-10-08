@@ -3,29 +3,33 @@ VISOR/
 │   ├── ConfigWindow.xaml
 │   ├── ConfigWindow.xaml.cs
 │   ├── RadarWindow.xaml
-│   ├── RadarWindow.xaml.cs (UPDATED: SettingsManager integration)
+│   ├── RadarWindow.xaml.cs
 │   ├── MainWindow.xaml
-│   └── MainWindow.xaml.cs (UPDATED: SettingsManager integration)
+│   └── MainWindow.xaml.cs
 ├── ViewModels/
-│   ├── MainViewModel.cs (UPDATED: Settings + ClassColorManager integration)
+│   ├── MainViewModel.cs
 │   ├── FuelViewModel.cs
-│   ├── RadarViewModel.cs (UPDATED: ClassColorManager integration)
-│   ├── RelativeViewModel.cs (UPDATED: ClassColorManager integration)
+│   ├── RadarViewModel.cs 
+│   ├── RelativeViewModel.cs 
 │   ├── RelativeRowViewModel.cs
-│   ├── RelativeDisplayCalculator.cs (UPDATED: ClassColorManager integration)
+│   ├── RelativeDisplayCalculator.cs 
 │   ├── DeltaBarViewModel.cs
 │   ├── WarningsViewModel.cs
-│   └── ClassColorManager.cs (NEW: Centralized color service)
-├── Settings/ (NEW FOLDER)
-│   ├── UserSettings.cs (NEW: Application Settings persistence)
-│   └── SettingsManager.cs (NEW: Window sizing and visibility logic)
+│   ├── ClassColorManager.cs 
+│   └── CountdownViewModel.cs 
+├── Settings/ 
+│   ├── UserSettings.cs 
+│   ├── ConfigModeManager.cs 
+│   └── SettingsManager.cs 
 ├── Resources/
+│   ├── Styles.xaml
 │   ├── Converters/
 │   │   └── BoolToVisibilityConverter.cs
+│   │   └── ProximityToWidthConverter.cs
 │   └── Fonts/
 │       └── digital-7.ttf (position and gear displays)
 ├── Telemetry/
-│   ├── SVappsLABSDKWrapper.cs (implements ISessionDataProvider, session-aware logging)
+│   ├── SVappsLABSDKWrapper.cs (implements ISessionDataProvider)
 │   ├── SVappsLABSnapshot.cs (telemetry data container)
 │   ├── SessionDataModels.cs (StaticEventData, SessionTransitionData, LiveSessionData)
 │   ├── SessionDataParsers.cs (StaticEventParser, SessionTransitionParser, LiveSessionParser)
@@ -38,4 +42,4 @@ VISOR/
 ├── Visor Logo.ico (application icon for taskbar/explorer)
 ├── VISOR.csproj 
 ├── App.xaml
-└── App.xaml.cs (UPDATED: ClassColorManager sharing between windows)
+└── App.xaml.cs
