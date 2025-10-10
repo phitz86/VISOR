@@ -21,9 +21,8 @@ namespace VISOR.Views
         private readonly ConfigModeManager _configModeManager;
         private static DateTime _lastSessionReadyLog = DateTime.MinValue;
         private bool _isDragging = false;
-        private bool _lastRelativeVisibility = true; // Track relative display visibility state
+        private bool _lastRelativeVisibility = true;
 
-        // Expose ViewModel for App.xaml.cs to access ClassColorManager
         public MainViewModel ViewModel => _viewModel;
 
         public MainWindow(SVappsLABSDKWrapper sdkWrapper)
@@ -41,17 +40,11 @@ namespace VISOR.Views
             Background = Brushes.Transparent;
             Topmost = true;
 
-            // Initialize window positioning and sizing using SettingsManager
             ApplyWindowSizing();
             ApplyWindowPositioning();
 
-            System.Diagnostics.Debug.WriteLine($"[MainWindow] Initialized with size {Width}x{Height} at position ({Left}, {Top})");
-
-            // Subscribe to settings changes for real-time updates
             _settingsManager.ElementVisibilityChanged += OnElementVisibilityChanged;
             _settingsManager.WindowSizeChanged += OnWindowSizeChanged;
-
-            // Subscribe to config mode changes
             _configModeManager.ConfigModeChanged += OnConfigModeChanged;
 
             Loaded += MainWindow_Loaded;
@@ -59,7 +52,6 @@ namespace VISOR.Views
 
         private void ApplyWindowSizing()
         {
-            // Pass current session data provider if available for dynamic height calculation
             ISessionDataProvider sessionProvider = null;
             if (_sdk?.IsSessionDataReady == true)
             {
@@ -83,11 +75,7 @@ namespace VISOR.Views
             Dispatcher.Invoke(() =>
             {
                 System.Diagnostics.Debug.WriteLine("[MainWindow] Element visibility changed - resizing window");
-
-                // Update ViewModel to refresh visibility bindings
                 _viewModel.RefreshElementVisibility();
-
-                // Resize window to fit new content
                 ApplyWindowSizing();
             });
         }
@@ -97,14 +85,8 @@ namespace VISOR.Views
             Dispatcher.Invoke(() =>
             {
                 System.Diagnostics.Debug.WriteLine($"[MainWindow] Window size preset changed to {e.NewSize} - resizing");
-                System.Diagnostics.Debug.WriteLine($"[MainWindow] New dimensions: {e.NewMainWindowSize.Width}x{e.NewMainWindowSize.Height}");
-
-                // Update ViewModel to refresh ScaleFactor binding
                 _viewModel.RefreshElementVisibility();
-
-                // Apply new window dimensions
                 ApplyWindowSizing();
-
                 System.Diagnostics.Debug.WriteLine($"[MainWindow] Applied dimensions: {Width}x{Height}");
             });
         }
@@ -114,8 +96,6 @@ namespace VISOR.Views
             Dispatcher.Invoke(() =>
             {
                 System.Diagnostics.Debug.WriteLine($"[MainWindow] Config mode changed to: {e.IsInConfigMode}");
-
-                // Simply show/hide the drag handle based on config mode
                 DragHandle.Visibility = e.IsInConfigMode ? Visibility.Visible : Visibility.Collapsed;
             });
         }
@@ -129,25 +109,17 @@ namespace VISOR.Views
             }
         }
 
-        private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             try
             {
-                // Subscribe to events
                 _sdk.SnapshotAvailable += OnSnapshotAvailable;
                 _sdk.SessionYamlAvailable += OnSessionYamlAvailable;
                 _sdk.ConnectionStateChanged += OnConnectionStateChanged;
                 _sdk.PrimedStateChanged += OnPrimedStateChanged;
                 _sdk.SessionDataUpdated += OnSessionDataUpdated;
 
-                // Check initial state
                 UpdateUIState();
-
-                // If not primed, show waiting message
-                if (!_sdk.IsPrimed)
-                {
-                    await WaitForPrimedStateAsync();
-                }
             }
             catch (Exception ex)
             {
@@ -181,7 +153,10 @@ namespace VISOR.Views
                 if (isPrimed)
                 {
                     StatusText.Text = "Fully connected!";
-                    StatusText.Visibility = Visibility.Collapsed;
+                    Task.Delay(1000).ContinueWith(_ =>
+                    {
+                        Dispatcher.Invoke(() => StatusText.Visibility = Visibility.Collapsed);
+                    });
                     _viewModel.IsTelemetryConnected = true;
                 }
                 else
@@ -195,10 +170,9 @@ namespace VISOR.Views
 
         private void OnSessionDataUpdated()
         {
-            // Session data changed (driver joined/left)
             Dispatcher.Invoke(() =>
             {
-                Console.WriteLine("[MainWindow] Session data updated - drivers may have changed");
+                System.Diagnostics.Debug.WriteLine("[MainWindow] Session data updated - drivers may have changed");
             });
         }
 
@@ -208,7 +182,6 @@ namespace VISOR.Views
             {
                 if (_sdk.IsSessionDataReady)
                 {
-                    // Throttle debug output to once per 10 seconds
                     var now = DateTime.Now;
                     if ((now - _lastSessionReadyLog).TotalSeconds > 10)
                     {
@@ -217,8 +190,6 @@ namespace VISOR.Views
 
                     _viewModel.UpdateFromTelemetry(snapshot, _sdk.Coordinator);
 
-                    // Only resize when relative display visibility changes (e.g., entering/exiting Lone Qualifying)
-                    // This preserves automatic resizing for Lone Qualify sessions while eliminating constant 60Hz resizing
                     bool currentRelativeVisibility = !_sdk.Coordinator.ShouldHideRelativeDisplay();
                     if (currentRelativeVisibility != _lastRelativeVisibility)
                     {
@@ -237,7 +208,6 @@ namespace VISOR.Views
 
         private void OnSessionYamlAvailable(string yaml)
         {
-            // Save YAML for debugging purposes
             Task.Run(() =>
             {
                 try
@@ -248,49 +218,9 @@ namespace VISOR.Views
                 }
                 catch
                 {
-                    // Non-fatal, can be ignored
+                    // Non-fatal
                 }
             });
-        }
-
-        private async Task WaitForPrimedStateAsync()
-        {
-            int retries = 0;
-
-            while (!_sdk.IsConnected && retries < 360) // Wait up to 3 minutes for connection
-            {
-                if (StatusText != null)
-                {
-                    Dispatcher.Invoke(() =>
-                    {
-                        StatusText.Text = "Waiting for iRacing telemetry...";
-                        StatusText.Visibility = Visibility.Visible;
-                    });
-                }
-
-                await Task.Delay(500);
-                retries++;
-            }
-
-            if (_sdk.IsConnected)
-            {
-                Dispatcher.Invoke(() =>
-                {
-                    StatusText.Text = "Connected!";
-                    // Hide after a brief moment
-                    Task.Delay(1000).ContinueWith(_ =>
-                    {
-                        Dispatcher.Invoke(() => StatusText.Visibility = Visibility.Collapsed);
-                    });
-                });
-            }
-            else
-            {
-                Dispatcher.Invoke(() =>
-                {
-                    StatusText.Text = "Timeout waiting for telemetry.";
-                });
-            }
         }
 
         private void UpdateUIState()
@@ -327,28 +257,21 @@ namespace VISOR.Views
 
         private void ConfigButton_Click(object sender, RoutedEventArgs e)
         {
-            // Check if a ConfigWindow is already open to prevent duplicates
             foreach (Window window in Application.Current.Windows)
             {
                 if (window is ConfigWindow)
                 {
-                    // If it is, just bring it to the front and exit the method
                     window.Activate();
                     return;
                 }
             }
 
-            // Find the RadarWindow instance
-            var radarWindow = Application.Current.Windows.OfType<RadarWindow>().FirstOrDefault();
-
-            // If no ConfigWindow was found, create a new one with the required parameters.
-            ConfigWindow configWindow = new ConfigWindow(_sdk, this, radarWindow);
+            ConfigWindow configWindow = new ConfigWindow(_sdk, this);
             configWindow.Show();
         }
 
         protected override void OnClosed(EventArgs e)
         {
-            // Unsubscribe from settings events
             _settingsManager.ElementVisibilityChanged -= OnElementVisibilityChanged;
             _settingsManager.WindowSizeChanged -= OnWindowSizeChanged;
             _configModeManager.ConfigModeChanged -= OnConfigModeChanged;

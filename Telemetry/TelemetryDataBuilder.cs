@@ -119,18 +119,6 @@ namespace VISOR.Telemetry
                 if (currentSessionInfo != _lastSessionInfo)
                 {
                     System.Diagnostics.Debug.WriteLine($"[DataBuilder] Session Info: {currentSessionInfo}");
-
-                    var trackLength = _coordinator.GetTrackLength();
-                    if (trackLength > 0)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[DataBuilder] Track Length: {trackLength:F1}m");
-                    }
-
-                    var carIsAI = _coordinator.CarIsAI;
-                    int humanCount = carIsAI.Count(isAI => !isAI);
-                    int aiCount = carIsAI.Count(isAI => isAI);
-                    System.Diagnostics.Debug.WriteLine($"[DataBuilder] Drivers: {humanCount} human, {aiCount} AI");
-
                     _lastSessionInfo = currentSessionInfo;
                 }
             }

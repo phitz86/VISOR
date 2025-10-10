@@ -5,7 +5,6 @@
         WindowStartupLocation="CenterScreen">
 
     <Window.Resources>
-        <!-- GroupBox style with explicit header template -->
         <Style TargetType="GroupBox">
             <Setter Property="HeaderTemplate">
                 <Setter.Value>
@@ -78,5 +77,14 @@
             </StackPanel>
 
         </StackPanel>
+
+        <!-- Version display in bottom-right corner -->
+        <TextBlock x:Name="VersionText"
+                   HorizontalAlignment="Right" 
+                   VerticalAlignment="Bottom"
+                   Margin="0,0,15,10"
+                   FontSize="10"
+                   Foreground="Gray"
+                   Text="Version 1.0.0"/>
     </Grid>
 </Window>

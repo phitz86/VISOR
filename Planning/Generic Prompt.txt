@@ -1,40 +1,24 @@
-Thread: VISOR Position Calculator Refactor
+Thread: VISOR Beta Release Prep
 
 Context:
 Good afternoon Claude,
 
 I'm building an overlay UI for iRacing called VISOR (Virtual Intelligence Simulator Overlay & Radar). VISOR is a C# application, built in Visual Studio with .NET 8.0 and WPF. I've set AnyCPU for now, but can pivot if needed. We're targeting a MVVM architecture with discrete classes/files to handle individual tasks.
 
-I'm not a coder, but I work in tech, so I have a general understanding of how things work. I'm using this project to evaluate the coding and project management capabilities of various LLMs, including you, Gemini, Grok, and ChatGPT. We're doing our last few bug fixes and feature improvements before our Beta release.
+I'm not a coder, but I work in tech, so I have a general understanding of how things work. I'm using this project to evaluate the coding and project management capabilities of various LLMs, including you, Gemini, Grok, and ChatGPT. We've completed our last round of bug fixes and are now prepping for Beta release.
 
 Our SDK wrapper for ingesting the telemetry is the SVappsLAB iRacing SDK, installed via NuGet. The repo for the SDK is here: https://github.com/SVappsLAB/iRacingTelemetrySDK/tree/main
 
-Goals for this thread: Position Calculator Refactor
+Goals for this thread: Beta Release Prep Tasks
 
-CONTEXT:
-We're refactoring VISOR's position calculation logic to:
-1. Extract position calculation into a dedicated PositionCalculator service (2Hz updates)
-2. Rename RelativeDisplayCalculator → RelativeDisplayBuilder (60Hz proximity display)
-3. Decouple MainViewModel from RelativeViewModel for position data
-
-ARCHITECTURE GOALS:
-- PositionCalculator (2Hz): Calculates class positions, shared by MainViewModel & RelativeViewModel
-- RelativeDisplayBuilder (60Hz): Builds 7-row proximity UI with colors/bars
-- MainViewModel & RelativeViewModel both consume PositionCalculator independently
-
-FILTERING STRATEGY:
-- 2Hz position calculation acts as validation window
-- Cars with invalid LapDistPct (< 0 or > 1) excluded during calculation snapshot
-- Natural flap filtering without frame counters
-- Disconnected cars removed within 500ms
-
-FILES TO CREATE:
-- PositionCalculator.cs (new service)
-- RelativeDisplayBuilder.cs (renamed from RelativeDisplayCalculator)
-
-FILES TO MODIFY:
-- MainViewModel.cs
-- RelativeViewModel.cs
+Versioning:
+ - Visual Studio's publish tool automatically increments versioning. I would like that version number to be included in the bottom right corner of the Config Window, and for it to automatically update. Is this possible?
+ 
+Installer:
+ - I would like the installer to be more sophisticated than it currently is. It needs to clean up previous install versions as needed, and also allow the user to select the install location and location of any launch icons (e.g. Start Menu or Desktop).
+ 
+Code Cleanup
+ - We need to perform a complete code review for any remaining issue identification, cleanup of commented-out legacy code, removal of debug messages related to completed troubleshooting, etc. Debug messages related to app operation, such as launch messages, session transitions, and other significant UI events can remain, as they will remain useful for future improvements and testing.
 
 Potential Issue Identification:
  - The app is testing nicely now, but as you see the code we're working on, point out any places where you suspect we'll run into problems, or places we could make things cleaner or more efficient.

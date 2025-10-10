@@ -203,7 +203,6 @@ namespace VISOR.Telemetry
             {
                 var positions = _liveData.SessionResultsPositions.GetValueOrDefault(CurrentSessionNum,
                     new List<LiveSessionData.ResultPosition>());
-                // Return a copy to avoid collection modified exceptions
                 return new List<LiveSessionData.ResultPosition>(positions);
             }
         }
@@ -214,7 +213,6 @@ namespace VISOR.Telemetry
             {
                 var positions = _liveData.SessionResultsPositions.GetValueOrDefault(sessionNum,
                     new List<LiveSessionData.ResultPosition>());
-                // Return a copy to avoid collection modified exceptions
                 return new List<LiveSessionData.ResultPosition>(positions);
             }
         }
@@ -263,11 +261,9 @@ namespace VISOR.Telemetry
         {
             int currentSession = CurrentSessionNum;
 
-            // Early exit for races - always use track position
             if (IsRaceSession(currentSession))
                 return false;
 
-            // Practice and qualifying always use fastest lap positioning
             if (IsPracticeSession(currentSession) || (IsQualifyingSession(currentSession)))
             {
                 return true;
@@ -289,22 +285,18 @@ namespace VISOR.Telemetry
 
             if (IsPracticeSession(currentSession) || IsQualifyingSession(currentSession))
             {
-                // Get a thread-safe snapshot of the results positions
                 List<LiveSessionData.ResultPosition> resultsSnapshot;
                 lock (_parseLock)
                 {
                     var resultsPositions = _liveData.SessionResultsPositions.GetValueOrDefault(currentSession,
                         new List<LiveSessionData.ResultPosition>());
-                    // Create a copy to avoid collection modified exception
                     resultsSnapshot = new List<LiveSessionData.ResultPosition>(resultsPositions);
                 }
 
                 foreach (var pos in resultsSnapshot)
                 {
-                    if (pos.FastestTime > 0) // Only include cars with valid times
+                    if (pos.FastestTime > 0)
                     {
-                        // Use ClassPosition instead of Position for multi-class sessions
-                        // ClassPosition in YAML is 0-indexed, so add 1 for display (1st, 2nd, 3rd...)
                         result.Add((pos.CarIdx, pos.FastestTime, pos.ClassPosition + 1));
                     }
                 }
@@ -328,8 +320,6 @@ namespace VISOR.Telemetry
                     {
                         return false;
                     }
-
-                    System.Diagnostics.Debug.WriteLine($"[SessionCoordinator] YAML changed - parsing");
 
                     var lines = sessionData.Split('\n');
 
