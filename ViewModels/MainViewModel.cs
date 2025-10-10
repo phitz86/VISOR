@@ -24,6 +24,7 @@ namespace VISOR.ViewModels
 
         private readonly ClassColorManager _classColorManager;
         private readonly SettingsManager _settingsManager;
+        private readonly PositionCalculator _positionCalculator;
 
         private int _lastSessionNum = -1;
         private int _lastSessionState = -999;
@@ -57,8 +58,10 @@ namespace VISOR.ViewModels
         {
             _classColorManager = new ClassColorManager();
             _settingsManager = SettingsManager.Instance;
+            _positionCalculator = new PositionCalculator();
+
             FuelVM = new FuelViewModel();
-            RelativeVM = new RelativeViewModel(_classColorManager);
+            RelativeVM = new RelativeViewModel(_classColorManager, _positionCalculator);
             DeltaBarVM = new DeltaBarViewModel();
             WarningsVM = new WarningsViewModel();
             CountdownVM = new CountdownViewModel();
@@ -88,6 +91,9 @@ namespace VISOR.ViewModels
         {
             CheckSessionStateTransitions(snapshot);
             CheckForSessionTransition(snapshot, sessionDataProvider);
+
+            // Update PositionCalculator every frame (internally throttled to 30 frames)
+            _positionCalculator.Update(snapshot, sessionDataProvider);
 
             FuelVM.Update(snapshot.GetValue<float>("FuelLevel"), snapshot.GetValue<int>("Lap"));
             RelativeVM.Update(snapshot, sessionDataProvider);
@@ -153,10 +159,6 @@ namespace VISOR.ViewModels
 
         private void UpdatePlayerPosition(SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider)
         {
-            // Position display logic depends on session type:
-            // - Practice/Qualifying: Use fastest lap position from YAML
-            // - Race: Use calculated real-time position from RelativeVM
-
             string newPosition;
 
             if (dataProvider.ShouldUseFastestLapPositioning())
@@ -169,13 +171,25 @@ namespace VISOR.ViewModels
             }
             else
             {
-                // Race - use calculated position from RelativeVM
-                var playerRow = RelativeVM.RelativeRows.FirstOrDefault(r => r.IsPlayer);
-                newPosition = playerRow?.ClassPos ?? "--";
+                // Race - use calculated position from PositionCalculator
+                var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx", -1);
+                var carClassIDs = dataProvider.CarClassIDs;
+
+                if (playerCarIdx >= 0 && playerCarIdx < carClassIDs.Length)
+                {
+                    int playerClassId = carClassIDs[playerCarIdx];
+                    int position = _positionCalculator.GetClassPosition(playerCarIdx, playerClassId);
+                    newPosition = position > 0 ? position.ToString() : "--";
+                }
+                else
+                {
+                    newPosition = "--";
+                }
             }
 
             if (ClassPositionNumber != newPosition)
             {
+                System.Diagnostics.Debug.WriteLine($"[MainVM] Position changed: '{ClassPositionNumber}' -> '{newPosition}'");
                 ClassPositionNumber = newPosition;
                 OnPropertyChanged(nameof(ClassPositionNumber));
             }
@@ -220,6 +234,7 @@ namespace VISOR.ViewModels
             ClassPositionNumber = "--";
 
             _classColorManager.Reset();
+            _positionCalculator.Reset();
 
             OnPropertyChanged(string.Empty);
         }
@@ -248,6 +263,7 @@ namespace VISOR.ViewModels
             FuelVM.Reset();
             WarningsVM.Reset();
             CountdownVM.Reset();
+            _positionCalculator.Reset();
             OnPropertyChanged(string.Empty);
         }
 

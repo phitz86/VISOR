@@ -7,23 +7,44 @@ using VISOR.Telemetry;
 
 namespace VISOR.ViewModels
 {
-    public class RelativeDisplayCalculator
+    /// <summary>
+    /// Builds the 7-row proximity-based relative display with visual properties.
+    /// Uses PositionCalculator's valid car roster as the starting point for filtering.
+    /// Focuses on proximity sorting and visual styling - no position calculation.
+    /// </summary>
+    public class RelativeDisplayBuilder
     {
+        #region Constants
         private const double PROXIMITY_MAX_DISTANCE = 0.15;
         private const double PROXIMITY_ALERT_DISTANCE = 0.05;
         private static readonly Color NeutralColor = (Color)ColorConverter.ConvertFromString("#80404040");
         private static readonly Color AheadAlertColor = (Color)ColorConverter.ConvertFromString("#FF00FFFF");
         private static readonly Color BehindAlertColor = (Color)ColorConverter.ConvertFromString("#FFFF9900");
+        #endregion
 
+        #region Private Fields
         private readonly Dictionary<int, RelativeRowViewModel> _carCache;
         private readonly ClassColorManager _classColorManager;
+        private readonly PositionCalculator _positionCalculator;
+        #endregion
 
-        public RelativeDisplayCalculator(Dictionary<int, RelativeRowViewModel> carCache, ClassColorManager classColorManager)
+        #region Constructor
+        public RelativeDisplayBuilder(
+            Dictionary<int, RelativeRowViewModel> carCache,
+            ClassColorManager classColorManager,
+            PositionCalculator positionCalculator)
         {
             _carCache = carCache;
             _classColorManager = classColorManager;
+            _positionCalculator = positionCalculator;
         }
+        #endregion
 
+        #region Public Methods
+        /// <summary>
+        /// Calculate the 7-row proximity display (3 ahead, player, 3 behind).
+        /// Uses valid cars from PositionCalculator and sorts by proximity to player.
+        /// </summary>
         public List<RelativeRowViewModel> Calculate(SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider)
         {
             var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx");
@@ -36,11 +57,12 @@ namespace VISOR.ViewModels
             var incidentCounts = dataProvider.CurDriverIncidentCount;
             var lapDistPct = snapshot.GetValue<float[]>("CarIdxLapDistPct");
             var currentLap = snapshot.GetValue<int[]>("CarIdxLap");
-            var trackSurface = snapshot.GetValue<int[]>("CarIdxTrackSurface");
             var onPitRoad = snapshot.GetValue<bool[]>("CarIdxOnPitRoad");
-            var playerLastLapTime = snapshot.GetValue<float>("LapLastLapTime");
 
-            var allValidCars = BuildValidCarsList(carNumbers, userNames, carIsAI,
+            // Get valid cars from PositionCalculator
+            var validCarIndices = _positionCalculator.ValidCarIndices;
+
+            var allValidCars = BuildValidCarsList(validCarIndices, carNumbers, userNames, carIsAI,
                 carClassIDs, incidentCounts, currentLap, lapDistPct, onPitRoad, playerCarIdx);
 
             if (!allValidCars.Any())
@@ -48,31 +70,41 @@ namespace VISOR.ViewModels
                 return new List<RelativeRowViewModel>();
             }
 
-            List<RelativeRowViewModel> finalRows = BuildProximityBasedRows(allValidCars, playerLastLapTime);
+            List<RelativeRowViewModel> finalRows = BuildProximityBasedRows(allValidCars);
 
             bool useFastestLap = dataProvider.ShouldUseFastestLapPositioning();
-            ApplyDisplayLogic(finalRows, allValidCars, playerLastLapTime, useFastestLap, dataProvider, carClassColors, carClassIDs);
+            ApplyDisplayLogic(finalRows, useFastestLap, dataProvider, carClassColors, carClassIDs);
 
             return finalRows;
         }
 
         public void Reset() { }
+        #endregion
 
-        #region Calculation Logic
-
-        private List<RelativeRowViewModel> BuildValidCarsList(string[] carNumbers, string[] userNames,
-            bool[] carIsAI, int[] carClassIDs, int[] incidentCounts, int[] currentLap, float[] lapDistPct, bool[] onPitRoad, int playerCarIdx)
+        #region Private Methods - Car List Building
+        private List<RelativeRowViewModel> BuildValidCarsList(
+            IReadOnlySet<int> validCarIndices,
+            string[] carNumbers,
+            string[] userNames,
+            bool[] carIsAI,
+            int[] carClassIDs,
+            int[] incidentCounts,
+            int[] currentLap,
+            float[] lapDistPct,
+            bool[] onPitRoad,
+            int playerCarIdx)
         {
             var allValidCars = new List<RelativeRowViewModel>();
 
-            // Use minimal filtering - only exclude cars with no data
-            // This allows disconnected cars to naturally fall down the order based on their frozen position
-            for (int i = 0; i < carNumbers.Length; i++)
+            // Only include cars from PositionCalculator's valid car roster
+            foreach (int i in validCarIndices)
             {
-                if (!string.IsNullOrEmpty(carNumbers[i]) &&
+                if (i >= 0 && i < carNumbers.Length &&
+                    !string.IsNullOrEmpty(carNumbers[i]) &&
                     !string.IsNullOrEmpty(userNames[i]))
                 {
                     string displayName = carIsAI[i] ? $"🤖 {userNames[i]}" : userNames[i];
+
                     if (!_carCache.TryGetValue(i, out var row))
                     {
                         row = new RelativeRowViewModel();
@@ -88,13 +120,17 @@ namespace VISOR.ViewModels
                     row.ClassID = carClassIDs[i];
                     row.IncidentCount = incidentCounts[i];
                     row.IsOnPitRoad = (onPitRoad != null && i < onPitRoad.Length) && onPitRoad[i];
+
                     allValidCars.Add(row);
                 }
             }
+
             return allValidCars;
         }
+        #endregion
 
-        private List<RelativeRowViewModel> BuildProximityBasedRows(List<RelativeRowViewModel> allCars, float playerLastLapTime)
+        #region Private Methods - Proximity Sorting
+        private List<RelativeRowViewModel> BuildProximityBasedRows(List<RelativeRowViewModel> allCars)
         {
             var playerRow = allCars.FirstOrDefault(r => r.IsPlayer);
             if (playerRow == null) return new List<RelativeRowViewModel>();
@@ -116,19 +152,25 @@ namespace VISOR.ViewModels
             result.AddRange(carsAhead.Take(3).Reverse());
             result.Add(playerRow);
             result.AddRange(carsBehind.Take(3));
+
             return result;
         }
+        #endregion
 
-        private void ApplyDisplayLogic(List<RelativeRowViewModel> displayRows, List<RelativeRowViewModel> allCars,
-            float playerLastLapTime, bool isFastestLapMode, ISessionDataProvider dataProvider, int[] carClassColors, int[] carClassIDs)
+        #region Private Methods - Display Styling
+        private void ApplyDisplayLogic(
+            List<RelativeRowViewModel> displayRows,
+            bool isFastestLapMode,
+            ISessionDataProvider dataProvider,
+            int[] carClassColors,
+            int[] carClassIDs)
         {
             var playerRow = displayRows.FirstOrDefault(r => r.IsPlayer);
             if (playerRow == null) return;
 
-            var classPositions = CalculateClassPositions(allCars);
             foreach (var row in displayRows)
             {
-                AssignClassPositionDisplay(row, isFastestLapMode, dataProvider, classPositions);
+                AssignClassPositionDisplay(row, isFastestLapMode, dataProvider);
                 AssignNameColor(row, playerRow);
                 AssignClassBackgroundColor(row, playerRow, carClassColors, carClassIDs);
                 AssignFontStyle(row);
@@ -136,39 +178,41 @@ namespace VISOR.ViewModels
             }
         }
 
-        private Dictionary<int, Dictionary<int, int>> CalculateClassPositions(List<RelativeRowViewModel> allCars)
-        {
-            return allCars.GroupBy(c => c.ClassID).ToDictionary(g => g.Key,
-                g => g.OrderByDescending(c => c.CurrentLap + c.LapDistPct)
-                      .Select((car, index) => new { car.CarIdx, Position = index + 1 })
-                      .ToDictionary(x => x.CarIdx, x => x.Position));
-        }
-
-        private void AssignClassPositionDisplay(RelativeRowViewModel row, bool isFastestLapMode, ISessionDataProvider dataProvider, Dictionary<int, Dictionary<int, int>> classPositions)
+        private void AssignClassPositionDisplay(
+            RelativeRowViewModel row,
+            bool isFastestLapMode,
+            ISessionDataProvider dataProvider)
         {
             if (isFastestLapMode)
             {
-                // Use pre-sorted position data directly from YAML
                 var fastestLapData = dataProvider.GetFastestLapPositioning();
                 var carData = fastestLapData.FirstOrDefault(d => d.carIdx == row.CarIdx);
                 row.ClassPos = (carData.fastestTime > 0) ? $"{carData.position}" : "--";
             }
             else
             {
-                // Race mode - use calculated positions based on current lap distance
-                row.ClassPos = (classPositions.TryGetValue(row.ClassID, out var positions) && positions.TryGetValue(row.CarIdx, out var classPos)) ? $"{classPos}" : "??";
+                int position = _positionCalculator.GetClassPosition(row.CarIdx, row.ClassID);
+                row.ClassPos = (position > 0) ? $"{position}" : "--";
             }
         }
 
         private void AssignNameColor(RelativeRowViewModel row, RelativeRowViewModel playerRow)
         {
-            if (row.IsPlayer) row.NameColor = Brushes.Yellow;
-            else if (row.CurrentLap > playerRow.CurrentLap) row.NameColor = Brushes.Red;
-            else if (row.CurrentLap < playerRow.CurrentLap) row.NameColor = Brushes.CornflowerBlue;
-            else row.NameColor = Brushes.White;
+            if (row.IsPlayer)
+                row.NameColor = Brushes.Yellow;
+            else if (row.CurrentLap > playerRow.CurrentLap)
+                row.NameColor = Brushes.Red;
+            else if (row.CurrentLap < playerRow.CurrentLap)
+                row.NameColor = Brushes.CornflowerBlue;
+            else
+                row.NameColor = Brushes.White;
         }
 
-        private void AssignClassBackgroundColor(RelativeRowViewModel row, RelativeRowViewModel playerRow, int[] carClassColors, int[] carClassIDs)
+        private void AssignClassBackgroundColor(
+            RelativeRowViewModel row,
+            RelativeRowViewModel playerRow,
+            int[] carClassColors,
+            int[] carClassIDs)
         {
             if (row.ClassID == 0) return;
             row.ClassBackground = _classColorManager.GetClassColor(row.ClassID, carClassColors, carClassIDs);
@@ -187,7 +231,9 @@ namespace VISOR.ViewModels
 
             if (row.IsPlayer) return;
 
-            float proximityDistance = Math.Min(Math.Abs(row.LapDistPct - playerRow.LapDistPct), 1.0f - Math.Abs(row.LapDistPct - playerRow.LapDistPct));
+            float proximityDistance = Math.Min(
+                Math.Abs(row.LapDistPct - playerRow.LapDistPct),
+                1.0f - Math.Abs(row.LapDistPct - playerRow.LapDistPct));
 
             if (proximityDistance <= PROXIMITY_MAX_DISTANCE)
             {

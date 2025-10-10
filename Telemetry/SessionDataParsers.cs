@@ -244,6 +244,8 @@ namespace VISOR.Telemetry
     /// </summary>
     public class LiveSessionParser
     {
+        private int _lastResultsPositionCount = -1;
+
         public bool ParseLiveData(string[] lines, LiveSessionData liveData, int currentSessionNum)
         {
             bool inSessionInfo = false;
@@ -282,7 +284,9 @@ namespace VISOR.Telemetry
                     // Start new position entry
                     var position = new LiveSessionData.ResultPosition();
                     if (TryParseIntValue(trimmed, out int pos))
+                    {
                         position.Position = pos;
+                    }
                     liveData.SessionResultsPositions[currentSessionNum].Add(position);
                 }
                 else if (inResultsPositions && liveData.SessionResultsPositions[currentSessionNum].Count > 0)
@@ -348,6 +352,14 @@ namespace VISOR.Telemetry
                     else if (trimmed.StartsWith("FastestTime:") && TryParseFloatValue(trimmed, out float fastTime))
                         liveData.QualifyFastestTimes[currentQualifyCarIdx] = fastTime;
                 }
+            }
+
+            // Only log when ResultsPositions count changes (car posts new lap time)
+            int currentCount = liveData.SessionResultsPositions.GetValueOrDefault(currentSessionNum, new System.Collections.Generic.List<LiveSessionData.ResultPosition>()).Count;
+            if (currentCount != _lastResultsPositionCount)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LiveSessionParser] ResultsPositions updated - Session {currentSessionNum} now has {currentCount} entries");
+                _lastResultsPositionCount = currentCount;
             }
 
             return true;

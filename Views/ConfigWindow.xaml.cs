@@ -158,7 +158,22 @@ namespace VISOR.Views
 
         private void DoneButton_Click(object sender, RoutedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine("[ConfigWindow] Done button clicked - closing config window");
+            System.Diagnostics.Debug.WriteLine("[ConfigWindow] Done button clicked - saving window positions");
+
+            // Save all window positions before closing config mode
+            if (_mainWindow != null)
+            {
+                Point mainPos = new Point(_mainWindow.Left, _mainWindow.Top);
+                Point radarPos = _radarWindow != null
+                    ? new Point(_radarWindow.Left, _radarWindow.Top)
+                    : _settingsManager.GetRadarWindowPosition(); // Use last known position if window hidden/null
+
+                _settingsManager.SaveWindowPositions(mainPos, radarPos);
+
+                System.Diagnostics.Debug.WriteLine($"[ConfigWindow] Positions saved - Main: ({mainPos.X}, {mainPos.Y}), Radar: ({radarPos.X}, {radarPos.Y})");
+            }
+
+            System.Diagnostics.Debug.WriteLine("[ConfigWindow] Closing config window");
 
             // All settings have been applied in real-time, so just close the window
             this.Close();

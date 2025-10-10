@@ -256,28 +256,7 @@ namespace VISOR.Views
                 DragMove();
             }
         }
-
-        private void DragHandle_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            if (_isDragging)
-            {
-                _isDragging = false;
-
-                // Always save radar window position
-                var mainWindow = Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
-                Point mainPos = mainWindow != null
-                    ? new Point(mainWindow.Left, mainWindow.Top)
-                    : _settingsManager.GetMainWindowPosition(); // Use last known position
-
-                _settingsManager.SaveWindowPositions(
-                    mainPos,
-                    new Point(this.Left, this.Top)
-                );
-
-                System.Diagnostics.Debug.WriteLine($"[RadarWindow] Position saved after drag: ({this.Left}, {this.Top})");
-            }
-        }
-
+                
         private async void RadarWindow_Loaded(object sender, RoutedEventArgs e)
         {
             try

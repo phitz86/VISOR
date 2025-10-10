@@ -154,8 +154,7 @@
                 Canvas.Top="10"
                 Cursor="SizeAll"
                 Visibility="Collapsed"
-                MouseLeftButtonDown="DragHandle_MouseLeftButtonDown"
-                MouseLeftButtonUp="DragHandle_MouseLeftButtonUp">
+                MouseLeftButtonDown="DragHandle_MouseLeftButtonDown">
             <Border.Style>
                 <Style TargetType="Border">
                     <Setter Property="Background" Value="#80404040"/>

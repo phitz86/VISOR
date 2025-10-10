@@ -21,6 +21,7 @@ namespace VISOR.Views
         private readonly ConfigModeManager _configModeManager;
         private static DateTime _lastSessionReadyLog = DateTime.MinValue;
         private bool _isDragging = false;
+        private bool _lastRelativeVisibility = true; // Track relative display visibility state
 
         // Expose ViewModel for App.xaml.cs to access ClassColorManager
         public MainViewModel ViewModel => _viewModel;
@@ -128,27 +129,6 @@ namespace VISOR.Views
             }
         }
 
-        private void DragHandle_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            if (_isDragging)
-            {
-                _isDragging = false;
-
-                // Always save main window position
-                var radarWindow = Application.Current.Windows.OfType<RadarWindow>().FirstOrDefault();
-                Point radarPos = radarWindow != null
-                    ? new Point(radarWindow.Left, radarWindow.Top)
-                    : _settingsManager.GetRadarWindowPosition(); // Use last known position
-
-                _settingsManager.SaveWindowPositions(
-                    new Point(this.Left, this.Top),
-                    radarPos
-                );
-
-                System.Diagnostics.Debug.WriteLine($"[MainWindow] Position saved after drag: ({this.Left}, {this.Top})");
-            }
-        }
-
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             try
@@ -237,9 +217,15 @@ namespace VISOR.Views
 
                     _viewModel.UpdateFromTelemetry(snapshot, _sdk.Coordinator);
 
-                    // Check if window needs resizing due to session state changes (like lone qualifying)
-                    // This ensures the window shrinks/expands when relative display is hidden/shown
-                    ApplyWindowSizing();
+                    // Only resize when relative display visibility changes (e.g., entering/exiting Lone Qualifying)
+                    // This preserves automatic resizing for Lone Qualify sessions while eliminating constant 60Hz resizing
+                    bool currentRelativeVisibility = !_sdk.Coordinator.ShouldHideRelativeDisplay();
+                    if (currentRelativeVisibility != _lastRelativeVisibility)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[MainWindow] Relative display visibility changed: {_lastRelativeVisibility} -> {currentRelativeVisibility}");
+                        ApplyWindowSizing();
+                        _lastRelativeVisibility = currentRelativeVisibility;
+                    }
                 }
                 else
                 {

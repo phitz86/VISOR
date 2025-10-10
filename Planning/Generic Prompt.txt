@@ -1,4 +1,4 @@
-Thread: VISOR Overlay Feature Improvement Thread
+Thread: VISOR Position Calculator Refactor
 
 Context:
 Good afternoon Claude,
@@ -9,23 +9,43 @@ I'm not a coder, but I work in tech, so I have a general understanding of how th
 
 Our SDK wrapper for ingesting the telemetry is the SVappsLAB iRacing SDK, installed via NuGet. The repo for the SDK is here: https://github.com/SVappsLAB/iRacingTelemetrySDK/tree/main
 
-Goals for this thread:
+Goals for this thread: Position Calculator Refactor
 
-Window location save
- - One of our recent updates accidentally broke the ability to save the window location after it's moved.
+CONTEXT:
+We're refactoring VISOR's position calculation logic to:
+1. Extract position calculation into a dedicated PositionCalculator service (2Hz updates)
+2. Rename RelativeDisplayCalculator → RelativeDisplayBuilder (60Hz proximity display)
+3. Decouple MainViewModel from RelativeViewModel for position data
 
-Position data calculations
- - Our Main Window position indicator and Relative display fields are supposed to calculate real-time class position based on LapDistPct, rather than waiting on the once-a-lap updates provided by iRacing's position fields. We discovered through extensive testing and logging that many frames contain invalid data for cars that are still actively competing. Our old logic was dumping those cars from our calculations entirely, resutling in our Position display showing us much further up the order than we were. We need to update the logic to see and dump values of -1, and see if the remaining valid data is good enough to do our position calculations.
- - We had been using TrackSurface to exclude invalid cars from our sorting and ranking, then we tried LapComplete. I'm now questioning whether there's value to excluding cars during races at all.
+ARCHITECTURE GOALS:
+- PositionCalculator (2Hz): Calculates class positions, shared by MainViewModel & RelativeViewModel
+- RelativeDisplayBuilder (60Hz): Builds 7-row proximity UI with colors/bars
+- MainViewModel & RelativeViewModel both consume PositionCalculator independently
+
+FILTERING STRATEGY:
+- 2Hz position calculation acts as validation window
+- Cars with invalid LapDistPct (< 0 or > 1) excluded during calculation snapshot
+- Natural flap filtering without frame counters
+- Disconnected cars removed within 500ms
+
+FILES TO CREATE:
+- PositionCalculator.cs (new service)
+- RelativeDisplayBuilder.cs (renamed from RelativeDisplayCalculator)
+
+FILES TO MODIFY:
+- MainViewModel.cs
+- RelativeViewModel.cs
 
 Potential Issue Identification:
  - The app is testing nicely now, but as you see the code we're working on, point out any places where you suspect we'll run into problems, or places we could make things cleaner or more efficient.
 
  Rules & Methods:
+ - I don't need to see all your thinking. To preserve tokens, keep your replies and queries as concise as you can while still providing adequate information
  - Let's talk about what you see, understand, and want to do before we make any modifications to the code.
  - If you need more context or have decisions you want more information to support, say so. 
  - If you see something that makes you think you need to see another file, let me know and I'll upload it.
- - Suggest we start a new thread if this one is getting too big and I make a big ask.
+ - Provide a token usage update every 3 messages
+ - Any debug messages we create need to be throttled to avoid excessively large log file returns.
  - I prefer complete new versions of files instead of code snippets or diffs. Exceptions to this can be short snippets that only need inserted one place in a file, single-line changes, or syntax corrections.
  - We need to keep our files under 500 lines of code each. If we're getting close to breaking that, we need to investigate breaking out functions into separate files.
  

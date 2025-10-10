@@ -201,8 +201,10 @@ namespace VISOR.Telemetry
         {
             lock (_parseLock)
             {
-                return _liveData.SessionResultsPositions.GetValueOrDefault(CurrentSessionNum,
+                var positions = _liveData.SessionResultsPositions.GetValueOrDefault(CurrentSessionNum,
                     new List<LiveSessionData.ResultPosition>());
+                // Return a copy to avoid collection modified exceptions
+                return new List<LiveSessionData.ResultPosition>(positions);
             }
         }
 
@@ -210,8 +212,10 @@ namespace VISOR.Telemetry
         {
             lock (_parseLock)
             {
-                return _liveData.SessionResultsPositions.GetValueOrDefault(sessionNum,
+                var positions = _liveData.SessionResultsPositions.GetValueOrDefault(sessionNum,
                     new List<LiveSessionData.ResultPosition>());
+                // Return a copy to avoid collection modified exceptions
+                return new List<LiveSessionData.ResultPosition>(positions);
             }
         }
 
@@ -264,13 +268,11 @@ namespace VISOR.Telemetry
                 return false;
 
             // Practice and qualifying always use fastest lap positioning
-            // Don't wait for data to be available - the session type is sufficient
             if (IsPracticeSession(currentSession) || (IsQualifyingSession(currentSession)))
             {
                 return true;
             }
 
-            // Lone qualifying and everything else
             return false;
         }
 
@@ -285,14 +287,26 @@ namespace VISOR.Telemetry
             var result = new List<(int carIdx, float fastestTime, int position)>();
             int currentSession = CurrentSessionNum;
 
-            // Both Practice and Qualifying use ResultsPositions - it contains pre-sorted position data
             if (IsPracticeSession(currentSession) || IsQualifyingSession(currentSession))
             {
-                var resultsPositions = GetCurrentSessionResultsPositions();
-                foreach (var pos in resultsPositions)
+                // Get a thread-safe snapshot of the results positions
+                List<LiveSessionData.ResultPosition> resultsSnapshot;
+                lock (_parseLock)
+                {
+                    var resultsPositions = _liveData.SessionResultsPositions.GetValueOrDefault(currentSession,
+                        new List<LiveSessionData.ResultPosition>());
+                    // Create a copy to avoid collection modified exception
+                    resultsSnapshot = new List<LiveSessionData.ResultPosition>(resultsPositions);
+                }
+
+                foreach (var pos in resultsSnapshot)
                 {
                     if (pos.FastestTime > 0) // Only include cars with valid times
-                        result.Add((pos.CarIdx, pos.FastestTime, pos.Position));
+                    {
+                        // Use ClassPosition instead of Position for multi-class sessions
+                        // ClassPosition in YAML is 0-indexed, so add 1 for display (1st, 2nd, 3rd...)
+                        result.Add((pos.CarIdx, pos.FastestTime, pos.ClassPosition + 1));
+                    }
                 }
             }
 
@@ -309,8 +323,13 @@ namespace VISOR.Telemetry
                 lock (_parseLock)
                 {
                     var currentHash = sessionData.GetHashCode().ToString();
+
                     if (currentHash == _lastDataHash)
+                    {
                         return false;
+                    }
+
+                    System.Diagnostics.Debug.WriteLine($"[SessionCoordinator] YAML changed - parsing");
 
                     var lines = sessionData.Split('\n');
 
@@ -327,8 +346,6 @@ namespace VISOR.Telemetry
 
                         IsDataReady = true;
 
-                        bool useFastestLap = ShouldUseFastestLapPositioning();
-                        
                         return true;
                     }
                 }

@@ -25,19 +25,18 @@ namespace VISOR.ViewModels
         private readonly Dictionary<int, RelativeRowViewModel> _carCache = new();
 
         // --- Child Services ---
-        private readonly RelativeDisplayCalculator _calculator;
+        private readonly RelativeDisplayBuilder _builder;
 
-        // --- Expose calculator for MainViewModel to access position data ---
-        public RelativeDisplayCalculator Calculator => _calculator;
-
-        public RelativeViewModel(ClassColorManager classColorManager)
+        public RelativeViewModel(ClassColorManager classColorManager, PositionCalculator positionCalculator)
         {
-            _calculator = new RelativeDisplayCalculator(_carCache, classColorManager);
+            _builder = new RelativeDisplayBuilder(_carCache, classColorManager, positionCalculator);
         }
 
         public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
-            if (snapshot.GetValue<int>("PlayerCarIdx", -1) == -1 || sessionDataProvider == null || !sessionDataProvider.IsDataReady)
+            if (snapshot.GetValue<int>("PlayerCarIdx", -1) == -1 ||
+                sessionDataProvider == null ||
+                !sessionDataProvider.IsDataReady)
             {
                 return;
             }
@@ -48,8 +47,8 @@ namespace VISOR.ViewModels
                 return;
             }
 
-            // --- Delegate to Calculator ---
-            var newRows = _calculator.Calculate(snapshot, sessionDataProvider);
+            // --- Delegate to Builder ---
+            var newRows = _builder.Calculate(snapshot, sessionDataProvider);
 
             // --- Update State from Result ---
             UpdateCollection(newRows);
@@ -73,6 +72,7 @@ namespace VISOR.ViewModels
                     RelativeRows.Add(newRows[i]);
                 }
             }
+
             while (RelativeRows.Count > newRows.Count)
             {
                 RelativeRows.RemoveAt(RelativeRows.Count - 1);
@@ -82,7 +82,7 @@ namespace VISOR.ViewModels
         public void Reset()
         {
             RelativeRows.Clear();
-            _calculator.Reset();
+            _builder.Reset();
 
             foreach (var row in _carCache.Values)
             {
