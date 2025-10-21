@@ -14,12 +14,18 @@ namespace VISOR.ViewModels
     {
         #region Constants
         private const int UPDATE_INTERVAL_FRAMES = 30; // ~500ms at 60Hz
-        private const int VALIDITY_TIMEOUT_FRAMES = 30; // Remove cars after 30 frames of invalid data
+        // CHANGED: Increased the timeout for better data resilience
+        private const int VALIDITY_TIMEOUT_FRAMES = 120; // Remove cars after 120 frames (~2 seconds) of invalid data
+        // ADDED: A threshold to prevent logging insignificant data blips
+        private const int INTERRUPTION_LOG_THRESHOLD_FRAMES = 15; // ~250ms at 60Hz
         #endregion
 
         #region Private Fields
         private int _frameCounter = 0;
         private int _globalFrameCounter = 0;
+
+        // ADDED: Tracks the start frame of a data interruption for logging purposes
+        private readonly Dictionary<int, int> _carInterruptionStartFrame = new();
 
         // Valid car tracking
         private readonly Dictionary<int, int> _carLastValidFrame = new();
@@ -34,7 +40,7 @@ namespace VISOR.ViewModels
 
         #region Public Properties
         /// <summary>
-        /// Set of car indices that have had valid LapDistPct data within the last 30 frames.
+        /// Set of car indices that have had valid LapDistPct data within the last 120 frames.
         /// This is used by RelativeDisplayBuilder to filter which cars to display.
         /// </summary>
         public IReadOnlySet<int> ValidCarIndices => _validCarIndices;
@@ -89,6 +95,8 @@ namespace VISOR.ViewModels
             _validCarIndices.Clear();
             _classPositions.Clear();
             _lastFrameValidCars.Clear();
+            // ADDED: Ensure the new interruption tracker is also cleared
+            _carInterruptionStartFrame.Clear();
         }
         #endregion
 
@@ -121,17 +129,39 @@ namespace VISOR.ViewModels
             if (lapDistPct == null || carNumbers == null || userNames == null)
                 return;
 
-            // Mark cars with valid data this update cycle
+            // REPLACED BLOCK: Swapped simple check with intelligent interruption tracking and logging
             for (int i = 0; i < 64; i++)
             {
-                // Skip cars without basic data
                 if (string.IsNullOrEmpty(carNumbers[i]) || string.IsNullOrEmpty(userNames[i]))
                     continue;
 
-                // Check if LapDistPct is valid (between 0.0 and 1.0)
-                if (lapDistPct[i] >= 0f && lapDistPct[i] <= 1f)
+                bool hasValidData = lapDistPct[i] >= 0f && lapDistPct[i] <= 1f;
+
+                if (hasValidData)
                 {
+                    // Car has valid data. Update its last known valid frame.
                     _carLastValidFrame[i] = _globalFrameCounter;
+
+                    // Now, check if it just recovered from a tracked interruption.
+                    if (_carInterruptionStartFrame.Remove(i, out int startFrame))
+                    {
+                        int interruptionDuration = _globalFrameCounter - startFrame;
+                        if (interruptionDuration > INTERRUPTION_LOG_THRESHOLD_FRAMES)
+                        {
+                            // This is our key metric!
+                            System.Diagnostics.Debug.WriteLine(
+                                $"[PositionCalc-Metrics] Car #{carNumbers[i]} data recovered after an interruption of {interruptionDuration} frames.");
+                        }
+                    }
+                }
+                else
+                {
+                    // Car has invalid data. If we aren't already tracking it,
+                    // add it to the dictionary to mark the start of the interruption.
+                    if (!_carInterruptionStartFrame.ContainsKey(i))
+                    {
+                        _carInterruptionStartFrame.Add(i, _globalFrameCounter);
+                    }
                 }
             }
 

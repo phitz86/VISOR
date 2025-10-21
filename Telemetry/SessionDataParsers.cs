@@ -272,7 +272,12 @@ namespace VISOR.Telemetry
                 else if (inSessionInfo && trimmed.StartsWith("- SessionNum:"))
                 {
                     if (TryParseIntValue(trimmed, out int sessionNum))
+                    {
                         currentSessionIdx = sessionNum;
+                        // Reset flags to prevent state bleed between sessions
+                        inResultsPositions = false;
+                        inResultsFastestLap = false;
+                    }
                 }
                 else if (inSessionInfo && currentSessionIdx == currentSessionNum && trimmed.StartsWith("ResultsPositions:"))
                 {
