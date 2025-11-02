@@ -6,42 +6,51 @@ using VISOR.Telemetry;
 namespace VISOR.ViewModels
 {
     /// <summary>
-    /// Calculates race positions and tracks valid cars for the relative display.
-    /// Updates every 30 frames (~500ms at 60Hz) to filter out disconnected cars
-    /// and provide stable position data to the UI.
+    /// Calculates race positions with predictive position tracking for data resilience.
+    /// Three-tier approach:
+    /// 1. HasEverHadValidData - gates entry to display
+    /// 2. Predictive LapDistPct - smooth extrapolation during brief gaps
+    /// 3. Cache expiration - removes truly disconnected cars after timeout
+    /// 
+    /// Exports clean, validated data to consumers via ValidCarIndices and GetEffectiveLapDistPct.
     /// </summary>
     public class PositionCalculator
     {
         #region Constants
-        private const int UPDATE_INTERVAL_FRAMES = 30; // ~500ms at 60Hz
-        // CHANGED: Increased the timeout for better data resilience
-        private const int VALIDITY_TIMEOUT_FRAMES = 120; // Remove cars after 120 frames (~2 seconds) of invalid data
-        // ADDED: A threshold to prevent logging insignificant data blips
-        private const int INTERRUPTION_LOG_THRESHOLD_FRAMES = 15; // ~250ms at 60Hz
+        private const int MAX_CACHE_AGE_FRAMES = 180; // 3 seconds at 60Hz
+        private const int LOG_PREDICTION_THRESHOLD = 30; // Log predictions lasting >30 frames
+        private const float MIN_VELOCITY_THRESHOLD = 0.00001f; // Minimum velocity to use prediction
         #endregion
 
-        #region Private Fields
-        private int _frameCounter = 0;
+        #region Private Fields - Core State
         private int _globalFrameCounter = 0;
-
-        // ADDED: Tracks the start frame of a data interruption for logging purposes
-        private readonly Dictionary<int, int> _carInterruptionStartFrame = new();
-
-        // Valid car tracking
-        private readonly Dictionary<int, int> _carLastValidFrame = new();
         private readonly HashSet<int> _validCarIndices = new();
+        private readonly Dictionary<(int carIdx, int classId), int> _cachedPositions = new();
+        #endregion
 
-        // Race position calculation results
-        private readonly Dictionary<(int carIdx, int classId), int> _classPositions = new();
+        #region Private Fields - Prediction System
+        // Tier 1: Gate keeper
+        private readonly HashSet<int> _carsWithValidDataHistory = new();
 
-        // For logging state changes
+        // Tier 2: Velocity tracking for prediction
+        private readonly Dictionary<int, float> _lastValidLapDistPct = new();
+        private readonly Dictionary<int, float> _lapDistPctVelocity = new();
+        private readonly Dictionary<int, int> _lastValidCurrentLap = new();
+
+        // Tier 3: Cache management
+        private readonly Dictionary<int, int> _framesSinceValidData = new();
+        private readonly Dictionary<int, int> _predictionStartFrame = new();
+        #endregion
+
+        #region Private Fields - Logging State
         private readonly HashSet<int> _lastFrameValidCars = new();
+        private readonly Dictionary<int, bool> _isCurrentlyPredicting = new();
         #endregion
 
         #region Public Properties
         /// <summary>
-        /// Set of car indices that have had valid LapDistPct data within the last 120 frames.
-        /// This is used by RelativeDisplayBuilder to filter which cars to display.
+        /// Set of car indices that have valid YAML data, have ever had valid telemetry,
+        /// AND have valid cache (not expired). This is the filtered roster for displays.
         /// </summary>
         public IReadOnlySet<int> ValidCarIndices => _validCarIndices;
         #endregion
@@ -49,39 +58,71 @@ namespace VISOR.ViewModels
         #region Public Methods
         /// <summary>
         /// Update the position calculator with the latest telemetry snapshot.
-        /// Should be called every frame (60Hz) from MainViewModel.
-        /// Internal logic throttles to process every 30 frames.
+        /// Processes every frame (60Hz) with prediction for smooth display.
         /// </summary>
         public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
             if (snapshot == null || sessionDataProvider == null || !sessionDataProvider.IsDataReady)
                 return;
 
-            _frameCounter++;
             _globalFrameCounter++;
+            ProcessUpdate(snapshot, sessionDataProvider);
+        }
 
-            // Only process every 30 frames (~500ms)
-            if (_frameCounter >= UPDATE_INTERVAL_FRAMES)
+        /// <summary>
+        /// Get the effective LapDistPct for a car (current valid data OR predicted value).
+        /// Returns -1 if no valid data or cache expired.
+        /// This is the ONLY method consumers should use to get car positions.
+        /// </summary>
+        public float GetEffectiveLapDistPct(int carIdx)
+        {
+            // If we have current valid data, return it
+            if (_framesSinceValidData.TryGetValue(carIdx, out int framesSinceValid) &&
+                framesSinceValid == 0 &&
+                _lastValidLapDistPct.TryGetValue(carIdx, out float currentValid))
             {
-                ProcessUpdate(snapshot, sessionDataProvider);
-                _frameCounter = 0;
+                return currentValid;
             }
+
+            // If cache is still valid, return predicted value
+            if (HasValidCache(carIdx))
+            {
+                return GetPredictedLapDistPct(carIdx);
+            }
+
+            // No valid data available
+            return -1f;
         }
 
         /// <summary>
         /// Get the class position for a specific car.
-        /// In race mode, returns calculated position based on lap + track position.
-        /// In practice/qualifying mode, returns position from YAML fastest lap data.
+        /// Returns calculated position in race mode, YAML position in practice/qual.
         /// </summary>
         public int GetClassPosition(int carIdx, int classId)
         {
-            // Return calculated race position
-            if (_classPositions.TryGetValue((carIdx, classId), out int position))
+            if (_cachedPositions.TryGetValue((carIdx, classId), out int position))
             {
                 return position;
             }
+            return -1;
+        }
 
-            return -1; // Unknown/invalid position
+        /// <summary>
+        /// Check if a car has ever had valid telemetry data.
+        /// Used as gate keeper - once true, always true for the session.
+        /// </summary>
+        public bool HasEverHadValidData(int carIdx)
+        {
+            return _carsWithValidDataHistory.Contains(carIdx);
+        }
+
+        /// <summary>
+        /// Check if cached data is still valid for a car (within expiration window).
+        /// </summary>
+        public bool HasValidCache(int carIdx)
+        {
+            return _framesSinceValidData.TryGetValue(carIdx, out int frames) &&
+                   frames <= MAX_CACHE_AGE_FRAMES;
         }
 
         /// <summary>
@@ -89,134 +130,209 @@ namespace VISOR.ViewModels
         /// </summary>
         public void Reset()
         {
-            _frameCounter = 0;
             _globalFrameCounter = 0;
-            _carLastValidFrame.Clear();
             _validCarIndices.Clear();
-            _classPositions.Clear();
+            _cachedPositions.Clear();
+            _carsWithValidDataHistory.Clear();
+            _lastValidLapDistPct.Clear();
+            _lapDistPctVelocity.Clear();
+            _lastValidCurrentLap.Clear();
+            _framesSinceValidData.Clear();
+            _predictionStartFrame.Clear();
             _lastFrameValidCars.Clear();
-            // ADDED: Ensure the new interruption tracker is also cleared
-            _carInterruptionStartFrame.Clear();
+            _isCurrentlyPredicting.Clear();
+
+            System.Diagnostics.Debug.WriteLine("[PositionCalc] Reset - all state cleared");
         }
         #endregion
 
         #region Private Methods - Update Processing
         private void ProcessUpdate(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
-            // Step 1: Update which cars have valid data
-            UpdateValidCarTracking(snapshot);
+            UpdateValidCarTracking(sessionDataProvider);
+            UpdatePredictiveCache(snapshot, sessionDataProvider);
 
-            // Step 2: Calculate race positions (only in race mode)
             if (!sessionDataProvider.ShouldUseFastestLapPositioning())
             {
                 CalculateRacePositions(snapshot, sessionDataProvider);
             }
             else
             {
-                // Clear race positions in practice/qual modes
-                _classPositions.Clear();
+                _cachedPositions.Clear();
             }
         }
         #endregion
 
         #region Private Methods - Valid Car Tracking
-        private void UpdateValidCarTracking(SVappsLABSnapshot snapshot)
+        private void UpdateValidCarTracking(ISessionDataProvider sessionDataProvider)
         {
-            var lapDistPct = snapshot.GetValue<float[]>("CarIdxLapDistPct");
-            var carNumbers = snapshot.GetValue<string[]>("CarIdxCarNumber");
-            var userNames = snapshot.GetValue<string[]>("CarIdxUserName");
+            var carNumbers = sessionDataProvider.CarNumbers;
+            var userNames = sessionDataProvider.UserNames;
 
-            if (lapDistPct == null || carNumbers == null || userNames == null)
+            if (carNumbers == null || userNames == null)
                 return;
 
-            // REPLACED BLOCK: Swapped simple check with intelligent interruption tracking and logging
-            for (int i = 0; i < 64; i++)
-            {
-                if (string.IsNullOrEmpty(carNumbers[i]) || string.IsNullOrEmpty(userNames[i]))
-                    continue;
-
-                bool hasValidData = lapDistPct[i] >= 0f && lapDistPct[i] <= 1f;
-
-                if (hasValidData)
-                {
-                    // Car has valid data. Update its last known valid frame.
-                    _carLastValidFrame[i] = _globalFrameCounter;
-
-                    // Now, check if it just recovered from a tracked interruption.
-                    if (_carInterruptionStartFrame.Remove(i, out int startFrame))
-                    {
-                        int interruptionDuration = _globalFrameCounter - startFrame;
-                        if (interruptionDuration > INTERRUPTION_LOG_THRESHOLD_FRAMES)
-                        {
-                            // This is our key metric!
-                            System.Diagnostics.Debug.WriteLine(
-                                $"[PositionCalc-Metrics] Car #{carNumbers[i]} data recovered after an interruption of {interruptionDuration} frames.");
-                        }
-                    }
-                }
-                else
-                {
-                    // Car has invalid data. If we aren't already tracking it,
-                    // add it to the dictionary to mark the start of the interruption.
-                    if (!_carInterruptionStartFrame.ContainsKey(i))
-                    {
-                        _carInterruptionStartFrame.Add(i, _globalFrameCounter);
-                    }
-                }
-            }
-
-            // Store previous state for logging
             _lastFrameValidCars.Clear();
             foreach (var carIdx in _validCarIndices)
             {
                 _lastFrameValidCars.Add(carIdx);
             }
 
-            // Rebuild valid car set based on timeout window
             _validCarIndices.Clear();
-            foreach (var kvp in _carLastValidFrame)
+            for (int i = 0; i < 64; i++)
             {
-                int carIdx = kvp.Key;
-                int lastValidFrame = kvp.Value;
-
-                // Include cars that had valid data within the timeout window
-                if (_globalFrameCounter - lastValidFrame <= VALIDITY_TIMEOUT_FRAMES)
+                // Car must have YAML data AND have valid history AND have valid cache
+                // This ensures expired cars (disconnected >3 seconds) are removed from the roster
+                if (!string.IsNullOrEmpty(carNumbers[i]) &&
+                    !string.IsNullOrEmpty(userNames[i]) &&
+                    HasEverHadValidData(i) &&
+                    HasValidCache(i))
                 {
-                    _validCarIndices.Add(carIdx);
+                    _validCarIndices.Add(i);
 
-                    // Log if this car was just re-added
-                    if (!_lastFrameValidCars.Contains(carIdx))
+                    if (!_lastFrameValidCars.Contains(i))
                     {
-                        LogCarAdded(carIdx, carNumbers, userNames);
+                        System.Diagnostics.Debug.WriteLine(
+                            $"[PositionCalc] Car #{carNumbers[i]} ({userNames[i]}) added to valid roster");
                     }
+                }
+                else if (_lastFrameValidCars.Contains(i))
+                {
+                    // Car removed from roster (disconnected or cache expired)
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[PositionCalc] Car #{carNumbers[i]} ({userNames[i]}) removed from roster (cache expired or left session)");
+                }
+            }
+        }
+        #endregion
+
+        #region Private Methods - Predictive Cache
+        private void UpdatePredictiveCache(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        {
+            var lapDistPct = snapshot.GetValue<float[]>("CarIdxLapDistPct");
+            var currentLap = snapshot.GetValue<int[]>("CarIdxLap");
+            var onPitRoad = snapshot.GetValue<bool[]>("CarIdxOnPitRoad");
+            var carNumbers = sessionDataProvider.CarNumbers;
+
+            if (lapDistPct == null || currentLap == null || carNumbers == null)
+                return;
+
+            // Process all cars with YAML data
+            for (int i = 0; i < 64; i++)
+            {
+                if (string.IsNullOrEmpty(carNumbers[i]))
+                    continue;
+
+                bool hasValidData = lapDistPct[i] >= 0f && lapDistPct[i] <= 1f;
+                bool isOnPitRoad = onPitRoad != null && i < onPitRoad.Length && onPitRoad[i];
+
+                if (hasValidData)
+                {
+                    ProcessValidData(i, lapDistPct[i], currentLap[i], isOnPitRoad, carNumbers);
                 }
                 else
                 {
-                    // Log if this car was just removed
-                    if (_lastFrameValidCars.Contains(carIdx))
-                    {
-                        LogCarRemoved(carIdx, carNumbers, userNames);
-                    }
+                    ProcessInvalidData(i, carNumbers);
                 }
             }
         }
 
-        private void LogCarAdded(int carIdx, string[] carNumbers, string[] userNames)
+        private void ProcessValidData(int carIdx, float lapDist, int lap, bool isOnPit, string[] carNumbers)
         {
-            if (carIdx >= 0 && carIdx < carNumbers.Length && carIdx < userNames.Length)
+            // Mark as having valid data history (Tier 1: Gate keeper)
+            if (!_carsWithValidDataHistory.Contains(carIdx))
             {
+                _carsWithValidDataHistory.Add(carIdx);
                 System.Diagnostics.Debug.WriteLine(
-                    $"[PositionCalc] Car #{carNumbers[carIdx]} ({userNames[carIdx]}) re-added with valid LapDistPct");
+                    $"[PositionCalc] Car #{carNumbers[carIdx]} first valid data - added to history");
+            }
+
+            // Calculate velocity for prediction (Tier 2: Prediction)
+            if (_lastValidLapDistPct.TryGetValue(carIdx, out float lastDist))
+            {
+                float delta = lapDist - lastDist;
+
+                // Handle lap boundary wrap-around
+                if (delta < -0.5f) delta += 1.0f;
+                if (delta > 0.5f) delta -= 1.0f;
+
+                // Smooth velocity with exponential averaging (70% old, 30% new)
+                float instantVelocity = delta;
+                float smoothedVelocity = _lapDistPctVelocity.GetValueOrDefault(carIdx, 0f);
+                smoothedVelocity = (instantVelocity * 0.3f) + (smoothedVelocity * 0.7f);
+
+                // Zero out velocity if on pit road (don't predict through pits)
+                if (isOnPit)
+                {
+                    smoothedVelocity = 0f;
+                }
+
+                _lapDistPctVelocity[carIdx] = smoothedVelocity;
+            }
+
+            // Update cache
+            _lastValidLapDistPct[carIdx] = lapDist;
+            _lastValidCurrentLap[carIdx] = lap;
+            _framesSinceValidData[carIdx] = 0;
+
+            // Log prediction recovery if we were predicting
+            if (_predictionStartFrame.Remove(carIdx, out int startFrame))
+            {
+                int predictionDuration = _globalFrameCounter - startFrame;
+                if (predictionDuration > LOG_PREDICTION_THRESHOLD)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[PositionCalc-Predict] Car #{carNumbers[carIdx]} prediction ended after {predictionDuration} frames");
+                }
+                _isCurrentlyPredicting.Remove(carIdx);
             }
         }
 
-        private void LogCarRemoved(int carIdx, string[] carNumbers, string[] userNames)
+        private void ProcessInvalidData(int carIdx, string[] carNumbers)
         {
-            if (carIdx >= 0 && carIdx < carNumbers.Length && carIdx < userNames.Length)
+            // Increment frames since valid data (Tier 3: Cache expiration)
+            int framesSinceValid = _framesSinceValidData.GetValueOrDefault(carIdx, 0) + 1;
+            _framesSinceValidData[carIdx] = framesSinceValid;
+
+            // Start tracking prediction if this is the first invalid frame
+            if (!_predictionStartFrame.ContainsKey(carIdx) &&
+                _lastValidLapDistPct.ContainsKey(carIdx))
+            {
+                _predictionStartFrame[carIdx] = _globalFrameCounter;
+                _isCurrentlyPredicting[carIdx] = true;
+            }
+
+            // Log when cache expires
+            if (framesSinceValid == MAX_CACHE_AGE_FRAMES &&
+                _carsWithValidDataHistory.Contains(carIdx))
             {
                 System.Diagnostics.Debug.WriteLine(
-                    $"[PositionCalc] Car #{carNumbers[carIdx]} ({userNames[carIdx]}) removed - no valid LapDistPct for {VALIDITY_TIMEOUT_FRAMES} frames");
+                    $"[PositionCalc-Cache] Car #{carNumbers[carIdx]} cache expired after {MAX_CACHE_AGE_FRAMES} frames");
             }
+        }
+
+        private float GetPredictedLapDistPct(int carIdx)
+        {
+            if (!_lastValidLapDistPct.TryGetValue(carIdx, out float lastDist) ||
+                !_lapDistPctVelocity.TryGetValue(carIdx, out float velocity) ||
+                !_framesSinceValidData.TryGetValue(carIdx, out int framesSinceValid))
+            {
+                return -1f; // No data to predict from
+            }
+
+            // Don't predict if velocity is too small (stopped/pitting)
+            if (Math.Abs(velocity) < MIN_VELOCITY_THRESHOLD)
+            {
+                return lastDist; // Return last known position (frozen)
+            }
+
+            // Predict position based on velocity
+            float predictedDist = lastDist + (velocity * framesSinceValid);
+
+            // Wrap around track (0.0 to 1.0)
+            predictedDist = (predictedDist % 1.0f + 1.0f) % 1.0f;
+
+            return predictedDist;
         }
         #endregion
 
@@ -230,41 +346,57 @@ namespace VISOR.ViewModels
             if (carClassIDs == null || currentLap == null || lapDistPct == null)
                 return;
 
-            // Build list of valid cars with their position data
             var carsWithPositions = new List<CarPositionData>();
 
             foreach (int carIdx in _validCarIndices)
             {
-                if (carIdx >= 0 && carIdx < carClassIDs.Length)
+                if (carIdx < 0 || carIdx >= carClassIDs.Length)
+                    continue;
+
+                // Use effective LapDistPct (current or predicted)
+                float effectiveLapDistPct = GetEffectiveLapDistPct(carIdx);
+                int effectiveCurrentLap;
+
+                // Try current lap data
+                if (lapDistPct[carIdx] >= 0f && lapDistPct[carIdx] <= 1f)
                 {
-                    carsWithPositions.Add(new CarPositionData
-                    {
-                        CarIdx = carIdx,
-                        ClassId = carClassIDs[carIdx],
-                        CurrentLap = currentLap[carIdx],
-                        LapDistPct = lapDistPct[carIdx],
-                        TrackPosition = currentLap[carIdx] + lapDistPct[carIdx]
-                    });
+                    effectiveCurrentLap = currentLap[carIdx];
                 }
+                else if (_lastValidCurrentLap.TryGetValue(carIdx, out int cachedLap))
+                {
+                    effectiveCurrentLap = cachedLap;
+                }
+                else
+                {
+                    continue; // No lap data available
+                }
+
+                // Skip if no effective position available
+                if (effectiveLapDistPct < 0f)
+                    continue;
+
+                carsWithPositions.Add(new CarPositionData
+                {
+                    CarIdx = carIdx,
+                    ClassId = carClassIDs[carIdx],
+                    CurrentLap = effectiveCurrentLap,
+                    LapDistPct = effectiveLapDistPct,
+                    TrackPosition = effectiveCurrentLap + effectiveLapDistPct
+                });
             }
 
-            // Clear previous positions
-            _classPositions.Clear();
+            // Calculate positions by class
+            var classGroups = carsWithPositions.GroupBy(c => c.ClassId);
 
-            // Group by class and calculate positions within each class
-            var clasGroups = carsWithPositions.GroupBy(c => c.ClassId);
-
-            foreach (var classGroup in clasGroups)
+            foreach (var classGroup in classGroups)
             {
-                // Sort by track position (lap + lap distance percentage) descending
                 var sortedCars = classGroup.OrderByDescending(c => c.TrackPosition).ToList();
 
-                // Assign positions (1st, 2nd, 3rd, etc.)
                 for (int i = 0; i < sortedCars.Count; i++)
                 {
                     var car = sortedCars[i];
                     int position = i + 1;
-                    _classPositions[(car.CarIdx, car.ClassId)] = position;
+                    _cachedPositions[(car.CarIdx, car.ClassId)] = position;
                 }
             }
         }

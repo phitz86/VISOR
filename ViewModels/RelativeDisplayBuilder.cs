@@ -9,8 +9,8 @@ namespace VISOR.ViewModels
 {
     /// <summary>
     /// Builds the 7-row proximity-based relative display with visual properties.
-    /// Uses PositionCalculator's valid car roster as the starting point for filtering.
-    /// Focuses on proximity sorting and visual styling - no position calculation.
+    /// Uses PositionCalculator for all filtering, validation, and prediction.
+    /// Focuses purely on proximity sorting and visual styling.
     /// </summary>
     public class RelativeDisplayBuilder
     {
@@ -43,7 +43,7 @@ namespace VISOR.ViewModels
         #region Public Methods
         /// <summary>
         /// Calculate the 7-row proximity display (3 ahead, player, 3 behind).
-        /// Uses valid cars from PositionCalculator and sorts by proximity to player.
+        /// Uses PositionCalculator's filtered roster and effective (predicted) positions.
         /// </summary>
         public List<RelativeRowViewModel> Calculate(SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider)
         {
@@ -55,15 +55,15 @@ namespace VISOR.ViewModels
             var carNumbers = dataProvider.CarNumbers;
             var carIsAI = dataProvider.CarIsAI;
             var incidentCounts = dataProvider.CurDriverIncidentCount;
-            var lapDistPct = snapshot.GetValue<float[]>("CarIdxLapDistPct");
             var currentLap = snapshot.GetValue<int[]>("CarIdxLap");
             var onPitRoad = snapshot.GetValue<bool[]>("CarIdxOnPitRoad");
 
             // Get valid cars from PositionCalculator
+            // This list is already filtered to: (1) YAML data exists, (2) HasEverHadValidData, (3) Cache valid
             var validCarIndices = _positionCalculator.ValidCarIndices;
 
             var allValidCars = BuildValidCarsList(validCarIndices, carNumbers, userNames, carIsAI,
-                carClassIDs, incidentCounts, currentLap, lapDistPct, onPitRoad, playerCarIdx);
+                carClassIDs, incidentCounts, currentLap, onPitRoad, playerCarIdx);
 
             if (!allValidCars.Any())
             {
@@ -90,13 +90,13 @@ namespace VISOR.ViewModels
             int[] carClassIDs,
             int[] incidentCounts,
             int[] currentLap,
-            float[] lapDistPct,
             bool[] onPitRoad,
             int playerCarIdx)
         {
             var allValidCars = new List<RelativeRowViewModel>();
 
-            // Only include cars from PositionCalculator's valid car roster
+            // PositionCalculator has already filtered this list to valid cars only
+            // We just need to build the view models
             foreach (int i in validCarIndices)
             {
                 if (i >= 0 && i < carNumbers.Length &&
@@ -111,10 +111,14 @@ namespace VISOR.ViewModels
                         _carCache[i] = row;
                     }
 
+                    // CRITICAL: Use PositionCalculator's effective LapDistPct (current OR predicted)
+                    // This ensures smooth display during brief data gaps
+                    float effectiveLapDistPct = _positionCalculator.GetEffectiveLapDistPct(i);
+
                     row.CarIdx = i;
                     row.IsPlayer = (i == playerCarIdx);
                     row.CurrentLap = currentLap[i];
-                    row.LapDistPct = lapDistPct[i];
+                    row.LapDistPct = effectiveLapDistPct; // Use predicted value if needed
                     row.Name = displayName;
                     row.CarNum = carNumbers[i];
                     row.ClassID = carClassIDs[i];
@@ -137,6 +141,8 @@ namespace VISOR.ViewModels
 
             float playerTrackPercent = playerRow.LapDistPct;
 
+            // No need to filter LapDistPct here - PositionCalculator already provides clean data
+            // All cars in this list have valid effective LapDistPct (current or predicted)
             var otherCars = allCars.Where(c => !c.IsPlayer).Select(car =>
             {
                 float directDistance = Math.Abs(car.LapDistPct - playerTrackPercent);

@@ -19,48 +19,24 @@ namespace VISOR.Telemetry
 
         public bool IsDataReady { get; private set; }
 
-        private readonly string[] _userNamesCache = new string[64];
-        private readonly string[] _carNumbersCache = new string[64];
-        private readonly int[] _carNumberRawCache = new int[64];
-        private readonly int[] _carClassIDsCache = new int[64];
-        private readonly int[] _carClassColorsCache = new int[64];
-        private readonly bool[] _carIsAICache = new bool[64];
-        private readonly int[] _curDriverIncidentCountCache = new int[64];
+        // PERFORMANCE FIX: Arrays are cached and replaced atomically - no locks needed on reads
+        // C# guarantees that reference assignments are atomic on all platforms
+        private volatile string[] _userNamesCache = new string[64];
+        private volatile string[] _carNumbersCache = new string[64];
+        private volatile int[] _carNumberRawCache = new int[64];
+        private volatile int[] _carClassIDsCache = new int[64];
+        private volatile int[] _carClassColorsCache = new int[64];
+        private volatile bool[] _carIsAICache = new bool[64];
+        private volatile int[] _curDriverIncidentCountCache = new int[64];
 
-        public string[] UserNames
-        {
-            get { lock (_parseLock) { return _userNamesCache; } }
-        }
-
-        public string[] CarNumbers
-        {
-            get { lock (_parseLock) { return _carNumbersCache; } }
-        }
-
-        public int[] CarNumberRaw
-        {
-            get { lock (_parseLock) { return _carNumberRawCache; } }
-        }
-
-        public int[] CarClassIDs
-        {
-            get { lock (_parseLock) { return _carClassIDsCache; } }
-        }
-
-        public int[] CarClassColors
-        {
-            get { lock (_parseLock) { return _carClassColorsCache; } }
-        }
-
-        public bool[] CarIsAI
-        {
-            get { lock (_parseLock) { return _carIsAICache; } }
-        }
-
-        public int[] CurDriverIncidentCount
-        {
-            get { lock (_parseLock) { return _curDriverIncidentCountCache; } }
-        }
+        // Lock-free reads - arrays are replaced atomically during updates
+        public string[] UserNames => _userNamesCache;
+        public string[] CarNumbers => _carNumbersCache;
+        public int[] CarNumberRaw => _carNumberRawCache;
+        public int[] CarClassIDs => _carClassIDsCache;
+        public int[] CarClassColors => _carClassColorsCache;
+        public bool[] CarIsAI => _carIsAICache;
+        public int[] CurDriverIncidentCount => _curDriverIncidentCountCache;
 
         public int IncidentLimit
         {
@@ -350,24 +326,26 @@ namespace VISOR.Telemetry
 
         private void UpdateDriverDataCaches()
         {
-            Array.Fill(_userNamesCache, null);
-            Array.Fill(_carNumbersCache, null);
-            Array.Fill(_carNumberRawCache, 0);
-            Array.Fill(_carClassIDsCache, 0);
-            Array.Fill(_carClassColorsCache, 0);
-            Array.Fill(_carIsAICache, false);
-            Array.Fill(_curDriverIncidentCountCache, 0);
+            // PERFORMANCE FIX: Build new arrays and replace atomically
+            // This avoids lock contention on the 60Hz telemetry read path
+            var newUserNames = new string[64];
+            var newCarNumbers = new string[64];
+            var newCarNumberRaw = new int[64];
+            var newCarClassIDs = new int[64];
+            var newCarClassColors = new int[64];
+            var newCarIsAI = new bool[64];
+            var newIncidentCounts = new int[64];
 
             foreach (var kvp in _staticData.Drivers)
             {
                 if (kvp.Key >= 0 && kvp.Key < 64)
                 {
-                    _userNamesCache[kvp.Key] = kvp.Value.UserName;
-                    _carNumbersCache[kvp.Key] = kvp.Value.CarNumber;
-                    _carNumberRawCache[kvp.Key] = kvp.Value.CarNumberRaw;
-                    _carClassIDsCache[kvp.Key] = kvp.Value.CarClassID;
-                    _carClassColorsCache[kvp.Key] = kvp.Value.CarClassColor;
-                    _carIsAICache[kvp.Key] = kvp.Value.IsAI;
+                    newUserNames[kvp.Key] = kvp.Value.UserName;
+                    newCarNumbers[kvp.Key] = kvp.Value.CarNumber;
+                    newCarNumberRaw[kvp.Key] = kvp.Value.CarNumberRaw;
+                    newCarClassIDs[kvp.Key] = kvp.Value.CarClassID;
+                    newCarClassColors[kvp.Key] = kvp.Value.CarClassColor;
+                    newCarIsAI[kvp.Key] = kvp.Value.IsAI;
                 }
             }
 
@@ -375,9 +353,18 @@ namespace VISOR.Telemetry
             {
                 if (kvp.Key >= 0 && kvp.Key < 64)
                 {
-                    _curDriverIncidentCountCache[kvp.Key] = kvp.Value;
+                    newIncidentCounts[kvp.Key] = kvp.Value;
                 }
             }
+
+            // Atomic replacement - no locks needed for reads
+            _userNamesCache = newUserNames;
+            _carNumbersCache = newCarNumbers;
+            _carNumberRawCache = newCarNumberRaw;
+            _carClassIDsCache = newCarClassIDs;
+            _carClassColorsCache = newCarClassColors;
+            _carIsAICache = newCarIsAI;
+            _curDriverIncidentCountCache = newIncidentCounts;
         }
 
         public void ClearCache()
