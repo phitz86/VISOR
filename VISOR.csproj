@@ -15,9 +15,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Archive\**" />
     <Compile Remove="Raw outputs\**" />
+    <EmbeddedResource Remove="Archive\**" />
     <EmbeddedResource Remove="Raw outputs\**" />
+    <None Remove="Archive\**" />
     <None Remove="Raw outputs\**" />
+    <Page Remove="Archive\**" />
     <Page Remove="Raw outputs\**" />
   </ItemGroup>
 
