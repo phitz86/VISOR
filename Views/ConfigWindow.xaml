@@ -1,7 +1,7 @@
 ﻿<Window x:Class="VISOR.Views.ConfigWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="VISOR Configuration" Height="750" Width="500"
+        Title="VISOR Configuration" Height="870" Width="500"
         WindowStartupLocation="CenterScreen">
 
     <Window.Resources>
@@ -20,11 +20,11 @@
         <StackPanel>
             <TextBlock Text="VISOR Configuration" FontWeight="Bold" FontSize="18" Margin="0,0,0,15" HorizontalAlignment="Center"/>
 
-            <TextBlock Text="Configure which overlay elements to display:" Margin="0,0,0,15"/>
+            <TextBlock Text="Configure which overlay elements to display:" Margin="0,0,0,15" TextWrapping="Wrap"/>
 
             <GroupBox Header="Window Size" Margin="0,0,0,15">
                 <StackPanel Margin="10">
-                    <TextBlock Text="Choose size preset for all windows:" Margin="0,0,0,8"/>
+                    <TextBlock Text="Choose size preset for all windows:" Margin="0,0,0,8" TextWrapping="Wrap"/>
                     <ComboBox x:Name="WindowSizeCombo" SelectedIndex="2" SelectionChanged="WindowSizeCombo_SelectionChanged">
                         <ComboBoxItem Content="Small (60% scale)" Tag="Small"/>
                         <ComboBoxItem Content="Medium (80% scale)" Tag="Medium"/>
@@ -55,7 +55,7 @@
                     <CheckBox x:Name="RadarCheckBox" Content="Show Radar Window"
                               IsChecked="True" Margin="0,0,0,8" Checked="RadarCheckBox_Changed" Unchecked="RadarCheckBox_Changed"/>
                     <TextBlock Text="Displays nearby cars and spotter information"
-                               FontStyle="Italic" Foreground="Gray" FontSize="11"/>
+                               FontStyle="Italic" Foreground="Gray" FontSize="11" TextWrapping="Wrap"/>
                 </StackPanel>
             </GroupBox>
 
@@ -90,7 +90,7 @@
             </Border>
 
             <TextBlock Text="Changes are applied in real-time to preview windows. Drag windows to reposition them."
-                       FontStyle="Italic" Foreground="Gray" FontSize="11" TextAlignment="Center" Margin="0,0,0,15"/>
+                       FontStyle="Italic" Foreground="Gray" FontSize="11" TextAlignment="Center" Margin="0,0,0,15" TextWrapping="Wrap"/>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                 <Button Content="Done" Click="DoneButton_Click" Width="80" Margin="0,0,10,0" IsDefault="True"/>
