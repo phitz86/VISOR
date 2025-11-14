@@ -315,7 +315,7 @@ namespace VISOR.ViewModels
             if (framesSinceValid == MAX_CACHE_AGE_FRAMES &&
                 _carsWithValidDataHistory.Contains(carIdx))
             {
-                Log.Warning($"Car #{carNumbers[carIdx]} cache expired after {MAX_CACHE_AGE_FRAMES} frames (3 seconds)");
+                Log.Info($"Car #{carNumbers[carIdx]} cache expired after {MAX_CACHE_AGE_FRAMES} frames (3 seconds)");
             }
         }
 
