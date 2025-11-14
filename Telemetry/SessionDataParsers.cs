@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using VISOR.Diagnostics;
 
 namespace VISOR.Telemetry
 {
@@ -363,7 +364,7 @@ namespace VISOR.Telemetry
             int currentCount = liveData.SessionResultsPositions.GetValueOrDefault(currentSessionNum, new System.Collections.Generic.List<LiveSessionData.ResultPosition>()).Count;
             if (currentCount != _lastResultsPositionCount)
             {
-                System.Diagnostics.Debug.WriteLine($"[LiveSessionParser] ResultsPositions updated - Session {currentSessionNum} now has {currentCount} entries");
+                Log.Debug($"ResultsPositions updated - Session {currentSessionNum} now has {currentCount} entries");
                 _lastResultsPositionCount = currentCount;
             }
 

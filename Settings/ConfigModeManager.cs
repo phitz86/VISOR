@@ -1,4 +1,5 @@
 ﻿using System;
+using VISOR.Diagnostics;
 
 namespace VISOR.Settings
 {
@@ -30,7 +31,7 @@ namespace VISOR.Settings
                 if (_isInConfigMode != value)
                 {
                     _isInConfigMode = value;
-                    System.Diagnostics.Debug.WriteLine($"[ConfigModeManager] Config mode changed to: {value}");
+                    Log.Info($"[ConfigModeManager] Config mode changed to: {value}");
                     ConfigModeChanged?.Invoke(this, new ConfigModeChangedEventArgs(value));
                 }
             }
@@ -60,7 +61,7 @@ namespace VISOR.Settings
         private ConfigModeManager()
         {
             _isInConfigMode = false;
-            System.Diagnostics.Debug.WriteLine("[ConfigModeManager] Initialized");
+            Log.Info("[ConfigModeManager] Initialized");
         }
 
         /// <summary>
@@ -68,7 +69,7 @@ namespace VISOR.Settings
         /// </summary>
         public void EnterConfigMode()
         {
-            System.Diagnostics.Debug.WriteLine("[ConfigModeManager] Entering config mode");
+            Log.Info("[ConfigModeManager] Entering config mode");
             IsInConfigMode = true;
         }
 
@@ -77,7 +78,7 @@ namespace VISOR.Settings
         /// </summary>
         public void ExitConfigMode()
         {
-            System.Diagnostics.Debug.WriteLine("[ConfigModeManager] Exiting config mode");
+            Log.Info("[ConfigModeManager] Exiting config mode");
             IsInConfigMode = false;
         }
     }

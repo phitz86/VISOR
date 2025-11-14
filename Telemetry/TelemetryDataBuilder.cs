@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using SVappsLAB.iRacingTelemetrySDK;
+using VISOR.Diagnostics;
 
 namespace VISOR.Telemetry
 {
@@ -31,7 +32,7 @@ namespace VISOR.Telemetry
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[DataBuilder] Error building telemetry dictionary: {ex.Message}");
+                Log.Error($"[DataBuilder] Error building telemetry dictionary: {ex.Message}");
             }
             return dict;
         }
@@ -81,7 +82,7 @@ namespace VISOR.Telemetry
             int currentSessionState = (int)data.SessionState;
             if (currentSessionState != _lastSessionState)
             {
-                System.Diagnostics.Debug.WriteLine($"[DataBuilder] SessionState: {_lastSessionState} -> {currentSessionState}");
+                Log.Info($"[DataBuilder] SessionState: {_lastSessionState} -> {currentSessionState}");
                 _lastSessionState = currentSessionState;
             }
         }
@@ -118,7 +119,7 @@ namespace VISOR.Telemetry
                 string currentSessionInfo = $"{sessionType}({_coordinator.GetCurrentSessionName()})";
                 if (currentSessionInfo != _lastSessionInfo)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[DataBuilder] Session Info: {currentSessionInfo}");
+                    Log.Info($"[DataBuilder] Session Info: {currentSessionInfo}");
                     _lastSessionInfo = currentSessionInfo;
                 }
             }
@@ -146,7 +147,7 @@ namespace VISOR.Telemetry
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[DataBuilder] Error accessing field '{fieldName}': {ex.Message}");
+                Log.Error($"[DataBuilder] Error accessing field '{fieldName}': {ex.Message}");
             }
 
             return defaultValue;

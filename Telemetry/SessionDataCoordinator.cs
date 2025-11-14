@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using VISOR.Diagnostics;
 
 namespace VISOR.Telemetry
 {
@@ -318,7 +319,7 @@ namespace VISOR.Telemetry
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[SessionCoordinator] Parse error: {ex.Message}");
+                Log.Error("SessionDataCoordinator parse error", ex);
             }
 
             return false;

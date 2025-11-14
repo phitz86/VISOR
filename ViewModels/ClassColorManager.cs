@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Windows.Media;
+using VISOR.Diagnostics;
 
 namespace VISOR.ViewModels
 {
@@ -37,13 +38,13 @@ namespace VISOR.ViewModels
                         var brush = ConvertHexColorToBrush(carClassColors[i]);
                         _classColorMap[classID] = brush;
 
-                        System.Diagnostics.Debug.WriteLine($"[ClassColorManager] Assigned YAML color 0x{carClassColors[i]:X6} to class {classID}");
+                        Log.Debug($"[ClassColorManager] Assigned YAML color 0x{carClassColors[i]:X6} to class {classID}");
                         return brush;
                     }
                 }
             }
 
-            System.Diagnostics.Debug.WriteLine($"[ClassColorManager] No YAML color found for class {classID}, using Transparent");
+            Log.Warning($"[ClassColorManager] No YAML color found for class {classID}, using Transparent");
             _classColorMap[classID] = Brushes.Transparent;
             return Brushes.Transparent;
         }
@@ -90,7 +91,7 @@ namespace VISOR.ViewModels
         public void Reset()
         {
             _classColorMap.Clear();
-            System.Diagnostics.Debug.WriteLine("[ClassColorManager] Reset - all color assignments cleared");
+            Log.Info("[ClassColorManager] Reset - all color assignments cleared");
         }
 
         /// <summary>

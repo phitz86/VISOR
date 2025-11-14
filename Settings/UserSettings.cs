@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using System.Configuration;
+using VISOR.Diagnostics;
 
 namespace VISOR.Settings
 {
@@ -165,6 +166,21 @@ namespace VISOR.Settings
 
         #endregion
 
+        #region Debug Settings
+
+        /// <summary>
+        /// Enable debug mode (verbose logging)
+        /// </summary>
+        [UserScopedSetting]
+        [DefaultSettingValue("false")]
+        public bool DebugModeEnabled
+        {
+            get => (bool)this["DebugModeEnabled"];
+            set => this["DebugModeEnabled"] = value;
+        }
+
+        #endregion
+
         #region Helper Methods
 
         /// <summary>
@@ -175,11 +191,11 @@ namespace VISOR.Settings
             try
             {
                 this.Save();
-                System.Diagnostics.Debug.WriteLine("[UserSettings] Settings saved successfully");
+                Log.Debug("Settings saved successfully");
             }
             catch (System.Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[UserSettings] Error saving settings: {ex.Message}");
+                Log.Error("Error saving settings", ex);
             }
         }
 
@@ -191,11 +207,11 @@ namespace VISOR.Settings
             try
             {
                 this.Reload();
-                System.Diagnostics.Debug.WriteLine("[UserSettings] Settings reloaded successfully");
+                Log.Debug("Settings reloaded successfully");
             }
             catch (System.Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[UserSettings] Error reloading settings: {ex.Message}");
+                Log.Error("Error reloading settings", ex);
             }
         }
 
@@ -207,11 +223,11 @@ namespace VISOR.Settings
             try
             {
                 this.Reset();
-                System.Diagnostics.Debug.WriteLine("[UserSettings] Settings reset to defaults");
+                Log.Info("Settings reset to defaults");
             }
             catch (System.Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[UserSettings] Error resetting settings: {ex.Message}");
+                Log.Error("Error resetting settings", ex);
             }
         }
 

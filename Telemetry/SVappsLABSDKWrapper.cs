@@ -78,7 +78,7 @@ namespace VISOR.Telemetry
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine("=== App OnStartup started ===");
+                Log.Info("SVappsLAB SDK initialization started");
 
                 _client = TelemetryClient<TelemetryData>.Create(_logger);
                 _client.OnSessionInfoUpdate += OnSessionInfoUpdate;
@@ -89,11 +89,12 @@ namespace VISOR.Telemetry
                 _monitoringTask = Task.Run(() => _client.Monitor(_cancellationTokenSource.Token));
 
                 await Task.Delay(200);
+                Log.Info("SVappsLAB SDK initialized successfully");
                 return true;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Initialize error: {ex.Message}");
+                Log.Error("SVappsLAB SDK initialization error", ex);
                 return false;
             }
         }
@@ -109,7 +110,7 @@ namespace VISOR.Telemetry
             if (newConnectionState == _isConnected) return;
 
             _isConnected = newConnectionState;
-            System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Connection state changed: {_isConnected}");
+            Log.Info($"iRacing connection state changed: {(_isConnected ? "Connected" : "Disconnected")}");
             ConnectionStateChanged?.Invoke(_isConnected);
 
             if (!_isConnected)
@@ -134,6 +135,7 @@ namespace VISOR.Telemetry
                 string sessionInfo = _client?.GetRawTelemetrySessionInfoYaml();
                 if (string.IsNullOrEmpty(sessionInfo))
                 {
+                    Log.Warning("Session YAML is empty, retrying...");
                     StartYamlRetryTimer();
                     return;
                 }
@@ -143,6 +145,7 @@ namespace VISOR.Telemetry
                 {
                     if (_sessionCoordinator.ParseSessionData(sessionInfo))
                     {
+                        Log.Info("Session YAML retrieved and parsed successfully");
                         SessionYamlAvailable?.Invoke(sessionInfo);
                         SessionDataUpdated?.Invoke();
                         CheckPrimedStateChange();
@@ -150,13 +153,14 @@ namespace VISOR.Telemetry
                     }
                     else
                     {
+                        Log.Warning("Failed to parse session YAML, retrying...");
                         StartYamlRetryTimer();
                     }
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Error in OnSessionInfoUpdate: {ex.Message}");
+                Log.Error("Error in OnSessionInfoUpdate", ex);
                 StartYamlRetryTimer();
             }
         }
@@ -169,6 +173,8 @@ namespace VISOR.Telemetry
                 string sessionType = _sessionCoordinator.GetSessionType(currentSessionNum);
                 string sessionName = _sessionCoordinator.GetSessionName(currentSessionNum);
                 double sessionTimeSeconds = _sessionCoordinator.GetSessionTimeSeconds(currentSessionNum);
+
+                Log.Info($"Session transition: {sessionName} (Type: {sessionType}, Duration: {sessionTimeSeconds}s)");
 
 #if DEBUG
                 _sessionLogger?.ScheduleSessionAwareLogs(currentSessionNum, sessionName, sessionTimeSeconds);
@@ -191,7 +197,7 @@ namespace VISOR.Telemetry
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Telemetry update error: {ex.Message}");
+                Log.Error("Telemetry update error", ex);
             }
         }
 
@@ -233,6 +239,7 @@ namespace VISOR.Telemetry
         {
             try
             {
+                Log.Info("SVappsLAB SDK shutdown initiated");
                 StopYamlRetryTimer();
                 _yamlRetryTimer?.Dispose();
 
@@ -244,7 +251,7 @@ namespace VISOR.Telemetry
 
                 if (_monitoringTask != null && !_monitoringTask.Wait(TimeSpan.FromSeconds(2)))
                 {
-                    System.Diagnostics.Debug.WriteLine("[SVappsLAB] Monitoring task did not shut down gracefully");
+                    Log.Warning("Monitoring task did not shut down gracefully");
                 }
 
                 if (_client != null)
@@ -256,10 +263,11 @@ namespace VISOR.Telemetry
                 }
                 _cancellationTokenSource?.Dispose();
                 _sessionCoordinator.ClearCache();
+                Log.Info("SVappsLAB SDK shutdown complete");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[SVappsLAB] Shutdown error: {ex.Message}");
+                Log.Error("SVappsLAB SDK shutdown error", ex);
             }
         }
 

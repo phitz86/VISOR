@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using VISOR.Diagnostics;
 using VISOR.ViewModels;
 using VISOR.Telemetry;
 using VISOR.Settings;
@@ -74,7 +75,7 @@ namespace VISOR.Views
         {
             Dispatcher.Invoke(() =>
             {
-                System.Diagnostics.Debug.WriteLine("[MainWindow] Element visibility changed - resizing window");
+                Log.Info("[MainWindow] Element visibility changed - resizing window");
                 _viewModel.RefreshElementVisibility();
                 ApplyWindowSizing();
             });
@@ -84,10 +85,10 @@ namespace VISOR.Views
         {
             Dispatcher.Invoke(() =>
             {
-                System.Diagnostics.Debug.WriteLine($"[MainWindow] Window size preset changed to {e.NewSize} - resizing");
+                Log.Info($"[MainWindow] Window size preset changed to {e.NewSize} - resizing");
                 _viewModel.RefreshElementVisibility();
                 ApplyWindowSizing();
-                System.Diagnostics.Debug.WriteLine($"[MainWindow] Applied dimensions: {Width}x{Height}");
+                Log.Debug($"[MainWindow] Applied dimensions: {Width}x{Height}");
             });
         }
 
@@ -95,7 +96,7 @@ namespace VISOR.Views
         {
             Dispatcher.Invoke(() =>
             {
-                System.Diagnostics.Debug.WriteLine($"[MainWindow] Config mode changed to: {e.IsInConfigMode}");
+                Log.Info($"[MainWindow] Config mode changed to: {e.IsInConfigMode}");
                 DragHandle.Visibility = e.IsInConfigMode ? Visibility.Visible : Visibility.Collapsed;
             });
         }
@@ -172,7 +173,7 @@ namespace VISOR.Views
         {
             Dispatcher.Invoke(() =>
             {
-                System.Diagnostics.Debug.WriteLine("[MainWindow] Session data updated - drivers may have changed");
+                Log.Info("[MainWindow] Session data updated - drivers may have changed");
             });
         }
 
@@ -193,14 +194,14 @@ namespace VISOR.Views
                     bool currentRelativeVisibility = !_sdk.Coordinator.ShouldHideRelativeDisplay();
                     if (currentRelativeVisibility != _lastRelativeVisibility)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[MainWindow] Relative display visibility changed: {_lastRelativeVisibility} -> {currentRelativeVisibility}");
+                        Log.Info($"[MainWindow] Relative display visibility changed: {_lastRelativeVisibility} -> {currentRelativeVisibility}");
                         ApplyWindowSizing();
                         _lastRelativeVisibility = currentRelativeVisibility;
                     }
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine("[MainWindow] Session data not ready - passing null");
+                    Log.Debug("[MainWindow] Session data not ready - passing null");
                     _viewModel.UpdateFromTelemetry(snapshot, null);
                 }
             });

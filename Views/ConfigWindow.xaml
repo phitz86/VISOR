@@ -52,10 +52,31 @@
 
             <GroupBox Header="Radar Window" Margin="0,0,0,15">
                 <StackPanel Margin="10">
-                    <CheckBox x:Name="RadarCheckBox" Content="Show Radar Window" 
+                    <CheckBox x:Name="RadarCheckBox" Content="Show Radar Window"
                               IsChecked="True" Margin="0,0,0,8" Checked="RadarCheckBox_Changed" Unchecked="RadarCheckBox_Changed"/>
-                    <TextBlock Text="Displays nearby cars and spotter information" 
+                    <TextBlock Text="Displays nearby cars and spotter information"
                                FontStyle="Italic" Foreground="Gray" FontSize="11"/>
+                </StackPanel>
+            </GroupBox>
+
+            <GroupBox Header="Debug Settings (for Beta Testing)" Margin="0,0,0,15">
+                <StackPanel Margin="10">
+                    <CheckBox x:Name="DebugModeCheckBox"
+                             Content="Enable Debug Mode (Verbose Logging)"
+                             Margin="0,0,0,8"
+                             Checked="DebugModeCheckBox_Checked"
+                             Unchecked="DebugModeCheckBox_Unchecked"/>
+
+                    <TextBlock Text="When enabled, detailed logs will be saved to the Logs folder."
+                              FontStyle="Italic" Foreground="Gray" FontSize="11"
+                              TextWrapping="Wrap" Margin="0,0,0,8"/>
+
+                    <Button x:Name="OpenLogsFolderButton" Content="Open Logs Folder"
+                           Width="130" Height="25" HorizontalAlignment="Left" Margin="0,0,0,8"
+                           Click="OpenLogsFolderButton_Click"/>
+
+                    <TextBlock x:Name="CurrentLogFileText" FontSize="10" Foreground="Gray"
+                              TextWrapping="Wrap"/>
                 </StackPanel>
             </GroupBox>
 

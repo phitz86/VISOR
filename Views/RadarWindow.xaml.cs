@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
+using VISOR.Diagnostics;
 using VISOR.Settings;
 using VISOR.Telemetry;
 using VISOR.ViewModels;
@@ -195,7 +196,7 @@ namespace VISOR.Views
         {
             Dispatcher.Invoke(() =>
             {
-                System.Diagnostics.Debug.WriteLine($"[RadarWindow] Window size preset changed to {e.NewSize} - resizing");
+                Log.Info($"[RadarWindow] Window size preset changed to {e.NewSize} - resizing");
                 ApplyWindowSizing();
             });
         }
@@ -204,7 +205,7 @@ namespace VISOR.Views
         {
             Dispatcher.Invoke(() =>
             {
-                System.Diagnostics.Debug.WriteLine($"[RadarWindow] Config mode changed to: {e.IsInConfigMode}");
+                Log.Info($"[RadarWindow] Config mode changed to: {e.IsInConfigMode}");
 
                 DragHandle.Visibility = e.IsInConfigMode ? Visibility.Visible : Visibility.Collapsed;
             });
