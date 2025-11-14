@@ -46,6 +46,7 @@ namespace VISOR.ViewModels
         #region Private Fields - Logging State
         private readonly HashSet<int> _lastFrameValidCars = new();
         private readonly Dictionary<int, bool> _isCurrentlyPredicting = new();
+        private readonly HashSet<int> _carsWithInvalidLapDistPctLogged = new();
         #endregion
 
         #region Public Properties
@@ -142,6 +143,7 @@ namespace VISOR.ViewModels
             _predictionStartFrame.Clear();
             _lastFrameValidCars.Clear();
             _isCurrentlyPredicting.Clear();
+            _carsWithInvalidLapDistPctLogged.Clear();
 
             Log.Info("PositionCalculator reset - all state cleared");
         }
@@ -200,6 +202,9 @@ namespace VISOR.ViewModels
                 {
                     // Car removed from roster (disconnected or cache expired)
                     Log.Info($"Car #{carNumbers[i]} ({userNames[i]}) removed from roster (cache expired or left session)");
+
+                    // Clear invalid LapDistPct flag so it can log again if car returns
+                    _carsWithInvalidLapDistPctLogged.Remove(i);
                 }
             }
         }
@@ -225,10 +230,11 @@ namespace VISOR.ViewModels
                 bool hasValidData = lapDistPct[i] >= 0f && lapDistPct[i] <= 1f;
                 bool isOnPitRoad = onPitRoad != null && i < onPitRoad.Length && onPitRoad[i];
 
-                // Log invalid LapDistPct values for troubleshooting
-                if (!hasValidData && lapDistPct[i] < 0f)
+                // Log invalid LapDistPct values for troubleshooting (once per car)
+                if (!hasValidData && lapDistPct[i] < 0f && !_carsWithInvalidLapDistPctLogged.Contains(i))
                 {
-                    Log.Warning($"Invalid LapDistPct for car #{carNumbers[i]} (idx {i}): {lapDistPct[i]}");
+                    Log.Info($"Invalid LapDistPct for car #{carNumbers[i]} (idx {i}): {lapDistPct[i]}");
+                    _carsWithInvalidLapDistPctLogged.Add(i);
                 }
 
                 if (hasValidData)
