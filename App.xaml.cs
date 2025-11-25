@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Reflection;
 using System.Windows;
+using VISOR.Diagnostics;
 using VISOR.Telemetry;
 using VISOR.Views;
 using VISOR.Settings;
@@ -21,15 +23,28 @@ namespace VISOR
 
             try
             {
-                System.Diagnostics.Debug.WriteLine("=== App OnStartup started ===");
+                // Initialize logging system
+                var settings = UserSettings.Instance;
+                Log.DebugModeEnabled = settings.DebugModeEnabled;
+                Log.StartNewSession();
+
+                // Get version from assembly
+                var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "Unknown";
+                Log.Info($"VISOR started - Version: {version}");
+
+                // Clean up old log files
+                Log.CleanupOldLogs();
+
+                Log.Info("Application startup initiated");
 
                 _sdkWrapper = new SVappsLABSDKWrapper();
 
                 bool initialized = await _sdkWrapper.Initialize();
-                System.Diagnostics.Debug.WriteLine($"SDK initialization result: {initialized}");
+                Log.Info($"SDK initialization result: {initialized}");
 
                 if (!initialized)
                 {
+                    Log.Error("Failed to initialize telemetry connection");
                     MessageBox.Show("Failed to initialize telemetry connection.", "Initialization Error");
                     Shutdown();
                     return;
@@ -39,7 +54,7 @@ namespace VISOR
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"=== EXCEPTION in OnStartup: {ex} ===");
+                Log.Error("EXCEPTION in OnStartup", ex);
                 MessageBox.Show($"Application startup error: {ex.Message}\n\nFull details:\n{ex}", "Startup Error");
                 Shutdown();
             }
@@ -49,31 +64,31 @@ namespace VISOR
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine("=== LaunchAllWindows started ===");
+                Log.Info("LaunchAllWindows started");
 
                 _mainWindow = new MainWindow(_sdkWrapper);
-                System.Diagnostics.Debug.WriteLine("MainWindow created successfully");
+                Log.Info("MainWindow created successfully");
 
                 var settingsManager = SettingsManager.Instance;
                 if (settingsManager.IsRadarVisible)
                 {
                     _radarWindow = new RadarWindow(_sdkWrapper, _mainWindow.ViewModel.ClassColorManager);
-                    System.Diagnostics.Debug.WriteLine("RadarWindow created successfully");
+                    Log.Info("RadarWindow created successfully");
                 }
 
                 _configWindow = new ConfigWindow(_sdkWrapper, _mainWindow);
-                System.Diagnostics.Debug.WriteLine("ConfigWindow created successfully");
+                Log.Info("ConfigWindow created successfully");
 
-                System.Diagnostics.Debug.WriteLine("Showing MainWindow...");
+                Log.Info("Showing MainWindow");
                 _mainWindow.Show();
 
                 if (_radarWindow != null)
                 {
-                    System.Diagnostics.Debug.WriteLine("Showing RadarWindow...");
+                    Log.Info("Showing RadarWindow");
                     _radarWindow.Show();
                 }
 
-                System.Diagnostics.Debug.WriteLine("Showing ConfigWindow...");
+                Log.Info("Showing ConfigWindow");
                 _configWindow.Show();
 
                 MainWindow = _mainWindow;
@@ -88,11 +103,11 @@ namespace VISOR
                 _configWindow.Closed += OnConfigWindowClosed;
                 _configWindow.ExitRequested += OnConfigExitRequested;
 
-                System.Diagnostics.Debug.WriteLine("=== LaunchAllWindows completed successfully ===");
+                Log.Info("LaunchAllWindows completed successfully");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"=== EXCEPTION in LaunchAllWindows: {ex} ===");
+                Log.Error("EXCEPTION in LaunchAllWindows", ex);
                 MessageBox.Show($"Error launching application windows: {ex.Message}\n\nFull details:\n{ex}", "Launch Error");
                 Shutdown();
             }
@@ -100,23 +115,23 @@ namespace VISOR
 
         private void OnMainWindowClosed(object sender, EventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine("MainWindow closed - shutting down application");
+            Log.Info("MainWindow closed - shutting down application");
             Shutdown();
         }
 
         private void OnRadarWindowClosed(object sender, EventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine("RadarWindow closed independently");
+            Log.Info("RadarWindow closed independently");
         }
 
         private void OnConfigWindowClosed(object sender, EventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine("ConfigWindow closed independently");
+            Log.Info("ConfigWindow closed independently");
         }
 
         private void OnConfigExitRequested(object sender, EventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine("Config window requested application exit");
+            Log.Info("Config window requested application exit");
             Shutdown();
         }
 
@@ -124,7 +139,7 @@ namespace VISOR
         {
             if (_radarWindow == null && _mainWindow != null)
             {
-                System.Diagnostics.Debug.WriteLine("Creating RadarWindow on demand...");
+                Log.Info("Creating RadarWindow on demand");
                 _radarWindow = new RadarWindow(_sdkWrapper, _mainWindow.ViewModel.ClassColorManager);
                 _radarWindow.Closed += OnRadarWindowClosed;
                 _radarWindow.Show();
@@ -145,12 +160,13 @@ namespace VISOR
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine("=== App OnExit called ===");
+                Log.Info("Application exit initiated");
                 _sdkWrapper?.Shutdown();
+                Log.Shutdown();
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error during shutdown: {ex.Message}");
+                Log.Error("Error during shutdown", ex);
             }
 
             base.OnExit(e);

@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using VISOR.Diagnostics;
 using VISOR.Telemetry;
 using VISOR.Settings;
 
@@ -200,7 +201,7 @@ namespace VISOR.ViewModels
             // Debug output only when state changes
             if (stateChanged)
             {
-                System.Diagnostics.Debug.WriteLine($"[Radar] CarLeftRight state changed to {carLeftRightState}, {visibleCars.Count} visible cars");
+                Log.Info($"[Radar] CarLeftRight state changed to {carLeftRightState}, {visibleCars.Count} visible cars");
             }
 
             // Reset all cars to center zone first
@@ -220,7 +221,7 @@ namespace VISOR.ViewModels
                     {
                         _carZoneAssignments[visibleCars[0].CarIdx] = RadarZone.LeftNear;
                         if (stateChanged)
-                            System.Diagnostics.Debug.WriteLine($"[Radar] Assigned car {visibleCars[0].CarNumber} to LeftNear zone");
+                            Log.Debug($"[Radar] Assigned car {visibleCars[0].CarNumber} to LeftNear zone");
                     }
                     break;
 
@@ -229,7 +230,7 @@ namespace VISOR.ViewModels
                     {
                         _carZoneAssignments[visibleCars[0].CarIdx] = RadarZone.RightNear;
                         if (stateChanged)
-                            System.Diagnostics.Debug.WriteLine($"[Radar] Assigned car {visibleCars[0].CarNumber} to RightNear zone");
+                            Log.Debug($"[Radar] Assigned car {visibleCars[0].CarNumber} to RightNear zone");
                     }
                     break;
 
@@ -238,13 +239,13 @@ namespace VISOR.ViewModels
                     {
                         _carZoneAssignments[visibleCars[0].CarIdx] = RadarZone.LeftNear;
                         if (stateChanged)
-                            System.Diagnostics.Debug.WriteLine($"[Radar] Assigned car {visibleCars[0].CarNumber} to LeftNear zone (CarLeftRight)");
+                            Log.Debug($"[Radar] Assigned car {visibleCars[0].CarNumber} to LeftNear zone (CarLeftRight)");
                     }
                     if (visibleCars.Count > 1)
                     {
                         _carZoneAssignments[visibleCars[1].CarIdx] = RadarZone.RightNear;
                         if (stateChanged)
-                            System.Diagnostics.Debug.WriteLine($"[Radar] Assigned car {visibleCars[1].CarNumber} to RightNear zone (CarLeftRight)");
+                            Log.Debug($"[Radar] Assigned car {visibleCars[1].CarNumber} to RightNear zone (CarLeftRight)");
                     }
                     break;
 
@@ -253,13 +254,13 @@ namespace VISOR.ViewModels
                     {
                         _carZoneAssignments[visibleCars[0].CarIdx] = RadarZone.LeftNear;
                         if (stateChanged)
-                            System.Diagnostics.Debug.WriteLine($"[Radar] Assigned car {visibleCars[0].CarNumber} to LeftNear zone (TwoCarsLeft)");
+                            Log.Debug($"[Radar] Assigned car {visibleCars[0].CarNumber} to LeftNear zone (TwoCarsLeft)");
                     }
                     if (visibleCars.Count > 1)
                     {
                         _carZoneAssignments[visibleCars[1].CarIdx] = RadarZone.LeftFar;
                         if (stateChanged)
-                            System.Diagnostics.Debug.WriteLine($"[Radar] Assigned car {visibleCars[1].CarNumber} to LeftFar zone (TwoCarsLeft)");
+                            Log.Debug($"[Radar] Assigned car {visibleCars[1].CarNumber} to LeftFar zone (TwoCarsLeft)");
                     }
                     break;
 
@@ -268,13 +269,13 @@ namespace VISOR.ViewModels
                     {
                         _carZoneAssignments[visibleCars[0].CarIdx] = RadarZone.RightNear;
                         if (stateChanged)
-                            System.Diagnostics.Debug.WriteLine($"[Radar] Assigned car {visibleCars[0].CarNumber} to RightNear zone (TwoCarsRight)");
+                            Log.Debug($"[Radar] Assigned car {visibleCars[0].CarNumber} to RightNear zone (TwoCarsRight)");
                     }
                     if (visibleCars.Count > 1)
                     {
                         _carZoneAssignments[visibleCars[1].CarIdx] = RadarZone.RightFar;
                         if (stateChanged)
-                            System.Diagnostics.Debug.WriteLine($"[Radar] Assigned car {visibleCars[1].CarNumber} to RightFar zone (TwoCarsRight)");
+                            Log.Debug($"[Radar] Assigned car {visibleCars[1].CarNumber} to RightFar zone (TwoCarsRight)");
                     }
                     break;
 
@@ -283,7 +284,7 @@ namespace VISOR.ViewModels
                 default:
                     // All cars stay in center zone (already set above)
                     if (stateChanged)
-                        System.Diagnostics.Debug.WriteLine($"[Radar] All cars assigned to Center zone (state: {carLeftRightState})");
+                        Log.Debug($"[Radar] All cars assigned to Center zone (state: {carLeftRightState})");
                     break;
             }
         }

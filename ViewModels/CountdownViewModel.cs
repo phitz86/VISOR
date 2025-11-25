@@ -1,6 +1,7 @@
 ﻿using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using VISOR.Diagnostics;
 using VISOR.Telemetry;
 
 namespace VISOR.ViewModels
@@ -74,11 +75,11 @@ namespace VISOR.ViewModels
             if (sessionDataProvider.IsQualifyingSession(newSessionNum))
             {
                 _totalQualifyingLaps = sessionDataProvider.GetSessionLaps(newSessionNum);
-                System.Diagnostics.Debug.WriteLine($"[Countdown] Qualifying session detected, total laps: {_totalQualifyingLaps}");
+                Log.Info($"[Countdown] Qualifying session detected, total laps: {_totalQualifyingLaps}");
                 if (_totalQualifyingLaps > 0)
                 {
                     _isFirstQualiLap = true;
-                    System.Diagnostics.Debug.WriteLine($"[Countdown] Lap-limited qualifying initialized, will ignore out-lap");
+                    Log.Info($"[Countdown] Lap-limited qualifying initialized, will ignore out-lap");
                 }
             }
         }
@@ -134,14 +135,14 @@ namespace VISOR.ViewModels
                 if (_isFirstQualiLap)
                 {
                     // This is the out-lap, consume it without counting
-                    System.Diagnostics.Debug.WriteLine($"[Countdown] Out-lap completed, not counting");
+                    Log.Debug($"[Countdown] Out-lap completed, not counting");
                     _isFirstQualiLap = false;
                 }
                 else
                 {
                     // This is a flying lap, count it
                     _qualifyingLapsCompleted++;
-                    System.Diagnostics.Debug.WriteLine($"[Countdown] Flying lap completed, count: {_qualifyingLapsCompleted}/{_totalQualifyingLaps}");
+                    Log.Debug($"[Countdown] Flying lap completed, count: {_qualifyingLapsCompleted}/{_totalQualifyingLaps}");
                 }
             }
 

@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
+using VISOR.Diagnostics;
 using VISOR.Telemetry;
 using VISOR.Views;
 using VISOR.Settings;
@@ -189,7 +190,7 @@ namespace VISOR.ViewModels
 
             if (ClassPositionNumber != newPosition)
             {
-                System.Diagnostics.Debug.WriteLine($"[MainVM] Position changed: '{ClassPositionNumber}' -> '{newPosition}'");
+                Log.Debug($"Player position changed: '{ClassPositionNumber}' -> '{newPosition}'");
                 ClassPositionNumber = newPosition;
                 OnPropertyChanged(nameof(ClassPositionNumber));
             }
@@ -213,6 +214,21 @@ namespace VISOR.ViewModels
             int currentSessionState = snapshot.GetValue<int>("SessionState", -1);
             if (currentSessionState != _lastSessionState)
             {
+                // Map session state codes to readable names
+                string GetStateName(int state) => state switch
+                {
+                    0 => "Invalid",
+                    1 => "GetInCar",
+                    2 => "Warmup",
+                    3 => "ParadeLaps",
+                    4 => "Racing",
+                    5 => "Checkered",
+                    6 => "CoolDown",
+                    _ => $"Unknown({state})"
+                };
+
+                Log.Info($"Session state transition: {GetStateName(_lastSessionState)} -> {GetStateName(currentSessionState)}");
+
                 if (_lastSessionState == 6 && currentSessionState == 1)
                 {
                     ClearSessionUI();

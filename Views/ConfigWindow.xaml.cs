@@ -1,6 +1,9 @@
 ﻿using System;
+using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using VISOR.Diagnostics;
 using VISOR.Telemetry;
 using VISOR.Settings;
 
@@ -38,9 +41,10 @@ namespace VISOR.Views
             }
 
             LoadCurrentSettings();
+            UpdateDebugModeDisplay();
             _isInitialized = true;
 
-            System.Diagnostics.Debug.WriteLine("[ConfigWindow] Opened - config mode enabled");
+            Log.Info("ConfigWindow opened - config mode enabled");
         }
 
         private RadarWindow GetCurrentRadarWindow()
@@ -67,8 +71,23 @@ namespace VISOR.Views
             Row4CheckBox.IsChecked = settings.ShowRow4;
             Row5CheckBox.IsChecked = settings.ShowRow5;
             RadarCheckBox.IsChecked = settings.ShowRadar;
+            DebugModeCheckBox.IsChecked = settings.DebugModeEnabled;
 
-            System.Diagnostics.Debug.WriteLine("[ConfigWindow] Loaded current settings into UI");
+            Log.Debug("Loaded current settings into UI");
+        }
+
+        private void UpdateDebugModeDisplay()
+        {
+            string logPath = Log.GetCurrentLogPath();
+            if (!string.IsNullOrEmpty(logPath))
+            {
+                string fileName = Path.GetFileName(logPath);
+                CurrentLogFileText.Text = $"Current log: {fileName}";
+            }
+            else
+            {
+                CurrentLogFileText.Text = "No log file active";
+            }
         }
 
         private void WindowSizeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -86,8 +105,57 @@ namespace VISOR.Views
                     _ => WindowSizePreset.Large
                 };
 
-                System.Diagnostics.Debug.WriteLine($"[ConfigWindow] Window size changed to {newSize}");
+                Log.Info($"Window size changed to {newSize}");
                 _settingsManager.UpdateWindowSize(newSize);
+            }
+        }
+
+        private void DebugModeCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            if (!_isInitialized)
+                return;
+
+            var settings = _settingsManager.Settings;
+            settings.DebugModeEnabled = true;
+            settings.SaveSettings();
+            Log.DebugModeEnabled = true;
+            Log.Info("Debug mode enabled - verbose logging activated");
+            UpdateDebugModeDisplay();
+        }
+
+        private void DebugModeCheckBox_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (!_isInitialized)
+                return;
+
+            var settings = _settingsManager.Settings;
+            settings.DebugModeEnabled = false;
+            settings.SaveSettings();
+            Log.Info("Debug mode disabled - returning to normal logging");
+            Log.DebugModeEnabled = false;
+            UpdateDebugModeDisplay();
+        }
+
+        private void OpenLogsFolderButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string logsDirectory = Log.GetLogsDirectory();
+
+                // Ensure directory exists
+                if (!Directory.Exists(logsDirectory))
+                {
+                    Directory.CreateDirectory(logsDirectory);
+                }
+
+                // Open in Windows Explorer
+                Process.Start("explorer.exe", logsDirectory);
+                Log.Info("Opened logs folder in Explorer");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Failed to open logs folder", ex);
+                MessageBox.Show($"Could not open logs folder: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -104,7 +172,7 @@ namespace VISOR.Views
             bool showRow5 = Row5CheckBox.IsChecked ?? false;
             bool showRadar = RadarCheckBox.IsChecked ?? false;
 
-            System.Diagnostics.Debug.WriteLine($"[ConfigWindow] Row visibility changed - updating settings");
+            Log.Debug("Row visibility changed - updating settings");
 
             _settingsManager.UpdateElementVisibility(
                 showRow0, showRow1, showRow2, showRow3, showRow4, showRow5, showRadar);
@@ -117,7 +185,7 @@ namespace VISOR.Views
 
             bool showRadar = RadarCheckBox.IsChecked ?? false;
 
-            System.Diagnostics.Debug.WriteLine($"[ConfigWindow] Radar visibility changed to {showRadar}");
+            Log.Info($"Radar visibility changed to {showRadar}");
 
             if (showRadar)
             {
@@ -142,19 +210,19 @@ namespace VISOR.Views
 
         private void DoneButton_Click(object sender, RoutedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine("[ConfigWindow] Done button clicked - closing config window");
+            Log.Info("Done button clicked - closing config window");
             Close();
         }
 
         private void ExitButton_Click(object sender, RoutedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine("[ConfigWindow] Exit button clicked - requesting application shutdown");
+            Log.Info("Exit button clicked - requesting application shutdown");
             ExitRequested?.Invoke(this, EventArgs.Empty);
         }
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine("[ConfigWindow] Closing - saving window positions and exiting config mode");
+            Log.Info("ConfigWindow closing - saving window positions and exiting config mode");
 
             SaveWindowPositions();
             _configModeManager.ExitConfigMode();
@@ -181,13 +249,13 @@ namespace VISOR.Views
 
                 _settingsManager.SaveWindowPositions(mainPos, radarPos);
 
-                System.Diagnostics.Debug.WriteLine($"[ConfigWindow] Positions saved - Main: ({mainPos.X}, {mainPos.Y}), Radar: ({radarPos.X}, {radarPos.Y})");
+                Log.Debug($"Positions saved - Main: ({mainPos.X}, {mainPos.Y}), Radar: ({radarPos.X}, {radarPos.Y})");
             }
         }
 
         protected override void OnClosed(EventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine("[ConfigWindow] Config window closed");
+            Log.Info("ConfigWindow closed");
             base.OnClosed(e);
         }
     }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using VISOR.Diagnostics;
 using VISOR.Telemetry;
 
 namespace VISOR.ViewModels
@@ -45,6 +46,7 @@ namespace VISOR.ViewModels
         #region Private Fields - Logging State
         private readonly HashSet<int> _lastFrameValidCars = new();
         private readonly Dictionary<int, bool> _isCurrentlyPredicting = new();
+        private readonly HashSet<int> _carsWithInvalidLapDistPctLogged = new();
         #endregion
 
         #region Public Properties
@@ -141,8 +143,9 @@ namespace VISOR.ViewModels
             _predictionStartFrame.Clear();
             _lastFrameValidCars.Clear();
             _isCurrentlyPredicting.Clear();
+            _carsWithInvalidLapDistPctLogged.Clear();
 
-            System.Diagnostics.Debug.WriteLine("[PositionCalc] Reset - all state cleared");
+            Log.Info("PositionCalculator reset - all state cleared");
         }
         #endregion
 
@@ -192,15 +195,16 @@ namespace VISOR.ViewModels
 
                     if (!_lastFrameValidCars.Contains(i))
                     {
-                        System.Diagnostics.Debug.WriteLine(
-                            $"[PositionCalc] Car #{carNumbers[i]} ({userNames[i]}) added to valid roster");
+                        Log.Info($"Car #{carNumbers[i]} ({userNames[i]}) added to valid roster");
                     }
                 }
                 else if (_lastFrameValidCars.Contains(i))
                 {
                     // Car removed from roster (disconnected or cache expired)
-                    System.Diagnostics.Debug.WriteLine(
-                        $"[PositionCalc] Car #{carNumbers[i]} ({userNames[i]}) removed from roster (cache expired or left session)");
+                    Log.Info($"Car #{carNumbers[i]} ({userNames[i]}) removed from roster (cache expired or left session)");
+
+                    // Clear invalid LapDistPct flag so it can log again if car returns
+                    _carsWithInvalidLapDistPctLogged.Remove(i);
                 }
             }
         }
@@ -226,6 +230,13 @@ namespace VISOR.ViewModels
                 bool hasValidData = lapDistPct[i] >= 0f && lapDistPct[i] <= 1f;
                 bool isOnPitRoad = onPitRoad != null && i < onPitRoad.Length && onPitRoad[i];
 
+                // Log invalid LapDistPct values for troubleshooting (once per car)
+                if (!hasValidData && lapDistPct[i] < 0f && !_carsWithInvalidLapDistPctLogged.Contains(i))
+                {
+                    Log.Info($"Invalid LapDistPct for car #{carNumbers[i]} (idx {i}): {lapDistPct[i]}");
+                    _carsWithInvalidLapDistPctLogged.Add(i);
+                }
+
                 if (hasValidData)
                 {
                     ProcessValidData(i, lapDistPct[i], currentLap[i], isOnPitRoad, carNumbers);
@@ -243,8 +254,7 @@ namespace VISOR.ViewModels
             if (!_carsWithValidDataHistory.Contains(carIdx))
             {
                 _carsWithValidDataHistory.Add(carIdx);
-                System.Diagnostics.Debug.WriteLine(
-                    $"[PositionCalc] Car #{carNumbers[carIdx]} first valid data - added to history");
+                Log.Info($"Car #{carNumbers[carIdx]} first valid data - added to history");
             }
 
             // Calculate velocity for prediction (Tier 2: Prediction)
@@ -281,8 +291,7 @@ namespace VISOR.ViewModels
                 int predictionDuration = _globalFrameCounter - startFrame;
                 if (predictionDuration > LOG_PREDICTION_THRESHOLD)
                 {
-                    System.Diagnostics.Debug.WriteLine(
-                        $"[PositionCalc-Predict] Car #{carNumbers[carIdx]} prediction ended after {predictionDuration} frames");
+                    Log.Debug($"Car #{carNumbers[carIdx]} prediction ended after {predictionDuration} frames");
                 }
                 _isCurrentlyPredicting.Remove(carIdx);
             }
@@ -306,8 +315,7 @@ namespace VISOR.ViewModels
             if (framesSinceValid == MAX_CACHE_AGE_FRAMES &&
                 _carsWithValidDataHistory.Contains(carIdx))
             {
-                System.Diagnostics.Debug.WriteLine(
-                    $"[PositionCalc-Cache] Car #{carNumbers[carIdx]} cache expired after {MAX_CACHE_AGE_FRAMES} frames");
+                Log.Info($"Car #{carNumbers[carIdx]} cache expired after {MAX_CACHE_AGE_FRAMES} frames (3 seconds)");
             }
         }
 
