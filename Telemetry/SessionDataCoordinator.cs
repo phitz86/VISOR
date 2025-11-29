@@ -39,6 +39,24 @@ namespace VISOR.Telemetry
         public bool[] CarIsAI => _carIsAICache;
         public int[] CurDriverIncidentCount => _curDriverIncidentCountCache;
 
+        // --- NEW PUBLIC ACCESSORS FOR PACE MANAGER ---
+        public StaticEventData GetStaticEventData()
+        {
+            lock (_parseLock)
+            {
+                return _staticData;
+            }
+        }
+
+        public LiveSessionData GetLiveSessionData()
+        {
+            lock (_parseLock)
+            {
+                return _liveData;
+            }
+        }
+        // ---------------------------------------------
+
         public int IncidentLimit
         {
             get { lock (_parseLock) { return _staticData.IncidentLimit; } }

@@ -38,6 +38,8 @@ VISOR/
 │   ├── TelemetryDataBuilder.cs (YAML integration, field mapping)
 │   └── TelemetryFieldRegistry.cs (field definitions and validation)
 ├── Diagnostics/
+│   ├── Log.cs (log formatting class, referenced by all debug messages)
+│   ├── TelemetryCSVLogger.cs (used to create telemetry output for troubleshooting)
 │   └── SessionDataLogger.cs (session-time-aware logging)
 ├── Visor Logo.ico (application icon for taskbar/explorer)
 ├── VISOR.csproj 

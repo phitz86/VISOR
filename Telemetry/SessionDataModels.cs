@@ -43,6 +43,9 @@ namespace VISOR.Telemetry
             public int CarClassID { get; set; }
             public int CarClassColor { get; set; }
             public bool IsAI { get; set; }
+
+            // ADDED: For Cold Start Pace Estimation
+            public float CarClassEstLapTime { get; set; }
         }
 
         public class SessionSchedule
@@ -69,9 +72,8 @@ namespace VISOR.Telemetry
         }
     }
 
-    /// <summary>
-    /// Session-specific data that changes between sessions
-    /// </summary>
+    // ... (Remainder of file remains unchanged: SessionTransitionData, LiveSessionData)
+    // Included here for completeness if you are copy/pasting the whole file
     public class SessionTransitionData
     {
         public int CurrentSessionNum { get; set; } = -1;
@@ -81,9 +83,6 @@ namespace VISOR.Telemetry
         public string CurrentSessionName { get; set; } = string.Empty;
     }
 
-    /// <summary>
-    /// Live session data that updates frequently during sessions
-    /// </summary>
     public class LiveSessionData
     {
         public readonly Dictionary<int, List<ResultPosition>> SessionResultsPositions = new();

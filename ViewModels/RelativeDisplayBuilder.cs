@@ -10,18 +10,23 @@ namespace VISOR.ViewModels
 {
     /// <summary>
     /// Builds the 7-row proximity-based relative display with visual properties.
-    /// Uses PositionCalculator for all filtering, validation, and prediction.
-    /// Focuses purely on proximity sorting and visual styling.
+    /// Uses "Synthetic Time" logic to normalize gaps across different tracks and car classes.
     /// </summary>
     public class RelativeDisplayBuilder
     {
         #region Constants
-        // Segment thresholds (exponential curve, gentle)
-        private const double SEGMENT_1_THRESHOLD = 0.100;  // Farthest
-        private const double SEGMENT_2_THRESHOLD = 0.075;
-        private const double SEGMENT_3_THRESHOLD = 0.055;
-        private const double SEGMENT_4_THRESHOLD = 0.035;
-        private const double SEGMENT_5_THRESHOLD = 0.018;  // Closest
+
+        // "Synthetic Time" Thresholds (Seconds)
+        // Normalized for reaction time + physics, regardless of track length.
+        private const float TIME_SEG5_CRITICAL = 0.6f;  // < 0.6s (Contact Imminent / Netcode zone)
+        private const float TIME_SEG4_DANGER = 1.5f;  // < 1.5s (Drafting / Attack Range)
+        private const float TIME_SEG3_WARNING = 3.0f;  // < 3.0s (Hunting / Mirrors Full)
+        private const float TIME_SEG2_AWARE = 5.0f;  // < 5.0s (Traffic Monitoring)
+        private const float TIME_SEG1_INFO = 8.0f;  // < 8.0s (On Radar)
+
+        // Minimum speed floor to prevent "Limp Mode" false security.
+        // 35 m/s is approx 78 mph / 126 kph.
+        private const float MIN_SPEED_FLOOR_MS = 35.0f;
 
         private static readonly Color NeutralColor = (Color)ColorConverter.ConvertFromString("#80404040");
         private static readonly Color AheadAlertColor = (Color)ColorConverter.ConvertFromString("#FF00FFFF");
@@ -32,25 +37,24 @@ namespace VISOR.ViewModels
         private readonly Dictionary<int, RelativeRowViewModel> _carCache;
         private readonly ClassColorManager _classColorManager;
         private readonly PositionCalculator _positionCalculator;
+        private readonly ClassPaceManager _paceManager;
         #endregion
 
         #region Constructor
         public RelativeDisplayBuilder(
             Dictionary<int, RelativeRowViewModel> carCache,
             ClassColorManager classColorManager,
-            PositionCalculator positionCalculator)
+            PositionCalculator positionCalculator,
+            ClassPaceManager paceManager)
         {
             _carCache = carCache;
             _classColorManager = classColorManager;
             _positionCalculator = positionCalculator;
+            _paceManager = paceManager;
         }
         #endregion
 
         #region Public Methods
-        /// <summary>
-        /// Calculate the 7-row proximity display (3 ahead, player, 3 behind).
-        /// Uses PositionCalculator's filtered roster and effective (predicted) positions.
-        /// </summary>
         public List<RelativeRowViewModel> Calculate(SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider)
         {
             var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx");
@@ -64,8 +68,6 @@ namespace VISOR.ViewModels
             var currentLap = snapshot.GetValue<int[]>("CarIdxLap");
             var onPitRoad = snapshot.GetValue<bool[]>("CarIdxOnPitRoad");
 
-            // Get valid cars from PositionCalculator
-            // This list is already filtered to: (1) YAML data exists, (2) HasEverHadValidData, (3) Cache valid
             var validCarIndices = _positionCalculator.ValidCarIndices;
 
             var allValidCars = BuildValidCarsList(validCarIndices, carNumbers, userNames, carIsAI,
@@ -79,7 +81,7 @@ namespace VISOR.ViewModels
             List<RelativeRowViewModel> finalRows = BuildProximityBasedRows(allValidCars);
 
             bool useFastestLap = dataProvider.ShouldUseFastestLapPositioning();
-            ApplyDisplayLogic(finalRows, useFastestLap, dataProvider, carClassColors, carClassIDs);
+            ApplyDisplayLogic(finalRows, useFastestLap, dataProvider, carClassColors, carClassIDs, snapshot);
 
             return finalRows;
         }
@@ -101,8 +103,6 @@ namespace VISOR.ViewModels
         {
             var allValidCars = new List<RelativeRowViewModel>();
 
-            // PositionCalculator has already filtered this list to valid cars only
-            // We just need to build the view models
             foreach (int i in validCarIndices)
             {
                 if (i >= 0 && i < carNumbers.Length &&
@@ -117,14 +117,12 @@ namespace VISOR.ViewModels
                         _carCache[i] = row;
                     }
 
-                    // CRITICAL: Use PositionCalculator's effective LapDistPct (current OR predicted)
-                    // This ensures smooth display during brief data gaps
                     float effectiveLapDistPct = _positionCalculator.GetEffectiveLapDistPct(i);
 
                     row.CarIdx = i;
                     row.IsPlayer = (i == playerCarIdx);
                     row.CurrentLap = currentLap[i];
-                    row.LapDistPct = effectiveLapDistPct; // Use predicted value if needed
+                    row.LapDistPct = effectiveLapDistPct;
                     row.Name = displayName;
                     row.CarNum = carNumbers[i];
                     row.ClassID = carClassIDs[i];
@@ -147,8 +145,6 @@ namespace VISOR.ViewModels
 
             float playerTrackPercent = playerRow.LapDistPct;
 
-            // No need to filter LapDistPct here - PositionCalculator already provides clean data
-            // All cars in this list have valid effective LapDistPct (current or predicted)
             var otherCars = allCars.Where(c => !c.IsPlayer).Select(car =>
             {
                 float directDistance = Math.Abs(car.LapDistPct - playerTrackPercent);
@@ -175,7 +171,8 @@ namespace VISOR.ViewModels
             bool isFastestLapMode,
             ISessionDataProvider dataProvider,
             int[] carClassColors,
-            int[] carClassIDs)
+            int[] carClassIDs,
+            SVappsLABSnapshot snapshot)
         {
             var playerRow = displayRows.FirstOrDefault(r => r.IsPlayer);
             if (playerRow == null) return;
@@ -186,7 +183,7 @@ namespace VISOR.ViewModels
                 AssignNameColor(row, playerRow);
                 AssignClassBackgroundColor(row, playerRow, carClassColors, carClassIDs);
                 AssignFontStyle(row);
-                AssignProximitySegments(row, playerRow);
+                AssignProximitySegments(row, playerRow, snapshot);
             }
         }
 
@@ -235,9 +232,9 @@ namespace VISOR.ViewModels
             row.FontStyle = row.IsOnPitRoad ? FontStyles.Italic : FontStyles.Normal;
         }
 
-        private void AssignProximitySegments(RelativeRowViewModel row, RelativeRowViewModel playerRow)
+        private void AssignProximitySegments(RelativeRowViewModel row, RelativeRowViewModel playerRow, SVappsLABSnapshot snapshot)
         {
-            // Reset all segments to transparent
+            // Reset Segments
             row.Segment1Color = Brushes.Transparent;
             row.Segment2Color = Brushes.Transparent;
             row.Segment3Color = Brushes.Transparent;
@@ -246,55 +243,81 @@ namespace VISOR.ViewModels
 
             if (row.IsPlayer) return;
 
-            // Calculate proximity distance
-            float proximityDistance = Math.Min(
-                Math.Abs(row.LapDistPct - playerRow.LapDistPct),
-                1.0f - Math.Abs(row.LapDistPct - playerRow.LapDistPct));
+            // 1. Get Data Points
+            float trackLength = snapshot.GetValue<float>("TrackLength", 0f);
+            float playerSpeed = snapshot.GetValue<float>("Speed", 0f);
 
-            // Determine if car is ahead or behind
-            bool isAhead = (row.LapDistPct - playerRow.LapDistPct + 1.5f) % 1.0f > 0.5f;
+            // Safety Check: If track length is missing, we can't do math.
+            if (trackLength <= 0) return;
+
+            // 2. Calculate Distance (Meters)
+            float deltaPct = row.LapDistPct - playerRow.LapDistPct;
+
+            // Handle Wrap-Around (Ring Logic)
+            if (deltaPct > 0.5f) deltaPct -= 1.0f;
+            else if (deltaPct < -0.5f) deltaPct += 1.0f;
+
+            float distanceMeters = Math.Abs(deltaPct * trackLength);
+            bool isAhead = deltaPct > 0; // True if they are physically ahead of us on track
+
+            // 3. Determine Threat Speed (The Scalar Magic)
+            // Goal: How fast is the "Gap" closing/opening relative to race pace?
+            float calculationSpeed;
+
+            if (isAhead)
+            {
+                // If they are ahead, we use OUR speed (We are catching them).
+                // This naturally solves the "Accordion Effect" when we brake for corners.
+                calculationSpeed = playerSpeed;
+            }
+            else
+            {
+                // If they are behind, we use THEIR estimated speed (They are catching us).
+                // Use ClassPaceManager to get the relative performance scalar (e.g., GTP vs Miata).
+                float scalar = _paceManager.GetThreatScalar(playerRow.ClassID, row.ClassID);
+
+                // "Estimated Threat Speed" = My Speed * Scalar
+                // Example: If I'm Miata (50mps) and they are GTP (Scalar 1.45), result is 72.5mps.
+                float estimatedThreatSpeed = playerSpeed * scalar;
+
+                // Use the higher of the two to be safe.
+                // If I brake to 50mph, use their estimated 180mph (derived from scalar).
+                calculationSpeed = Math.Max(playerSpeed, estimatedThreatSpeed);
+            }
+
+            // 4. Apply Speed Floor (Limp Mode Protection)
+            // Ensures that even if we are stopped (0 mps), we calculate gap based on racing speed.
+            calculationSpeed = Math.Max(calculationSpeed, MIN_SPEED_FLOOR_MS);
+
+            // 5. Calculate Synthetic Time Gap
+            // This converts Meters into Seconds-to-Impact
+            float syntheticTimeGap = distanceMeters / calculationSpeed;
+
+            // Pass this raw time to the RowViewModel for smoothing (prevents visual flicker)
+            row.UpdateSmoothedGap(syntheticTimeGap);
+            float displayGap = row.SmoothedGap;
+
+            // 6. Light up Segments based on Time Thresholds
             Color alertColor = isAhead ? AheadAlertColor : BehindAlertColor;
 
-            // DEBUG: Log proximity and segment activation
-            int segmentsLit = 0;
-            if (proximityDistance <= SEGMENT_1_THRESHOLD) segmentsLit = 1;
-            if (proximityDistance <= SEGMENT_2_THRESHOLD) segmentsLit = 2;
-            if (proximityDistance <= SEGMENT_3_THRESHOLD) segmentsLit = 3;
-            if (proximityDistance <= SEGMENT_4_THRESHOLD) segmentsLit = 4;
-            if (proximityDistance <= SEGMENT_5_THRESHOLD) segmentsLit = 5;
-
-            if (segmentsLit > 0)
-            {
-                Log.Debug($"[ProximitySegments] Car {row.CarNum}: proximity={proximityDistance:F4}, segments={segmentsLit}, " +
-                         $"S1={SEGMENT_1_THRESHOLD}, S2={SEGMENT_2_THRESHOLD}, S3={SEGMENT_3_THRESHOLD}, S4={SEGMENT_4_THRESHOLD}, S5={SEGMENT_5_THRESHOLD}");
-            }
-
-            // Light up segments based on proximity with gradual color fade
-            if (proximityDistance <= SEGMENT_1_THRESHOLD)
-            {
+            if (displayGap <= TIME_SEG1_INFO)
                 row.Segment1Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.0));
-            }
-            if (proximityDistance <= SEGMENT_2_THRESHOLD)
-            {
+
+            if (displayGap <= TIME_SEG2_AWARE)
                 row.Segment2Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.25));
-            }
-            if (proximityDistance <= SEGMENT_3_THRESHOLD)
-            {
+
+            if (displayGap <= TIME_SEG3_WARNING)
                 row.Segment3Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.50));
-            }
-            if (proximityDistance <= SEGMENT_4_THRESHOLD)
-            {
+
+            if (displayGap <= TIME_SEG4_DANGER)
                 row.Segment4Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.75));
-            }
-            if (proximityDistance <= SEGMENT_5_THRESHOLD)
-            {
+
+            if (displayGap <= TIME_SEG5_CRITICAL)
                 row.Segment5Color = new SolidColorBrush(alertColor);
-            }
         }
 
         private Color BlendColors(Color color1, Color color2, double ratio)
         {
-            // ratio: 0.0 = full color1, 1.0 = full color2
             byte r = (byte)(color1.R + (color2.R - color1.R) * ratio);
             byte g = (byte)(color1.G + (color2.G - color1.G) * ratio);
             byte b = (byte)(color1.B + (color2.B - color1.B) * ratio);

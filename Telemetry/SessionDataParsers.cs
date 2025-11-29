@@ -101,6 +101,12 @@ namespace VISOR.Telemetry
                         driver.CarClassColor = classColor;
                     else if (trimmed.StartsWith("CarIsAI:"))
                         driver.IsAI = ParseBoolValue(trimmed);
+                    // ADDED: Capture estimated lap time for Cold Start logic
+                    else if (trimmed.StartsWith("CarClassEstLapTime:"))
+                    {
+                        if (float.TryParse(ParseStringValue(trimmed), out float estTime))
+                            driver.CarClassEstLapTime = estTime;
+                    }
                 }
                 else if (inSessionInfo && trimmed.StartsWith("Sessions:"))
                 {

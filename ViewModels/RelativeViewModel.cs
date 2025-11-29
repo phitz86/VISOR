@@ -26,10 +26,15 @@ namespace VISOR.ViewModels
 
         // --- Child Services ---
         private readonly RelativeDisplayBuilder _builder;
+        private readonly ClassPaceManager _paceManager; // Added
 
         public RelativeViewModel(ClassColorManager classColorManager, PositionCalculator positionCalculator)
         {
-            _builder = new RelativeDisplayBuilder(_carCache, classColorManager, positionCalculator);
+            // Initialize the Pace Manager
+            _paceManager = new ClassPaceManager();
+
+            // Pass it to the Builder
+            _builder = new RelativeDisplayBuilder(_carCache, classColorManager, positionCalculator, _paceManager);
         }
 
         public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
@@ -45,6 +50,13 @@ namespace VISOR.ViewModels
             {
                 if (RelativeRows.Count > 0) RelativeRows.Clear();
                 return;
+            }
+
+            // CRITICAL: Update the Pace Manager with the latest session data
+            // This ensures scalars evolve as the race progresses
+            if (sessionDataProvider is SessionDataCoordinator coordinator)
+            {
+                _paceManager.Update(coordinator.GetLiveSessionData(), coordinator.GetStaticEventData());
             }
 
             // --- Delegate to Builder ---
@@ -83,6 +95,7 @@ namespace VISOR.ViewModels
         {
             RelativeRows.Clear();
             _builder.Reset();
+            _paceManager.Reset(); // Reset scalars on session change
 
             foreach (var row in _carCache.Values)
             {
