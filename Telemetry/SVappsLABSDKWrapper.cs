@@ -28,6 +28,7 @@ namespace VISOR.Telemetry
         private readonly SessionDataCoordinator _sessionCoordinator;
 #if DEBUG
         private readonly SessionDataLogger _sessionLogger;
+        private readonly TelemetryCSVLogger _telemetryLogger;
 #endif
         private SVappsLABSnapshot _latestSnapshot;
         private CancellationTokenSource _cancellationTokenSource;
@@ -68,6 +69,7 @@ namespace VISOR.Telemetry
                 () => _sessionCoordinator.GetCachedSessionYaml(),
                 () => GetFieldTypes()
             );
+            _telemetryLogger = new TelemetryCSVLogger();
 #endif
 
             _yamlRetryTimer = new System.Timers.Timer(1000) { AutoReset = true };
@@ -193,6 +195,12 @@ namespace VISOR.Telemetry
                     _sessionCoordinator.GetCachedSessionYaml(),
                     DateTime.UtcNow
                 );
+
+#if DEBUG
+                // Log telemetry data for analysis (internally throttled to 1Hz)
+                _telemetryLogger?.LogSnapshot(_latestSnapshot, _sessionCoordinator);
+#endif
+
                 SnapshotAvailable?.Invoke(_latestSnapshot);
             }
             catch (Exception ex)
@@ -245,6 +253,7 @@ namespace VISOR.Telemetry
 
 #if DEBUG
                 _sessionLogger?.Dispose();
+                _telemetryLogger?.Dispose();
 #endif
 
                 _cancellationTokenSource?.Cancel();

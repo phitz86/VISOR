@@ -67,6 +67,7 @@ namespace VISOR.Telemetry
             dict["CarIdxLapCompleted"] = data.CarIdxLapCompleted;
             dict["CarIdxLastLapTime"] = data.CarIdxLastLapTime;
             dict["CarIdxOnPitRoad"] = SafeGetFieldValue(data, "CarIdxOnPitRoad", new bool[64]);
+            dict["CarIdxEstTime"] = SafeGetFieldValue(data, "CarIdxEstTime", new float[64]);
         }
 
         private void AddSessionData(Dictionary<string, object> dict, TelemetryData data)

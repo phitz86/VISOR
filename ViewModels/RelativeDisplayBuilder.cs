@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Media;
+using VISOR.Diagnostics;
 using VISOR.Telemetry;
 
 namespace VISOR.ViewModels
@@ -15,8 +16,13 @@ namespace VISOR.ViewModels
     public class RelativeDisplayBuilder
     {
         #region Constants
-        private const double PROXIMITY_MAX_DISTANCE = 0.15;
-        private const double PROXIMITY_ALERT_DISTANCE = 0.05;
+        // Segment thresholds (exponential curve, gentle)
+        private const double SEGMENT_1_THRESHOLD = 0.100;  // Farthest
+        private const double SEGMENT_2_THRESHOLD = 0.075;
+        private const double SEGMENT_3_THRESHOLD = 0.055;
+        private const double SEGMENT_4_THRESHOLD = 0.035;
+        private const double SEGMENT_5_THRESHOLD = 0.018;  // Closest
+
         private static readonly Color NeutralColor = (Color)ColorConverter.ConvertFromString("#80404040");
         private static readonly Color AheadAlertColor = (Color)ColorConverter.ConvertFromString("#FF00FFFF");
         private static readonly Color BehindAlertColor = (Color)ColorConverter.ConvertFromString("#FFFF9900");
@@ -180,7 +186,7 @@ namespace VISOR.ViewModels
                 AssignNameColor(row, playerRow);
                 AssignClassBackgroundColor(row, playerRow, carClassColors, carClassIDs);
                 AssignFontStyle(row);
-                AssignProximityBar(row, playerRow);
+                AssignProximitySegments(row, playerRow);
             }
         }
 
@@ -229,35 +235,71 @@ namespace VISOR.ViewModels
             row.FontStyle = row.IsOnPitRoad ? FontStyles.Italic : FontStyles.Normal;
         }
 
-        private void AssignProximityBar(RelativeRowViewModel row, RelativeRowViewModel playerRow)
+        private void AssignProximitySegments(RelativeRowViewModel row, RelativeRowViewModel playerRow)
         {
-            row.BarWidthRatio = 0.0;
-            row.BarStartColor = Colors.Transparent;
-            row.BarEndColor = Colors.Transparent;
+            // Reset all segments to transparent
+            row.Segment1Color = Brushes.Transparent;
+            row.Segment2Color = Brushes.Transparent;
+            row.Segment3Color = Brushes.Transparent;
+            row.Segment4Color = Brushes.Transparent;
+            row.Segment5Color = Brushes.Transparent;
 
             if (row.IsPlayer) return;
 
+            // Calculate proximity distance
             float proximityDistance = Math.Min(
                 Math.Abs(row.LapDistPct - playerRow.LapDistPct),
                 1.0f - Math.Abs(row.LapDistPct - playerRow.LapDistPct));
 
-            if (proximityDistance <= PROXIMITY_MAX_DISTANCE)
+            // Determine if car is ahead or behind
+            bool isAhead = (row.LapDistPct - playerRow.LapDistPct + 1.5f) % 1.0f > 0.5f;
+            Color alertColor = isAhead ? AheadAlertColor : BehindAlertColor;
+
+            // DEBUG: Log proximity and segment activation
+            int segmentsLit = 0;
+            if (proximityDistance <= SEGMENT_1_THRESHOLD) segmentsLit = 1;
+            if (proximityDistance <= SEGMENT_2_THRESHOLD) segmentsLit = 2;
+            if (proximityDistance <= SEGMENT_3_THRESHOLD) segmentsLit = 3;
+            if (proximityDistance <= SEGMENT_4_THRESHOLD) segmentsLit = 4;
+            if (proximityDistance <= SEGMENT_5_THRESHOLD) segmentsLit = 5;
+
+            if (segmentsLit > 0)
             {
-                row.BarWidthRatio = 1.0 - (proximityDistance / PROXIMITY_MAX_DISTANCE);
-
-                bool isAhead = (row.LapDistPct - playerRow.LapDistPct + 1.5f) % 1.0f > 0.5f;
-
-                if (proximityDistance > PROXIMITY_ALERT_DISTANCE)
-                {
-                    row.BarStartColor = NeutralColor;
-                    row.BarEndColor = NeutralColor;
-                }
-                else
-                {
-                    row.BarStartColor = NeutralColor;
-                    row.BarEndColor = isAhead ? AheadAlertColor : BehindAlertColor;
-                }
+                Log.Debug($"[ProximitySegments] Car {row.CarNum}: proximity={proximityDistance:F4}, segments={segmentsLit}, " +
+                         $"S1={SEGMENT_1_THRESHOLD}, S2={SEGMENT_2_THRESHOLD}, S3={SEGMENT_3_THRESHOLD}, S4={SEGMENT_4_THRESHOLD}, S5={SEGMENT_5_THRESHOLD}");
             }
+
+            // Light up segments based on proximity with gradual color fade
+            if (proximityDistance <= SEGMENT_1_THRESHOLD)
+            {
+                row.Segment1Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.0));
+            }
+            if (proximityDistance <= SEGMENT_2_THRESHOLD)
+            {
+                row.Segment2Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.25));
+            }
+            if (proximityDistance <= SEGMENT_3_THRESHOLD)
+            {
+                row.Segment3Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.50));
+            }
+            if (proximityDistance <= SEGMENT_4_THRESHOLD)
+            {
+                row.Segment4Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.75));
+            }
+            if (proximityDistance <= SEGMENT_5_THRESHOLD)
+            {
+                row.Segment5Color = new SolidColorBrush(alertColor);
+            }
+        }
+
+        private Color BlendColors(Color color1, Color color2, double ratio)
+        {
+            // ratio: 0.0 = full color1, 1.0 = full color2
+            byte r = (byte)(color1.R + (color2.R - color1.R) * ratio);
+            byte g = (byte)(color1.G + (color2.G - color1.G) * ratio);
+            byte b = (byte)(color1.B + (color2.B - color1.B) * ratio);
+            byte a = (byte)(color1.A + (color2.A - color1.A) * ratio);
+            return Color.FromArgb(a, r, g, b);
         }
         #endregion
     }

@@ -13,7 +13,7 @@ namespace VISOR.Telemetry
             "LapDeltaToOptimalLap", "LapDeltaToSessionBestLap", "Lap",
             "FuelLevel", "FuelUsePerHour", "Gear", "Speed", "RPM",
             "CarIdxLapDistPct", "CarIdxPosition", "CarIdxClassPosition", "CarIdxTrackSurface",
-            "CarIdxLap", "CarIdxLastLapTime", "CarIdxOnPitRoad",
+            "CarIdxLap", "CarIdxLastLapTime", "CarIdxOnPitRoad", "CarIdxEstTime",
             "SessionState", "SessionTime", "SessionTimeRemain", "SessionLapsRemain",
             "SessionLapsTotal", "SessionNum", "PlayerCarIdx", "SessionFlags",
             "TrackTemp", "AirTemp", "Skies", "WindVel",
@@ -50,6 +50,7 @@ namespace VISOR.Telemetry
             ["CarIdxLap"] = typeof(int[]),
             ["CarIdxLastLapTime"] = typeof(float[]),
             ["CarIdxOnPitRoad"] = typeof(bool[]),
+            ["CarIdxEstTime"] = typeof(float[]),
 
             ["SessionState"] = typeof(int),
             ["SessionTime"] = typeof(double),
@@ -158,7 +159,7 @@ namespace VISOR.Telemetry
             {
                 "CarIdxLapDistPct", "CarIdxPosition", "CarIdxClassPosition",
                 "CarIdxTrackSurface", "CarIdxLap", "CarIdxLastLapTime", "CarIdxOnPitRoad",
-                "CarIdxUserName", "CarIdxCarNumber", "CarIdxCarNumberRaw", "CarIdxLapCompleted",
+                "CarIdxEstTime", "CarIdxUserName", "CarIdxCarNumber", "CarIdxCarNumberRaw", "CarIdxLapCompleted",
                 "CarIdxClassID", "CarIdxIsAI", "CarIdxIncidentCount"
             };
         }

@@ -18,9 +18,11 @@ namespace VISOR.ViewModels
         private Brush _nameColor = Brushes.White;
         private FontStyle _fontStyle = FontStyles.Normal;
         private bool _isOnPitRoad;
-        private double _barWidthRatio;
-        private Color _barStartColor = Colors.Transparent;
-        private Color _barEndColor = Colors.Transparent;
+        private Brush _segment1Color = Brushes.Transparent;
+        private Brush _segment2Color = Brushes.Transparent;
+        private Brush _segment3Color = Brushes.Transparent;
+        private Brush _segment4Color = Brushes.Transparent;
+        private Brush _segment5Color = Brushes.Transparent;
 
         public int CarIdx { get; set; }
         public string ClassPos { get => _classPos; set { _classPos = value; OnPropertyChanged(); } }
@@ -38,9 +40,11 @@ namespace VISOR.ViewModels
             set { _isOnPitRoad = value; OnPropertyChanged(); }
         }
 
-        public double BarWidthRatio { get => _barWidthRatio; set { _barWidthRatio = value; OnPropertyChanged(); } }
-        public Color BarStartColor { get => _barStartColor; set { _barStartColor = value; OnPropertyChanged(); } }
-        public Color BarEndColor { get => _barEndColor; set { _barEndColor = value; OnPropertyChanged(); } }
+        public Brush Segment1Color { get => _segment1Color; set { _segment1Color = value; OnPropertyChanged(); } }
+        public Brush Segment2Color { get => _segment2Color; set { _segment2Color = value; OnPropertyChanged(); } }
+        public Brush Segment3Color { get => _segment3Color; set { _segment3Color = value; OnPropertyChanged(); } }
+        public Brush Segment4Color { get => _segment4Color; set { _segment4Color = value; OnPropertyChanged(); } }
+        public Brush Segment5Color { get => _segment5Color; set { _segment5Color = value; OnPropertyChanged(); } }
 
         public float LapDistPct { get; set; }
         public int CurrentLap { get; set; }

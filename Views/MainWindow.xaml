@@ -164,31 +164,60 @@
                                     <TextBlock Text="{Binding CarNum}" FontSize="24" HorizontalAlignment="Center" FontWeight="Bold" FontFamily="Segoe UI"/>
                                 </Border>
 
-                                <Grid Grid.Column="2" x:Name="NameContainer">
-                                    <Border x:Name="ProximityBar"
-                                            HorizontalAlignment="Left"
-                                            Opacity="0.7"
-                                            CornerRadius="3">
-                                        <Border.Width>
-                                            <MultiBinding Converter="{StaticResource ProximityToWidthConverter}">
-                                                <Binding Path="BarWidthRatio"/>
-                                                <Binding Path="ActualWidth" ElementName="NameContainer"/>
-                                            </MultiBinding>
-                                        </Border.Width>
-                                        <Border.Background>
-                                            <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
-                                                <GradientStop Color="{Binding BarStartColor}" Offset="0.0" />
-                                                <GradientStop Color="{Binding BarEndColor}" Offset="1.0" />
-                                            </LinearGradientBrush>
-                                        </Border.Background>
-                                    </Border>
+                                <Grid Grid.Column="2">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
 
-                                    <TextBlock Text="{Binding Name}" 
+                                    <TextBlock Grid.Row="0"
+                                               Text="{Binding Name}" 
                                                FontSize="24" 
                                                Foreground="{Binding NameColor}" 
                                                FontStyle="{Binding FontStyle}" 
-                                               Margin="8,0"
+                                               Margin="8,0,8,2"
                                                Style="{StaticResource SemiboldText}"/>
+
+                                    <!-- 5-Segment Proximity Indicator as Underline -->
+                                    <Grid Grid.Row="1" Margin="8,0,8,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="2"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="2"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="2"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="2"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border Grid.Column="0"
+                                                Background="{Binding Segment1Color}" 
+                                                Height="8" 
+                                                CornerRadius="2" 
+                                                Opacity="0.8"/>
+                                        <Border Grid.Column="2"
+                                                Background="{Binding Segment2Color}" 
+                                                Height="8" 
+                                                CornerRadius="2" 
+                                                Opacity="0.8"/>
+                                        <Border Grid.Column="4"
+                                                Background="{Binding Segment3Color}" 
+                                                Height="8" 
+                                                CornerRadius="2" 
+                                                Opacity="0.8"/>
+                                        <Border Grid.Column="6"
+                                                Background="{Binding Segment4Color}" 
+                                                Height="8" 
+                                                CornerRadius="2" 
+                                                Opacity="0.8"/>
+                                        <Border Grid.Column="8"
+                                                Background="{Binding Segment5Color}" 
+                                                Height="8" 
+                                                CornerRadius="2" 
+                                                Opacity="0.8"/>
+                                    </Grid>
                                 </Grid>
                             </Grid>
                         </DataTemplate>
