@@ -156,6 +156,7 @@
                                     <ColumnDefinition Width="50"/>
                                     <ColumnDefinition Width="70"/>
                                     <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="60"/>
                                 </Grid.ColumnDefinitions>
 
                                 <TextBlock Text="{Binding ClassPos}" Grid.Column="0" FontSize="24" HorizontalAlignment="Center" Margin="0,0,8,0" Style="{StaticResource SemiboldText}"/>
@@ -219,6 +220,17 @@
                                                 Opacity="0.8"/>
                                     </Grid>
                                 </Grid>
+
+                                <!-- Gap Display Column -->
+                                <TextBlock Grid.Column="3"
+                                           Text="{Binding GapText}"
+                                           FontSize="24"
+                                           Foreground="LightGray"
+                                           HorizontalAlignment="Right"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,8,0"
+                                           Style="{StaticResource SemiboldText}"/>
+
                             </Grid>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

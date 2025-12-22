@@ -10,23 +10,21 @@ namespace VISOR.ViewModels
 {
     /// <summary>
     /// Builds the 7-row proximity-based relative display with visual properties.
-    /// Uses "Synthetic Time" logic to normalize gaps across different tracks and car classes.
+    /// Uses Native CarIdxEstTime for accurate time gap calculations.
     /// </summary>
     public class RelativeDisplayBuilder
     {
         #region Constants
 
-        // "Synthetic Time" Thresholds (Seconds)
-        // Normalized for reaction time + physics, regardless of track length.
+        // Time Gap Thresholds (Seconds) - Based on Native CarIdxEstTime
         private const float TIME_SEG5_CRITICAL = 0.6f;  // < 0.6s (Contact Imminent / Netcode zone)
-        private const float TIME_SEG4_DANGER = 1.5f;  // < 1.5s (Drafting / Attack Range)
-        private const float TIME_SEG3_WARNING = 3.0f;  // < 3.0s (Hunting / Mirrors Full)
-        private const float TIME_SEG2_AWARE = 5.0f;  // < 5.0s (Traffic Monitoring)
-        private const float TIME_SEG1_INFO = 8.0f;  // < 8.0s (On Radar)
+        private const float TIME_SEG4_DANGER = 1.5f;    // < 1.5s (Drafting / Attack Range)
+        private const float TIME_SEG3_WARNING = 3.0f;   // < 3.0s (Hunting / Mirrors Full)
+        private const float TIME_SEG2_AWARE = 5.0f;     // < 5.0s (Traffic Monitoring)
+        private const float TIME_SEG1_INFO = 8.0f;      // < 8.0s (On Radar)
 
-        // Minimum speed floor to prevent "Limp Mode" false security.
-        // 35 m/s is approx 78 mph / 126 kph.
-        private const float MIN_SPEED_FLOOR_MS = 35.0f;
+        // Debug constants
+        private const int DEBUG_LOG_INTERVAL = 60; // Log every ~1 second (assuming 60Hz)
 
         private static readonly Color NeutralColor = (Color)ColorConverter.ConvertFromString("#80404040");
         private static readonly Color AheadAlertColor = (Color)ColorConverter.ConvertFromString("#FF00FFFF");
@@ -37,26 +35,29 @@ namespace VISOR.ViewModels
         private readonly Dictionary<int, RelativeRowViewModel> _carCache;
         private readonly ClassColorManager _classColorManager;
         private readonly PositionCalculator _positionCalculator;
-        private readonly ClassPaceManager _paceManager;
+
+        // Rolling counter for throttling debug logs
+        private int _debugFrameCounter = 0;
         #endregion
 
         #region Constructor
         public RelativeDisplayBuilder(
             Dictionary<int, RelativeRowViewModel> carCache,
             ClassColorManager classColorManager,
-            PositionCalculator positionCalculator,
-            ClassPaceManager paceManager)
+            PositionCalculator positionCalculator)
         {
             _carCache = carCache;
             _classColorManager = classColorManager;
             _positionCalculator = positionCalculator;
-            _paceManager = paceManager;
         }
         #endregion
 
         #region Public Methods
         public List<RelativeRowViewModel> Calculate(SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider)
         {
+            // Increment frame counter for logging throttle
+            _debugFrameCounter++;
+
             var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx");
 
             var carClassIDs = dataProvider.CarClassIDs;
@@ -86,20 +87,23 @@ namespace VISOR.ViewModels
             return finalRows;
         }
 
-        public void Reset() { }
+        public void Reset()
+        {
+            _debugFrameCounter = 0;
+        }
         #endregion
 
         #region Private Methods - Car List Building
         private List<RelativeRowViewModel> BuildValidCarsList(
-            IReadOnlySet<int> validCarIndices,
-            string[] carNumbers,
-            string[] userNames,
-            bool[] carIsAI,
-            int[] carClassIDs,
-            int[] incidentCounts,
-            int[] currentLap,
-            bool[] onPitRoad,
-            int playerCarIdx)
+    IReadOnlySet<int> validCarIndices,
+    string[] carNumbers,
+    string[] userNames,
+    bool[] carIsAI,
+    int[] carClassIDs,
+    int[] incidentCounts,
+    int[] currentLap,
+    bool[] onPitRoad,
+    int playerCarIdx)
         {
             var allValidCars = new List<RelativeRowViewModel>();
 
@@ -109,6 +113,16 @@ namespace VISOR.ViewModels
                     !string.IsNullOrEmpty(carNumbers[i]) &&
                     !string.IsNullOrEmpty(userNames[i]))
                 {
+                    // Check if this is the pace car (class ID 11)
+                    bool isPaceCar = (carClassIDs[i] == 11);
+                    bool isOnPitRoad = (onPitRoad != null && i < onPitRoad.Length) && onPitRoad[i];
+
+                    // Skip pace car if it's on pit road
+                    if (isPaceCar && isOnPitRoad)
+                    {
+                        continue;
+                    }
+
                     string displayName = carIsAI[i] ? $"🤖 {userNames[i]}" : userNames[i];
 
                     if (!_carCache.TryGetValue(i, out var row))
@@ -127,7 +141,7 @@ namespace VISOR.ViewModels
                     row.CarNum = carNumbers[i];
                     row.ClassID = carClassIDs[i];
                     row.IncidentCount = incidentCounts[i];
-                    row.IsOnPitRoad = (onPitRoad != null && i < onPitRoad.Length) && onPitRoad[i];
+                    row.IsOnPitRoad = isOnPitRoad;
 
                     allValidCars.Add(row);
                 }
@@ -144,12 +158,34 @@ namespace VISOR.ViewModels
             if (playerRow == null) return new List<RelativeRowViewModel>();
 
             float playerTrackPercent = playerRow.LapDistPct;
+            int playerLap = playerRow.CurrentLap;
 
             var otherCars = allCars.Where(c => !c.IsPlayer).Select(car =>
             {
-                float directDistance = Math.Abs(car.LapDistPct - playerTrackPercent);
-                float proximity = Math.Min(directDistance, 1.0f - directDistance);
-                bool isAhead = (car.LapDistPct - playerTrackPercent + 1.5f) % 1.0f > 0.5f;
+                float proximity;
+                bool isAhead;
+                int lapDelta = car.CurrentLap - playerLap;
+
+                if (lapDelta == 0)
+                {
+                    // Same lap - use wrap-around distance
+                    float deltaPct = car.LapDistPct - playerTrackPercent;
+
+                    // Handle wrap-around (ring logic)
+                    if (deltaPct > 0.5f) deltaPct -= 1.0f;
+                    else if (deltaPct < -0.5f) deltaPct += 1.0f;
+
+                    proximity = Math.Abs(deltaPct);
+                    isAhead = deltaPct > 0;
+                }
+                else
+                {
+                    // Different laps - they're far away
+                    // Use a large proximity value so same-lap cars are prioritized
+                    proximity = 10.0f + Math.Abs(lapDelta); // Far away, scaled by lap difference
+                    isAhead = lapDelta > 0; // Higher lap number = ahead
+                }
+
                 return new { Car = car, Proximity = proximity, IsAhead = isAhead };
             }).ToList();
 
@@ -241,63 +277,99 @@ namespace VISOR.ViewModels
             row.Segment4Color = Brushes.Transparent;
             row.Segment5Color = Brushes.Transparent;
 
-            if (row.IsPlayer) return;
-
-            // 1. Get Data Points
-            float trackLength = snapshot.GetValue<float>("TrackLength", 0f);
-            float playerSpeed = snapshot.GetValue<float>("Speed", 0f);
-
-            // Safety Check: If track length is missing, we can't do math.
-            if (trackLength <= 0) return;
-
-            // 2. Calculate Distance (Meters)
-            float deltaPct = row.LapDistPct - playerRow.LapDistPct;
-
-            // Handle Wrap-Around (Ring Logic)
-            if (deltaPct > 0.5f) deltaPct -= 1.0f;
-            else if (deltaPct < -0.5f) deltaPct += 1.0f;
-
-            float distanceMeters = Math.Abs(deltaPct * trackLength);
-            bool isAhead = deltaPct > 0; // True if they are physically ahead of us on track
-
-            // 3. Determine Threat Speed (The Scalar Magic)
-            // Goal: How fast is the "Gap" closing/opening relative to race pace?
-            float calculationSpeed;
-
-            if (isAhead)
+            if (row.IsPlayer)
             {
-                // If they are ahead, we use OUR speed (We are catching them).
-                // This naturally solves the "Accordion Effect" when we brake for corners.
-                calculationSpeed = playerSpeed;
+                // Player row - no gap display
+                row.GapText = string.Empty;
+                return;
+            }
+
+            // --- NATIVE TIME GAP CALCULATION ---
+            // Use iRacing's CarIdxEstTime directly - it already accounts for:
+            // - Actual current speeds (not lap averages)
+            // - Class differences
+            // - Damage/fuel/penalties
+            // - Acceleration/deceleration
+
+            var estTimes = snapshot.GetValue<float[]>("CarIdxEstTime");
+            if (estTimes == null)
+            {
+                row.GapText = string.Empty;
+                return;
+            }
+
+            float playerEstTime = estTimes[playerRow.CarIdx];
+            float opponentEstTime = estTimes[row.CarIdx];
+
+            float nativeTimeGap = 0f;
+            bool isAhead = false;
+
+            // Calculate time gap using Native EstTime
+            if (playerEstTime > 0 && opponentEstTime > 0)
+            {
+                float rawDelta = opponentEstTime - playerEstTime;
+                nativeTimeGap = Math.Abs(rawDelta);
+                isAhead = rawDelta > 0; // Positive delta = opponent ahead
             }
             else
             {
-                // If they are behind, we use THEIR estimated speed (They are catching us).
-                // Use ClassPaceManager to get the relative performance scalar (e.g., GTP vs Miata).
-                float scalar = _paceManager.GetThreatScalar(playerRow.ClassID, row.ClassID);
+                // Fallback: If EstTime unavailable, use distance/speed approximation
+                float trackLength = snapshot.GetValue<float>("TrackLength", 0f);
+                float playerSpeed = snapshot.GetValue<float>("Speed", 0f);
 
-                // "Estimated Threat Speed" = My Speed * Scalar
-                // Example: If I'm Miata (50mps) and they are GTP (Scalar 1.45), result is 72.5mps.
-                float estimatedThreatSpeed = playerSpeed * scalar;
+                if (trackLength > 0 && playerSpeed > 1.0f)
+                {
+                    float deltaPct = row.LapDistPct - playerRow.LapDistPct;
 
-                // Use the higher of the two to be safe.
-                // If I brake to 50mph, use their estimated 180mph (derived from scalar).
-                calculationSpeed = Math.Max(playerSpeed, estimatedThreatSpeed);
+                    // Handle Wrap-Around (Ring Logic)
+                    if (deltaPct > 0.5f) deltaPct -= 1.0f;
+                    else if (deltaPct < -0.5f) deltaPct += 1.0f;
+
+                    float distanceMeters = Math.Abs(deltaPct * trackLength);
+                    isAhead = deltaPct > 0;
+
+                    // Simple distance/speed approximation
+                    nativeTimeGap = distanceMeters / Math.Max(playerSpeed, 1.0f);
+                }
+                else
+                {
+                    // No valid data - skip this car
+                    row.GapText = string.Empty;
+                    return;
+                }
             }
 
-            // 4. Apply Speed Floor (Limp Mode Protection)
-            // Ensures that even if we are stopped (0 mps), we calculate gap based on racing speed.
-            calculationSpeed = Math.Max(calculationSpeed, MIN_SPEED_FLOOR_MS);
+            // Reset smoothing if car was recently absent from telemetry (between 1-2 seconds)
+            int framesSinceValid = _positionCalculator.GetFramesSinceValidData(row.CarIdx);
+            if (framesSinceValid > 60 && framesSinceValid < 120)
+            {
+                row.ResetSmoothing();
+            }
 
-            // 5. Calculate Synthetic Time Gap
-            // This converts Meters into Seconds-to-Impact
-            float syntheticTimeGap = distanceMeters / calculationSpeed;
-
-            // Pass this raw time to the RowViewModel for smoothing (prevents visual flicker)
-            row.UpdateSmoothedGap(syntheticTimeGap);
+            // Update smoothed gap in ViewModel (for display stability)
+            row.UpdateSmoothedGap(nativeTimeGap);
             float displayGap = row.SmoothedGap;
 
-            // 6. Light up Segments based on Time Thresholds
+            // --- SET GAP TEXT FOR DISPLAY ---
+            if (displayGap > 0 && displayGap < 100f) // Only show reasonable gaps
+            {
+                string sign = isAhead ? "+" : "-";
+                row.GapText = $"{sign}{displayGap:F1}";
+            }
+            else
+            {
+                row.GapText = string.Empty;
+            }
+
+            // --- DEBUG LOGGING ---
+            // Log once per second for cars within awareness window
+            if (_debugFrameCounter % DEBUG_LOG_INTERVAL == 0 && displayGap <= TIME_SEG2_AWARE)
+            {
+                string relation = isAhead ? "AHEAD" : "BEHIND";
+                Log.Debug($"[Native] #{row.CarNum} ({relation}): Gap={displayGap:F2}s (EstTime)");
+            }
+
+            // --- LIGHT UP SEGMENTS ---
             Color alertColor = isAhead ? AheadAlertColor : BehindAlertColor;
 
             if (displayGap <= TIME_SEG1_INFO)

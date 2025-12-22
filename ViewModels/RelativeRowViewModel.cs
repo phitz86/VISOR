@@ -18,6 +18,7 @@ namespace VISOR.ViewModels
         private Brush _nameColor = Brushes.White;
         private FontStyle _fontStyle = FontStyles.Normal;
         private bool _isOnPitRoad;
+        private string _gapText = string.Empty;
         private Brush _segment1Color = Brushes.Transparent;
         private Brush _segment2Color = Brushes.Transparent;
         private Brush _segment3Color = Brushes.Transparent;
@@ -38,6 +39,12 @@ namespace VISOR.ViewModels
         {
             get => _isOnPitRoad;
             set { _isOnPitRoad = value; OnPropertyChanged(); }
+        }
+
+        public string GapText
+        {
+            get => _gapText;
+            set { _gapText = value; OnPropertyChanged(); }
         }
 
         public Brush Segment1Color { get => _segment1Color; set { _segment1Color = value; OnPropertyChanged(); } }
@@ -61,7 +68,15 @@ namespace VISOR.ViewModels
             }
             else
             {
-                _smoothedGap = (smoothingFactor * newGap) + ((1f - smoothingFactor) * _smoothedGap);
+                // If gap jumped by more than 5 seconds, reset smoothing (likely data gap recovery)
+                if (System.Math.Abs(newGap - _smoothedGap) > 5.0f)
+                {
+                    _smoothedGap = newGap; // Hard reset
+                }
+                else
+                {
+                    _smoothedGap = (smoothingFactor * newGap) + ((1f - smoothingFactor) * _smoothedGap);
+                }
             }
         }
 

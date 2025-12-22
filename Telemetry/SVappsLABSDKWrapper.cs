@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using VISOR.Diagnostics;
+using VISOR.ViewModels;
 
 namespace VISOR.Telemetry
 {
@@ -17,7 +18,7 @@ namespace VISOR.Telemetry
         "CarIdxLap", "CarIdxLastLapTime", "CarIdxOnPitRoad",
         "SessionState", "SessionTime", "SessionTimeRemain", "SessionLapsRemain",
         "SessionLapsTotal", "SessionNum", "PlayerCarIdx", "SessionFlags",
-        "CarLeftRight", "CarIdxF2Time", "CarIdxLapCompleted"
+        "CarLeftRight", "CarIdxF2Time", "CarIdxEstTime", "CarIdxLapCompleted"
     ])]
     public class SVappsLABSDKWrapper : IDisposable
     {

@@ -128,6 +128,16 @@ namespace VISOR.ViewModels
         }
 
         /// <summary>
+        /// Get the number of frames since valid data was received for a car.
+        /// Returns int.MaxValue if car has never had valid data.
+        /// Used to detect cars returning from telemetry gaps.
+        /// </summary>
+        public int GetFramesSinceValidData(int carIdx)
+        {
+            return _framesSinceValidData.GetValueOrDefault(carIdx, int.MaxValue);
+        }
+
+        /// <summary>
         /// Reset all tracking state when session changes or connection lost.
         /// </summary>
         public void Reset()
@@ -200,11 +210,7 @@ namespace VISOR.ViewModels
                 }
                 else if (_lastFrameValidCars.Contains(i))
                 {
-                    // Car removed from roster (disconnected or cache expired)
                     Log.Info($"Car #{carNumbers[i]} ({userNames[i]}) removed from roster (cache expired or left session)");
-
-                    // Clear invalid LapDistPct flag so it can log again if car returns
-                    _carsWithInvalidLapDistPctLogged.Remove(i);
                 }
             }
         }
@@ -221,7 +227,6 @@ namespace VISOR.ViewModels
             if (lapDistPct == null || currentLap == null || carNumbers == null)
                 return;
 
-            // Process all cars with YAML data
             for (int i = 0; i < 64; i++)
             {
                 if (string.IsNullOrEmpty(carNumbers[i]))
