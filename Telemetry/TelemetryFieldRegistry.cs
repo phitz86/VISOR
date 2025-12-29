@@ -13,7 +13,7 @@ namespace VISOR.Telemetry
             "LapDeltaToOptimalLap", "LapDeltaToSessionBestLap", "Lap",
             "FuelLevel", "FuelUsePerHour", "Gear", "Speed", "RPM",
             "CarIdxLapDistPct", "CarIdxPosition", "CarIdxClassPosition", "CarIdxTrackSurface",
-            "CarIdxLap", "CarIdxLastLapTime", "CarIdxOnPitRoad", "CarIdxEstTime",
+            "CarIdxLap", "CarIdxLastLapTime", "CarIdxBestLapTime", "CarIdxOnPitRoad", "CarIdxEstTime",
             "SessionState", "SessionTime", "SessionTimeRemain", "SessionLapsRemain",
             "SessionLapsTotal", "SessionNum", "PlayerCarIdx", "SessionFlags",
             "TrackTemp", "AirTemp", "Skies", "WindVel",
@@ -50,6 +50,7 @@ namespace VISOR.Telemetry
             ["CarIdxLap"] = typeof(int[]),
             ["CarIdxLastLapTime"] = typeof(float[]),
             ["CarIdxOnPitRoad"] = typeof(bool[]),
+            ["CarIdxBestLapTime"] = typeof(float[]),
             ["CarIdxEstTime"] = typeof(float[]),
 
             ["SessionState"] = typeof(int),

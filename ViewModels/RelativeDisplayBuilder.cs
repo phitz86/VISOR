@@ -158,34 +158,12 @@ namespace VISOR.ViewModels
             if (playerRow == null) return new List<RelativeRowViewModel>();
 
             float playerTrackPercent = playerRow.LapDistPct;
-            int playerLap = playerRow.CurrentLap;
 
             var otherCars = allCars.Where(c => !c.IsPlayer).Select(car =>
             {
-                float proximity;
-                bool isAhead;
-                int lapDelta = car.CurrentLap - playerLap;
-
-                if (lapDelta == 0)
-                {
-                    // Same lap - use wrap-around distance
-                    float deltaPct = car.LapDistPct - playerTrackPercent;
-
-                    // Handle wrap-around (ring logic)
-                    if (deltaPct > 0.5f) deltaPct -= 1.0f;
-                    else if (deltaPct < -0.5f) deltaPct += 1.0f;
-
-                    proximity = Math.Abs(deltaPct);
-                    isAhead = deltaPct > 0;
-                }
-                else
-                {
-                    // Different laps - they're far away
-                    // Use a large proximity value so same-lap cars are prioritized
-                    proximity = 10.0f + Math.Abs(lapDelta); // Far away, scaled by lap difference
-                    isAhead = lapDelta > 0; // Higher lap number = ahead
-                }
-
+                float directDistance = Math.Abs(car.LapDistPct - playerTrackPercent);
+                float proximity = Math.Min(directDistance, 1.0f - directDistance);
+                bool isAhead = (car.LapDistPct - playerTrackPercent + 1.5f) % 1.0f > 0.5f;
                 return new { Car = car, Proximity = proximity, IsAhead = isAhead };
             }).ToList();
 
@@ -308,6 +286,38 @@ namespace VISOR.ViewModels
             if (playerEstTime > 0 && opponentEstTime > 0)
             {
                 float rawDelta = opponentEstTime - playerEstTime;
+
+                // Handle wrap-around at start/finish line
+                // Use the opponent's best lap time as reference for detecting wrap-around
+                // This works correctly in multiclass racing where different classes have different lap times
+                var carBestLaps = snapshot.GetValue<float[]>("CarIdxBestLapTime");
+                float referenceLapTime = 120f; // Default fallback (2 minutes)
+
+                if (carBestLaps != null && row.CarIdx < carBestLaps.Length && carBestLaps[row.CarIdx] > 0)
+                {
+                    // Use opponent's own best lap time
+                    referenceLapTime = carBestLaps[row.CarIdx];
+                }
+                else if (carBestLaps != null && playerRow.CarIdx < carBestLaps.Length && carBestLaps[playerRow.CarIdx] > 0)
+                {
+                    // Fallback to player's best lap if opponent hasn't set one yet
+                    referenceLapTime = carBestLaps[playerRow.CarIdx];
+                }
+
+                float halfLapTime = referenceLapTime / 2f;
+
+                // Detect and correct wrap-around
+                if (rawDelta > halfLapTime)
+                {
+                    // Opponent's EstTime wrapped to 0, they're actually ahead
+                    rawDelta -= referenceLapTime;
+                }
+                else if (rawDelta < -halfLapTime)
+                {
+                    // Player's EstTime wrapped to 0, opponent is actually behind
+                    rawDelta += referenceLapTime;
+                }
+
                 nativeTimeGap = Math.Abs(rawDelta);
                 isAhead = rawDelta > 0; // Positive delta = opponent ahead
             }

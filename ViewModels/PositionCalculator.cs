@@ -235,10 +235,21 @@ namespace VISOR.ViewModels
                 bool hasValidData = lapDistPct[i] >= 0f && lapDistPct[i] <= 1f;
                 bool isOnPitRoad = onPitRoad != null && i < onPitRoad.Length && onPitRoad[i];
 
-                // Log invalid LapDistPct values for troubleshooting (once per car)
+                // Log invalid LapDistPct values AND alternative telemetry fields for troubleshooting (once per car)
                 if (!hasValidData && lapDistPct[i] < 0f && !_carsWithInvalidLapDistPctLogged.Contains(i))
                 {
-                    Log.Info($"Invalid LapDistPct for car #{carNumbers[i]} (idx {i}): {lapDistPct[i]}");
+                    // Capture alternative telemetry fields at the moment LapDistPct becomes invalid
+                    var estTimes = snapshot.GetValue<float[]>("CarIdxEstTime");
+                    var trackSurface = snapshot.GetValue<int[]>("CarIdxTrackSurface");
+                    var carLaps = snapshot.GetValue<int[]>("CarIdxLap");
+                    var bestLaps = snapshot.GetValue<float[]>("CarIdxBestLapTime");
+
+                    float estTime = (estTimes != null && i < estTimes.Length) ? estTimes[i] : -999f;
+                    int surface = (trackSurface != null && i < trackSurface.Length) ? trackSurface[i] : -999;
+                    int lap = (carLaps != null && i < carLaps.Length) ? carLaps[i] : -999;
+                    float bestLap = (bestLaps != null && i < bestLaps.Length) ? bestLaps[i] : -999f;
+
+                    Log.Info($"Car #{carNumbers[i]} (idx {i}) telemetry snapshot - LapDist:{lapDistPct[i]:F3}, EstTime:{estTime:F2}, Surface:{surface}, Lap:{lap}, BestLap:{bestLap:F2}, OnPit:{isOnPitRoad}");
                     _carsWithInvalidLapDistPctLogged.Add(i);
                 }
 
@@ -261,6 +272,10 @@ namespace VISOR.ViewModels
                 _carsWithValidDataHistory.Add(carIdx);
                 Log.Info($"Car #{carNumbers[carIdx]} first valid data - added to history");
             }
+
+            // Reset invalid logging flag so we can capture the NEXT time this car goes invalid
+            // This allows us to log mid-race telemetry gaps, not just session startup
+            _carsWithInvalidLapDistPctLogged.Remove(carIdx);
 
             // Calculate velocity for prediction (Tier 2: Prediction)
             if (_lastValidLapDistPct.TryGetValue(carIdx, out float lastDist))

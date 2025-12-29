@@ -15,7 +15,7 @@ namespace VISOR.Telemetry
         "LapDeltaToOptimalLap", "LapDeltaToSessionBestLap", "Lap",
         "FuelLevel", "FuelUsePerHour", "Gear", "Speed", "RPM",
         "CarIdxLapDistPct", "CarIdxPosition", "CarIdxClassPosition", "CarIdxTrackSurface",
-        "CarIdxLap", "CarIdxLastLapTime", "CarIdxOnPitRoad",
+        "CarIdxLap", "CarIdxLastLapTime", "CarIdxBestLapTime", "CarIdxOnPitRoad",
         "SessionState", "SessionTime", "SessionTimeRemain", "SessionLapsRemain",
         "SessionLapsTotal", "SessionNum", "PlayerCarIdx", "SessionFlags",
         "CarLeftRight", "CarIdxF2Time", "CarIdxEstTime", "CarIdxLapCompleted"
