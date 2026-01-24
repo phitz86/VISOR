@@ -285,41 +285,62 @@ namespace VISOR.ViewModels
             // Calculate time gap using Native EstTime
             if (playerEstTime > 0 && opponentEstTime > 0)
             {
-                float rawDelta = opponentEstTime - playerEstTime;
-
-                // Handle wrap-around at start/finish line
-                // Use the opponent's best lap time as reference for detecting wrap-around
-                // This works correctly in multiclass racing where different classes have different lap times
-                var carBestLaps = snapshot.GetValue<float[]>("CarIdxBestLapTime");
-                float referenceLapTime = 120f; // Default fallback (2 minutes)
-
-                if (carBestLaps != null && row.CarIdx < carBestLaps.Length && carBestLaps[row.CarIdx] > 0)
                 {
-                    // Use opponent's own best lap time
-                    referenceLapTime = carBestLaps[row.CarIdx];
-                }
-                else if (carBestLaps != null && playerRow.CarIdx < carBestLaps.Length && carBestLaps[playerRow.CarIdx] > 0)
-                {
-                    // Fallback to player's best lap if opponent hasn't set one yet
-                    referenceLapTime = carBestLaps[playerRow.CarIdx];
-                }
+                    float rawDelta = opponentEstTime - playerEstTime;
+                    float originalRawDelta = rawDelta; // Save for logging
 
-                float halfLapTime = referenceLapTime / 2f;
+                    // Handle wrap-around at start/finish line
+                    // Use the opponent's best lap time as reference for detecting wrap-around
+                    // This works correctly in multiclass racing where different classes have different lap times
+                    var carBestLaps = snapshot.GetValue<float[]>("CarIdxBestLapTime");
+                    float referenceLapTime = 120f; // Default fallback (2 minutes)
+                    string lapTimeSource = "default";
 
-                // Detect and correct wrap-around
-                if (rawDelta > halfLapTime)
-                {
-                    // Opponent's EstTime wrapped to 0, they're actually ahead
-                    rawDelta -= referenceLapTime;
-                }
-                else if (rawDelta < -halfLapTime)
-                {
-                    // Player's EstTime wrapped to 0, opponent is actually behind
-                    rawDelta += referenceLapTime;
-                }
+                    if (carBestLaps != null && row.CarIdx < carBestLaps.Length && carBestLaps[row.CarIdx] > 0)
+                    {
+                        // Use opponent's own best lap time
+                        referenceLapTime = carBestLaps[row.CarIdx];
+                        lapTimeSource = "opponent";
+                    }
+                    else if (carBestLaps != null && playerRow.CarIdx < carBestLaps.Length && carBestLaps[playerRow.CarIdx] > 0)
+                    {
+                        // Fallback to player's best lap if opponent hasn't set one yet
+                        referenceLapTime = carBestLaps[playerRow.CarIdx];
+                        lapTimeSource = "player";
+                    }
 
-                nativeTimeGap = Math.Abs(rawDelta);
-                isAhead = rawDelta > 0; // Positive delta = opponent ahead
+                    float halfLapTime = referenceLapTime / 2f;
+                    string wrapCorrection = "none";
+
+                    // Detect and correct wrap-around
+                    if (rawDelta > halfLapTime)
+                    {
+                        // Opponent's EstTime wrapped to 0, they're actually ahead
+                        rawDelta -= referenceLapTime;
+                        wrapCorrection = "opponent_wrapped";
+                    }
+                    else if (rawDelta < -halfLapTime)
+                    {
+                        // Player's EstTime wrapped to 0, opponent is actually behind
+                        rawDelta += referenceLapTime;
+                        wrapCorrection = "player_wrapped";
+                    }
+
+                    nativeTimeGap = Math.Abs(rawDelta);
+                    isAhead = rawDelta > 0; // Positive delta = opponent ahead
+
+                    // Log wrap-around corrections and unusual gaps
+                    // Trigger logging when: (a) wrap correction applied, OR (b) gap seems unusually large (>15s)
+                    if (wrapCorrection != "none" || nativeTimeGap > 15f)
+                    {
+                        Log.Info($"[WrapDebug] Car #{row.CarNum}: " +
+                                 $"PlayerEstTime={playerEstTime:F2}s, OpponentEstTime={opponentEstTime:F2}s, " +
+                                 $"RawDelta={originalRawDelta:F2}s, RefLapTime={referenceLapTime:F2}s ({lapTimeSource}), " +
+                                 $"HalfLap={halfLapTime:F2}s, Correction={wrapCorrection}, " +
+                                 $"CorrectedDelta={rawDelta:F2}s, FinalGap={nativeTimeGap:F2}s, " +
+                                 $"Direction={(isAhead ? "AHEAD" : "BEHIND")}");
+                    }
+                }
             }
             else
             {
@@ -349,54 +370,55 @@ namespace VISOR.ViewModels
                 }
             }
 
-            // Reset smoothing if car was recently absent from telemetry (between 1-2 seconds)
-            int framesSinceValid = _positionCalculator.GetFramesSinceValidData(row.CarIdx);
-            if (framesSinceValid > 60 && framesSinceValid < 120)
-            {
-                row.ResetSmoothing();
+                // Reset smoothing if car was recently absent from telemetry (between 1-2 seconds)
+                int framesSinceValid = _positionCalculator.GetFramesSinceValidData(row.CarIdx);
+                if (framesSinceValid > 60 && framesSinceValid < 120)
+                {
+                    row.ResetSmoothing();
+                }
+
+                // Update smoothed gap in ViewModel (for display stability)
+                row.UpdateSmoothedGap(nativeTimeGap);
+                float displayGap = row.SmoothedGap;
+
+                // --- SET GAP TEXT FOR DISPLAY ---
+                if (displayGap > 0 && displayGap < 100f) // Only show reasonable gaps
+                {
+                    string sign = isAhead ? "+" : "-";
+                    row.GapText = $"{sign}{displayGap:F1}";
+                }
+                else
+                {
+                    row.GapText = string.Empty;
+                }
+
+                // --- DEBUG LOGGING ---
+                // Log once per second for cars within awareness window
+                if (_debugFrameCounter % DEBUG_LOG_INTERVAL == 0 && displayGap <= TIME_SEG2_AWARE)
+                {
+                    string relation = isAhead ? "AHEAD" : "BEHIND";
+                    Log.Debug($"[Native] #{row.CarNum} ({relation}): Gap={displayGap:F2}s (EstTime)");
+                }
+
+                // --- LIGHT UP SEGMENTS ---
+                Color alertColor = isAhead ? AheadAlertColor : BehindAlertColor;
+
+                if (displayGap <= TIME_SEG1_INFO)
+                    row.Segment1Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.0));
+
+                if (displayGap <= TIME_SEG2_AWARE)
+                    row.Segment2Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.25));
+
+                if (displayGap <= TIME_SEG3_WARNING)
+                    row.Segment3Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.50));
+
+                if (displayGap <= TIME_SEG4_DANGER)
+                    row.Segment4Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.75));
+
+                if (displayGap <= TIME_SEG5_CRITICAL)
+                    row.Segment5Color = new SolidColorBrush(alertColor);
             }
-
-            // Update smoothed gap in ViewModel (for display stability)
-            row.UpdateSmoothedGap(nativeTimeGap);
-            float displayGap = row.SmoothedGap;
-
-            // --- SET GAP TEXT FOR DISPLAY ---
-            if (displayGap > 0 && displayGap < 100f) // Only show reasonable gaps
-            {
-                string sign = isAhead ? "+" : "-";
-                row.GapText = $"{sign}{displayGap:F1}";
-            }
-            else
-            {
-                row.GapText = string.Empty;
-            }
-
-            // --- DEBUG LOGGING ---
-            // Log once per second for cars within awareness window
-            if (_debugFrameCounter % DEBUG_LOG_INTERVAL == 0 && displayGap <= TIME_SEG2_AWARE)
-            {
-                string relation = isAhead ? "AHEAD" : "BEHIND";
-                Log.Debug($"[Native] #{row.CarNum} ({relation}): Gap={displayGap:F2}s (EstTime)");
-            }
-
-            // --- LIGHT UP SEGMENTS ---
-            Color alertColor = isAhead ? AheadAlertColor : BehindAlertColor;
-
-            if (displayGap <= TIME_SEG1_INFO)
-                row.Segment1Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.0));
-
-            if (displayGap <= TIME_SEG2_AWARE)
-                row.Segment2Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.25));
-
-            if (displayGap <= TIME_SEG3_WARNING)
-                row.Segment3Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.50));
-
-            if (displayGap <= TIME_SEG4_DANGER)
-                row.Segment4Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.75));
-
-            if (displayGap <= TIME_SEG5_CRITICAL)
-                row.Segment5Color = new SolidColorBrush(alertColor);
-        }
+        
 
         private Color BlendColors(Color color1, Color color2, double ratio)
         {

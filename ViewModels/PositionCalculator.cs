@@ -14,6 +14,11 @@ namespace VISOR.ViewModels
     /// 3. Cache expiration - removes truly disconnected cars after timeout
     /// 
     /// Exports clean, validated data to consumers via ValidCarIndices and GetEffectiveLapDistPct.
+    /// 
+    /// NEW: Finishing Position Freezing
+    /// - Detects checkered flag (SessionState = 5 or 6)
+    /// - Freezes class positions when cars cross S/F during checkered
+    /// - Maintains finishing order even as cars exit session
     /// </summary>
     public class PositionCalculator
     {
@@ -27,6 +32,15 @@ namespace VISOR.ViewModels
         private int _globalFrameCounter = 0;
         private readonly HashSet<int> _validCarIndices = new();
         private readonly Dictionary<(int carIdx, int classId), int> _cachedPositions = new();
+        #endregion
+
+        #region Private Fields - Finishing Position Tracking
+        private readonly Dictionary<int, int> _finishingClassPositions = new();
+        private readonly HashSet<int> _carsFinished = new();
+        private bool _isCheckeredFlag = false;
+        private bool _leaderHasFinished = false;
+        private int _lastSessionNum = -1;
+        private readonly Dictionary<int, int> _lastLapCompleted = new();
         #endregion
 
         #region Private Fields - Prediction System
@@ -98,10 +112,18 @@ namespace VISOR.ViewModels
 
         /// <summary>
         /// Get the class position for a specific car.
+        /// Returns frozen finishing position if car has finished, otherwise calculated position.
         /// Returns calculated position in race mode, YAML position in practice/qual.
         /// </summary>
         public int GetClassPosition(int carIdx, int classId)
         {
+            // Return frozen finishing position if car has finished
+            if (_finishingClassPositions.TryGetValue(carIdx, out int finishingPosition))
+            {
+                return finishingPosition;
+            }
+
+            // Otherwise return live calculated position
             if (_cachedPositions.TryGetValue((carIdx, classId), out int position))
             {
                 return position;
@@ -155,6 +177,14 @@ namespace VISOR.ViewModels
             _isCurrentlyPredicting.Clear();
             _carsWithInvalidLapDistPctLogged.Clear();
 
+            // Clear finishing position tracking
+            _finishingClassPositions.Clear();
+            _carsFinished.Clear();
+            _isCheckeredFlag = false;
+            _leaderHasFinished = false;
+            _lastSessionNum = -1;
+            _lastLapCompleted.Clear();
+
             Log.Info("PositionCalculator reset - all state cleared");
         }
         #endregion
@@ -162,6 +192,10 @@ namespace VISOR.ViewModels
         #region Private Methods - Update Processing
         private void ProcessUpdate(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
+            DetectSessionTransition(snapshot, sessionDataProvider);
+            TrackCheckeredFlagState(snapshot);
+            FreezeFinishingPositions(snapshot, sessionDataProvider);
+
             UpdateValidCarTracking(sessionDataProvider);
             UpdatePredictiveCache(snapshot, sessionDataProvider);
 
@@ -172,6 +206,122 @@ namespace VISOR.ViewModels
             else
             {
                 _cachedPositions.Clear();
+            }
+        }
+        #endregion
+
+        #region Private Methods - Finishing Position Tracking
+        /// <summary>
+        /// Detect session transitions and clear finishing positions when session changes.
+        /// </summary>
+        private void DetectSessionTransition(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        {
+            int currentSessionNum = snapshot.GetValue<int>("SessionNum", -1);
+
+            if (_lastSessionNum != -1 && currentSessionNum != _lastSessionNum)
+            {
+                Log.Info($"Session transition detected ({_lastSessionNum} -> {currentSessionNum}), clearing finishing positions");
+                _finishingClassPositions.Clear();
+                _carsFinished.Clear();
+                _isCheckeredFlag = false;
+                _leaderHasFinished = false;
+                _lastLapCompleted.Clear();
+            }
+
+            _lastSessionNum = currentSessionNum;
+        }
+
+        /// <summary>
+        /// Track checkered flag state based on SessionState.
+        /// SessionState: 5 = Checkered, 6 = CoolDown
+        /// </summary>
+        private void TrackCheckeredFlagState(SVappsLABSnapshot snapshot)
+        {
+            int sessionState = snapshot.GetValue<int>("SessionState", -1);
+            bool wasCheckeredFlag = _isCheckeredFlag;
+
+            _isCheckeredFlag = (sessionState == 5 || sessionState == 6);
+
+            if (!wasCheckeredFlag && _isCheckeredFlag)
+            {
+                Log.Info($"Checkered flag detected (SessionState: {sessionState}), beginning finishing position tracking");
+            }
+        }
+
+        /// <summary>
+        /// Freeze class positions for cars as they take the checkered flag.
+        /// Only begins freezing after the P1 car (class leader) crosses S/F.
+        /// Monitors CarIdxLapCompleted increments during checkered flag state.
+        /// </summary>
+        private void FreezeFinishingPositions(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        {
+            if (!_isCheckeredFlag)
+            {
+                return;
+            }
+
+            var carClassIDs = sessionDataProvider.CarClassIDs;
+            var carNumbers = sessionDataProvider.CarNumbers;
+            var carLapCompleted = snapshot.GetValue<int[]>("CarIdxLapCompleted");
+
+            if (carClassIDs == null || carNumbers == null || carLapCompleted == null)
+            {
+                return;
+            }
+
+            // Check each car for lap completion increments
+            for (int carIdx = 0; carIdx < carLapCompleted.Length; carIdx++)
+            {
+                // Skip if car already finished
+                if (_carsFinished.Contains(carIdx))
+                {
+                    continue;
+                }
+
+                // Skip if car doesn't have valid YAML data
+                if (carIdx >= carClassIDs.Length || carIdx >= carNumbers.Length)
+                {
+                    continue;
+                }
+
+                int currentLapCompleted = carLapCompleted[carIdx];
+
+                // Check if this is the first time we're seeing this car
+                if (!_lastLapCompleted.ContainsKey(carIdx))
+                {
+                    _lastLapCompleted[carIdx] = currentLapCompleted;
+                    continue;
+                }
+
+                // Check if lap completed count has incremented (car crossed S/F)
+                int lastLapCompleted = _lastLapCompleted[carIdx];
+                if (currentLapCompleted > lastLapCompleted)
+                {
+                    int classId = carClassIDs[carIdx];
+                    int currentPosition = GetClassPosition(carIdx, classId);
+
+                    // Check if this is the P1 car (class leader)
+                    if (!_leaderHasFinished && currentPosition == 1)
+                    {
+                        // This is the leader finishing - freeze their position and enable freezing for others
+                        _finishingClassPositions[carIdx] = currentPosition;
+                        _carsFinished.Add(carIdx);
+                        _leaderHasFinished = true;
+
+                        Log.Info($"LEADER Car #{carNumbers[carIdx]} (idx {carIdx}) took checkered flag - frozen at P{currentPosition} (LapCompleted: {lastLapCompleted} -> {currentLapCompleted})");
+                    }
+                    else if (_leaderHasFinished && currentPosition > 0)
+                    {
+                        // Leader has already finished, freeze this car's position
+                        _finishingClassPositions[carIdx] = currentPosition;
+                        _carsFinished.Add(carIdx);
+
+                        Log.Info($"Car #{carNumbers[carIdx]} (idx {carIdx}) took checkered flag - frozen at P{currentPosition} (LapCompleted: {lastLapCompleted} -> {currentLapCompleted})");
+                    }
+                    // else: Leader hasn't finished yet, don't freeze this car (lapped traffic ahead of leader)
+
+                    _lastLapCompleted[carIdx] = currentLapCompleted;
+                }
             }
         }
         #endregion
@@ -195,23 +345,29 @@ namespace VISOR.ViewModels
             for (int i = 0; i < 64; i++)
             {
                 // Car must have YAML data AND have valid history AND have valid cache
-                // This ensures expired cars (disconnected >3 seconds) are removed from the roster
-                if (!string.IsNullOrEmpty(carNumbers[i]) &&
-                    !string.IsNullOrEmpty(userNames[i]) &&
-                    HasEverHadValidData(i) &&
+                bool hasYamlData = !string.IsNullOrEmpty(carNumbers[i]) &&
+                                   !string.IsNullOrEmpty(userNames[i]);
+
+                if (hasYamlData &&
+                    _carsWithValidDataHistory.Contains(i) &&
                     HasValidCache(i))
                 {
                     _validCarIndices.Add(i);
+                }
+            }
 
-                    if (!_lastFrameValidCars.Contains(i))
-                    {
-                        Log.Info($"Car #{carNumbers[i]} ({userNames[i]}) added to valid roster");
-                    }
-                }
-                else if (_lastFrameValidCars.Contains(i))
-                {
-                    Log.Info($"Car #{carNumbers[i]} ({userNames[i]}) removed from roster (cache expired or left session)");
-                }
+            // Log changes to valid car roster
+            var newCars = _validCarIndices.Except(_lastFrameValidCars).ToList();
+            var removedCars = _lastFrameValidCars.Except(_validCarIndices).ToList();
+
+            foreach (var carIdx in newCars)
+            {
+                Log.Debug($"Car #{carNumbers[carIdx]} added to valid roster");
+            }
+
+            foreach (var carIdx in removedCars)
+            {
+                Log.Debug($"Car #{carNumbers[carIdx]} removed from valid roster");
             }
         }
         #endregion
@@ -224,7 +380,7 @@ namespace VISOR.ViewModels
             var onPitRoad = snapshot.GetValue<bool[]>("CarIdxOnPitRoad");
             var carNumbers = sessionDataProvider.CarNumbers;
 
-            if (lapDistPct == null || currentLap == null || carNumbers == null)
+            if (lapDistPct == null || currentLap == null || onPitRoad == null || carNumbers == null)
                 return;
 
             for (int i = 0; i < 64; i++)
@@ -232,19 +388,19 @@ namespace VISOR.ViewModels
                 if (string.IsNullOrEmpty(carNumbers[i]))
                     continue;
 
-                bool hasValidData = lapDistPct[i] >= 0f && lapDistPct[i] <= 1f;
-                bool isOnPitRoad = onPitRoad != null && i < onPitRoad.Length && onPitRoad[i];
+                bool isOnPitRoad = (i < onPitRoad.Length) && onPitRoad[i];
+                bool hasValidData = (i < lapDistPct.Length) &&
+                                    lapDistPct[i] >= 0f &&
+                                    lapDistPct[i] <= 1f;
 
-                // Log invalid LapDistPct values AND alternative telemetry fields for troubleshooting (once per car)
-                if (!hasValidData && lapDistPct[i] < 0f && !_carsWithInvalidLapDistPctLogged.Contains(i))
+                // Log invalid LapDistPct once per car per invalid stretch
+                if (!hasValidData && !_carsWithInvalidLapDistPctLogged.Contains(i))
                 {
-                    // Capture alternative telemetry fields at the moment LapDistPct becomes invalid
-                    var estTimes = snapshot.GetValue<float[]>("CarIdxEstTime");
                     var trackSurface = snapshot.GetValue<int[]>("CarIdxTrackSurface");
                     var carLaps = snapshot.GetValue<int[]>("CarIdxLap");
                     var bestLaps = snapshot.GetValue<float[]>("CarIdxBestLapTime");
+                    var estTime = snapshot.GetValue<float[]>("CarIdxEstTime");
 
-                    float estTime = (estTimes != null && i < estTimes.Length) ? estTimes[i] : -999f;
                     int surface = (trackSurface != null && i < trackSurface.Length) ? trackSurface[i] : -999;
                     int lap = (carLaps != null && i < carLaps.Length) ? carLaps[i] : -999;
                     float bestLap = (bestLaps != null && i < bestLaps.Length) ? bestLaps[i] : -999f;

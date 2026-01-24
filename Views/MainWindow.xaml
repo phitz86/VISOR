@@ -156,7 +156,7 @@
                                     <ColumnDefinition Width="50"/>
                                     <ColumnDefinition Width="70"/>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="60"/>
+                                    <ColumnDefinition Width="100"/>
                                 </Grid.ColumnDefinitions>
 
                                 <TextBlock Text="{Binding ClassPos}" Grid.Column="0" FontSize="24" HorizontalAlignment="Center" Margin="0,0,8,0" Style="{StaticResource SemiboldText}"/>
@@ -176,7 +176,7 @@
                                                FontSize="24" 
                                                Foreground="{Binding NameColor}" 
                                                FontStyle="{Binding FontStyle}" 
-                                               Margin="8,0,8,2"
+                                               Margin="8,0,20,2"
                                                Style="{StaticResource SemiboldText}"/>
 
                                     <!-- 5-Segment Proximity Indicator as Underline -->
