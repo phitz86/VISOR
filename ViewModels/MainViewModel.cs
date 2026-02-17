@@ -279,6 +279,8 @@ namespace VISOR.ViewModels
             FuelVM.Reset();
             WarningsVM.Reset();
             CountdownVM.Reset();
+            RelativeVM.Reset();
+            _classColorManager.Reset();
             _positionCalculator.Reset();
             OnPropertyChanged(string.Empty);
         }

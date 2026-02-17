@@ -33,7 +33,7 @@ namespace VISOR.ViewModels
             {
                 for (int i = 0; i < carClassIDs.Length; i++)
                 {
-                    if (carClassIDs[i] == classID && carClassColors[i] != 0)
+                    if (carClassIDs[i] == classID)
                     {
                         var brush = ConvertHexColorToBrush(carClassColors[i]);
                         _classColorMap[classID] = brush;

@@ -200,7 +200,7 @@ namespace VISOR.ViewModels
             {
                 AssignClassPositionDisplay(row, isFastestLapMode, dataProvider);
                 AssignNameColor(row, playerRow);
-                AssignClassBackgroundColor(row, playerRow, carClassColors, carClassIDs);
+                AssignClassBackgroundColor(row, carClassColors, carClassIDs);
                 AssignFontStyle(row);
                 AssignProximitySegments(row, playerRow, snapshot);
             }
@@ -238,7 +238,6 @@ namespace VISOR.ViewModels
 
         private void AssignClassBackgroundColor(
             RelativeRowViewModel row,
-            RelativeRowViewModel playerRow,
             int[] carClassColors,
             int[] carClassIDs)
         {
