@@ -30,13 +30,13 @@ namespace VISOR.ViewModels
         // --- PUBLIC ACCESSOR FOR DEBUG LOGGERS ---
         public PositionCalculator PositionCalculator { get; }
 
-        public RelativeViewModel(ClassColorManager classColorManager, PositionCalculator positionCalculator)
+        public RelativeViewModel(ClassColorManager classColorManager, PositionCalculator positionCalculator, PaceReferenceLapManager paceManager)
         {
             // Store PositionCalculator for external access
             PositionCalculator = positionCalculator;
 
             // Pass dependencies to the Builder
-            _builder = new RelativeDisplayBuilder(_carCache, classColorManager, positionCalculator);
+            _builder = new RelativeDisplayBuilder(_carCache, classColorManager, positionCalculator, paceManager);
         }
 
         public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)

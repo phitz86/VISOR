@@ -34,7 +34,7 @@ namespace VISOR.Views
             _sdk = sdkWrapper;
             _settingsManager = SettingsManager.Instance;
             _configModeManager = ConfigModeManager.Instance;
-            _viewModel = new MainViewModel();
+            _viewModel = new MainViewModel(sdkWrapper.PaceManager);
             DataContext = _viewModel;
 
             AllowsTransparency = true;

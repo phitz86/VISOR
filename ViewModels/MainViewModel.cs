@@ -55,14 +55,14 @@ namespace VISOR.ViewModels
             _ => 1.0
         };
 
-        public MainViewModel()
+        public MainViewModel(PaceReferenceLapManager paceManager)
         {
             _classColorManager = new ClassColorManager();
             _settingsManager = SettingsManager.Instance;
             _positionCalculator = new PositionCalculator();
 
             FuelVM = new FuelViewModel();
-            RelativeVM = new RelativeViewModel(_classColorManager, _positionCalculator);
+            RelativeVM = new RelativeViewModel(_classColorManager, _positionCalculator, paceManager);
             DeltaBarVM = new DeltaBarViewModel();
             WarningsVM = new WarningsViewModel();
             CountdownVM = new CountdownViewModel();
