@@ -10,7 +10,8 @@ VISOR/
 │   ├── MainViewModel.cs
 │   ├── FuelViewModel.cs
 │   ├── RadarViewModel.cs 
-│   ├── RelativeViewModel.cs 
+│   ├── FuelViewModel.cs
+│   ├── PositionCalculator.cs 
 │   ├── RelativeRowViewModel.cs
 │   ├── RelativeDisplayCalculator.cs 
 │   ├── DeltaBarViewModel.cs
