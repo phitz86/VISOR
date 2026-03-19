@@ -79,11 +79,12 @@ namespace VISOR.ViewModels
             var incidentCounts = dataProvider.CurDriverIncidentCount;
             var currentLap = snapshot.GetValue<int[]>("CarIdxLap");
             var onPitRoad = snapshot.GetValue<bool[]>("CarIdxOnPitRoad");
+            var trackSurface = snapshot.GetValue<int[]>("CarIdxTrackSurface");
 
             var validCarIndices = _positionCalculator.ValidCarIndices;
 
             var allValidCars = BuildValidCarsList(validCarIndices, carNumbers, userNames, carIsAI,
-                carClassIDs, incidentCounts, currentLap, onPitRoad, playerCarIdx);
+                carClassIDs, incidentCounts, currentLap, onPitRoad, trackSurface, playerCarIdx);
 
             if (!allValidCars.Any())
             {
@@ -114,6 +115,7 @@ namespace VISOR.ViewModels
             int[] incidentCounts,
             int[] currentLap,
             bool[] onPitRoad,
+            int[] trackSurface,
             int playerCarIdx)
         {
             var allValidCars = new List<RelativeRowViewModel>();
@@ -128,10 +130,18 @@ namespace VISOR.ViewModels
                     bool isPaceCar = (carClassIDs[i] == 11);
                     bool isOnPitRoad = (onPitRoad != null && i < onPitRoad.Length) && onPitRoad[i];
 
-                    // Skip pace car if it's on pit road
-                    if (isPaceCar && isOnPitRoad)
+                    // Skip pace car if it's not actively on track
+                    // (handles parked near pit boundary where OnPitRoad is false)
+                    if (isPaceCar)
                     {
-                        continue;
+                        var surface = (trackSurface != null && i < trackSurface.Length)
+                            ? (iRacingTrackSurface)trackSurface[i]
+                            : iRacingTrackSurface.NotInWorld;
+
+                        if (surface != iRacingTrackSurface.OnTrack)
+                        {
+                            continue;
+                        }
                     }
 
                     string displayName = carIsAI[i] ? $"🤖 {userNames[i]}" : userNames[i];
