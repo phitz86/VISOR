@@ -9,9 +9,11 @@ namespace VISOR.ViewModels
 {
     public enum iRacingTrackSurface
     {
-        OnTrack,
-        InPitStall,
-        NotInWorld = -1
+        NotInWorld = -1,
+        OffTrack = 0,
+        InPitStall = 1,
+        AproachingPits = 2,
+        OnTrack = 3
     };
 
     public class RelativeViewModel : INotifyPropertyChanged
