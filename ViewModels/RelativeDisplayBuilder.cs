@@ -293,6 +293,10 @@ namespace VISOR.ViewModels
             // This determines the Sign (+/-) and Color of the gap, regardless of what Time says.
             float distDelta = row.LapDistPct - playerRow.LapDistPct;
 
+            // Detect if cars are on opposite sides of the S/F line:
+            // If the direct (unwrapped) distance > 0.5, the shortest path crosses S/F.
+            bool crossesSF = Math.Abs(distDelta) > 0.5f;
+
             // Wrap geometry to -0.5 to +0.5 range (Shortest Path on the Circle)
             if (distDelta > 0.5f) distDelta -= 1.0f;
             else if (distDelta < -0.5f) distDelta += 1.0f;
@@ -313,20 +317,23 @@ namespace VISOR.ViewModels
                 // Calculate raw time difference
                 float rawTimeDelta = oppTime - playerTime;
 
-                // Get rolling pace-based reference lap for S/F wrap correction arithmetic
-                // (Note: We use this only for adding/subtracting time, not for deciding "if" we wrap)
-                float refLap = _paceManager.GetReferenceLap(playerRow.CarIdx);
+                // Only apply S/F wrap correction when cars are genuinely on opposite sides
+                // of the start/finish line. Without this gate, EstTime noise can cause
+                // spurious corrections when both cars are well away from S/F.
+                if (crossesSF)
+                {
+                    float refLap = _paceManager.GetReferenceLap(playerRow.CarIdx);
 
-                // Force the Time Delta to align with Geometric Reality
-                if (isGeometricallyAhead && rawTimeDelta < 0)
-                {
-                    // Geometry says ahead, Time says behind -> We wrapped forward (Crossing S/F)
-                    rawTimeDelta += refLap;
-                }
-                else if (!isGeometricallyAhead && rawTimeDelta > 0)
-                {
-                    // Geometry says behind, Time says ahead -> We wrapped backward (Crossing S/F)
-                    rawTimeDelta -= refLap;
+                    if (isGeometricallyAhead && rawTimeDelta < 0)
+                    {
+                        // Geometry says ahead, Time says behind -> Opponent crossed S/F, player hasn't
+                        rawTimeDelta += refLap;
+                    }
+                    else if (!isGeometricallyAhead && rawTimeDelta > 0)
+                    {
+                        // Geometry says behind, Time says ahead -> Player crossed S/F, opponent hasn't
+                        rawTimeDelta -= refLap;
+                    }
                 }
 
                 nativeTimeGap = Math.Abs(rawTimeDelta);

@@ -187,18 +187,31 @@ namespace VISOR.Telemetry
                 }
             }
 
+            // On bootstrap->rolling transition, seed the rolling window with the bootstrap
+            // value so the first real lap doesn't cause a sudden reference shift.
+            // The bootstrap gradually phases out as real laps fill the window.
+            if (car.BootstrapActive)
+            {
+                car.BootstrapActive = false;
+
+                if (car.BootstrapLap > 0f)
+                {
+                    car.RollingLaps.Enqueue(car.BootstrapLap);
+                    float blended = (car.BootstrapLap + candidate) / 2f;
+                    Log.Info($"[PaceManager] Car {carIdx}: bootstrap -> rolling (first lap={candidate:F2}s, bootstrap={car.BootstrapLap:F2}s, blended ref={blended:F2}s)");
+                }
+                else
+                {
+                    Log.Info($"[PaceManager] Car {carIdx}: bootstrap -> rolling (first lap={candidate:F2}s, no bootstrap to blend)");
+                }
+            }
+
             // Normal acceptance
             car.RollingLaps.Enqueue(candidate);
             if (car.RollingLaps.Count > MAX_ROLLING_LAPS)
                 car.RollingLaps.Dequeue();
 
             car.WaitingRoom.Clear();
-
-            if (car.BootstrapActive)
-            {
-                car.BootstrapActive = false;
-                Log.Info($"[PaceManager] Car {carIdx}: bootstrap -> rolling (first lap={candidate:F2}s, bootstrap was={car.BootstrapLap:F2}s)");
-            }
 
             Log.Debug($"[PaceManager] Car {carIdx}: lap recorded {candidate:F2}s (ref={currentRef:F2}s, window={car.RollingLaps.Count})");
         }
