@@ -27,6 +27,7 @@ namespace VISOR.Telemetry
         private readonly ILogger _logger;
         private readonly TelemetryDataBuilder _dataBuilder;
         private readonly SessionDataCoordinator _sessionCoordinator;
+        private readonly PaceReferenceLapManager _paceManager;
 #if DEBUG
         private readonly SessionDataLogger _sessionLogger;
         private readonly TelemetryCSVLogger _telemetryLogger;
@@ -49,6 +50,7 @@ namespace VISOR.Telemetry
         public bool IsConnected => _isConnected;
         public bool IsPrimed => _isConnected && _sessionCoordinator.IsDataReady;
         public SessionDataCoordinator Coordinator => _sessionCoordinator;
+        public PaceReferenceLapManager PaceManager => _paceManager;
         #endregion
 
         #region Events
@@ -63,6 +65,7 @@ namespace VISOR.Telemetry
         {
             _logger = new NullLogger<SVappsLABSDKWrapper>();
             _sessionCoordinator = new SessionDataCoordinator();
+            _paceManager = new PaceReferenceLapManager(_sessionCoordinator);
             _dataBuilder = new TelemetryDataBuilder(_sessionCoordinator);
 
 #if DEBUG
@@ -120,6 +123,7 @@ namespace VISOR.Telemetry
             {
                 StopYamlRetryTimer();
                 _sessionCoordinator.ClearCache();
+                _paceManager.Reset();
                 _lastSessionNumForLog = -1;
             }
             CheckPrimedStateChange();
@@ -178,6 +182,7 @@ namespace VISOR.Telemetry
                 double sessionTimeSeconds = _sessionCoordinator.GetSessionTimeSeconds(currentSessionNum);
 
                 Log.Info($"Session transition: {sessionName} (Type: {sessionType}, Duration: {sessionTimeSeconds}s)");
+                _paceManager.Reset();
 
 #if DEBUG
                 _sessionLogger?.ScheduleSessionAwareLogs(currentSessionNum, sessionName, sessionTimeSeconds);

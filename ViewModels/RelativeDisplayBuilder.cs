@@ -16,6 +16,8 @@ namespace VISOR.ViewModels
     /// - Implemented "Geometric Truth" logic for gap direction.
     /// - Decoupled IsAhead logic from EstTime to fix "Zero-Cross" bug on short tracks.
     /// - EstTime is now used only for magnitude, forced to align with geometric reality.
+    /// - Replaced bestLapTime-based S/F correction with PaceReferenceLapManager rolling average.
+    /// - Aligned BuildProximityBasedRows isAhead wrapping with AssignProximitySegments for consistency.
     /// </summary>
     public class RelativeDisplayBuilder
     {
@@ -40,6 +42,7 @@ namespace VISOR.ViewModels
         private readonly Dictionary<int, RelativeRowViewModel> _carCache;
         private readonly ClassColorManager _classColorManager;
         private readonly PositionCalculator _positionCalculator;
+        private readonly PaceReferenceLapManager _paceManager;
 
         // Rolling counter for throttling debug logs
         private int _debugFrameCounter = 0;
@@ -49,11 +52,13 @@ namespace VISOR.ViewModels
         public RelativeDisplayBuilder(
             Dictionary<int, RelativeRowViewModel> carCache,
             ClassColorManager classColorManager,
-            PositionCalculator positionCalculator)
+            PositionCalculator positionCalculator,
+            PaceReferenceLapManager paceManager)
         {
             _carCache = carCache;
             _classColorManager = classColorManager;
             _positionCalculator = positionCalculator;
+            _paceManager = paceManager;
         }
         #endregion
 
@@ -62,6 +67,7 @@ namespace VISOR.ViewModels
         {
             // Increment frame counter for logging throttle
             _debugFrameCounter++;
+            _paceManager.Update(snapshot);
 
             var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx");
 
@@ -168,7 +174,10 @@ namespace VISOR.ViewModels
             {
                 float directDistance = Math.Abs(car.LapDistPct - playerTrackPercent);
                 float proximity = Math.Min(directDistance, 1.0f - directDistance);
-                bool isAhead = (car.LapDistPct - playerTrackPercent + 1.5f) % 1.0f > 0.5f;
+                float sortDelta = car.LapDistPct - playerTrackPercent;
+                if (sortDelta > 0.5f) sortDelta -= 1.0f;
+                else if (sortDelta < -0.5f) sortDelta += 1.0f;
+                bool isAhead = sortDelta > 0;
                 return new { Car = car, Proximity = proximity, IsAhead = isAhead };
             }).ToList();
 
@@ -294,16 +303,9 @@ namespace VISOR.ViewModels
                 // Calculate raw time difference
                 float rawTimeDelta = oppTime - playerTime;
 
-                // Get the best available lap time estimate for wrap correction arithmetic
+                // Get rolling pace-based reference lap for S/F wrap correction arithmetic
                 // (Note: We use this only for adding/subtracting time, not for deciding "if" we wrap)
-                float refLap = 120f; // Default fallback
-                var carBestLaps = snapshot.GetValue<float[]>("CarIdxBestLapTime");
-                if (carBestLaps != null)
-                {
-                    // Prefer player's best lap, then opponent's
-                    if (carBestLaps[playerRow.CarIdx] > 0) refLap = carBestLaps[playerRow.CarIdx];
-                    else if (carBestLaps[row.CarIdx] > 0) refLap = carBestLaps[row.CarIdx];
-                }
+                float refLap = _paceManager.GetReferenceLap(playerRow.CarIdx);
 
                 // Force the Time Delta to align with Geometric Reality
                 if (isGeometricallyAhead && rawTimeDelta < 0)
