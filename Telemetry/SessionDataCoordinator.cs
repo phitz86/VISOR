@@ -28,6 +28,7 @@ namespace VISOR.Telemetry
         private volatile int[] _carClassIDsCache = new int[64];
         private volatile int[] _carClassColorsCache = new int[64];
         private volatile bool[] _carIsAICache = new bool[64];
+        private volatile float[] _carClassEstLapTimesCache = new float[64];
         private volatile int[] _curDriverIncidentCountCache = new int[64];
 
         // Lock-free reads - arrays are replaced atomically during updates
@@ -37,6 +38,7 @@ namespace VISOR.Telemetry
         public int[] CarClassIDs => _carClassIDsCache;
         public int[] CarClassColors => _carClassColorsCache;
         public bool[] CarIsAI => _carIsAICache;
+        public float[] CarClassEstLapTimes => _carClassEstLapTimesCache;
         public int[] CurDriverIncidentCount => _curDriverIncidentCountCache;
 
         // --- NEW PUBLIC ACCESSORS FOR PACE MANAGER ---
@@ -353,6 +355,7 @@ namespace VISOR.Telemetry
             var newCarClassIDs = new int[64];
             var newCarClassColors = new int[64];
             var newCarIsAI = new bool[64];
+            var newCarClassEstLapTimes = new float[64];
             var newIncidentCounts = new int[64];
 
             foreach (var kvp in _staticData.Drivers)
@@ -365,6 +368,7 @@ namespace VISOR.Telemetry
                     newCarClassIDs[kvp.Key] = kvp.Value.CarClassID;
                     newCarClassColors[kvp.Key] = kvp.Value.CarClassColor;
                     newCarIsAI[kvp.Key] = kvp.Value.IsAI;
+                    newCarClassEstLapTimes[kvp.Key] = kvp.Value.CarClassEstLapTime;
                 }
             }
 
@@ -383,6 +387,7 @@ namespace VISOR.Telemetry
             _carClassIDsCache = newCarClassIDs;
             _carClassColorsCache = newCarClassColors;
             _carIsAICache = newCarIsAI;
+            _carClassEstLapTimesCache = newCarClassEstLapTimes;
             _curDriverIncidentCountCache = newIncidentCounts;
         }
 
