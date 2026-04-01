@@ -41,6 +41,10 @@ namespace VISOR.ViewModels
         private readonly ClassColorManager _classColorManager;
         private readonly PositionCalculator _positionCalculator;
 
+#if DEBUG
+        private readonly RelativeGapLogger _gapLogger;
+#endif
+
         // Rolling counter for throttling debug logs
         private int _debugFrameCounter = 0;
         #endregion
@@ -54,6 +58,9 @@ namespace VISOR.ViewModels
             _carCache = carCache;
             _classColorManager = classColorManager;
             _positionCalculator = positionCalculator;
+#if DEBUG
+            _gapLogger = new RelativeGapLogger();
+#endif
         }
         #endregion
 
@@ -62,6 +69,9 @@ namespace VISOR.ViewModels
         {
             // Increment frame counter for logging throttle
             _debugFrameCounter++;
+#if DEBUG
+            _gapLogger?.BeginFrame();
+#endif
 
             var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx");
 
@@ -196,13 +206,14 @@ namespace VISOR.ViewModels
             var playerRow = displayRows.FirstOrDefault(r => r.IsPlayer);
             if (playerRow == null) return;
 
-            foreach (var row in displayRows)
+            for (int i = 0; i < displayRows.Count; i++)
             {
+                var row = displayRows[i];
                 AssignClassPositionDisplay(row, isFastestLapMode, dataProvider);
                 AssignNameColor(row, playerRow);
                 AssignClassBackgroundColor(row, carClassColors, carClassIDs);
                 AssignFontStyle(row);
-                AssignProximitySegments(row, playerRow, snapshot, dataProvider);
+                AssignProximitySegments(row, playerRow, snapshot, dataProvider, i);
             }
         }
 
@@ -250,7 +261,7 @@ namespace VISOR.ViewModels
             row.FontStyle = row.IsOnPitRoad ? FontStyles.Italic : FontStyles.Normal;
         }
 
-        private void AssignProximitySegments(RelativeRowViewModel row, RelativeRowViewModel playerRow, SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider)
+        private void AssignProximitySegments(RelativeRowViewModel row, RelativeRowViewModel playerRow, SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider, int slotIndex)
         {
             // Reset Segments
             row.Segment1Color = Brushes.Transparent;
@@ -286,11 +297,13 @@ namespace VISOR.ViewModels
             // Cascade: player's best lap -> player's qualifying time -> class estimated lap time
             // Always use the player's reference so all rows share the same scale.
             float refLap = 0f;
+            string refLapSource = "none";
 
             var carBestLaps = snapshot.GetValue<float[]>("CarIdxBestLapTime");
             if (carBestLaps != null && carBestLaps[playerRow.CarIdx] > 0)
             {
                 refLap = carBestLaps[playerRow.CarIdx];
+                refLapSource = "best";
             }
             else
             {
@@ -298,6 +311,7 @@ namespace VISOR.ViewModels
                 if (qualifyTimes != null && playerRow.CarIdx < qualifyTimes.Length && qualifyTimes[playerRow.CarIdx] > 0)
                 {
                     refLap = qualifyTimes[playerRow.CarIdx];
+                    refLapSource = "quali";
                 }
                 else
                 {
@@ -305,6 +319,7 @@ namespace VISOR.ViewModels
                     if (classEstLapTimes != null && playerRow.CarIdx < classEstLapTimes.Length && classEstLapTimes[playerRow.CarIdx] > 0)
                     {
                         refLap = classEstLapTimes[playerRow.CarIdx];
+                        refLapSource = "class";
                     }
                 }
             }
@@ -319,13 +334,17 @@ namespace VISOR.ViewModels
             // --- 3. TIME MAGNITUDE (How big is the gap?) ---
             // We use CarIdxEstTime for the magnitude, with geometry for direction.
             var estTimes = snapshot.GetValue<float[]>("CarIdxEstTime");
+            float playerEstTime = 0f;
+            float oppEstTime = 0f;
+            float rawTimeDelta = 0f;
+            bool wrapCorrected = false;
 
             if (estTimes != null && estTimes[playerRow.CarIdx] > 0 && estTimes[row.CarIdx] > 0)
             {
-                float playerTime = estTimes[playerRow.CarIdx];
-                float oppTime = estTimes[row.CarIdx];
+                playerEstTime = estTimes[playerRow.CarIdx];
+                oppEstTime = estTimes[row.CarIdx];
 
-                float rawTimeDelta = oppTime - playerTime;
+                rawTimeDelta = oppEstTime - playerEstTime;
 
                 // S/F wrap correction: only apply when the disagreement between geometry and time
                 // is large enough to indicate a genuine start/finish boundary crossing.
@@ -334,10 +353,12 @@ namespace VISOR.ViewModels
                 if (isGeometricallyAhead && rawTimeDelta < 0 && Math.Abs(rawTimeDelta) > refLap * 0.5f)
                 {
                     rawTimeDelta += refLap;
+                    wrapCorrected = true;
                 }
                 else if (!isGeometricallyAhead && rawTimeDelta > 0 && rawTimeDelta > refLap * 0.5f)
                 {
                     rawTimeDelta -= refLap;
+                    wrapCorrected = true;
                 }
 
                 nativeTimeGap = Math.Abs(rawTimeDelta);
@@ -386,6 +407,18 @@ namespace VISOR.ViewModels
             {
                 row.GapText = string.Empty;
             }
+
+#if DEBUG
+            // --- CSV DIAGNOSTIC LOGGING ---
+            float sessionTime = snapshot.GetValue<float>("SessionTime", 0f);
+            _gapLogger?.LogRow(
+                sessionTime, slotIndex, row.CarNum,
+                playerRow.LapDistPct, row.LapDistPct,
+                distDelta, isGeometricallyAhead,
+                playerEstTime, oppEstTime, rawTimeDelta,
+                wrapCorrected, refLap, refLapSource,
+                nativeTimeGap, displayGap, row.GapText);
+#endif
 
             // --- DEBUG LOGGING ---
             // Log once per second for cars within awareness window
