@@ -7,7 +7,7 @@ namespace VISOR.Diagnostics
 #if DEBUG
     /// <summary>
     /// DEBUG-ONLY: Logs the relative gap calculation pipeline for cars in the 7-row display.
-    /// Captures every decision point from geometry through wrap correction to final display.
+    /// Captures geometry, gap source (buffer/stationary/pit/none), and final display values.
     /// Samples at 1Hz, logging only the cars actively shown in the relative display.
     /// </summary>
     public class RelativeGapLogger : IDisposable
@@ -75,13 +75,7 @@ namespace VISOR.Diagnostics
             float oppLapDistPct,
             float distDelta,
             bool isGeometricallyAhead,
-            float playerEstTime,
-            float oppEstTime,
-            float rawTimeDelta,
-            bool wrapCorrected,
-            float refLap,
-            string refLapSource,
-            float nativeTimeGap,
+            string gapSource,
             float displayGap,
             string gapText)
         {
@@ -97,13 +91,7 @@ namespace VISOR.Diagnostics
                 sb.Append($"{oppLapDistPct:F4},");
                 sb.Append($"{distDelta:F4},");
                 sb.Append($"{isGeometricallyAhead},");
-                sb.Append($"{playerEstTime:F2},");
-                sb.Append($"{oppEstTime:F2},");
-                sb.Append($"{rawTimeDelta:F2},");
-                sb.Append($"{wrapCorrected},");
-                sb.Append($"{refLap:F2},");
-                sb.Append($"{refLapSource},");
-                sb.Append($"{nativeTimeGap:F2},");
+                sb.Append($"{gapSource},");
                 sb.Append($"{displayGap:F2},");
                 sb.Append($"{gapText}");
 
@@ -126,13 +114,7 @@ namespace VISOR.Diagnostics
             header.Append("OppLapDistPct,");
             header.Append("DistDelta,");
             header.Append("IsGeomAhead,");
-            header.Append("PlayerEstTime,");
-            header.Append("OppEstTime,");
-            header.Append("RawTimeDelta,");
-            header.Append("WrapCorrected,");
-            header.Append("RefLap,");
-            header.Append("RefLapSource,");
-            header.Append("NativeTimeGap,");
+            header.Append("GapSource,");
             header.Append("DisplayGap,");
             header.Append("GapText");
 

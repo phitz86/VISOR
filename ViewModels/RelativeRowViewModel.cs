@@ -24,6 +24,8 @@ namespace VISOR.ViewModels
         private Brush _segment3Color = Brushes.Transparent;
         private Brush _segment4Color = Brushes.Transparent;
         private Brush _segment5Color = Brushes.Transparent;
+        private Brush _gapColor = Brushes.LightGray;
+        private FontWeight _gapFontWeight = FontWeights.Normal;
 
         public int CarIdx { get; set; }
         public string ClassPos { get => _classPos; set { _classPos = value; OnPropertyChanged(); } }
@@ -52,6 +54,8 @@ namespace VISOR.ViewModels
         public Brush Segment3Color { get => _segment3Color; set { _segment3Color = value; OnPropertyChanged(); } }
         public Brush Segment4Color { get => _segment4Color; set { _segment4Color = value; OnPropertyChanged(); } }
         public Brush Segment5Color { get => _segment5Color; set { _segment5Color = value; OnPropertyChanged(); } }
+        public Brush GapColor { get => _gapColor; set { _gapColor = value; OnPropertyChanged(); } }
+        public FontWeight GapFontWeight { get => _gapFontWeight; set { _gapFontWeight = value; OnPropertyChanged(); } }
 
         public float LapDistPct { get; set; }
         public int CurrentLap { get; set; }

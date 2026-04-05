@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -10,23 +10,28 @@ namespace VISOR.ViewModels
 {
     /// <summary>
     /// Builds the 7-row proximity-based relative display with visual properties.
-    /// Uses Native CarIdxEstTime for accurate time gap calculations.
-    /// 
+    /// Uses Historical Ring Buffer for gap calculation: measures the actual elapsed time
+    /// between two cars occupying the same physical track position, like a real transponder loop.
+    ///
     /// REFACTOR LOG:
-    /// - Implemented "Geometric Truth" logic for gap direction.
-    /// - Decoupled IsAhead logic from EstTime to fix "Zero-Cross" bug on short tracks.
-    /// - EstTime is now used only for magnitude, forced to align with geometric reality.
+    /// - Replaced CarIdxEstTime (pace-dependent) with historical position buffer approach.
+    /// - Pit road cars display "PIT" with gray segments.
+    /// - Stationary on-track cars display distance in feet (bold yellow, capped at 999ft).
+    /// - Normal cars use buffer crossing search with linear interpolation.
     /// </summary>
     public class RelativeDisplayBuilder
     {
         #region Constants
 
-        // Time Gap Thresholds (Seconds) - Based on Native CarIdxEstTime
+        // Time Gap Thresholds (Seconds) for proximity segment coloring
         private const float TIME_SEG5_CRITICAL = 0.6f;  // < 0.6s (Contact Imminent / Netcode zone)
         private const float TIME_SEG4_DANGER = 1.5f;    // < 1.5s (Drafting / Attack Range)
         private const float TIME_SEG3_WARNING = 3.0f;   // < 3.0s (Hunting / Mirrors Full)
         private const float TIME_SEG2_AWARE = 5.0f;     // < 5.0s (Traffic Monitoring)
         private const float TIME_SEG1_INFO = 8.0f;      // < 8.0s (On Radar)
+
+        private const float METERS_TO_FEET = 3.28084f;
+        private const int MAX_DISTANCE_FEET = 999;
 
         // Debug constants
         private const int DEBUG_LOG_INTERVAL = 60; // Log every ~1 second (assuming 60Hz)
@@ -34,12 +39,16 @@ namespace VISOR.ViewModels
         private static readonly Color NeutralColor = (Color)ColorConverter.ConvertFromString("#80404040");
         private static readonly Color AheadAlertColor = (Color)ColorConverter.ConvertFromString("#FF00FFFF");
         private static readonly Color BehindAlertColor = (Color)ColorConverter.ConvertFromString("#FFFF9900");
+        private static readonly Color PitGrayColor = (Color)ColorConverter.ConvertFromString("#60808080");
+        private static readonly SolidColorBrush PitGrayBrush = new SolidColorBrush(PitGrayColor);
+        private static readonly SolidColorBrush StationaryYellowBrush = new SolidColorBrush(Colors.Yellow);
         #endregion
 
         #region Private Fields
         private readonly Dictionary<int, RelativeRowViewModel> _carCache;
         private readonly ClassColorManager _classColorManager;
         private readonly PositionCalculator _positionCalculator;
+        private readonly PositionHistoryManager _historyManager;
 
 #if DEBUG
         private readonly RelativeGapLogger _gapLogger;
@@ -53,11 +62,13 @@ namespace VISOR.ViewModels
         public RelativeDisplayBuilder(
             Dictionary<int, RelativeRowViewModel> carCache,
             ClassColorManager classColorManager,
-            PositionCalculator positionCalculator)
+            PositionCalculator positionCalculator,
+            PositionHistoryManager historyManager)
         {
             _carCache = carCache;
             _classColorManager = classColorManager;
             _positionCalculator = positionCalculator;
+            _historyManager = historyManager;
 #if DEBUG
             _gapLogger = new RelativeGapLogger();
 #endif
@@ -72,6 +83,9 @@ namespace VISOR.ViewModels
 #if DEBUG
             _gapLogger?.BeginFrame();
 #endif
+
+            // Update position history buffers (handles 10Hz decimation internally)
+            _historyManager.Update(snapshot, dataProvider);
 
             var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx");
 
@@ -105,6 +119,7 @@ namespace VISOR.ViewModels
         public void Reset()
         {
             _debugFrameCounter = 0;
+            _historyManager.Reset();
         }
         #endregion
 
@@ -213,7 +228,7 @@ namespace VISOR.ViewModels
                 AssignNameColor(row, playerRow);
                 AssignClassBackgroundColor(row, carClassColors, carClassIDs);
                 AssignFontStyle(row);
-                AssignProximitySegments(row, playerRow, snapshot, dataProvider, i);
+                AssignProximitySegments(row, playerRow, snapshot, i);
             }
         }
 
@@ -261,126 +276,112 @@ namespace VISOR.ViewModels
             row.FontStyle = row.IsOnPitRoad ? FontStyles.Italic : FontStyles.Normal;
         }
 
-        private void AssignProximitySegments(RelativeRowViewModel row, RelativeRowViewModel playerRow, SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider, int slotIndex)
+        private void AssignProximitySegments(RelativeRowViewModel row, RelativeRowViewModel playerRow, SVappsLABSnapshot snapshot, int slotIndex)
         {
-            // Reset Segments
+            // Reset segments and gap styling to defaults
             row.Segment1Color = Brushes.Transparent;
             row.Segment2Color = Brushes.Transparent;
             row.Segment3Color = Brushes.Transparent;
             row.Segment4Color = Brushes.Transparent;
             row.Segment5Color = Brushes.Transparent;
+            row.GapColor = Brushes.LightGray;
+            row.GapFontWeight = FontWeights.Normal;
 
             if (row.IsPlayer)
             {
-                // Player row - no gap display
                 row.GapText = string.Empty;
                 return;
             }
 
-            float nativeTimeGap = 0f;
-            bool isAhead = false;
-
-            // --- 1. GEOMETRIC TRUTH (Who is actually ahead?) ---
-            // We use LapDistPct because it is normalized (0.0-1.0) and reliable for positioning.
-            // This determines the Sign (+/-) and Color of the gap, regardless of what Time says.
+            // --- 1. GEOMETRIC DIRECTION (Who is actually ahead?) ---
             float distDelta = row.LapDistPct - playerRow.LapDistPct;
 
-            // Wrap geometry to -0.5 to +0.5 range (Shortest Path on the Circle)
+            // Wrap geometry to -0.5 to +0.5 range (shortest path on the circle)
             if (distDelta > 0.5f) distDelta -= 1.0f;
             else if (distDelta < -0.5f) distDelta += 1.0f;
 
-            // Positive geometry = Ahead, Negative geometry = Behind
             bool isGeometricallyAhead = distDelta > 0;
 
-
-            // --- 2. REFERENCE LAP TIME (for wrap correction and sanity threshold) ---
-            // Cascade: player's best lap -> player's qualifying time -> class estimated lap time
-            // Always use the player's reference so all rows share the same scale.
-            float refLap = 0f;
-            string refLapSource = "none";
-
-            var carBestLaps = snapshot.GetValue<float[]>("CarIdxBestLapTime");
-            if (carBestLaps != null && carBestLaps[playerRow.CarIdx] > 0)
+            // --- 2. PIT ROAD CHECK ---
+            if (row.IsOnPitRoad)
             {
-                refLap = carBestLaps[playerRow.CarIdx];
-                refLapSource = "best";
-            }
-            else
-            {
-                var qualifyTimes = dataProvider.GetQualifyResultsFastestTimes();
-                if (qualifyTimes != null && playerRow.CarIdx < qualifyTimes.Length && qualifyTimes[playerRow.CarIdx] > 0)
-                {
-                    refLap = qualifyTimes[playerRow.CarIdx];
-                    refLapSource = "quali";
-                }
-                else
-                {
-                    var classEstLapTimes = dataProvider.CarClassEstLapTimes;
-                    if (classEstLapTimes != null && playerRow.CarIdx < classEstLapTimes.Length && classEstLapTimes[playerRow.CarIdx] > 0)
-                    {
-                        refLap = classEstLapTimes[playerRow.CarIdx];
-                        refLapSource = "class";
-                    }
-                }
-            }
+                row.GapText = "PIT";
+                row.GapColor = new SolidColorBrush(PitGrayColor);
+                row.Segment1Color = PitGrayBrush;
+                row.Segment2Color = PitGrayBrush;
+                row.Segment3Color = PitGrayBrush;
+                row.Segment4Color = PitGrayBrush;
+                row.Segment5Color = PitGrayBrush;
 
-            // If no reference lap time is available yet, skip gap calculation for this frame
-            if (refLap <= 0f)
-            {
-                row.GapText = string.Empty;
+#if DEBUG
+                LogDiagnosticRow(snapshot, slotIndex, row, playerRow, distDelta, isGeometricallyAhead, "pit", 0f, row.GapText);
+#endif
                 return;
             }
 
-            // --- 3. TIME MAGNITUDE (How big is the gap?) ---
-            // We use CarIdxEstTime for the magnitude, with geometry for direction.
-            var estTimes = snapshot.GetValue<float[]>("CarIdxEstTime");
-            float playerEstTime = 0f;
-            float oppEstTime = 0f;
-            float rawTimeDelta = 0f;
-            bool wrapCorrected = false;
-
-            if (estTimes != null && estTimes[playerRow.CarIdx] > 0 && estTimes[row.CarIdx] > 0)
+            // --- 3. STATIONARY CHECK ---
+            var oppBuffer = _historyManager.GetBuffer(row.CarIdx);
+            if (oppBuffer != null && oppBuffer.IsStationary())
             {
-                playerEstTime = estTimes[playerRow.CarIdx];
-                oppEstTime = estTimes[row.CarIdx];
-
-                rawTimeDelta = oppEstTime - playerEstTime;
-
-                // S/F wrap correction: only apply when the disagreement between geometry and time
-                // is large enough to indicate a genuine start/finish boundary crossing.
-                // Normal mid-lap EstTime wandering produces small disagreements (a few seconds).
-                // A real S/F wrap produces disagreements close to a full lap time.
-                if (isGeometricallyAhead && rawTimeDelta < 0 && Math.Abs(rawTimeDelta) > refLap * 0.5f)
+                float trackLengthMeters = _historyManager.TrackLengthMeters;
+                if (trackLengthMeters > 0)
                 {
-                    rawTimeDelta += refLap;
-                    wrapCorrected = true;
-                }
-                else if (!isGeometricallyAhead && rawTimeDelta > 0 && rawTimeDelta > refLap * 0.5f)
-                {
-                    rawTimeDelta -= refLap;
-                    wrapCorrected = true;
-                }
+                    float distanceMeters = Math.Abs(distDelta) * trackLengthMeters;
+                    int distanceFeet = Math.Min((int)(distanceMeters * METERS_TO_FEET), MAX_DISTANCE_FEET);
 
-                nativeTimeGap = Math.Abs(rawTimeDelta);
-                isAhead = isGeometricallyAhead;
-            }
-            else
-            {
-                // Fallback: If EstTime unavailable, use distance/speed approximation
-                float trackLength = snapshot.GetValue<float>("TrackLength", 0f);
-                float playerSpeed = snapshot.GetValue<float>("Speed", 0f);
-
-                if (trackLength > 0 && playerSpeed > 1.0f)
-                {
-                    float distanceMeters = Math.Abs(distDelta * trackLength);
-                    nativeTimeGap = distanceMeters / Math.Max(playerSpeed, 1.0f);
-                    isAhead = isGeometricallyAhead;
+                    row.GapText = $"{distanceFeet}ft";
+                    row.GapColor = StationaryYellowBrush;
+                    row.GapFontWeight = FontWeights.Bold;
                 }
                 else
                 {
                     row.GapText = string.Empty;
-                    return;
                 }
+
+#if DEBUG
+                LogDiagnosticRow(snapshot, slotIndex, row, playerRow, distDelta, isGeometricallyAhead, "stationary", 0f, row.GapText);
+#endif
+                return;
+            }
+
+            // --- 4. BUFFER-BASED GAP CALCULATION ---
+            double sessionTime = snapshot.GetValue<double>("SessionTime", 0.0);
+            float nativeTimeGap = 0f;
+            bool isAhead = isGeometricallyAhead;
+            string gapSource = "buffer";
+
+            // For car ahead of player: search OPPONENT's buffer for player's current position
+            // For car behind player: search PLAYER's buffer for opponent's current position
+            double? crossingTime = null;
+
+            if (isGeometricallyAhead)
+            {
+                // Car is ahead: when did the opponent last cross the player's current position?
+                if (oppBuffer != null)
+                    crossingTime = oppBuffer.FindCrossingTime(playerRow.LapDistPct);
+            }
+            else
+            {
+                // Car is behind: when did the player last cross the opponent's current position?
+                var playerBuffer = _historyManager.GetBuffer(playerRow.CarIdx);
+                if (playerBuffer != null)
+                    crossingTime = playerBuffer.FindCrossingTime(row.LapDistPct);
+            }
+
+            if (crossingTime.HasValue && sessionTime > crossingTime.Value)
+            {
+                nativeTimeGap = (float)(sessionTime - crossingTime.Value);
+            }
+            else
+            {
+                // No valid crossing found (buffer warm-up or out of range) — blank gap
+                row.GapText = string.Empty;
+                gapSource = "none";
+
+#if DEBUG
+                LogDiagnosticRow(snapshot, slotIndex, row, playerRow, distDelta, isGeometricallyAhead, gapSource, 0f, row.GapText);
+#endif
+                return;
             }
 
             // Reset smoothing if car was recently absent from telemetry (between 1-2 seconds)
@@ -395,10 +396,9 @@ namespace VISOR.ViewModels
             float displayGap = row.SmoothedGap;
 
             // --- SET GAP TEXT FOR DISPLAY ---
-            // Sanity threshold: max geometric distance in the proximity display is half the track.
-            // Using 0.75 of refLap gives headroom for EstTime wandering while still catching
-            // bogus wrap-corrected values (which would be near refLap itself).
-            if (displayGap > 0 && displayGap < refLap * 0.75f)
+            // Buffer-based gaps are naturally bounded by buffer depth (30s).
+            // Sanity cap: if the smoothed gap exceeds 30s, treat as out of range.
+            if (displayGap > 0 && displayGap < 30f)
             {
                 string sign = isAhead ? "+" : "-";
                 row.GapText = $"{sign}{displayGap:F1}";
@@ -409,23 +409,14 @@ namespace VISOR.ViewModels
             }
 
 #if DEBUG
-            // --- CSV DIAGNOSTIC LOGGING ---
-            float sessionTime = snapshot.GetValue<float>("SessionTime", 0f);
-            _gapLogger?.LogRow(
-                sessionTime, slotIndex, row.CarNum,
-                playerRow.LapDistPct, row.LapDistPct,
-                distDelta, isGeometricallyAhead,
-                playerEstTime, oppEstTime, rawTimeDelta,
-                wrapCorrected, refLap, refLapSource,
-                nativeTimeGap, displayGap, row.GapText);
+            LogDiagnosticRow(snapshot, slotIndex, row, playerRow, distDelta, isGeometricallyAhead, gapSource, displayGap, row.GapText);
 #endif
 
             // --- DEBUG LOGGING ---
-            // Log once per second for cars within awareness window
             if (_debugFrameCounter % DEBUG_LOG_INTERVAL == 0 && displayGap <= TIME_SEG2_AWARE)
             {
                 string relation = isAhead ? "AHEAD" : "BEHIND";
-                Log.Debug($"[Native] #{row.CarNum} ({relation}): Gap={displayGap:F2}s (EstTime)");
+                Log.Debug($"[Buffer] #{row.CarNum} ({relation}): Gap={displayGap:F2}s");
             }
 
             // --- LIGHT UP SEGMENTS ---
@@ -447,6 +438,19 @@ namespace VISOR.ViewModels
                 row.Segment5Color = new SolidColorBrush(alertColor);
         }
 
+#if DEBUG
+        private void LogDiagnosticRow(SVappsLABSnapshot snapshot, int slotIndex, RelativeRowViewModel row,
+            RelativeRowViewModel playerRow, float distDelta, bool isGeometricallyAhead, string gapSource,
+            float displayGap, string gapText)
+        {
+            float sessionTime = snapshot.GetValue<float>("SessionTime", 0f);
+            _gapLogger?.LogRow(
+                sessionTime, slotIndex, row.CarNum,
+                playerRow.LapDistPct, row.LapDistPct,
+                distDelta, isGeometricallyAhead,
+                gapSource, displayGap, gapText);
+        }
+#endif
 
         private Color BlendColors(Color color1, Color color2, double ratio)
         {

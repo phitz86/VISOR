@@ -26,6 +26,7 @@ namespace VISOR.ViewModels
 
         // --- Child Services ---
         private readonly RelativeDisplayBuilder _builder;
+        private readonly Telemetry.PositionHistoryManager _historyManager;
 
         // --- PUBLIC ACCESSOR FOR DEBUG LOGGERS ---
         public PositionCalculator PositionCalculator { get; }
@@ -35,8 +36,11 @@ namespace VISOR.ViewModels
             // Store PositionCalculator for external access
             PositionCalculator = positionCalculator;
 
+            // Create the position history manager for buffer-based gap calculation
+            _historyManager = new Telemetry.PositionHistoryManager();
+
             // Pass dependencies to the Builder
-            _builder = new RelativeDisplayBuilder(_carCache, classColorManager, positionCalculator);
+            _builder = new RelativeDisplayBuilder(_carCache, classColorManager, positionCalculator, _historyManager);
         }
 
         public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
@@ -90,6 +94,7 @@ namespace VISOR.ViewModels
         {
             RelativeRows.Clear();
             _builder.Reset();
+            _historyManager.Reset();
 
             foreach (var row in _carCache.Values)
             {
