@@ -284,8 +284,8 @@ namespace VISOR.ViewModels
             row.Segment3Color = Brushes.Transparent;
             row.Segment4Color = Brushes.Transparent;
             row.Segment5Color = Brushes.Transparent;
-            row.GapColor = Brushes.LightGray;
-            row.GapFontWeight = FontWeights.Normal;
+            row.GapColor = Brushes.White;
+            row.GapFontWeight = FontWeights.SemiBold;
 
             if (row.IsPlayer)
             {

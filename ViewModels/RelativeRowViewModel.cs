@@ -24,8 +24,8 @@ namespace VISOR.ViewModels
         private Brush _segment3Color = Brushes.Transparent;
         private Brush _segment4Color = Brushes.Transparent;
         private Brush _segment5Color = Brushes.Transparent;
-        private Brush _gapColor = Brushes.LightGray;
-        private FontWeight _gapFontWeight = FontWeights.Normal;
+        private Brush _gapColor = Brushes.White;
+        private FontWeight _gapFontWeight = FontWeights.SemiBold;
 
         public int CarIdx { get; set; }
         public string ClassPos { get => _classPos; set { _classPos = value; OnPropertyChanged(); } }
