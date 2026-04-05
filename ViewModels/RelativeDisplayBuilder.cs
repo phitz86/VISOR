@@ -10,13 +10,12 @@ namespace VISOR.ViewModels
 {
     /// <summary>
     /// Builds the 7-row proximity-based relative display with visual properties.
-    /// Uses geometric distance (LapDistPct) × reference lap time for gap calculations.
-    ///
+    /// Uses Native CarIdxEstTime for accurate time gap calculations.
+    /// 
     /// REFACTOR LOG:
-    /// - Implemented "Geometric Truth" logic for gap direction and magnitude.
-    /// - CarIdxEstTime is pace-dependent (each car's own speed), so raw deltas conflate
-    ///   position gap with pace difference. Replaced with geometry × refLap for consistent gaps.
-    /// - refLap cascade: player best lap → qualifying time → class estimated time.
+    /// - Implemented "Geometric Truth" logic for gap direction.
+    /// - Decoupled IsAhead logic from EstTime to fix "Zero-Cross" bug on short tracks.
+    /// - EstTime is now used only for magnitude, forced to align with geometric reality.
     /// </summary>
     public class RelativeDisplayBuilder
     {
@@ -333,18 +332,56 @@ namespace VISOR.ViewModels
             }
 
             // --- 3. TIME MAGNITUDE (How big is the gap?) ---
-            // Convert geometric distance to a time gap using the reference lap time.
-            // CarIdxEstTime is pace-dependent (each car's EstTime reflects its own speed),
-            // so raw EstTime deltas conflate position gap with pace difference, causing
-            // gaps that don't match the visual proximity order. Using geometry × refLap
-            // ensures gap magnitude always agrees with the proximity sort.
-            nativeTimeGap = Math.Abs(distDelta) * refLap;
-            isAhead = isGeometricallyAhead;
-
-            // Capture EstTime for diagnostic logging only
+            // We use CarIdxEstTime for the magnitude, with geometry for direction.
             var estTimes = snapshot.GetValue<float[]>("CarIdxEstTime");
-            float playerEstTime = (estTimes != null && playerRow.CarIdx < estTimes.Length) ? estTimes[playerRow.CarIdx] : 0f;
-            float oppEstTime = (estTimes != null && row.CarIdx < estTimes.Length) ? estTimes[row.CarIdx] : 0f;
+            float playerEstTime = 0f;
+            float oppEstTime = 0f;
+            float rawTimeDelta = 0f;
+            bool wrapCorrected = false;
+
+            if (estTimes != null && estTimes[playerRow.CarIdx] > 0 && estTimes[row.CarIdx] > 0)
+            {
+                playerEstTime = estTimes[playerRow.CarIdx];
+                oppEstTime = estTimes[row.CarIdx];
+
+                rawTimeDelta = oppEstTime - playerEstTime;
+
+                // S/F wrap correction: only apply when the disagreement between geometry and time
+                // is large enough to indicate a genuine start/finish boundary crossing.
+                // Normal mid-lap EstTime wandering produces small disagreements (a few seconds).
+                // A real S/F wrap produces disagreements close to a full lap time.
+                if (isGeometricallyAhead && rawTimeDelta < 0 && Math.Abs(rawTimeDelta) > refLap * 0.5f)
+                {
+                    rawTimeDelta += refLap;
+                    wrapCorrected = true;
+                }
+                else if (!isGeometricallyAhead && rawTimeDelta > 0 && rawTimeDelta > refLap * 0.5f)
+                {
+                    rawTimeDelta -= refLap;
+                    wrapCorrected = true;
+                }
+
+                nativeTimeGap = Math.Abs(rawTimeDelta);
+                isAhead = isGeometricallyAhead;
+            }
+            else
+            {
+                // Fallback: If EstTime unavailable, use distance/speed approximation
+                float trackLength = snapshot.GetValue<float>("TrackLength", 0f);
+                float playerSpeed = snapshot.GetValue<float>("Speed", 0f);
+
+                if (trackLength > 0 && playerSpeed > 1.0f)
+                {
+                    float distanceMeters = Math.Abs(distDelta * trackLength);
+                    nativeTimeGap = distanceMeters / Math.Max(playerSpeed, 1.0f);
+                    isAhead = isGeometricallyAhead;
+                }
+                else
+                {
+                    row.GapText = string.Empty;
+                    return;
+                }
+            }
 
             // Reset smoothing if car was recently absent from telemetry (between 1-2 seconds)
             int framesSinceValid = _positionCalculator.GetFramesSinceValidData(row.CarIdx);
@@ -358,8 +395,9 @@ namespace VISOR.ViewModels
             float displayGap = row.SmoothedGap;
 
             // --- SET GAP TEXT FOR DISPLAY ---
-            // Max geometric distance in the proximity display is 0.5 * refLap (half the track).
-            // Using 0.75 provides margin for smoothing transients.
+            // Sanity threshold: max geometric distance in the proximity display is half the track.
+            // Using 0.75 of refLap gives headroom for EstTime wandering while still catching
+            // bogus wrap-corrected values (which would be near refLap itself).
             if (displayGap > 0 && displayGap < refLap * 0.75f)
             {
                 string sign = isAhead ? "+" : "-";
@@ -377,8 +415,8 @@ namespace VISOR.ViewModels
                 sessionTime, slotIndex, row.CarNum,
                 playerRow.LapDistPct, row.LapDistPct,
                 distDelta, isGeometricallyAhead,
-                playerEstTime, oppEstTime, 0f,
-                false, refLap, refLapSource,
+                playerEstTime, oppEstTime, rawTimeDelta,
+                wrapCorrected, refLap, refLapSource,
                 nativeTimeGap, displayGap, row.GapText);
 #endif
 
