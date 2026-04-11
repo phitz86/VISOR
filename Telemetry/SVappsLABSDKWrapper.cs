@@ -53,15 +53,13 @@ namespace VISOR.Telemetry
 
         #region Events
         public event Action<SVappsLABSnapshot> SnapshotAvailable;
-        public event Action<string> SessionYamlAvailable;
         public event Action<bool> ConnectionStateChanged;
         public event Action<bool> PrimedStateChanged;
-        public event Action SessionDataUpdated;
         #endregion
 
         public SVappsLABSDKWrapper()
         {
-            _logger = new NullLogger<SVappsLABSDKWrapper>();
+            _logger = new VisorSdkLogger<SVappsLABSDKWrapper>();
             _sessionCoordinator = new SessionDataCoordinator();
             _dataBuilder = new TelemetryDataBuilder(_sessionCoordinator);
 
@@ -149,8 +147,6 @@ namespace VISOR.Telemetry
                     if (_sessionCoordinator.ParseSessionData(sessionInfo))
                     {
                         Log.Info("Session YAML retrieved and parsed successfully");
-                        SessionYamlAvailable?.Invoke(sessionInfo);
-                        SessionDataUpdated?.Invoke();
                         CheckPrimedStateChange();
                         CheckForSessionTransitionLog();
                     }
@@ -287,10 +283,40 @@ namespace VISOR.Telemetry
         }
     }
 
-    public class NullLogger<T> : ILogger<T>
+    /// <summary>
+    /// Bridges Microsoft.Extensions.Logging output from the SVappsLAB SDK into VISOR's Log.cs.
+    /// Warnings and errors are always surfaced; Info/Debug are forwarded when VISOR debug mode is on.
+    /// </summary>
+    public class VisorSdkLogger<T> : ILogger<T>
     {
         public IDisposable BeginScope<TState>(TState state) => null;
-        public bool IsEnabled(LogLevel logLevel) => false;
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter) { }
+
+        public bool IsEnabled(LogLevel logLevel) =>
+            logLevel >= LogLevel.Warning || Log.DebugModeEnabled;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+        {
+            if (!IsEnabled(logLevel)) return;
+            if (formatter == null) return;
+
+            string message = $"[SDK] {formatter(state, exception)}";
+
+            switch (logLevel)
+            {
+                case LogLevel.Critical:
+                case LogLevel.Error:
+                    Diagnostics.Log.Error(message, exception);
+                    break;
+                case LogLevel.Warning:
+                    Diagnostics.Log.Warning(exception == null ? message : $"{message} ({exception.GetType().Name}: {exception.Message})");
+                    break;
+                case LogLevel.Information:
+                    Diagnostics.Log.Info(message);
+                    break;
+                default:
+                    Diagnostics.Log.Debug(message);
+                    break;
+            }
+        }
     }
 }

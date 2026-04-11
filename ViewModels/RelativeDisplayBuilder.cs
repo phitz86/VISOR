@@ -23,18 +23,17 @@ namespace VISOR.ViewModels
     {
         #region Constants
 
-        // Time Gap Thresholds (Seconds) for proximity segment coloring
-        private const float TIME_SEG5_CRITICAL = 0.6f;  // < 0.6s (Contact Imminent / Netcode zone)
-        private const float TIME_SEG4_DANGER = 1.5f;    // < 1.5s (Drafting / Attack Range)
-        private const float TIME_SEG3_WARNING = 3.0f;   // < 3.0s (Hunting / Mirrors Full)
-        private const float TIME_SEG2_AWARE = 5.0f;     // < 5.0s (Traffic Monitoring)
-        private const float TIME_SEG1_INFO = 8.0f;      // < 8.0s (On Radar)
+        // Time gap thresholds (seconds) for proximity segment coloring.
+        private const float TIME_SEG5_CRITICAL = 0.6f;
+        private const float TIME_SEG4_DANGER = 1.5f;
+        private const float TIME_SEG3_WARNING = 3.0f;
+        private const float TIME_SEG2_AWARE = 5.0f;
+        private const float TIME_SEG1_INFO = 8.0f;
 
         private const float METERS_TO_FEET = 3.28084f;
         private const int MAX_DISTANCE_FEET = 999;
 
-        // Debug constants
-        private const int DEBUG_LOG_INTERVAL = 60; // Log every ~1 second (assuming 60Hz)
+        private const int DEBUG_LOG_INTERVAL = 60; // ~1s at 60Hz
 
         private static readonly Color NeutralColor = (Color)ColorConverter.ConvertFromString("#80404040");
         private static readonly Color AheadAlertColor = (Color)ColorConverter.ConvertFromString("#FF00FFFF");
@@ -54,7 +53,6 @@ namespace VISOR.ViewModels
         private readonly RelativeGapLogger _gapLogger;
 #endif
 
-        // Rolling counter for throttling debug logs
         private int _debugFrameCounter = 0;
         #endregion
 
@@ -78,13 +76,11 @@ namespace VISOR.ViewModels
         #region Public Methods
         public List<RelativeRowViewModel> Calculate(SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider)
         {
-            // Increment frame counter for logging throttle
             _debugFrameCounter++;
 #if DEBUG
             _gapLogger?.BeginFrame();
 #endif
 
-            // Update position history buffers (handles 10Hz decimation internally)
             _historyManager.Update(snapshot, dataProvider);
 
             var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx");
@@ -143,11 +139,10 @@ namespace VISOR.ViewModels
                     !string.IsNullOrEmpty(carNumbers[i]) &&
                     !string.IsNullOrEmpty(userNames[i]))
                 {
-                    // Check if this is the pace car (class ID 11)
+                    // Class ID 11 is the pace car — hide it while it sits in pit lane.
                     bool isPaceCar = (carClassIDs[i] == 11);
                     bool isOnPitRoad = (onPitRoad != null && i < onPitRoad.Length) && onPitRoad[i];
 
-                    // Skip pace car if it's on pit road
                     if (isPaceCar && isOnPitRoad)
                     {
                         continue;
@@ -278,7 +273,6 @@ namespace VISOR.ViewModels
 
         private void AssignProximitySegments(RelativeRowViewModel row, RelativeRowViewModel playerRow, SVappsLABSnapshot snapshot, int slotIndex)
         {
-            // Reset segments and gap styling to defaults
             row.Segment1Color = Brushes.Transparent;
             row.Segment2Color = Brushes.Transparent;
             row.Segment3Color = Brushes.Transparent;
@@ -293,16 +287,13 @@ namespace VISOR.ViewModels
                 return;
             }
 
-            // --- 1. GEOMETRIC DIRECTION (Who is actually ahead?) ---
+            // Wrap to the shortest arc around the lap (-0.5 to +0.5).
             float distDelta = row.LapDistPct - playerRow.LapDistPct;
-
-            // Wrap geometry to -0.5 to +0.5 range (shortest path on the circle)
             if (distDelta > 0.5f) distDelta -= 1.0f;
             else if (distDelta < -0.5f) distDelta += 1.0f;
 
             bool isGeometricallyAhead = distDelta > 0;
 
-            // --- 2. PIT ROAD CHECK ---
             if (row.IsOnPitRoad)
             {
                 row.GapText = "PIT";
@@ -344,25 +335,22 @@ namespace VISOR.ViewModels
                 return;
             }
 
-            // --- 4. BUFFER-BASED GAP CALCULATION ---
+            // Buffer crossing lookup: for a car ahead, search the opponent's buffer for the player's
+            // current track position; for a car behind, search the player's buffer for the opponent's.
             double sessionTime = snapshot.GetValue<double>("SessionTime", 0.0);
             float nativeTimeGap = 0f;
             bool isAhead = isGeometricallyAhead;
             string gapSource = "buffer";
 
-            // For car ahead of player: search OPPONENT's buffer for player's current position
-            // For car behind player: search PLAYER's buffer for opponent's current position
             double? crossingTime = null;
 
             if (isGeometricallyAhead)
             {
-                // Car is ahead: when did the opponent last cross the player's current position?
                 if (oppBuffer != null)
                     crossingTime = oppBuffer.FindCrossingTime(playerRow.LapDistPct);
             }
             else
             {
-                // Car is behind: when did the player last cross the opponent's current position?
                 var playerBuffer = _historyManager.GetBuffer(playerRow.CarIdx);
                 if (playerBuffer != null)
                     crossingTime = playerBuffer.FindCrossingTime(row.LapDistPct);
@@ -374,7 +362,7 @@ namespace VISOR.ViewModels
             }
             else
             {
-                // No valid crossing found (buffer warm-up or out of range) — blank gap
+                // Buffer warm-up or out of range.
                 row.GapText = string.Empty;
                 gapSource = "none";
 
@@ -384,20 +372,17 @@ namespace VISOR.ViewModels
                 return;
             }
 
-            // Reset smoothing if car was recently absent from telemetry (between 1-2 seconds)
+            // Drop smoothing if the car disappeared from telemetry for 1-2 seconds.
             int framesSinceValid = _positionCalculator.GetFramesSinceValidData(row.CarIdx);
             if (framesSinceValid > 60 && framesSinceValid < 120)
             {
                 row.ResetSmoothing();
             }
 
-            // Update smoothed gap in ViewModel (for display stability)
             row.UpdateSmoothedGap(nativeTimeGap);
             float displayGap = row.SmoothedGap;
 
-            // --- SET GAP TEXT FOR DISPLAY ---
-            // Buffer-based gaps are naturally bounded by buffer depth (30s).
-            // Sanity cap: if the smoothed gap exceeds 30s, treat as out of range.
+            // Buffer depth is 30s, so anything above that is out of range.
             if (displayGap > 0 && displayGap < 30f)
             {
                 string sign = isAhead ? "+" : "-";
@@ -412,14 +397,12 @@ namespace VISOR.ViewModels
             LogDiagnosticRow(snapshot, slotIndex, row, playerRow, distDelta, isGeometricallyAhead, gapSource, displayGap, row.GapText);
 #endif
 
-            // --- DEBUG LOGGING ---
             if (_debugFrameCounter % DEBUG_LOG_INTERVAL == 0 && displayGap <= TIME_SEG2_AWARE)
             {
                 string relation = isAhead ? "AHEAD" : "BEHIND";
                 Log.Debug($"[Buffer] #{row.CarNum} ({relation}): Gap={displayGap:F2}s");
             }
 
-            // --- LIGHT UP SEGMENTS ---
             Color alertColor = isAhead ? AheadAlertColor : BehindAlertColor;
 
             if (displayGap <= TIME_SEG1_INFO)

@@ -111,20 +111,16 @@ namespace VISOR.Settings
                 {
                     WindowSizePreset.Small => new Size(MAIN_WINDOW_WIDTH_LARGE * 0.6, MAIN_WINDOW_HEIGHT_LARGE * 0.6),
                     WindowSizePreset.Medium => new Size(MAIN_WINDOW_WIDTH_LARGE * 0.8, MAIN_WINDOW_HEIGHT_LARGE * 0.8),
-                    WindowSizePreset.Large => new Size(MAIN_WINDOW_WIDTH_LARGE, MAIN_WINDOW_HEIGHT_LARGE),
                     _ => new Size(MAIN_WINDOW_WIDTH_LARGE, MAIN_WINDOW_HEIGHT_LARGE)
                 };
             }
-            else
+
+            return sizePreset switch
             {
-                return sizePreset switch
-                {
-                    WindowSizePreset.Small => new Size(RADAR_WINDOW_WIDTH_LARGE * 0.8, RADAR_WINDOW_HEIGHT_LARGE * 0.8),
-                    WindowSizePreset.Medium => new Size(RADAR_WINDOW_WIDTH_LARGE * 0.9, RADAR_WINDOW_HEIGHT_LARGE * 0.9),
-                    WindowSizePreset.Large => new Size(RADAR_WINDOW_WIDTH_LARGE, RADAR_WINDOW_HEIGHT_LARGE),
-                    _ => new Size(RADAR_WINDOW_WIDTH_LARGE, RADAR_WINDOW_HEIGHT_LARGE)
-                };
-            }
+                WindowSizePreset.Small => new Size(RADAR_WINDOW_WIDTH_LARGE * 0.8, RADAR_WINDOW_HEIGHT_LARGE * 0.8),
+                WindowSizePreset.Medium => new Size(RADAR_WINDOW_WIDTH_LARGE * 0.9, RADAR_WINDOW_HEIGHT_LARGE * 0.9),
+                _ => new Size(RADAR_WINDOW_WIDTH_LARGE, RADAR_WINDOW_HEIGHT_LARGE)
+            };
         }
 
         private double GetMainWindowScaleFactor(WindowSizePreset sizePreset)
@@ -133,7 +129,6 @@ namespace VISOR.Settings
             {
                 WindowSizePreset.Small => 0.6,
                 WindowSizePreset.Medium => 0.8,
-                WindowSizePreset.Large => 1.0,
                 _ => 1.0
             };
         }

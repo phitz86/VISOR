@@ -93,7 +93,6 @@ namespace VISOR.ViewModels
             CheckSessionStateTransitions(snapshot);
             CheckForSessionTransition(snapshot, sessionDataProvider);
 
-            // Update PositionCalculator every frame (internally throttled to 30 frames)
             _positionCalculator.Update(snapshot, sessionDataProvider);
 
             FuelVM.Update(snapshot.GetValue<float>("FuelLevel"), snapshot.GetValue<int>("Lap"));
@@ -164,7 +163,6 @@ namespace VISOR.ViewModels
 
             if (dataProvider.ShouldUseFastestLapPositioning())
             {
-                // Practice/Qualifying - get position from YAML fastest lap data
                 var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx", -1);
                 var fastestLapData = dataProvider.GetFastestLapPositioning();
                 var playerData = fastestLapData.FirstOrDefault(d => d.carIdx == playerCarIdx);
@@ -172,7 +170,6 @@ namespace VISOR.ViewModels
             }
             else
             {
-                // Race - use calculated position from PositionCalculator
                 var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx", -1);
                 var carClassIDs = dataProvider.CarClassIDs;
 
@@ -214,7 +211,6 @@ namespace VISOR.ViewModels
             int currentSessionState = snapshot.GetValue<int>("SessionState", -1);
             if (currentSessionState != _lastSessionState)
             {
-                // Map session state codes to readable names
                 string GetStateName(int state) => state switch
                 {
                     0 => "Invalid",

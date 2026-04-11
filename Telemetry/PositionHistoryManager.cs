@@ -10,13 +10,12 @@ namespace VISOR.Telemetry
     public class PositionHistoryManager
     {
         private const int MaxCars = 64;
-        private const int DecimationInterval = 6; // 60Hz / 6 = 10Hz recording rate
+        private const int DecimationInterval = 6; // 60Hz / 6 = 10Hz
 
         private readonly PositionHistoryBuffer[] _buffers;
         private int _frameCounter = 0;
         private float _trackLengthMeters = 0f;
 
-        // Track pit road state transitions (previous frame's values)
         private readonly bool[] _prevOnPitRoad = new bool[MaxCars];
 
         public PositionHistoryManager()
@@ -44,7 +43,6 @@ namespace VISOR.Telemetry
         /// </summary>
         public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider)
         {
-            // Configure track length on first valid reading
             if (_trackLengthMeters <= 0f)
             {
                 if (dataProvider is SessionDataCoordinator coordinator)
@@ -63,13 +61,12 @@ namespace VISOR.Telemetry
                 }
             }
 
-            // Handle pit road transitions
             var onPitRoad = snapshot.GetValue<bool[]>("CarIdxOnPitRoad");
             if (onPitRoad != null)
             {
                 for (int i = 0; i < Math.Min(onPitRoad.Length, MaxCars); i++)
                 {
-                    // Entered pit road this frame — invalidate buffer
+                    // Entering pit road invalidates the buffer.
                     if (onPitRoad[i] && !_prevOnPitRoad[i])
                     {
                         _buffers[i].Clear();
@@ -78,12 +75,10 @@ namespace VISOR.Telemetry
                 }
             }
 
-            // Decimation: only record every 6th frame (10Hz)
             _frameCounter++;
             if (_frameCounter % DecimationInterval != 0)
                 return;
 
-            // Record positions for all cars not on pit road
             var lapDistPcts = snapshot.GetValue<float[]>("CarIdxLapDistPct");
             double sessionTime = snapshot.GetValue<double>("SessionTime", 0.0);
 
@@ -92,17 +87,14 @@ namespace VISOR.Telemetry
 
             for (int i = 0; i < Math.Min(lapDistPcts.Length, MaxCars); i++)
             {
-                // Skip cars on pit road — don't record their positions
                 if (onPitRoad != null && i < onPitRoad.Length && onPitRoad[i])
                     continue;
 
                 float pct = lapDistPcts[i];
 
-                // Skip invalid positions (car not in world)
                 if (pct < 0f || pct > 1.0f)
                     continue;
 
-                // Record returns false on teleport detection (buffer auto-flushed, skip this tick)
                 _buffers[i].Record(sessionTime, pct);
             }
         }

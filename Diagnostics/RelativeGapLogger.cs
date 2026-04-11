@@ -22,10 +22,7 @@ namespace VISOR.Diagnostics
 
         public RelativeGapLogger()
         {
-            _outputDirectory = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-                "VISOR_TelemetryLogs"
-            );
+            _outputDirectory = Path.Combine(Log.GetDiagnosticsDirectory(), "RelativeGap");
             Directory.CreateDirectory(_outputDirectory);
 
             string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");

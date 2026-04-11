@@ -23,16 +23,13 @@ namespace VISOR
 
             try
             {
-                // Initialize logging system
                 var settings = UserSettings.Instance;
                 Log.DebugModeEnabled = settings.DebugModeEnabled;
                 Log.StartNewSession();
 
-                // Get version from assembly
                 var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "Unknown";
                 Log.Info($"VISOR started - Version: {version}");
 
-                // Clean up old log files
                 Log.CleanupOldLogs();
 
                 Log.Info("Application startup initiated");

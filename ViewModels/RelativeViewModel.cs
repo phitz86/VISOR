@@ -20,26 +20,19 @@ namespace VISOR.ViewModels
         private void OnPropertyChanged([CallerMemberName] string? name = null) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
-        // --- State Properties ---
         public ObservableCollection<RelativeRowViewModel> RelativeRows { get; } = new();
         private readonly Dictionary<int, RelativeRowViewModel> _carCache = new();
 
-        // --- Child Services ---
         private readonly RelativeDisplayBuilder _builder;
         private readonly Telemetry.PositionHistoryManager _historyManager;
 
-        // --- PUBLIC ACCESSOR FOR DEBUG LOGGERS ---
+        // Exposed so debug loggers can query the same calculator.
         public PositionCalculator PositionCalculator { get; }
 
         public RelativeViewModel(ClassColorManager classColorManager, PositionCalculator positionCalculator)
         {
-            // Store PositionCalculator for external access
             PositionCalculator = positionCalculator;
-
-            // Create the position history manager for buffer-based gap calculation
             _historyManager = new Telemetry.PositionHistoryManager();
-
-            // Pass dependencies to the Builder
             _builder = new RelativeDisplayBuilder(_carCache, classColorManager, positionCalculator, _historyManager);
         }
 
@@ -58,10 +51,7 @@ namespace VISOR.ViewModels
                 return;
             }
 
-            // --- Delegate to Builder ---
             var newRows = _builder.Calculate(snapshot, sessionDataProvider);
-
-            // --- Update State from Result ---
             UpdateCollection(newRows);
         }
 

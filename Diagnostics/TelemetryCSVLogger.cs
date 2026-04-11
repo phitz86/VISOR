@@ -25,10 +25,7 @@ namespace VISOR.Diagnostics
 
         public TelemetryCSVLogger()
         {
-            _outputDirectory = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-                "VISOR_TelemetryLogs"
-            );
+            _outputDirectory = Path.Combine(Log.GetDiagnosticsDirectory(), "Telemetry");
             Directory.CreateDirectory(_outputDirectory);
             Log.Info($"[TelemetryCSV] Output directory: {_outputDirectory}");
         }
@@ -41,7 +38,6 @@ namespace VISOR.Diagnostics
             if (_isDisposed || snapshot == null || !snapshot.IsValid || dataProvider == null || !dataProvider.IsDataReady)
                 return;
 
-            // Throttle to 1Hz
             DateTime now = DateTime.UtcNow;
             if (now - _lastLogTime < _logInterval)
                 return;
@@ -52,21 +48,18 @@ namespace VISOR.Diagnostics
             {
                 int currentSessionNum = snapshot.GetValue<int>("SessionNum", -1);
 
-                // Check if we need to start a new CSV file for a new session
                 if (currentSessionNum != _lastSessionNum)
                 {
                     StartNewSessionFile(currentSessionNum, dataProvider);
                     _lastSessionNum = currentSessionNum;
                 }
 
-                // Write header if this is a new file
                 if (!_headerWritten && _writer != null)
                 {
                     WriteHeader();
                     _headerWritten = true;
                 }
 
-                // Write telemetry data rows
                 if (_writer != null)
                 {
                     WriteDataRows(snapshot, dataProvider, now);
@@ -82,19 +75,16 @@ namespace VISOR.Diagnostics
         {
             try
             {
-                // Close previous file if open
                 _writer?.Flush();
                 _writer?.Dispose();
                 _writer = null;
                 _headerWritten = false;
 
-                // Generate new filename
                 string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
                 string sessionName = GetSessionNameFromNumber(sessionNum);
                 string filename = $"Telemetry_{sessionName}_{timestamp}.csv";
                 _currentCsvPath = Path.Combine(_outputDirectory, filename);
 
-                // Open new file
                 _writer = new StreamWriter(_currentCsvPath, false, Encoding.UTF8);
                 Log.Info($"[TelemetryCSV] Started new log file: {filename}");
             }
@@ -146,22 +136,18 @@ namespace VISOR.Diagnostics
 
                 float playerLapDistPct = carIdxLapDistPct[playerCarIdx];
 
-                // Log all valid cars (cars with valid data in the session)
                 for (int carIdx = 0; carIdx < carIdxEstTime.Length; carIdx++)
                 {
-                    // Skip if no valid data for this car
                     if (carNumbers == null || carIdx >= carNumbers.Length || string.IsNullOrEmpty(carNumbers[carIdx]))
                         continue;
 
                     if (userNames == null || carIdx >= userNames.Length || string.IsNullOrEmpty(userNames[carIdx]))
                         continue;
 
-                    // Calculate proximity distance
                     float carLapDistPct = carIdxLapDistPct[carIdx];
                     float directDistance = Math.Abs(carLapDistPct - playerLapDistPct);
                     float proximityDistance = Math.Min(directDistance, 1.0f - directDistance);
 
-                    // Build CSV row
                     var row = new StringBuilder();
                     row.Append($"{timestampStr},");
                     row.Append($"{sessionTime:F3},");
@@ -192,7 +178,6 @@ namespace VISOR.Diagnostics
             if (string.IsNullOrEmpty(field))
                 return "";
 
-            // If field contains comma, quote, or newline, wrap in quotes and escape quotes
             if (field.Contains(",") || field.Contains("\"") || field.Contains("\n") || field.Contains("\r"))
             {
                 return $"\"{field.Replace("\"", "\"\"")}\"";

@@ -28,11 +28,11 @@ namespace VISOR.Telemetry
         private const double DiscontinuityThreshold = 0.3; // seconds
 
         private readonly Entry[] _entries = new Entry[BufferSize];
-        private int _head = 0;   // Next write position
-        private int _count = 0;  // Number of valid entries
+        private int _head = 0;
+        private int _count = 0;
 
-        // Stationary detection
-        private float _stationaryEpsilon = 0.001f; // Default; set via SetStationaryEpsilon
+        // Overwritten by SetStationaryEpsilon once track length is known.
+        private float _stationaryEpsilon = 0.001f;
 
         /// <summary>
         /// Sets the stationary detection epsilon based on track length.
@@ -55,17 +55,16 @@ namespace VISOR.Telemetry
         /// </summary>
         public bool Record(double sessionTime, float lapDistPct)
         {
-            // Teleport detection: compare against most recent entry
             if (_count > 0)
             {
                 var prev = GetEntry(_count - 1);
                 float delta = Math.Abs(lapDistPct - prev.LapDistPct);
 
-                // Check for teleport: large jump that isn't an S/F crossing
+                // Large jump that isn't an S/F crossing means the car teleported (tow, reset).
                 if (delta > TeleportThreshold && !IsSFWrap(prev.LapDistPct, lapDistPct))
                 {
                     Clear();
-                    return false; // Signal teleport — skip recording this tick
+                    return false;
                 }
             }
 
@@ -96,13 +95,12 @@ namespace VISOR.Telemetry
             if (_count < stationaryWindowEntries)
                 return false;
 
-            // Compare the oldest entry in the window to the newest
             var oldest = GetEntry(_count - stationaryWindowEntries);
             var newest = GetEntry(_count - 1);
 
             float totalMovement = Math.Abs(newest.LapDistPct - oldest.LapDistPct);
 
-            // Handle S/F wrap in the movement check
+            // S/F wrap.
             if (totalMovement > 0.5f)
                 totalMovement = 1.0f - totalMovement;
 
@@ -121,37 +119,32 @@ namespace VISOR.Telemetry
             if (_count < 2)
                 return null;
 
-            // Scan backward from newest to oldest, looking for two adjacent entries
-            // that bracket the target position
+            // Walk newest → oldest looking for two adjacent entries that bracket targetPct.
             for (int i = _count - 1; i > 0; i--)
             {
                 var current = GetEntry(i);
                 var previous = GetEntry(i - 1);
 
-                // Discontinuity check: if too much time between samples, don't interpolate
+                // Skip samples with a telemetry gap — interpolation would be unreliable.
                 if (current.SessionTime - previous.SessionTime > DiscontinuityThreshold)
                     continue;
 
-                // Determine the movement from previous → current
                 float prevPct = previous.LapDistPct;
                 float currPct = current.LapDistPct;
 
-                // Handle S/F wrap: if the car crossed the start/finish line between these two samples
                 bool isSFCrossing = IsSFWrap(prevPct, currPct);
 
                 if (isSFCrossing)
                 {
-                    // Unwrap: shift the lower value up by 1.0 so both are on the same scale
+                    // Unwrap so both samples lie on the same 0..2 scale, then try the target in both frames.
                     if (currPct < prevPct)
                         currPct += 1.0f;
                     else
                         prevPct += 1.0f;
 
-                    // The target might also need unwrapping to fall within range
                     float target = targetPct;
                     float targetAlt = targetPct + 1.0f;
 
-                    // Try both the original and unwrapped target
                     double? result = TryInterpolate(prevPct, currPct, previous.SessionTime, current.SessionTime, target);
                     if (result.HasValue) return result;
 
@@ -160,7 +153,6 @@ namespace VISOR.Telemetry
                 }
                 else
                 {
-                    // Normal case: no wrap
                     double? result = TryInterpolate(prevPct, currPct, previous.SessionTime, current.SessionTime, targetPct);
                     if (result.HasValue) return result;
                 }
@@ -175,7 +167,6 @@ namespace VISOR.Telemetry
         /// </summary>
         private static double? TryInterpolate(float pctA, float pctB, double timeA, double timeB, float target)
         {
-            // Check if target is bracketed (between pctA and pctB, inclusive of direction)
             float min = Math.Min(pctA, pctB);
             float max = Math.Max(pctA, pctB);
 
@@ -184,7 +175,7 @@ namespace VISOR.Telemetry
 
             float range = pctB - pctA;
             if (Math.Abs(range) < 1e-9f)
-                return timeB; // Essentially the same position, return the newer time
+                return timeB;
 
             float t = (target - pctA) / range;
             return timeA + t * (timeB - timeA);

@@ -1,7 +1,4 @@
 ﻿using System;
-using System.IO;
-using System.Linq;
-using System.Threading.Channels;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -11,7 +8,6 @@ using VISOR.Diagnostics;
 using VISOR.Settings;
 using VISOR.Telemetry;
 using VISOR.ViewModels;
-using VISOR.Views;
 
 namespace VISOR.Views
 {
@@ -21,8 +17,6 @@ namespace VISOR.Views
         private readonly SVappsLABSDKWrapper _sdk;
         private readonly SettingsManager _settingsManager;
         private readonly ConfigModeManager _configModeManager;
-        private static DateTime _lastSessionReadyLog = DateTime.MinValue;
-        private bool _isDragging = false;
         private bool _lastRelativeVisibility = true;
 
         public MainViewModel ViewModel => _viewModel;
@@ -106,7 +100,6 @@ namespace VISOR.Views
         {
             if (_configModeManager.IsInConfigMode)
             {
-                _isDragging = true;
                 DragMove();
             }
         }
@@ -116,10 +109,8 @@ namespace VISOR.Views
             try
             {
                 _sdk.SnapshotAvailable += OnSnapshotAvailable;
-                _sdk.SessionYamlAvailable += OnSessionYamlAvailable;
                 _sdk.ConnectionStateChanged += OnConnectionStateChanged;
                 _sdk.PrimedStateChanged += OnPrimedStateChanged;
-                _sdk.SessionDataUpdated += OnSessionDataUpdated;
 
                 UpdateUIState();
             }
@@ -152,24 +143,15 @@ namespace VISOR.Views
             catch (TaskCanceledException) { }
         }
 
-        private void OnPrimedStateChanged(bool isPrimed)
+        private async void OnPrimedStateChanged(bool isPrimed)
         {
             try
             {
-                Dispatcher.Invoke(() =>
+                await Dispatcher.InvokeAsync(() =>
                 {
                     if (isPrimed)
                     {
                         StatusText.Text = "Fully connected!";
-                        Task.Delay(1000).ContinueWith(_ =>
-                        {
-                            try
-                            {
-                                Dispatcher.Invoke(() => StatusText.Visibility = Visibility.Collapsed);
-                            }
-                            catch (TaskCanceledException) { /* Ignore shutdown */ }
-                            catch (OperationCanceledException) { /* Ignore shutdown */ }
-                        });
                         _viewModel.IsTelemetryConnected = true;
                     }
                     else
@@ -179,15 +161,15 @@ namespace VISOR.Views
                         _viewModel.IsTelemetryConnected = false;
                     }
                 });
-            }
-            catch (TaskCanceledException) { /* Ignore shutdown */ }
-        }
 
-        private void OnSessionDataUpdated()
-        {
-            Dispatcher.Invoke(() =>
-            {
-            });
+                if (isPrimed)
+                {
+                    await Task.Delay(1000);
+                    await Dispatcher.InvokeAsync(() => StatusText.Visibility = Visibility.Collapsed);
+                }
+            }
+            catch (TaskCanceledException) { }
+            catch (OperationCanceledException) { }
         }
 
         private void OnSnapshotAvailable(SVappsLABSnapshot snapshot)
@@ -198,12 +180,6 @@ namespace VISOR.Views
                 {
                     if (_sdk.IsSessionDataReady)
                     {
-                        var now = DateTime.Now;
-                        if ((now - _lastSessionReadyLog).TotalSeconds > 10)
-                        {
-                            _lastSessionReadyLog = now;
-                        }
-
                         _viewModel.UpdateFromTelemetry(snapshot, _sdk.Coordinator);
 
                         bool currentRelativeVisibility = !_sdk.Coordinator.ShouldHideRelativeDisplay();
@@ -222,23 +198,6 @@ namespace VISOR.Views
                 });
             }
             catch (TaskCanceledException) { }
-        }
-
-        private void OnSessionYamlAvailable(string yaml)
-        {
-            Task.Run(() =>
-            {
-                try
-                {
-                    var dir = Path.Combine(AppContext.BaseDirectory, "telemetry_baselines", "SVapps");
-                    Directory.CreateDirectory(dir);
-                    File.WriteAllText(Path.Combine(dir, "session.yaml"), yaml);
-                }
-                catch
-                {
-                    // Non-fatal
-                }
-            });
         }
 
         private void UpdateUIState()
@@ -265,11 +224,6 @@ namespace VISOR.Views
                 });
             }
             catch (TaskCanceledException) { }
-        }
-
-        private void QuitButton_Click(object sender, RoutedEventArgs e)
-        {
-            Application.Current.Shutdown();
         }
 
         private void ExitButton_Click(object sender, RoutedEventArgs e)

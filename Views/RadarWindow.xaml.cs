@@ -23,7 +23,6 @@ namespace VISOR.Views
         private int _lastVisibleCarCount = 0;
         private bool _isFadedOut = false;
         private bool _forceVisible = false;
-        private bool _isDragging = false;
 
         public RadarWindow(SVappsLABSDKWrapper sdkWrapper, ClassColorManager classColorManager)
         {
@@ -215,7 +214,6 @@ namespace VISOR.Views
         {
             if (_configModeManager.IsInConfigMode)
             {
-                _isDragging = true;
                 DragMove();
             }
         }

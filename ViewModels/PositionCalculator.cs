@@ -44,15 +44,15 @@ namespace VISOR.ViewModels
         #endregion
 
         #region Private Fields - Prediction System
-        // Tier 1: Gate keeper
+        // Tier 1: gate keeper — once a car has valid data it stays eligible for display.
         private readonly HashSet<int> _carsWithValidDataHistory = new();
 
-        // Tier 2: Velocity tracking for prediction
+        // Tier 2: velocity tracking drives short-gap extrapolation.
         private readonly Dictionary<int, float> _lastValidLapDistPct = new();
         private readonly Dictionary<int, float> _lapDistPctVelocity = new();
         private readonly Dictionary<int, int> _lastValidCurrentLap = new();
 
-        // Tier 3: Cache management
+        // Tier 3: cache expiration removes cars after prolonged invalid data.
         private readonly Dictionary<int, int> _framesSinceValidData = new();
         private readonly Dictionary<int, int> _predictionStartFrame = new();
         #endregion
@@ -92,7 +92,6 @@ namespace VISOR.ViewModels
         /// </summary>
         public float GetEffectiveLapDistPct(int carIdx)
         {
-            // If we have current valid data, return it
             if (_framesSinceValidData.TryGetValue(carIdx, out int framesSinceValid) &&
                 framesSinceValid == 0 &&
                 _lastValidLapDistPct.TryGetValue(carIdx, out float currentValid))
@@ -100,13 +99,11 @@ namespace VISOR.ViewModels
                 return currentValid;
             }
 
-            // If cache is still valid, return predicted value
             if (HasValidCache(carIdx))
             {
                 return GetPredictedLapDistPct(carIdx);
             }
 
-            // No valid data available
             return -1f;
         }
 
@@ -117,13 +114,11 @@ namespace VISOR.ViewModels
         /// </summary>
         public int GetClassPosition(int carIdx, int classId)
         {
-            // Return frozen finishing position if car has finished
             if (_finishingClassPositions.TryGetValue(carIdx, out int finishingPosition))
             {
                 return finishingPosition;
             }
 
-            // Otherwise return live calculated position
             if (_cachedPositions.TryGetValue((carIdx, classId), out int position))
             {
                 return position;
@@ -177,7 +172,6 @@ namespace VISOR.ViewModels
             _isCurrentlyPredicting.Clear();
             _carsWithInvalidLapDistPctLogged.Clear();
 
-            // Clear finishing position tracking
             _finishingClassPositions.Clear();
             _carsFinished.Clear();
             _isCheckeredFlag = false;
@@ -269,16 +263,13 @@ namespace VISOR.ViewModels
                 return;
             }
 
-            // Check each car for lap completion increments
             for (int carIdx = 0; carIdx < carLapCompleted.Length; carIdx++)
             {
-                // Skip if car already finished
                 if (_carsFinished.Contains(carIdx))
                 {
                     continue;
                 }
 
-                // Skip if car doesn't have valid YAML data
                 if (carIdx >= carClassIDs.Length || carIdx >= carNumbers.Length)
                 {
                     continue;
@@ -286,24 +277,20 @@ namespace VISOR.ViewModels
 
                 int currentLapCompleted = carLapCompleted[carIdx];
 
-                // Check if this is the first time we're seeing this car
                 if (!_lastLapCompleted.ContainsKey(carIdx))
                 {
                     _lastLapCompleted[carIdx] = currentLapCompleted;
                     continue;
                 }
 
-                // Check if lap completed count has incremented (car crossed S/F)
                 int lastLapCompleted = _lastLapCompleted[carIdx];
                 if (currentLapCompleted > lastLapCompleted)
                 {
                     int classId = carClassIDs[carIdx];
                     int currentPosition = GetClassPosition(carIdx, classId);
 
-                    // Check if this is the P1 car (class leader)
                     if (!_leaderHasFinished && currentPosition == 1)
                     {
-                        // This is the leader finishing - freeze their position and enable freezing for others
                         _finishingClassPositions[carIdx] = currentPosition;
                         _carsFinished.Add(carIdx);
                         _leaderHasFinished = true;
@@ -312,13 +299,12 @@ namespace VISOR.ViewModels
                     }
                     else if (_leaderHasFinished && currentPosition > 0)
                     {
-                        // Leader has already finished, freeze this car's position
+                        // Don't freeze lapped traffic ahead of the class leader until the leader has crossed.
                         _finishingClassPositions[carIdx] = currentPosition;
                         _carsFinished.Add(carIdx);
 
                         Log.Info($"Car #{carNumbers[carIdx]} (idx {carIdx}) took checkered flag - frozen at P{currentPosition} (LapCompleted: {lastLapCompleted} -> {currentLapCompleted})");
                     }
-                    // else: Leader hasn't finished yet, don't freeze this car (lapped traffic ahead of leader)
 
                     _lastLapCompleted[carIdx] = currentLapCompleted;
                 }
@@ -344,7 +330,6 @@ namespace VISOR.ViewModels
             _validCarIndices.Clear();
             for (int i = 0; i < 64; i++)
             {
-                // Car must have YAML data AND have valid history AND have valid cache
                 bool hasYamlData = !string.IsNullOrEmpty(carNumbers[i]) &&
                                    !string.IsNullOrEmpty(userNames[i]);
 
@@ -356,7 +341,6 @@ namespace VISOR.ViewModels
                 }
             }
 
-            // Log changes to valid car roster
             var newCars = _validCarIndices.Except(_lastFrameValidCars).ToList();
             var removedCars = _lastFrameValidCars.Except(_validCarIndices).ToList();
 
@@ -393,7 +377,7 @@ namespace VISOR.ViewModels
                                     lapDistPct[i] >= 0f &&
                                     lapDistPct[i] <= 1f;
 
-                // Log invalid LapDistPct once per car per invalid stretch
+                // Log once per invalid stretch so mid-race telemetry gaps are captured without spamming.
                 if (!hasValidData && !_carsWithInvalidLapDistPctLogged.Contains(i))
                 {
                     var trackSurface = snapshot.GetValue<int[]>("CarIdxTrackSurface");
@@ -422,32 +406,28 @@ namespace VISOR.ViewModels
 
         private void ProcessValidData(int carIdx, float lapDist, int lap, bool isOnPit, string[] carNumbers)
         {
-            // Mark as having valid data history (Tier 1: Gate keeper)
             if (!_carsWithValidDataHistory.Contains(carIdx))
             {
                 _carsWithValidDataHistory.Add(carIdx);
                 Log.Info($"Car #{carNumbers[carIdx]} first valid data - added to history");
             }
 
-            // Reset invalid logging flag so we can capture the NEXT time this car goes invalid
-            // This allows us to log mid-race telemetry gaps, not just session startup
             _carsWithInvalidLapDistPctLogged.Remove(carIdx);
 
-            // Calculate velocity for prediction (Tier 2: Prediction)
             if (_lastValidLapDistPct.TryGetValue(carIdx, out float lastDist))
             {
                 float delta = lapDist - lastDist;
 
-                // Handle lap boundary wrap-around
+                // Lap boundary wrap-around.
                 if (delta < -0.5f) delta += 1.0f;
                 if (delta > 0.5f) delta -= 1.0f;
 
-                // Smooth velocity with exponential averaging (70% old, 30% new)
+                // Exponential smoothing (70% old, 30% new).
                 float instantVelocity = delta;
                 float smoothedVelocity = _lapDistPctVelocity.GetValueOrDefault(carIdx, 0f);
                 smoothedVelocity = (instantVelocity * 0.3f) + (smoothedVelocity * 0.7f);
 
-                // Zero out velocity if on pit road (don't predict through pits)
+                // Don't predict through pit lane.
                 if (isOnPit)
                 {
                     smoothedVelocity = 0f;
@@ -456,12 +436,10 @@ namespace VISOR.ViewModels
                 _lapDistPctVelocity[carIdx] = smoothedVelocity;
             }
 
-            // Update cache
             _lastValidLapDistPct[carIdx] = lapDist;
             _lastValidCurrentLap[carIdx] = lap;
             _framesSinceValidData[carIdx] = 0;
 
-            // Log prediction recovery if we were predicting
             if (_predictionStartFrame.Remove(carIdx, out int startFrame))
             {
                 int predictionDuration = _globalFrameCounter - startFrame;
@@ -475,11 +453,9 @@ namespace VISOR.ViewModels
 
         private void ProcessInvalidData(int carIdx, string[] carNumbers)
         {
-            // Increment frames since valid data (Tier 3: Cache expiration)
             int framesSinceValid = _framesSinceValidData.GetValueOrDefault(carIdx, 0) + 1;
             _framesSinceValidData[carIdx] = framesSinceValid;
 
-            // Start tracking prediction if this is the first invalid frame
             if (!_predictionStartFrame.ContainsKey(carIdx) &&
                 _lastValidLapDistPct.ContainsKey(carIdx))
             {
@@ -487,7 +463,6 @@ namespace VISOR.ViewModels
                 _isCurrentlyPredicting[carIdx] = true;
             }
 
-            // Log when cache expires
             if (framesSinceValid == MAX_CACHE_AGE_FRAMES &&
                 _carsWithValidDataHistory.Contains(carIdx))
             {
@@ -501,19 +476,18 @@ namespace VISOR.ViewModels
                 !_lapDistPctVelocity.TryGetValue(carIdx, out float velocity) ||
                 !_framesSinceValidData.TryGetValue(carIdx, out int framesSinceValid))
             {
-                return -1f; // No data to predict from
+                return -1f;
             }
 
-            // Don't predict if velocity is too small (stopped/pitting)
+            // Stopped/pitting — hold last known position instead of drifting.
             if (Math.Abs(velocity) < MIN_VELOCITY_THRESHOLD)
             {
-                return lastDist; // Return last known position (frozen)
+                return lastDist;
             }
 
-            // Predict position based on velocity
             float predictedDist = lastDist + (velocity * framesSinceValid);
 
-            // Wrap around track (0.0 to 1.0)
+            // Wrap to [0, 1).
             predictedDist = (predictedDist % 1.0f + 1.0f) % 1.0f;
 
             return predictedDist;
@@ -537,11 +511,9 @@ namespace VISOR.ViewModels
                 if (carIdx < 0 || carIdx >= carClassIDs.Length)
                     continue;
 
-                // Use effective LapDistPct (current or predicted)
                 float effectiveLapDistPct = GetEffectiveLapDistPct(carIdx);
                 int effectiveCurrentLap;
 
-                // Try current lap data
                 if (lapDistPct[carIdx] >= 0f && lapDistPct[carIdx] <= 1f)
                 {
                     effectiveCurrentLap = currentLap[carIdx];
@@ -552,10 +524,9 @@ namespace VISOR.ViewModels
                 }
                 else
                 {
-                    continue; // No lap data available
+                    continue;
                 }
 
-                // Skip if no effective position available
                 if (effectiveLapDistPct < 0f)
                     continue;
 
@@ -569,7 +540,6 @@ namespace VISOR.ViewModels
                 });
             }
 
-            // Calculate positions by class
             var classGroups = carsWithPositions.GroupBy(c => c.ClassId);
 
             foreach (var classGroup in classGroups)

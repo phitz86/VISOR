@@ -74,17 +74,12 @@ namespace VISOR.Diagnostics
 
             try
             {
-                // Ensure logs directory exists
                 Directory.CreateDirectory(GetLogsDirectory());
-
-                // Start the background writer task
                 _writerTask = Task.Run(() => ProcessLogQueue(_cancellationTokenSource.Token));
-
                 _isInitialized = true;
             }
             catch (Exception ex)
             {
-                // Critical failure - bubble up
                 throw new InvalidOperationException("Failed to initialize logging system", ex);
             }
         }
@@ -98,18 +93,15 @@ namespace VISOR.Diagnostics
             {
                 lock (_fileLock)
                 {
-                    // Generate new log file path
                     string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
                     string fileName = $"{LOG_FILE_PREFIX}{timestamp}{LOG_FILE_EXTENSION}";
                     _currentLogFilePath = Path.Combine(GetLogsDirectory(), fileName);
 
-                    // Write session header
                     WriteSessionHeader();
                 }
             }
             catch (Exception ex)
             {
-                // Critical failure - bubble up
                 throw new InvalidOperationException("Failed to start new logging session", ex);
             }
         }
@@ -123,7 +115,7 @@ namespace VISOR.Diagnostics
             header.AppendLine($"OS: {Environment.OSVersion}");
             header.AppendLine("=======================================");
 
-            // Write header directly to file (not through queue to ensure it's first)
+            // Write directly instead of queueing so the header always lands first.
             lock (_fileLock)
             {
                 if (EnableFileLogging && !string.IsNullOrEmpty(_currentLogFilePath))
@@ -187,31 +179,27 @@ namespace VISOR.Diagnostics
         {
             try
             {
-                // Check if message should be logged based on minimum level
                 if (level < MinimumLevel)
                     return;
 
-                // Format the log entry
                 string timestamp = DateTime.Now.ToString("yyyyMMdd HH:mm:ss.fff");
                 string levelStr = level.ToString().ToUpper().PadRight(7);
                 string logEntry = $"[{timestamp}] [{levelStr}] {message}";
 
-                // Send to Debug output if enabled
                 if (EnableDebugOutput)
                 {
                     System.Diagnostics.Debug.WriteLine(logEntry);
                 }
 
-                // Queue for file writing if enabled
                 if (EnableFileLogging && !string.IsNullOrEmpty(_currentLogFilePath))
                 {
                     _logQueue.Add(logEntry);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Suppress logging errors to prevent cascading failures
-                // This is a non-critical operation
+                // Never let logging failures cascade, but surface them to the debugger.
+                System.Diagnostics.Debug.WriteLine($"[Log] LogMessage failed: {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -230,10 +218,8 @@ namespace VISOR.Diagnostics
                         {
                             if (!string.IsNullOrEmpty(_currentLogFilePath))
                             {
-                                // Write the log entry
                                 File.AppendAllText(_currentLogFilePath, logEntry + Environment.NewLine);
 
-                                // Check if truncation is needed
                                 var fileInfo = new FileInfo(_currentLogFilePath);
                                 if (fileInfo.Exists && fileInfo.Length > MAX_LOG_SIZE_BYTES)
                                 {
@@ -242,47 +228,60 @@ namespace VISOR.Diagnostics
                             }
                         }
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Suppress individual write errors
-                        // Continue processing other messages
+                        System.Diagnostics.Debug.WriteLine($"[Log] Write failed: {ex.GetType().Name}: {ex.Message}");
                     }
                 }
             }
             catch (OperationCanceledException)
             {
-                // Normal shutdown
             }
         }
 
         private static void TruncateLogFile()
         {
+            // Runs inside _fileLock. Two passes:
+            //   1. Stream through the file counting lines.
+            //   2. Stream again, writing the last TRUNCATE_KEEP_PERCENTAGE portion to a temp file.
+            // Finally swap the temp file over the original with File.Replace.
+            string tempPath = _currentLogFilePath + ".tmp";
+
             try
             {
-                // This runs inside _fileLock, so it's already thread-safe
-
-                // Read all lines from the file
-                var allLines = File.ReadAllLines(_currentLogFilePath);
-
-                // Calculate how many lines to keep (80%)
-                int linesToKeep = (int)(allLines.Length * TRUNCATE_KEEP_PERCENTAGE);
-                int linesToSkip = allLines.Length - linesToKeep;
-
-                // Build new file content
-                var newContent = new StringBuilder();
-                newContent.AppendLine("[SYSTEM] === LOG TRUNCATED - KEEPING RECENT ENTRIES ===");
-
-                foreach (var line in allLines.Skip(linesToSkip))
+                long totalLines = 0;
+                using (var counter = new StreamReader(_currentLogFilePath))
                 {
-                    newContent.AppendLine(line);
+                    while (counter.ReadLine() != null) totalLines++;
                 }
 
-                // Write back to file (overwrite)
-                File.WriteAllText(_currentLogFilePath, newContent.ToString());
+                long linesToSkip = totalLines - (long)(totalLines * TRUNCATE_KEEP_PERCENTAGE);
+                if (linesToSkip <= 0) return;
+
+                using (var reader = new StreamReader(_currentLogFilePath))
+                using (var writer = new StreamWriter(tempPath, false, Encoding.UTF8))
+                {
+                    writer.WriteLine("[SYSTEM] === LOG TRUNCATED - KEEPING RECENT ENTRIES ===");
+
+                    long skipped = 0;
+                    string line;
+                    while ((line = reader.ReadLine()) != null)
+                    {
+                        if (skipped < linesToSkip)
+                        {
+                            skipped++;
+                            continue;
+                        }
+                        writer.WriteLine(line);
+                    }
+                }
+
+                File.Replace(tempPath, _currentLogFilePath, destinationBackupFileName: null);
             }
-            catch
+            catch (Exception ex)
             {
-                // If truncation fails, just continue - better to have a large log than no log
+                System.Diagnostics.Debug.WriteLine($"[Log] TruncateLogFile failed: {ex.GetType().Name}: {ex.Message}");
+                try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
             }
         }
 
@@ -304,6 +303,16 @@ namespace VISOR.Diagnostics
         }
 
         /// <summary>
+        /// Gets the path to the per-user diagnostics directory (%LOCALAPPDATA%\VISOR\Diagnostics).
+        /// Use this for ad-hoc CSV/YAML dumps generated by debug loggers.
+        /// </summary>
+        public static string GetDiagnosticsDirectory()
+        {
+            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            return Path.Combine(localAppData, "VISOR", "Diagnostics");
+        }
+
+        /// <summary>
         /// Deletes old log files, keeping only the most recent ones.
         /// </summary>
         /// <param name="maxLogsToKeep">Maximum number of log files to retain</param>
@@ -320,7 +329,6 @@ namespace VISOR.Diagnostics
                     .OrderByDescending(f => f.CreationTime)
                     .ToList();
 
-                // Delete old files beyond the limit
                 foreach (var fileToDelete in logFiles.Skip(maxLogsToKeep))
                 {
                     try
@@ -329,13 +337,11 @@ namespace VISOR.Diagnostics
                     }
                     catch
                     {
-                        // Continue if individual file deletion fails
                     }
                 }
             }
             catch
             {
-                // Suppress cleanup errors - non-critical operation
             }
         }
 
@@ -346,18 +352,12 @@ namespace VISOR.Diagnostics
         {
             try
             {
-                // Signal shutdown
                 _logQueue.CompleteAdding();
-
-                // Wait for queue to drain (with timeout)
                 _writerTask?.Wait(TimeSpan.FromSeconds(5));
-
-                // Cancel the writer task
                 _cancellationTokenSource.Cancel();
             }
             catch
             {
-                // Best effort shutdown
             }
         }
     }

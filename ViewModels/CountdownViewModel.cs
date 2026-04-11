@@ -12,7 +12,6 @@ namespace VISOR.ViewModels
         private void OnPropertyChanged([CallerMemberName] string? name = null) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
-        // --- Public Properties for UI Binding ---
         private string _timeRemainingDisplay = "--:--";
         private string _timeRemainingSymbol = "⏳";
 
@@ -27,7 +26,6 @@ namespace VISOR.ViewModels
             private set { _timeRemainingSymbol = value; OnPropertyChanged(); }
         }
 
-        // --- Internal State Fields ---
         private bool _greenFlagSeen;
         private int _lastLap;
         private string _currentLapDisplay;
@@ -68,10 +66,8 @@ namespace VISOR.ViewModels
         /// </summary>
         public void OnSessionTransition(ISessionDataProvider sessionDataProvider, int newSessionNum)
         {
-            // Reset state for the new session
             Reset();
 
-            // Check if this is a lap-limited qualifying session and set up state
             if (sessionDataProvider.IsQualifyingSession(newSessionNum))
             {
                 _totalQualifyingLaps = sessionDataProvider.GetSessionLaps(newSessionNum);
@@ -104,7 +100,7 @@ namespace VISOR.ViewModels
 
             bool lapCompleted = currentLap > _lastLap;
 
-            // Reset flags when lap counter resets (session restart)
+            // Lap counter regressed — session restart.
             if (currentLap < _lastLap)
             {
                 _greenFlagSeen = false;
@@ -112,7 +108,6 @@ namespace VISOR.ViewModels
                 _pendingCheckeredFlag = false;
             }
 
-            // Track session flags
             if ((sessionFlagsValue & (int)SessionFlags.Green) == (int)SessionFlags.Green)
             {
                 _greenFlagSeen = true;
@@ -128,19 +123,16 @@ namespace VISOR.ViewModels
                 _pendingCheckeredFlag = true;
             }
 
-            // Increment qualifying lap counter if applicable
-            // Only count laps AFTER we've seen the green flag
+            // Only count qualifying laps after green; consume the out-lap silently.
             if (_totalQualifyingLaps > 0 && lapCompleted && _greenFlagSeen)
             {
                 if (_isFirstQualiLap)
                 {
-                    // This is the out-lap, consume it without counting
                     Log.Debug($"[Countdown] Out-lap completed, not counting");
                     _isFirstQualiLap = false;
                 }
                 else
                 {
-                    // This is a flying lap, count it
                     _qualifyingLapsCompleted++;
                     Log.Debug($"[Countdown] Flying lap completed, count: {_qualifyingLapsCompleted}/{_totalQualifyingLaps}");
                 }
@@ -150,7 +142,6 @@ namespace VISOR.ViewModels
 
             if (shouldShowTimer)
             {
-                // Latch final lap and finished states
                 if (_pendingWhiteFlag && lapCompleted)
                 {
                     _finalLapLatched = true;
@@ -163,25 +154,23 @@ namespace VISOR.ViewModels
                 string newLapDisplay;
                 string newSymbol;
 
-                // Priority 1: Finished
+                // Priority order: Finished > Final Lap > Quali lap counter > Race lap counter > Timed session.
                 if (_finishedLatched)
                 {
                     newSymbol = "🏁";
                     newLapDisplay = "FINISHED";
                 }
-                // Priority 2: Final Lap
                 else if (_finalLapLatched)
                 {
                     newSymbol = "🏁";
                     newLapDisplay = "Final Lap";
                 }
-                // Priority 3: Qualifying lap counter (personal lap tracking)
                 else if (_totalQualifyingLaps > 0 && _greenFlagSeen)
                 {
                     newSymbol = "🏁";
                     int lapsToGo = _totalQualifyingLaps - _qualifyingLapsCompleted;
 
-                    // If still on out-lap (haven't crossed line yet after green), show total laps
+                    // Out-lap hasn't crossed S/F yet — show the full allotment.
                     if (_isFirstQualiLap)
                     {
                         lapsToGo = _totalQualifyingLaps;
@@ -189,11 +178,10 @@ namespace VISOR.ViewModels
 
                     newLapDisplay = lapsToGo == 1 ? "1 Lap" : $"{lapsToGo} Laps";
                 }
-                // Priority 4: Race lap counter (leader-based tracking)
                 else if (!isTimedSession && lapsRemaining >= 0 && lapsRemaining < 10000)
                 {
                     newSymbol = "🏁";
-                    // +1 because iRacing's lapsRemaining counts down to 0 (leader on final lap shows 0)
+                    // iRacing's SessionLapsRemain counts down to 0 for the leader on the final lap, so add 1.
                     string latestLapDisplay = lapsRemaining == 0 ? "1 Lap" : $"{lapsRemaining + 1} Laps";
                     if (lapCompleted)
                     {
@@ -201,7 +189,6 @@ namespace VISOR.ViewModels
                     }
                     newLapDisplay = _currentLapDisplay;
                 }
-                // Priority 5: Timed session
                 else if (timeRemain > 0)
                 {
                     newSymbol = "⏳";
@@ -211,14 +198,12 @@ namespace VISOR.ViewModels
                     else
                         newLapDisplay = $"{(int)remaining.TotalMinutes}:{remaining.Seconds:D2}";
                 }
-                // Fallback
                 else
                 {
                     newSymbol = TimeRemainingSymbol;
                     newLapDisplay = "--:--";
                 }
 
-                // Update display if changed
                 if (TimeRemainingDisplay != newLapDisplay)
                 {
                     TimeRemainingDisplay = newLapDisplay;

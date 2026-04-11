@@ -44,7 +44,6 @@ namespace VISOR.Telemetry
             public int CarClassColor { get; set; }
             public bool IsAI { get; set; }
 
-            // ADDED: For Cold Start Pace Estimation
             public float CarClassEstLapTime { get; set; }
         }
 
@@ -72,8 +71,6 @@ namespace VISOR.Telemetry
         }
     }
 
-    // ... (Remainder of file remains unchanged: SessionTransitionData, LiveSessionData)
-    // Included here for completeness if you are copy/pasting the whole file
     public class SessionTransitionData
     {
         public int CurrentSessionNum { get; set; } = -1;

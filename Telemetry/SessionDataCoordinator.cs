@@ -20,8 +20,8 @@ namespace VISOR.Telemetry
 
         public bool IsDataReady { get; private set; }
 
-        // PERFORMANCE FIX: Arrays are cached and replaced atomically - no locks needed on reads
-        // C# guarantees that reference assignments are atomic on all platforms
+        // Cached arrays are replaced atomically (reference assignment is atomic in C#) so the 60Hz
+        // telemetry read path can access them without a lock.
         private volatile string[] _userNamesCache = new string[64];
         private volatile string[] _carNumbersCache = new string[64];
         private volatile int[] _carNumberRawCache = new int[64];
@@ -31,7 +31,6 @@ namespace VISOR.Telemetry
         private volatile float[] _carClassEstLapTimesCache = new float[64];
         private volatile int[] _curDriverIncidentCountCache = new int[64];
 
-        // Lock-free reads - arrays are replaced atomically during updates
         public string[] UserNames => _userNamesCache;
         public string[] CarNumbers => _carNumbersCache;
         public int[] CarNumberRaw => _carNumberRawCache;
@@ -41,7 +40,6 @@ namespace VISOR.Telemetry
         public float[] CarClassEstLapTimes => _carClassEstLapTimesCache;
         public int[] CurDriverIncidentCount => _curDriverIncidentCountCache;
 
-        // --- NEW PUBLIC ACCESSORS FOR PACE MANAGER ---
         public StaticEventData GetStaticEventData()
         {
             lock (_parseLock)
@@ -57,7 +55,6 @@ namespace VISOR.Telemetry
                 return _liveData;
             }
         }
-        // ---------------------------------------------
 
         public int IncidentLimit
         {
@@ -347,8 +344,6 @@ namespace VISOR.Telemetry
 
         private void UpdateDriverDataCaches()
         {
-            // PERFORMANCE FIX: Build new arrays and replace atomically
-            // This avoids lock contention on the 60Hz telemetry read path
             var newUserNames = new string[64];
             var newCarNumbers = new string[64];
             var newCarNumberRaw = new int[64];
@@ -380,7 +375,6 @@ namespace VISOR.Telemetry
                 }
             }
 
-            // Atomic replacement - no locks needed for reads
             _userNamesCache = newUserNames;
             _carNumbersCache = newCarNumbers;
             _carNumberRawCache = newCarNumberRaw;

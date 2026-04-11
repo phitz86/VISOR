@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -23,10 +22,10 @@ namespace VISOR.Diagnostics
             _getSessionYaml = getSessionYaml;
             _getFieldTypes = getFieldTypes;
 
-            _outputDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "VISOR_SessionData");
+            _outputDirectory = Path.Combine(Log.GetDiagnosticsDirectory(), "SessionData");
             Directory.CreateDirectory(_outputDirectory);
 
-            Debug.WriteLine($"[SessionLogger] Output directory: {_outputDirectory}");
+            Log.Debug($"[SessionLogger] Output directory: {_outputDirectory}");
         }
 
         public void ScheduleSessionAwareLogs(int sessionNum, string sessionType, double sessionTimeSeconds)
@@ -35,7 +34,7 @@ namespace VISOR.Diagnostics
 
             if (_loggedSessions.Contains(sessionNum))
             {
-                Debug.WriteLine($"[SessionLogger] Already scheduled logging for session {sessionNum}, skipping");
+                Log.Debug($"[SessionLogger] Already scheduled logging for session {sessionNum}, skipping");
                 return;
             }
 
@@ -43,26 +42,26 @@ namespace VISOR.Diagnostics
 
             if (sessionTimeSeconds <= 0)
             {
-                Debug.WriteLine($"[SessionLogger] Invalid session time ({sessionTimeSeconds}s) for {sessionType}, using fallback logging");
+                Log.Debug($"[SessionLogger] Invalid session time ({sessionTimeSeconds}s) for {sessionType}, using fallback logging");
                 ScheduleLogForSession(sessionNum, sessionType);
                 return;
             }
 
-            Debug.WriteLine($"[SessionLogger] Scheduling session-aware logs for {sessionType} ({sessionTimeSeconds}s duration):");
+            Log.Debug($"[SessionLogger] Scheduling session-aware logs for {sessionType} ({sessionTimeSeconds}s duration):");
 
             ScheduleLogAtInterval(sessionNum, sessionType, TimeSpan.FromMinutes(2), "early");
-            Debug.WriteLine($"[SessionLogger]   Early log: 2 minutes");
+            Log.Debug($"[SessionLogger]   Early log: 2 minutes");
 
             if (sessionTimeSeconds > 600)
             {
                 var midTime = TimeSpan.FromSeconds(sessionTimeSeconds * 0.6);
                 ScheduleLogAtInterval(sessionNum, sessionType, midTime, "mid");
-                Debug.WriteLine($"[SessionLogger]   Mid log: {midTime.TotalMinutes:F1} minutes");
+                Log.Debug($"[SessionLogger]   Mid log: {midTime.TotalMinutes:F1} minutes");
             }
 
             var endTime = TimeSpan.FromSeconds(Math.Max(sessionTimeSeconds - 30, sessionTimeSeconds * 0.9));
             ScheduleLogAtInterval(sessionNum, sessionType, endTime, "late");
-            Debug.WriteLine($"[SessionLogger]   Late log: {endTime.TotalMinutes:F1} minutes");
+            Log.Debug($"[SessionLogger]   Late log: {endTime.TotalMinutes:F1} minutes");
         }
 
         public void ScheduleLogForSession(int sessionNum, string sessionType)
@@ -71,12 +70,12 @@ namespace VISOR.Diagnostics
 
             if (_loggedSessions.Contains(sessionNum))
             {
-                Debug.WriteLine($"[SessionLogger] Already scheduled logging for session {sessionNum}, skipping");
+                Log.Debug($"[SessionLogger] Already scheduled logging for session {sessionNum}, skipping");
                 return;
             }
 
             _loggedSessions.Add(sessionNum);
-            Debug.WriteLine($"[SessionLogger] Scheduling simple log for SessionNum {sessionNum} ({sessionType}) in 2 minutes");
+            Log.Debug($"[SessionLogger] Scheduling simple log for SessionNum {sessionNum} ({sessionType}) in 2 minutes");
 
             ScheduleLogAtInterval(sessionNum, sessionType, TimeSpan.FromMinutes(2), "simple");
         }
@@ -88,7 +87,7 @@ namespace VISOR.Diagnostics
             var timer = new System.Timers.Timer(delay.TotalMilliseconds) { AutoReset = false };
             timer.Elapsed += async (sender, e) =>
             {
-                Debug.WriteLine($"[SessionLogger] Timer elapsed - executing {suffix} log for {sessionType}");
+                Log.Debug($"[SessionLogger] Timer elapsed - executing {suffix} log for {sessionType}");
                 await ExecuteLog(sessionNum, sessionType, suffix);
 
                 timer.Stop();
@@ -128,11 +127,11 @@ namespace VISOR.Diagnostics
                 {
                     await LogTelemetryFields(sessionName, timestamp);
                 }
-                Debug.WriteLine($"[SessionLogger] Files saved to: {_outputDirectory}");
+                Log.Debug($"[SessionLogger] Files saved to: {_outputDirectory}");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[SessionLogger] Exception during {suffix} logging: {ex.Message}");
+                Log.Error($"[SessionLogger] Exception during {suffix} logging", ex);
             }
         }
 
@@ -150,7 +149,7 @@ namespace VISOR.Diagnostics
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[SessionLogger] Error writing {suffix} YAML: {ex.Message}");
+                Log.Error($"[SessionLogger] Error writing {suffix} YAML", ex);
             }
         }
 
@@ -179,7 +178,7 @@ namespace VISOR.Diagnostics
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[SessionLogger] Error writing field data: {ex.Message}");
+                Log.Error($"[SessionLogger] Error writing field data", ex);
             }
         }
 
@@ -198,7 +197,7 @@ namespace VISOR.Diagnostics
         {
             if (_isDisposed) return;
             _isDisposed = true;
-            Debug.WriteLine("[SessionLogger] Disposing - cleaning up active timers");
+            Log.Debug("[SessionLogger] Disposing - cleaning up active timers");
 
             lock (_activeTimers)
             {
@@ -210,7 +209,7 @@ namespace VISOR.Diagnostics
                 _activeTimers.Clear();
             }
 
-            Debug.WriteLine($"[SessionLogger] Disposed with {_loggedSessions.Count} sessions logged");
+            Log.Debug($"[SessionLogger] Disposed with {_loggedSessions.Count} sessions logged");
         }
     }
 }

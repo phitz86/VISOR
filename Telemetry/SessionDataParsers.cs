@@ -23,13 +23,11 @@ namespace VISOR.Telemetry
             {
                 var trimmed = line.Trim();
 
-                // Parse incident limit
                 if (trimmed.StartsWith("IncidentLimit:"))
                 {
                     if (TryParseIntValue(trimmed, out int limit))
                         eventData.IncidentLimit = limit;
                 }
-                // Enter weekend info section
                 else if (trimmed.StartsWith("WeekendInfo:"))
                 {
                     inWeekendInfo = true;
@@ -37,7 +35,6 @@ namespace VISOR.Telemetry
                     inSessionInfo = false;
                     inSessionsArray = false;
                 }
-                // Enter driver info section
                 else if (trimmed.StartsWith("DriverInfo:"))
                 {
                     inDriverInfo = true;
@@ -45,7 +42,6 @@ namespace VISOR.Telemetry
                     inSessionInfo = false;
                     inSessionsArray = false;
                 }
-                // Parse session schedule
                 else if (trimmed.StartsWith("SessionInfo:"))
                 {
                     inSessionInfo = true;
@@ -53,7 +49,6 @@ namespace VISOR.Telemetry
                     inWeekendInfo = false;
                     inSessionsArray = false;
                 }
-                // Parse weekend/track information
                 else if (inWeekendInfo)
                 {
                     if (trimmed.StartsWith("TrackName:"))
@@ -65,7 +60,6 @@ namespace VISOR.Telemetry
                         var lengthStr = ParseStringValue(trimmed).Replace(" km", "").Replace(" m", "");
                         if (float.TryParse(lengthStr, out float length))
                         {
-                            // Convert to meters if needed
                             if (trimmed.Contains(" km"))
                                 length *= 1000f;
                             eventData.Weekend.TrackLength = length;
@@ -76,7 +70,6 @@ namespace VISOR.Telemetry
                     else if (trimmed.StartsWith("TrackDisplayShortName:"))
                         eventData.Weekend.TrackDisplayShortName = ParseStringValue(trimmed);
                 }
-                // Parse individual drivers
                 else if (inDriverInfo && trimmed.StartsWith("- CarIdx:"))
                 {
                     if (TryParseIntValue(trimmed, out int carIdx))
@@ -101,7 +94,6 @@ namespace VISOR.Telemetry
                         driver.CarClassColor = classColor;
                     else if (trimmed.StartsWith("CarIsAI:"))
                         driver.IsAI = ParseBoolValue(trimmed);
-                    // ADDED: Capture estimated lap time for Cold Start logic
                     else if (trimmed.StartsWith("CarClassEstLapTime:"))
                     {
                         if (float.TryParse(ParseStringValue(trimmed), out float estTime))
@@ -164,7 +156,6 @@ namespace VISOR.Telemetry
             if (parts.Length < 2) return false;
 
             var hexString = parts[1].Trim();
-            // Remove "0x" prefix if present
             if (hexString.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
                 hexString = hexString.Substring(2);
 
@@ -210,7 +201,6 @@ namespace VISOR.Telemetry
                     {
                         transitionData.CurrentSessionNum = sessionNum;
 
-                        // Set legacy compatibility fields
                         if (eventData.Schedule.Sessions.TryGetValue(sessionNum, out var sessionDef))
                         {
                             transitionData.CurrentSessionType = sessionDef.SessionType;
@@ -262,7 +252,6 @@ namespace VISOR.Telemetry
             int currentSessionIdx = -1;
             int currentQualifyCarIdx = -1;
 
-            // Initialize session data if not exists
             if (!liveData.SessionResultsPositions.ContainsKey(currentSessionNum))
                 liveData.SessionResultsPositions[currentSessionNum] = new System.Collections.Generic.List<LiveSessionData.ResultPosition>();
             if (!liveData.SessionFastestLaps.ContainsKey(currentSessionNum))
@@ -281,7 +270,7 @@ namespace VISOR.Telemetry
                     if (TryParseIntValue(trimmed, out int sessionNum))
                     {
                         currentSessionIdx = sessionNum;
-                        // Reset flags to prevent state bleed between sessions
+                        // Prevent state bleed between sessions.
                         inResultsPositions = false;
                         inResultsFastestLap = false;
                     }
@@ -293,7 +282,6 @@ namespace VISOR.Telemetry
                 }
                 else if (inResultsPositions && trimmed.StartsWith("- Position:"))
                 {
-                    // Start new position entry
                     var position = new LiveSessionData.ResultPosition();
                     if (TryParseIntValue(trimmed, out int pos))
                     {
@@ -340,7 +328,6 @@ namespace VISOR.Telemetry
                     else if (trimmed.StartsWith("FastestTime:") && TryParseFloatValue(trimmed, out float fastTime))
                         currentFast.FastestTime = fastTime;
                 }
-                // Legacy qualify results
                 else if (trimmed.StartsWith("QualifyResultsInfo:"))
                 {
                     inQualifyResults = true;
@@ -366,7 +353,7 @@ namespace VISOR.Telemetry
                 }
             }
 
-            // Only log when ResultsPositions count changes (car posts new lap time)
+            // Log only on count changes to avoid spam when no new lap is posted.
             int currentCount = liveData.SessionResultsPositions.GetValueOrDefault(currentSessionNum, new System.Collections.Generic.List<LiveSessionData.ResultPosition>()).Count;
             if (currentCount != _lastResultsPositionCount)
             {

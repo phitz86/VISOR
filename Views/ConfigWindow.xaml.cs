@@ -142,14 +142,17 @@ namespace VISOR.Views
             {
                 string logsDirectory = Log.GetLogsDirectory();
 
-                // Ensure directory exists
                 if (!Directory.Exists(logsDirectory))
                 {
                     Directory.CreateDirectory(logsDirectory);
                 }
 
-                // Open in Windows Explorer
-                Process.Start("explorer.exe", logsDirectory);
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = $"\"{logsDirectory}\"",
+                    UseShellExecute = false
+                });
                 Log.Info("Opened logs folder in Explorer");
             }
             catch (Exception ex)
