@@ -292,7 +292,7 @@ namespace VISOR.Telemetry
         public IDisposable BeginScope<TState>(TState state) => null;
 
         public bool IsEnabled(LogLevel logLevel) =>
-            logLevel >= LogLevel.Warning || Log.DebugModeEnabled;
+            logLevel >= LogLevel.Warning || Diagnostics.Log.DebugModeEnabled;
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
         {
