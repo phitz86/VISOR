@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
@@ -28,34 +28,34 @@ namespace VISOR.ViewModels
         private FontWeight _gapFontWeight = FontWeights.SemiBold;
 
         public int CarIdx { get; set; }
-        public string ClassPos { get => _classPos; set { _classPos = value; OnPropertyChanged(); } }
-        public string CarNum { get => _carNum; set { _carNum = value; OnPropertyChanged(); } }
-        public string Name { get => _name; set { _name = value; OnPropertyChanged(); } }
-        public Brush ClassBackground { get => _classBackground; set { _classBackground = value; OnPropertyChanged(); } }
-        public Brush NameColor { get => _nameColor; set { _nameColor = value; OnPropertyChanged(); } }
-        public FontStyle FontStyle { get => _fontStyle; set { _fontStyle = value; OnPropertyChanged(); } }
+        public string ClassPos { get => _classPos; set { if (_classPos == value) return; _classPos = value; OnPropertyChanged(); } }
+        public string CarNum { get => _carNum; set { if (_carNum == value) return; _carNum = value; OnPropertyChanged(); } }
+        public string Name { get => _name; set { if (_name == value) return; _name = value; OnPropertyChanged(); } }
+        public Brush ClassBackground { get => _classBackground; set { if (BrushEquals(_classBackground, value)) return; _classBackground = value; OnPropertyChanged(); } }
+        public Brush NameColor { get => _nameColor; set { if (BrushEquals(_nameColor, value)) return; _nameColor = value; OnPropertyChanged(); } }
+        public FontStyle FontStyle { get => _fontStyle; set { if (_fontStyle == value) return; _fontStyle = value; OnPropertyChanged(); } }
         public bool IsPlayer { get; set; }
         public int ClassID { get; set; }
         public int IncidentCount { get; set; }
         public bool IsOnPitRoad
         {
             get => _isOnPitRoad;
-            set { _isOnPitRoad = value; OnPropertyChanged(); }
+            set { if (_isOnPitRoad == value) return; _isOnPitRoad = value; OnPropertyChanged(); }
         }
 
         public string GapText
         {
             get => _gapText;
-            set { _gapText = value; OnPropertyChanged(); }
+            set { if (_gapText == value) return; _gapText = value; OnPropertyChanged(); }
         }
 
-        public Brush Segment1Color { get => _segment1Color; set { _segment1Color = value; OnPropertyChanged(); } }
-        public Brush Segment2Color { get => _segment2Color; set { _segment2Color = value; OnPropertyChanged(); } }
-        public Brush Segment3Color { get => _segment3Color; set { _segment3Color = value; OnPropertyChanged(); } }
-        public Brush Segment4Color { get => _segment4Color; set { _segment4Color = value; OnPropertyChanged(); } }
-        public Brush Segment5Color { get => _segment5Color; set { _segment5Color = value; OnPropertyChanged(); } }
-        public Brush GapColor { get => _gapColor; set { _gapColor = value; OnPropertyChanged(); } }
-        public FontWeight GapFontWeight { get => _gapFontWeight; set { _gapFontWeight = value; OnPropertyChanged(); } }
+        public Brush Segment1Color { get => _segment1Color; set { if (BrushEquals(_segment1Color, value)) return; _segment1Color = value; OnPropertyChanged(); } }
+        public Brush Segment2Color { get => _segment2Color; set { if (BrushEquals(_segment2Color, value)) return; _segment2Color = value; OnPropertyChanged(); } }
+        public Brush Segment3Color { get => _segment3Color; set { if (BrushEquals(_segment3Color, value)) return; _segment3Color = value; OnPropertyChanged(); } }
+        public Brush Segment4Color { get => _segment4Color; set { if (BrushEquals(_segment4Color, value)) return; _segment4Color = value; OnPropertyChanged(); } }
+        public Brush Segment5Color { get => _segment5Color; set { if (BrushEquals(_segment5Color, value)) return; _segment5Color = value; OnPropertyChanged(); } }
+        public Brush GapColor { get => _gapColor; set { if (BrushEquals(_gapColor, value)) return; _gapColor = value; OnPropertyChanged(); } }
+        public FontWeight GapFontWeight { get => _gapFontWeight; set { if (_gapFontWeight == value) return; _gapFontWeight = value; OnPropertyChanged(); } }
 
         public float LapDistPct { get; set; }
         public int CurrentLap { get; set; }
@@ -75,7 +75,7 @@ namespace VISOR.ViewModels
                 // If gap jumped by more than 5 seconds, reset smoothing (likely data gap recovery)
                 if (System.Math.Abs(newGap - _smoothedGap) > 5.0f)
                 {
-                    _smoothedGap = newGap; // Hard reset
+                    _smoothedGap = newGap;
                 }
                 else
                 {
@@ -90,6 +90,14 @@ namespace VISOR.ViewModels
         {
             _smoothedGap = 0f;
             _hasInitializedGap = false;
+        }
+
+        private static bool BrushEquals(Brush a, Brush b)
+        {
+            if (ReferenceEquals(a, b)) return true;
+            if (a is SolidColorBrush sa && b is SolidColorBrush sb)
+                return sa.Color == sb.Color;
+            return false;
         }
     }
 }

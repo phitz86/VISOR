@@ -192,8 +192,9 @@ namespace VISOR.ViewModels
                 return new { Car = car, Proximity = proximity, IsAhead = isAhead };
             }).ToList();
 
-            var carsAhead = otherCars.Where(x => x.IsAhead).OrderBy(x => x.Proximity).Select(x => x.Car).ToList();
-            var carsBehind = otherCars.Where(x => !x.IsAhead).OrderBy(x => x.Proximity).Select(x => x.Car).ToList();
+            // Tie-break on CarIdx so sort order is deterministic when gaps are nearly equal.
+            var carsAhead = otherCars.Where(x => x.IsAhead).OrderBy(x => x.Proximity).ThenBy(x => x.Car.CarIdx).Select(x => x.Car).ToList();
+            var carsBehind = otherCars.Where(x => !x.IsAhead).OrderBy(x => x.Proximity).ThenBy(x => x.Car.CarIdx).Select(x => x.Car).ToList();
 
             var result = new List<RelativeRowViewModel>();
             result.AddRange(carsAhead.Take(3).Reverse());
