@@ -277,17 +277,10 @@ namespace VISOR.ViewModels
 
         private void AssignProximitySegments(RelativeRowViewModel row, RelativeRowViewModel playerRow, SVappsLABSnapshot snapshot, int slotIndex)
         {
-            row.Segment1Color = Brushes.Transparent;
-            row.Segment2Color = Brushes.Transparent;
-            row.Segment3Color = Brushes.Transparent;
-            row.Segment4Color = Brushes.Transparent;
-            row.Segment5Color = Brushes.Transparent;
-            row.GapColor = Brushes.White;
-            row.GapFontWeight = FontWeights.SemiBold;
-
             if (row.IsPlayer)
             {
                 row.GapText = string.Empty;
+                ClearSegments(row);
                 return;
             }
 
@@ -332,6 +325,7 @@ namespace VISOR.ViewModels
                 {
                     row.GapText = string.Empty;
                 }
+                ClearSegments(row);
 
 #if DEBUG
                 LogDiagnosticRow(snapshot, slotIndex, row, playerRow, distDelta, isGeometricallyAhead, "stationary", 0f, row.GapText);
@@ -372,12 +366,9 @@ namespace VISOR.ViewModels
             }
             else
             {
-                // Buffer warm-up or out of range.
-                row.GapText = string.Empty;
-                gapSource = "none";
-
+                // Buffer miss — hold previous display state instead of blanking the row.
 #if DEBUG
-                LogDiagnosticRow(snapshot, slotIndex, row, playerRow, distDelta, isGeometricallyAhead, gapSource, 0f, row.GapText);
+                LogDiagnosticRow(snapshot, slotIndex, row, playerRow, distDelta, isGeometricallyAhead, "none", 0f, row.GapText);
 #endif
                 return;
             }
@@ -402,6 +393,9 @@ namespace VISOR.ViewModels
             {
                 row.GapText = string.Empty;
             }
+
+            row.GapColor = Brushes.White;
+            row.GapFontWeight = FontWeights.SemiBold;
 
 #if DEBUG
             LogDiagnosticRow(snapshot, slotIndex, row, playerRow, distDelta, isGeometricallyAhead, gapSource, displayGap, row.GapText);
@@ -428,18 +422,25 @@ namespace VISOR.ViewModels
                     activeSegments = s + 1;
             }
 
-            if (activeSegments >= 1)
-                row.Segment1Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.0));
-            if (activeSegments >= 2)
-                row.Segment2Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.25));
-            if (activeSegments >= 3)
-                row.Segment3Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.50));
-            if (activeSegments >= 4)
-                row.Segment4Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.75));
-            if (activeSegments >= 5)
-                row.Segment5Color = new SolidColorBrush(alertColor);
+            // Explicitly set every segment — either colored or Transparent — so segments
+            // that are no longer active get cleared without needing a blanket reset at the top.
+            row.Segment1Color = (activeSegments >= 1) ? new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.0)) : Brushes.Transparent;
+            row.Segment2Color = (activeSegments >= 2) ? new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.25)) : Brushes.Transparent;
+            row.Segment3Color = (activeSegments >= 3) ? new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.50)) : Brushes.Transparent;
+            row.Segment4Color = (activeSegments >= 4) ? new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.75)) : Brushes.Transparent;
+            row.Segment5Color = (activeSegments >= 5) ? new SolidColorBrush(alertColor) : Brushes.Transparent;
 
             row._lastActiveSegmentCount = activeSegments;
+        }
+
+        private static void ClearSegments(RelativeRowViewModel row)
+        {
+            row.Segment1Color = Brushes.Transparent;
+            row.Segment2Color = Brushes.Transparent;
+            row.Segment3Color = Brushes.Transparent;
+            row.Segment4Color = Brushes.Transparent;
+            row.Segment5Color = Brushes.Transparent;
+            row._lastActiveSegmentCount = 0;
         }
 
 #if DEBUG
