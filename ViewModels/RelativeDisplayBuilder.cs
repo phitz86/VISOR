@@ -341,23 +341,29 @@ namespace VISOR.ViewModels
 
             // Buffer crossing lookup: for a car ahead, search the opponent's buffer for the player's
             // current track position; for a car behind, search the player's buffer for the opponent's.
+            // Fallback to the other buffer when the primary search misses — at close range the
+            // ahead/behind flag can flip frame-to-frame, making the "wrong" buffer get tried first.
             double sessionTime = snapshot.GetValue<double>("SessionTime", 0.0);
             float nativeTimeGap = 0f;
             bool isAhead = isGeometricallyAhead;
             string gapSource = "buffer";
 
             double? crossingTime = null;
+            var playerBuffer = _historyManager.GetBuffer(playerRow.CarIdx);
 
             if (isGeometricallyAhead)
             {
                 if (oppBuffer != null)
                     crossingTime = oppBuffer.FindCrossingTime(playerRow.LapDistPct);
+                if (!crossingTime.HasValue && playerBuffer != null)
+                    crossingTime = playerBuffer.FindCrossingTime(row.LapDistPct);
             }
             else
             {
-                var playerBuffer = _historyManager.GetBuffer(playerRow.CarIdx);
                 if (playerBuffer != null)
                     crossingTime = playerBuffer.FindCrossingTime(row.LapDistPct);
+                if (!crossingTime.HasValue && oppBuffer != null)
+                    crossingTime = oppBuffer.FindCrossingTime(playerRow.LapDistPct);
             }
 
             if (crossingTime.HasValue && sessionTime > crossingTime.Value)
