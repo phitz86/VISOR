@@ -511,6 +511,10 @@ namespace VISOR.ViewModels
                 if (carIdx < 0 || carIdx >= carClassIDs.Length)
                     continue;
 
+                // Already frozen — don't include in the live sort.
+                if (_carsFinished.Contains(carIdx))
+                    continue;
+
                 float effectiveLapDistPct = GetEffectiveLapDistPct(carIdx);
                 int effectiveCurrentLap;
 
@@ -544,12 +548,17 @@ namespace VISOR.ViewModels
 
             foreach (var classGroup in classGroups)
             {
+                // Offset by the number of cars already frozen in this class so
+                // remaining cars don't slide up to fill vacated positions.
+                int finishedInClass = _carsFinished
+                    .Count(c => c < carClassIDs.Length && carClassIDs[c] == classGroup.Key);
+
                 var sortedCars = classGroup.OrderByDescending(c => c.TrackPosition).ToList();
 
                 for (int i = 0; i < sortedCars.Count; i++)
                 {
                     var car = sortedCars[i];
-                    int position = i + 1;
+                    int position = i + 1 + finishedInClass;
                     _cachedPositions[(car.CarIdx, car.ClassId)] = position;
                 }
             }

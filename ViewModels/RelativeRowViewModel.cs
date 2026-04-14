@@ -62,6 +62,7 @@ namespace VISOR.ViewModels
 
         internal float _smoothedGap = 0f;
         internal bool _hasInitializedGap = false;
+        internal int _lastActiveSegmentCount = 0;
 
         public void UpdateSmoothedGap(float newGap, float smoothingFactor = 0.3f)
         {
@@ -90,6 +91,7 @@ namespace VISOR.ViewModels
         {
             _smoothedGap = 0f;
             _hasInitializedGap = false;
+            _lastActiveSegmentCount = 0;
         }
 
         private static bool BrushEquals(Brush a, Brush b)

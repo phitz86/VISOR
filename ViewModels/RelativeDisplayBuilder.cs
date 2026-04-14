@@ -30,6 +30,9 @@ namespace VISOR.ViewModels
         private const float TIME_SEG2_AWARE = 5.0f;
         private const float TIME_SEG1_INFO = 8.0f;
 
+        // Deactivation requires exceeding the threshold by this margin to prevent flicker.
+        private const float SEGMENT_HYSTERESIS = 0.2f;
+
         private const float METERS_TO_FEET = 3.28084f;
         private const int MAX_DISTANCE_FEET = 999;
 
@@ -406,20 +409,31 @@ namespace VISOR.ViewModels
 
             Color alertColor = isAhead ? AheadAlertColor : BehindAlertColor;
 
-            if (displayGap <= TIME_SEG1_INFO)
+            // Count active segments. Hysteresis: once lit, a segment stays on until
+            // the gap exceeds its threshold + margin, preventing flicker at boundaries.
+            int prevSegments = row._lastActiveSegmentCount;
+            int activeSegments = 0;
+
+            float[] thresholds = { TIME_SEG1_INFO, TIME_SEG2_AWARE, TIME_SEG3_WARNING, TIME_SEG4_DANGER, TIME_SEG5_CRITICAL };
+            for (int s = 0; s < thresholds.Length; s++)
+            {
+                float deactivateAt = (s < prevSegments) ? thresholds[s] + SEGMENT_HYSTERESIS : thresholds[s];
+                if (displayGap <= deactivateAt)
+                    activeSegments = s + 1;
+            }
+
+            if (activeSegments >= 1)
                 row.Segment1Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.0));
-
-            if (displayGap <= TIME_SEG2_AWARE)
+            if (activeSegments >= 2)
                 row.Segment2Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.25));
-
-            if (displayGap <= TIME_SEG3_WARNING)
+            if (activeSegments >= 3)
                 row.Segment3Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.50));
-
-            if (displayGap <= TIME_SEG4_DANGER)
+            if (activeSegments >= 4)
                 row.Segment4Color = new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.75));
-
-            if (displayGap <= TIME_SEG5_CRITICAL)
+            if (activeSegments >= 5)
                 row.Segment5Color = new SolidColorBrush(alertColor);
+
+            row._lastActiveSegmentCount = activeSegments;
         }
 
 #if DEBUG
