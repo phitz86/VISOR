@@ -548,18 +548,27 @@ namespace VISOR.ViewModels
 
             foreach (var classGroup in classGroups)
             {
-                // Offset by the number of cars already frozen in this class so
-                // remaining cars don't slide up to fill vacated positions.
-                int finishedInClass = _carsFinished
-                    .Count(c => c < carClassIDs.Length && carClassIDs[c] == classGroup.Key);
+                // Collect position numbers already taken by frozen (finished) cars in this class.
+                var frozenPositions = new HashSet<int>();
+                foreach (var kv in _finishingClassPositions)
+                {
+                    if (kv.Key < carClassIDs.Length && carClassIDs[kv.Key] == classGroup.Key)
+                        frozenPositions.Add(kv.Value);
+                }
 
+                // Assign live cars to the next available slot, skipping frozen positions.
+                // This prevents a lapped car frozen at P5 from pushing P3/P4 down.
                 var sortedCars = classGroup.OrderByDescending(c => c.TrackPosition).ToList();
+                int nextPosition = 1;
 
                 for (int i = 0; i < sortedCars.Count; i++)
                 {
+                    while (frozenPositions.Contains(nextPosition))
+                        nextPosition++;
+
                     var car = sortedCars[i];
-                    int position = i + 1 + finishedInClass;
-                    _cachedPositions[(car.CarIdx, car.ClassId)] = position;
+                    _cachedPositions[(car.CarIdx, car.ClassId)] = nextPosition;
+                    nextPosition++;
                 }
             }
         }
