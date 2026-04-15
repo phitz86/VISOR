@@ -99,6 +99,14 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChang
 [Code]
 var
   DotNetRuntimeDownloadPage: TDownloadWizardPage;
+  DonateLabel: TNewStaticText;
+
+procedure DonateLabelClick(Sender: TObject);
+var
+  ErrorCode: Integer;
+begin
+  ShellExec('open', 'https://venmo.com/u/Pete-Hitzeman', '', '', SW_SHOWNORMAL, ewNoWait, ErrorCode);
+end;
 
 // Check for .NET 8 Runtime
 function IsDotNet8Installed: Boolean;
@@ -106,7 +114,6 @@ var
   Version: String;
 begin
   Result := False;
-  
   // Check registry for Desktop Runtime 8.0.x
   if RegQueryStringValue(HKLM, 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\desktop', 'Version', Version) then
   begin
@@ -131,12 +138,24 @@ begin
   begin
     DotNetRuntimeDownloadPage := CreateDownloadPage(SetupMessage(msgWizardPreparing), 'Downloading .NET 8 Desktop Runtime', nil);
   end;
+
+  // Create the Donation Link on the Finished Page
+  DonateLabel := TNewStaticText.Create(WizardForm);
+  DonateLabel.Parent := WizardForm.FinishedPage;
+  DonateLabel.Caption := 'Support VISOR development! Click here to donate via Venmo.';
+  DonateLabel.Cursor := crHand;
+  DonateLabel.Font.Color := clBlue;
+  DonateLabel.Font.Style := [fsUnderline];
+  
+  DonateLabel.Left := ScaleX(176); 
+  DonateLabel.Top := ScaleY(220);  
+  
+  DonateLabel.OnClick := @DonateLabelClick;
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
 begin
   Result := True;
-  
   if (CurPageID = wpReady) and not IsDotNet8Installed then
   begin
     DotNetRuntimeDownloadPage.Clear;
@@ -165,11 +184,9 @@ var
   RuntimeInstaller: String;
 begin
   Result := '';
-  
   if not IsDotNet8Installed then
   begin
     RuntimeInstaller := ExpandConstant('{tmp}\windowsdesktop-runtime-8.0.10-win-x64.exe');
-    
     if FileExists(RuntimeInstaller) then
     begin
       if MsgBox('.NET 8 Desktop Runtime will now be installed. This may take a few minutes.' + #13#10 + #13#10 + 'Continue?', mbConfirmation, MB_YESNO) = IDYES then
