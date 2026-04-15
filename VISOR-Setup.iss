@@ -7,7 +7,7 @@
 #define MyAppExeName "VISOR.exe"
 
 ; Read version from compiled executable
-#define MyAppVersion GetFileVersion("bin\Release\net8.0-windows8.0\VISOR.exe")
+#define MyAppVersion GetVersionNumbersString("bin\Release\net8.0-windows8.0\VISOR.exe")
 
 [Setup]
 ; Basic app info
