@@ -299,8 +299,8 @@ namespace VISOR.Diagnostics
         /// </summary>
         public static string GetLogsDirectory()
         {
-            string exePath = AppDomain.CurrentDomain.BaseDirectory;
-            return Path.Combine(exePath, LOG_FOLDER_NAME);
+            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            return Path.Combine(appDataPath, "VISOR", LOG_FOLDER_NAME);
         }
 
         /// <summary>
