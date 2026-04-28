@@ -81,8 +81,20 @@ namespace VISOR
 
                 _configWindow = new ConfigWindow(_sdkWrapper, _mainWindow);
 
+                _mainWindow.WindowState = WindowState.Normal;
+                _mainWindow.ShowActivated = true;
                 _mainWindow.Show();
-                _radarWindow?.Show();
+                _mainWindow.Activate();
+
+                if (_radarWindow != null)
+                {
+                    _radarWindow.WindowState = WindowState.Normal;
+                    _radarWindow.ShowActivated = true;
+                    _radarWindow.Show();
+                }
+
+                _configWindow.WindowState = WindowState.Normal;
+                _configWindow.ShowActivated = true;
                 _configWindow.Show();
 
                 MainWindow = _mainWindow;
