@@ -206,23 +206,23 @@ namespace VISOR.ViewModels
             }
         }
 
+        private static string GetStateName(int state) => state switch
+        {
+            0 => "Invalid",
+            1 => "GetInCar",
+            2 => "Warmup",
+            3 => "ParadeLaps",
+            4 => "Racing",
+            5 => "Checkered",
+            6 => "CoolDown",
+            _ => $"Unknown({state})"
+        };
+
         private void CheckSessionStateTransitions(SVappsLABSnapshot snapshot)
         {
             int currentSessionState = snapshot.GetValue<int>("SessionState", -1);
             if (currentSessionState != _lastSessionState)
             {
-                string GetStateName(int state) => state switch
-                {
-                    0 => "Invalid",
-                    1 => "GetInCar",
-                    2 => "Warmup",
-                    3 => "ParadeLaps",
-                    4 => "Racing",
-                    5 => "Checkered",
-                    6 => "CoolDown",
-                    _ => $"Unknown({state})"
-                };
-
                 Log.Info($"Session state transition: {GetStateName(_lastSessionState)} -> {GetStateName(currentSessionState)}");
 
                 if (_lastSessionState == 6 && currentSessionState == 1)

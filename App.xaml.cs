@@ -30,6 +30,16 @@ namespace VISOR
                 var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "Unknown";
                 Log.Info($"VISOR started - Version: {version}");
 
+                var visibleRows = string.Join(",", new[] {
+                    settings.ShowRow0 ? "0" : null,
+                    settings.ShowRow1 ? "1" : null,
+                    settings.ShowRow2 ? "2" : null,
+                    settings.ShowRow3 ? "3" : null,
+                    settings.ShowRow4 ? "4" : null,
+                    settings.ShowRow5 ? "5" : null
+                }.Where(r => r != null));
+                Log.Info($"Settings: size={settings.WindowSize}, rows=[{visibleRows}], radar={settings.ShowRadar}, debug={settings.DebugModeEnabled}");
+
                 Log.CleanupOldLogs();
 
                 Log.Info("Application startup initiated");
@@ -61,53 +71,29 @@ namespace VISOR
         {
             try
             {
-                Log.Info("LaunchAllWindows started");
-
                 _mainWindow = new MainWindow(_sdkWrapper);
-                Log.Info("MainWindow created successfully");
 
                 var settingsManager = SettingsManager.Instance;
                 if (settingsManager.IsRadarVisible)
                 {
                     _radarWindow = new RadarWindow(_sdkWrapper, _mainWindow.ViewModel.ClassColorManager);
-                    Log.Info("RadarWindow created successfully");
                 }
 
                 _configWindow = new ConfigWindow(_sdkWrapper, _mainWindow);
-                Log.Info("ConfigWindow created successfully");
 
-                Log.Info("Showing MainWindow");
-                _mainWindow.WindowState = WindowState.Normal;
-                _mainWindow.ShowActivated = true;
                 _mainWindow.Show();
-                _mainWindow.Activate();
-
-                if (_radarWindow != null)
-                {
-                    Log.Info("Showing RadarWindow");
-                    _radarWindow.WindowState = WindowState.Normal;
-                    _radarWindow.ShowActivated = true;
-                    _radarWindow.Show();
-                }
-
-                Log.Info("Showing ConfigWindow");
-                _configWindow.WindowState = WindowState.Normal;
-                _configWindow.ShowActivated = true;
+                _radarWindow?.Show();
                 _configWindow.Show();
 
                 MainWindow = _mainWindow;
 
                 _mainWindow.Closed += OnMainWindowClosed;
-
                 if (_radarWindow != null)
-                {
                     _radarWindow.Closed += OnRadarWindowClosed;
-                }
-
                 _configWindow.Closed += OnConfigWindowClosed;
                 _configWindow.ExitRequested += OnConfigExitRequested;
 
-                Log.Info("LaunchAllWindows completed successfully");
+                Log.Info("All windows launched successfully");
             }
             catch (Exception ex)
             {

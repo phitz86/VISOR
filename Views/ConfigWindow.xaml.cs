@@ -213,13 +213,13 @@ namespace VISOR.Views
 
         private void DoneButton_Click(object sender, RoutedEventArgs e)
         {
-            Log.Info("Done button clicked - closing config window");
+            Log.Debug("Done button clicked - closing config window");
             Close();
         }
 
         private void ExitButton_Click(object sender, RoutedEventArgs e)
         {
-            Log.Info("Exit button clicked - requesting application shutdown");
+            Log.Debug("Exit button clicked - requesting application shutdown");
             ExitRequested?.Invoke(this, EventArgs.Empty);
         }
 
@@ -258,7 +258,6 @@ namespace VISOR.Views
 
         protected override void OnClosed(EventArgs e)
         {
-            Log.Info("ConfigWindow closed");
             base.OnClosed(e);
         }
     }

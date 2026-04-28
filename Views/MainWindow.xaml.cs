@@ -70,7 +70,7 @@ namespace VISOR.Views
         {
             Dispatcher.Invoke(() =>
             {
-                Log.Info("[MainWindow] Element visibility changed - resizing window");
+                Log.Debug("[MainWindow] Element visibility changed - resizing window");
                 _viewModel.RefreshElementVisibility();
                 ApplyWindowSizing();
             });
@@ -80,10 +80,9 @@ namespace VISOR.Views
         {
             Dispatcher.Invoke(() =>
             {
-                Log.Info($"[MainWindow] Window size preset changed to {e.NewSize} - resizing");
+                Log.Debug($"[MainWindow] Window size preset changed to {e.NewSize} - resizing");
                 _viewModel.RefreshElementVisibility();
                 ApplyWindowSizing();
-                Log.Debug($"[MainWindow] Applied dimensions: {Width}x{Height}");
             });
         }
 

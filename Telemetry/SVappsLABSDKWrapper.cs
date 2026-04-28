@@ -39,8 +39,11 @@ namespace VISOR.Telemetry
         private System.Timers.Timer _yamlRetryTimer;
         private readonly object _retryLock = new();
         private bool _isRetryingYaml = false;
+        private int _yamlRetryCount = 0;
 
         private int _lastSessionNumForLog = -1;
+        private bool _lastPrimedState = false;
+        private DateTime? _disconnectedAt = null;
         #endregion
 
         #region Public Properties
@@ -111,7 +114,20 @@ namespace VISOR.Telemetry
             if (newConnectionState == _isConnected) return;
 
             _isConnected = newConnectionState;
-            Log.Info($"iRacing connection state changed: {(_isConnected ? "Connected" : "Disconnected")}");
+
+            if (_isConnected && _disconnectedAt.HasValue)
+            {
+                var duration = DateTime.UtcNow - _disconnectedAt.Value;
+                Log.Info($"iRacing reconnected after {duration.TotalSeconds:F1}s disconnection");
+                _disconnectedAt = null;
+            }
+            else
+            {
+                Log.Info($"iRacing connection state changed: {(_isConnected ? "Connected" : "Disconnected")}");
+                if (!_isConnected)
+                    _disconnectedAt = DateTime.UtcNow;
+            }
+
             ConnectionStateChanged?.Invoke(_isConnected);
 
             if (!_isConnected)
@@ -126,6 +142,13 @@ namespace VISOR.Telemetry
         private void CheckPrimedStateChange()
         {
             bool isPrimed = _isConnected && _sessionCoordinator.IsDataReady;
+            if (isPrimed != _lastPrimedState)
+            {
+                Log.Info(isPrimed
+                    ? "HUD ready: iRacing connected and session data parsed"
+                    : "HUD no longer primed: waiting for connection or session data");
+                _lastPrimedState = isPrimed;
+            }
             PrimedStateChanged?.Invoke(isPrimed);
         }
 
@@ -213,6 +236,7 @@ namespace VISOR.Telemetry
                 if (!_isRetryingYaml && _isConnected && !_sessionCoordinator.IsDataReady)
                 {
                     _isRetryingYaml = true;
+                    _yamlRetryCount = 0;
                     _yamlRetryTimer.Start();
                 }
             }
@@ -226,6 +250,7 @@ namespace VISOR.Telemetry
                 {
                     _yamlRetryTimer.Stop();
                     _isRetryingYaml = false;
+                    _yamlRetryCount = 0;
                 }
             }
         }
@@ -237,6 +262,9 @@ namespace VISOR.Telemetry
                 StopYamlRetryTimer();
                 return;
             }
+            _yamlRetryCount++;
+            if (_yamlRetryCount == 10)
+                Log.Error($"Session YAML still empty after 10 retries — possible iRacing issue");
             OnSessionInfoUpdate(this, EventArgs.Empty);
         }
 

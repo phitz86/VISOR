@@ -2,6 +2,7 @@
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using VISOR.Diagnostics;
 
 namespace VISOR.ViewModels
 {
@@ -48,6 +49,9 @@ namespace VISOR.ViewModels
                         {
                             _lastLapsFuelUsage.RemoveAt(0);
                         }
+
+                        float avg = _lastLapsFuelUsage.Average();
+                        Log.Debug($"[Fuel] Lap {currentLap}: used {fuelUsedLastLap:F3}L, {_lastLapsFuelUsage.Count}-lap avg {avg:F3}L/lap");
                     }
                 }
                 _lastProcessedLap = currentLap;

@@ -12,12 +12,6 @@ namespace VISOR.ViewModels
     /// Builds the 7-row proximity-based relative display with visual properties.
     /// Uses Historical Ring Buffer for gap calculation: measures the actual elapsed time
     /// between two cars occupying the same physical track position, like a real transponder loop.
-    ///
-    /// REFACTOR LOG:
-    /// - Replaced CarIdxEstTime (pace-dependent) with historical position buffer approach.
-    /// - Pit road cars display "PIT" with gray segments.
-    /// - Stationary on-track cars display distance in feet (bold yellow, capped at 999ft).
-    /// - Normal cars use buffer crossing search with linear interpolation.
     /// </summary>
     public class RelativeDisplayBuilder
     {
