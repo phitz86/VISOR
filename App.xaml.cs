@@ -77,15 +77,22 @@ namespace VISOR
                 Log.Info("ConfigWindow created successfully");
 
                 Log.Info("Showing MainWindow");
+                _mainWindow.WindowState = WindowState.Normal;
+                _mainWindow.ShowActivated = true;
                 _mainWindow.Show();
+                _mainWindow.Activate();
 
                 if (_radarWindow != null)
                 {
                     Log.Info("Showing RadarWindow");
+                    _radarWindow.WindowState = WindowState.Normal;
+                    _radarWindow.ShowActivated = true;
                     _radarWindow.Show();
                 }
 
                 Log.Info("Showing ConfigWindow");
+                _configWindow.WindowState = WindowState.Normal;
+                _configWindow.ShowActivated = true;
                 _configWindow.Show();
 
                 MainWindow = _mainWindow;
