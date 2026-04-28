@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
+using VISOR.Diagnostics;
 
 namespace VISOR.ViewModels
 {
@@ -38,6 +39,8 @@ namespace VISOR.ViewModels
                 _incidentCount = newCount;
                 IncidentDisplay = $"{newCount}x";
                 IncidentColor = GetIncidentColor(newCount);
+                string severity = newCount == 0 ? "clear" : newCount <= 4 ? "yellow" : newCount <= 8 ? "orange" : "red";
+                Log.Debug($"[Warnings] Incident count: {newCount}x ({severity})");
             }
         }
 
@@ -63,6 +66,9 @@ namespace VISOR.ViewModels
 
             bool isTier2Active = (lastLapTopSpeed < (topSpeedBaseline * 0.96f)) && (lastLapTime > (rollingAverage * 1.04f));
 
+            bool wasPaceWarning = IsPaceWarningVisible;
+            bool wasPitNow = IsPitNowVisible;
+
             IsPaceWarningVisible = isTier2Active;
             if (isTier2Active) IsPersistentDotVisible = true;
 
@@ -73,19 +79,22 @@ namespace VISOR.ViewModels
                 float dynamicRepairEstimate = CalculateDynamicRepairTime(paceLossPercent);
                 float totalPitTime = 35.0f + dynamicRepairEstimate;
 
-                if ((timeLostPerLap * lapsRemaining) > totalPitTime)
-                {
-                    IsPitNowVisible = true;
-                }
-                else
-                {
-                    IsPitNowVisible = false;
-                }
+                IsPitNowVisible = (timeLostPerLap * lapsRemaining) > totalPitTime;
             }
             else
             {
                 IsPitNowVisible = false;
             }
+
+            if (!wasPaceWarning && IsPaceWarningVisible)
+                Log.Debug($"[Warnings] Pace warning: lap {lastLapTime:F2}s vs avg {rollingAverage:F2}s (+{(lastLapTime / rollingAverage - 1) * 100:F0}%), top speed -{(1 - lastLapTopSpeed / topSpeedBaseline) * 100:F0}%");
+            else if (wasPaceWarning && !IsPaceWarningVisible)
+                Log.Debug("[Warnings] Pace warning cleared");
+
+            if (!wasPitNow && IsPitNowVisible)
+                Log.Debug($"[Warnings] Pit-now recommendation activated ({lapsRemaining} laps remaining)");
+            else if (wasPitNow && !IsPitNowVisible)
+                Log.Debug("[Warnings] Pit-now recommendation deactivated");
 
             if (IsPersistentDotVisible && lastLapTime < (bestPaceAverage * 1.01f))
             {

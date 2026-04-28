@@ -9,7 +9,6 @@ namespace VISOR.Telemetry
     public class TelemetryDataBuilder
     {
         private readonly SessionDataCoordinator _coordinator;
-        private int _lastSessionState = -1;
         private string _lastSessionInfo = "";
 
         public TelemetryDataBuilder(SessionDataCoordinator coordinator)
@@ -80,13 +79,6 @@ namespace VISOR.Telemetry
             dict["SessionLapsTotal"] = data.SessionLapsTotal;
             dict["SessionNum"] = data.SessionNum;
             dict["SessionFlags"] = Convert.ToInt32(SafeGetFieldValue<object>(data, "SessionFlags", 0));
-
-            int currentSessionState = (int)data.SessionState;
-            if (currentSessionState != _lastSessionState)
-            {
-                Log.Info($"[DataBuilder] SessionState: {_lastSessionState} -> {currentSessionState}");
-                _lastSessionState = currentSessionState;
-            }
         }
 
         private void AddPlayerData(Dictionary<string, object> dict, TelemetryData data)
@@ -121,7 +113,7 @@ namespace VISOR.Telemetry
                 string currentSessionInfo = $"{sessionType}({_coordinator.GetCurrentSessionName()})";
                 if (currentSessionInfo != _lastSessionInfo)
                 {
-                    Log.Info($"[DataBuilder] Session Info: {currentSessionInfo}");
+                    Log.Debug($"[DataBuilder] Session Info: {currentSessionInfo}");
                     _lastSessionInfo = currentSessionInfo;
                 }
             }
@@ -146,6 +138,8 @@ namespace VISOR.Telemetry
                     if (value is T tValue)
                         return tValue;
                 }
+
+                Log.Debug($"[DataBuilder] Field '{fieldName}' not found on TelemetryData, using default");
             }
             catch (Exception ex)
             {

@@ -323,12 +323,21 @@ namespace VISOR.Telemetry
 
                     if (staticSuccess && transitionSuccess)
                     {
+                        if (!liveSuccess)
+                            Log.Warning("Live session data parse failed — qualifying results and fastest laps may be unavailable");
+
                         _lastDataHash = currentHash;
                         _cachedSessionYaml = sessionData;
 
                         UpdateDriverDataCaches();
 
                         IsDataReady = true;
+
+                        var trackName = !string.IsNullOrEmpty(_staticData.Weekend.TrackDisplayName)
+                            ? _staticData.Weekend.TrackDisplayName
+                            : _staticData.Weekend.TrackName;
+                        var sessions = string.Join(", ", _staticData.Schedule.Sessions.Values.Select(s => s.SessionType));
+                        Log.Info($"Session data parsed: {trackName}, {_staticData.Drivers.Count} drivers, sessions: [{sessions}]");
 
                         return true;
                     }

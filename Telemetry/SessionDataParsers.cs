@@ -139,7 +139,10 @@ namespace VISOR.Telemetry
                 }
             }
 
-            return eventData.Drivers.Count > 0 && eventData.Schedule.Sessions.Count > 0;
+            bool success = eventData.Drivers.Count > 0 && eventData.Schedule.Sessions.Count > 0;
+            if (!success)
+                Log.Warning($"[StaticParser] Parse incomplete: {eventData.Drivers.Count} drivers, {eventData.Schedule.Sessions.Count} sessions found");
+            return success;
         }
 
         private bool TryParseIntValue(string line, out int value)
@@ -225,6 +228,8 @@ namespace VISOR.Telemetry
                 }
             }
 
+            if (transitionData.CurrentSessionNum < 0)
+                Log.Warning("[TransitionParser] CurrentSessionNum not found in session data");
             return transitionData.CurrentSessionNum >= 0;
         }
 

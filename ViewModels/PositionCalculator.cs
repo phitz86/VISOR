@@ -389,7 +389,7 @@ namespace VISOR.ViewModels
                     int lap = (carLaps != null && i < carLaps.Length) ? carLaps[i] : -999;
                     float bestLap = (bestLaps != null && i < bestLaps.Length) ? bestLaps[i] : -999f;
 
-                    Log.Info($"Car #{carNumbers[i]} (idx {i}) telemetry snapshot - LapDist:{lapDistPct[i]:F3}, EstTime:{estTime:F2}, Surface:{surface}, Lap:{lap}, BestLap:{bestLap:F2}, OnPit:{isOnPitRoad}");
+                    Log.Debug($"Car #{carNumbers[i]} (idx {i}) telemetry snapshot - LapDist:{lapDistPct[i]:F3}, EstTime:{estTime:F2}, Surface:{surface}, Lap:{lap}, BestLap:{bestLap:F2}, OnPit:{isOnPitRoad}");
                     _carsWithInvalidLapDistPctLogged.Add(i);
                 }
 
