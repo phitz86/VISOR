@@ -169,7 +169,7 @@ namespace VISOR.Telemetry
                 {
                     if (_sessionCoordinator.ParseSessionData(sessionInfo))
                     {
-                        Log.Info("Session YAML retrieved and parsed successfully");
+                        Log.Debug("Session YAML retrieved and parsed successfully");
                         CheckPrimedStateChange();
                         CheckForSessionTransitionLog();
                     }

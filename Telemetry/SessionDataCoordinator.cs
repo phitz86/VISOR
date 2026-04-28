@@ -337,7 +337,12 @@ namespace VISOR.Telemetry
                             ? _staticData.Weekend.TrackDisplayName
                             : _staticData.Weekend.TrackName;
                         var sessions = string.Join(", ", _staticData.Schedule.Sessions.Values.Select(s => s.SessionType));
-                        Log.Info($"Session data parsed: {trackName}, {_staticData.Drivers.Count} drivers, sessions: [{sessions}]");
+                        var summary = $"Session data parsed: {trackName}, {_staticData.Drivers.Count} drivers, sessions: [{sessions}]";
+                        if (summary != _lastParseSummary)
+                        {
+                            Log.Info(summary);
+                            _lastParseSummary = summary;
+                        }
 
                         return true;
                     }
@@ -417,6 +422,7 @@ namespace VISOR.Telemetry
                 _liveData.QualifyPositions.Clear();
                 _liveData.QualifyFastestTimes.Clear();
                 _lastDataHash = string.Empty;
+                _lastParseSummary = string.Empty;
                 IsDataReady = false;
 
                 UpdateDriverDataCaches();
@@ -424,6 +430,7 @@ namespace VISOR.Telemetry
         }
 
         private string _cachedSessionYaml = string.Empty;
+        private string _lastParseSummary = string.Empty;
 
         public string GetCachedSessionYaml()
         {
