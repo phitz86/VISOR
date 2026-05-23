@@ -11,14 +11,14 @@ using VISOR.ViewModels;
 namespace VISOR.Telemetry
 {
     [RequiredTelemetryVars([
-        "LapCurrentLapTime", "LapLastLapTime", "LapBestLapTime", "LapDeltaToBestLap",
-        "LapDeltaToOptimalLap", "LapDeltaToSessionBestLap", "Lap",
-        "FuelLevel", "FuelUsePerHour", "Gear", "Speed", "RPM",
-        "CarIdxLapDistPct", "CarIdxPosition", "CarIdxClassPosition", "CarIdxTrackSurface",
-        "CarIdxLap", "CarIdxLastLapTime", "CarIdxBestLapTime", "CarIdxOnPitRoad",
-        "SessionState", "SessionTime", "SessionTimeRemain", "SessionLapsRemain",
-        "SessionLapsTotal", "SessionNum", "PlayerCarIdx", "SessionFlags",
-        "CarLeftRight", "CarIdxF2Time", "CarIdxEstTime", "CarIdxLapCompleted"
+        TelemetryVar.LapCurrentLapTime, TelemetryVar.LapLastLapTime, TelemetryVar.LapBestLapTime, TelemetryVar.LapDeltaToBestLap,
+        TelemetryVar.LapDeltaToOptimalLap, TelemetryVar.LapDeltaToSessionBestLap, TelemetryVar.Lap,
+        TelemetryVar.FuelLevel, TelemetryVar.FuelUsePerHour, TelemetryVar.Gear, TelemetryVar.Speed, TelemetryVar.RPM,
+        TelemetryVar.CarIdxLapDistPct, TelemetryVar.CarIdxPosition, TelemetryVar.CarIdxClassPosition, TelemetryVar.CarIdxTrackSurface,
+        TelemetryVar.CarIdxLap, TelemetryVar.CarIdxLastLapTime, TelemetryVar.CarIdxBestLapTime, TelemetryVar.CarIdxOnPitRoad,
+        TelemetryVar.SessionState, TelemetryVar.SessionTime, TelemetryVar.SessionTimeRemain, TelemetryVar.SessionLapsRemain,
+        TelemetryVar.SessionLapsTotal, TelemetryVar.SessionNum, TelemetryVar.PlayerCarIdx, TelemetryVar.SessionFlags,
+        TelemetryVar.CarLeftRight, TelemetryVar.CarIdxF2Time, TelemetryVar.CarIdxEstTime, TelemetryVar.CarIdxLapCompleted
     ])]
     public class SVappsLABSDKWrapper : IDisposable
     {
@@ -110,7 +110,7 @@ namespace VISOR.Telemetry
 
         private void OnConnectStateChanged(object sender, EventArgs e)
         {
-            bool newConnectionState = _client?.IsConnected() ?? false;
+            bool newConnectionState = _client?.IsConnected ?? false;
             if (newConnectionState == _isConnected) return;
 
             _isConnected = newConnectionState;
@@ -293,7 +293,7 @@ namespace VISOR.Telemetry
                     _client.OnSessionInfoUpdate -= OnSessionInfoUpdate;
                     _client.OnTelemetryUpdate -= OnTelemetryUpdate;
                     _client.OnConnectStateChanged -= OnConnectStateChanged;
-                    _client.Dispose();
+                    await _client.DisposeAsync();
                 }
                 _cancellationTokenSource?.Dispose();
                 _sessionCoordinator.ClearCache();
