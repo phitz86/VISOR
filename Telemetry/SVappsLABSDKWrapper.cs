@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -40,10 +41,22 @@ namespace VISOR.Telemetry
         private readonly object _retryLock = new();
         private bool _isRetryingYaml = false;
         private int _yamlRetryCount = 0;
+        private string _lastRawYaml = string.Empty;
 
         private int _lastSessionNumForLog = -1;
         private bool _lastPrimedState = false;
         private DateTime? _disconnectedAt = null;
+
+        // Defensive detector state (see Planning/SDK-Migration-Roadmap.md §"Defensive logging strategy")
+        private long _lastTickTs;
+        private int _frameGapCount;
+        private double _worstGapMs;
+        private readonly object _frameGapLock = new();
+        private readonly System.Timers.Timer _frameGapFlushTimer;
+        private long _lastLatencyLogTs;
+        private const double FrameGapThresholdMs = 33.0;     // ~2 missed 60Hz frames
+        private const double HandlerLatencyWarnMs = 10.0;    // margin before 16.6ms danger zone
+        private const double HandlerLatencyCooldownSec = 5.0;
         #endregion
 
         #region Public Properties
@@ -76,6 +89,9 @@ namespace VISOR.Telemetry
 
             _yamlRetryTimer = new System.Timers.Timer(1000) { AutoReset = true };
             _yamlRetryTimer.Elapsed += OnYamlRetryTimer;
+
+            _frameGapFlushTimer = new System.Timers.Timer(5000) { AutoReset = true };
+            _frameGapFlushTimer.Elapsed += OnFrameGapFlushTimer;
         }
 
         public async Task<bool> Initialize()
@@ -84,13 +100,10 @@ namespace VISOR.Telemetry
             {
                 Log.Info("SVappsLAB SDK initialization started");
 
-                _client = TelemetryClient<TelemetryData>.Create(_logger);
-                _client.OnSessionInfoUpdate += OnSessionInfoUpdate;
-                _client.OnTelemetryUpdate += OnTelemetryUpdate;
-                _client.OnConnectStateChanged += OnConnectStateChanged;
-
                 _cancellationTokenSource = new CancellationTokenSource();
-                _monitoringTask = Task.Run(() => _client.Monitor(_cancellationTokenSource.Token));
+                _client = TelemetryClient<TelemetryData>.Create(_logger);
+                _frameGapFlushTimer.Start();
+                _monitoringTask = Task.Run(() => RunAsync(_cancellationTokenSource.Token));
 
                 await Task.Delay(200);
                 Log.Info("SVappsLAB SDK initialized successfully");
@@ -103,14 +116,60 @@ namespace VISOR.Telemetry
             }
         }
 
+        private async Task RunAsync(CancellationToken ct)
+        {
+            try
+            {
+                await using (_client)
+                {
+                    var subscriptionTask = _client.SubscribeToAllStreams(
+                        onTelemetryUpdate: data => { OnTelemetryUpdate(data); return Task.CompletedTask; },
+                        onRawSessionInfoUpdate: yaml => { OnRawSessionInfoUpdate(yaml); return Task.CompletedTask; },
+                        onConnectStateChanged: state => { OnConnectStateChanged(state); return Task.CompletedTask; },
+                        onError: ex => { Log.Error("[SDK Stream] error from SDK", ex); return Task.CompletedTask; },
+                        cancellationToken: ct);
+                    var monitorTask = _client.Monitor(ct);
+
+                    // Defensive detector #3: stream task fault logger.
+                    // Task.WhenAny returns the first task to finish; if it finished unexpectedly
+                    // (faulted, or completed without shutdown being requested), surface it.
+                    var winner = await Task.WhenAny(monitorTask, subscriptionTask);
+                    if (winner.IsFaulted)
+                    {
+                        Log.Error("[StreamFault] SDK task ended unexpectedly", winner.Exception);
+                    }
+                    else if (!ct.IsCancellationRequested)
+                    {
+                        Log.Warning("[StreamFault] SDK task ended without exception (expected only on shutdown)");
+                    }
+
+                    // Observe any pending exception on the other task so it doesn't disappear into the void.
+                    try
+                    {
+                        await Task.WhenAll(monitorTask, subscriptionTask);
+                    }
+                    catch (OperationCanceledException) { /* expected on shutdown */ }
+                    catch (Exception ex)
+                    {
+                        Log.Error("[StreamFault] additional exception while draining SDK tasks", ex);
+                    }
+                }
+            }
+            catch (OperationCanceledException) { /* expected on shutdown */ }
+            catch (Exception ex)
+            {
+                Log.Error("[SDK Stream] RunAsync error", ex);
+            }
+        }
+
         public SVappsLABSnapshot GetSnapshot() => _latestSnapshot;
         public HashSet<string> GetSupportedFields() => TelemetryFieldRegistry.GetAllSupportedFields();
         public Dictionary<string, Type> GetFieldTypes() => new Dictionary<string, Type>(TelemetryFieldRegistry.FieldTypes);
         public bool SupportsField(string fieldName) => TelemetryFieldRegistry.IsFieldSupported(fieldName);
 
-        private void OnConnectStateChanged(object sender, EventArgs e)
+        private void OnConnectStateChanged(ConnectState state)
         {
-            bool newConnectionState = _client?.IsConnected ?? false;
+            bool newConnectionState = state == ConnectState.Connected;
             if (newConnectionState == _isConnected) return;
 
             _isConnected = newConnectionState;
@@ -152,11 +211,16 @@ namespace VISOR.Telemetry
             PrimedStateChanged?.Invoke(isPrimed);
         }
 
-        private void OnSessionInfoUpdate(object sender, object e)
+        private void OnRawSessionInfoUpdate(string sessionInfo)
+        {
+            _lastRawYaml = sessionInfo ?? string.Empty;
+            ProcessSessionYaml(_lastRawYaml);
+        }
+
+        private void ProcessSessionYaml(string sessionInfo)
         {
             try
             {
-                string sessionInfo = _client?.GetRawTelemetrySessionInfoYaml();
                 if (string.IsNullOrEmpty(sessionInfo))
                 {
                     Log.Warning("Session YAML is empty, retrying...");
@@ -182,7 +246,7 @@ namespace VISOR.Telemetry
             }
             catch (Exception ex)
             {
-                Log.Error("Error in OnSessionInfoUpdate", ex);
+                Log.Error("Error in ProcessSessionYaml", ex);
                 StartYamlRetryTimer();
             }
         }
@@ -205,8 +269,27 @@ namespace VISOR.Telemetry
             }
         }
 
-        private void OnTelemetryUpdate(object sender, TelemetryData telemetryData)
+        private void OnTelemetryUpdate(TelemetryData telemetryData)
         {
+            // Defensive detector #1: frame-gap detector. 60Hz expected, flag gaps >33ms.
+            var now = Stopwatch.GetTimestamp();
+            if (_lastTickTs != 0)
+            {
+                var gapMs = (now - _lastTickTs) * 1000.0 / Stopwatch.Frequency;
+                if (gapMs > FrameGapThresholdMs)
+                {
+                    lock (_frameGapLock)
+                    {
+                        _frameGapCount++;
+                        if (gapMs > _worstGapMs) _worstGapMs = gapMs;
+                    }
+                }
+            }
+            _lastTickTs = now;
+
+            // Defensive detector #2: handler latency timer. Times the body below.
+            var handlerStart = Stopwatch.GetTimestamp();
+
             try
             {
                 var telemetryDict = _dataBuilder.BuildTelemetryDictionary(telemetryData);
@@ -227,6 +310,32 @@ namespace VISOR.Telemetry
             {
                 Log.Error("Telemetry update error", ex);
             }
+
+            var elapsedMs = (Stopwatch.GetTimestamp() - handlerStart) * 1000.0 / Stopwatch.Frequency;
+            if (elapsedMs > HandlerLatencyWarnMs)
+            {
+                var cooldownTicks = (long)(HandlerLatencyCooldownSec * Stopwatch.Frequency);
+                if (handlerStart - _lastLatencyLogTs > cooldownTicks)
+                {
+                    _lastLatencyLogTs = handlerStart;
+                    Log.Warning($"[HandlerLatency] OnTelemetryUpdate took {elapsedMs:F1}ms (>{HandlerLatencyWarnMs}ms); risk of dropped samples in 1.x ring buffer");
+                }
+            }
+        }
+
+        private void OnFrameGapFlushTimer(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            int count;
+            double worst;
+            lock (_frameGapLock)
+            {
+                if (_frameGapCount == 0) return;
+                count = _frameGapCount;
+                worst = _worstGapMs;
+                _frameGapCount = 0;
+                _worstGapMs = 0;
+            }
+            Log.Warning($"[FrameGap] {count} gap(s) >{FrameGapThresholdMs:F0}ms between telemetry samples in last 5s (worst: {worst:F1}ms)");
         }
 
         private void StartYamlRetryTimer()
@@ -265,7 +374,7 @@ namespace VISOR.Telemetry
             _yamlRetryCount++;
             if (_yamlRetryCount == 10)
                 Log.Error($"Session YAML still empty after 10 retries — possible iRacing issue");
-            OnSessionInfoUpdate(this, EventArgs.Empty);
+            ProcessSessionYaml(_lastRawYaml);
         }
 
         public void Shutdown()
@@ -275,6 +384,8 @@ namespace VISOR.Telemetry
                 Log.Info("SVappsLAB SDK shutdown initiated");
                 StopYamlRetryTimer();
                 _yamlRetryTimer?.Dispose();
+                _frameGapFlushTimer?.Stop();
+                _frameGapFlushTimer?.Dispose();
 
 #if DEBUG
                 _sessionLogger?.Dispose();
@@ -283,18 +394,12 @@ namespace VISOR.Telemetry
 
                 _cancellationTokenSource?.Cancel();
 
+                // RunAsync owns the `await using` on _client; cancellation unwinds it and disposes the SDK client.
                 if (_monitoringTask != null && !_monitoringTask.Wait(TimeSpan.FromSeconds(2)))
                 {
-                    Log.Warning("Monitoring task did not shut down gracefully");
+                    Log.Warning("Run task did not shut down gracefully");
                 }
 
-                if (_client != null)
-                {
-                    _client.OnSessionInfoUpdate -= OnSessionInfoUpdate;
-                    _client.OnTelemetryUpdate -= OnTelemetryUpdate;
-                    _client.OnConnectStateChanged -= OnConnectStateChanged;
-                    await _client.DisposeAsync();
-                }
                 _cancellationTokenSource?.Dispose();
                 _sessionCoordinator.ClearCache();
                 Log.Info("SVappsLAB SDK shutdown complete");
