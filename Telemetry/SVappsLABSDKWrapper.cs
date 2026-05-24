@@ -194,6 +194,9 @@ namespace VISOR.Telemetry
                 StopYamlRetryTimer();
                 _sessionCoordinator.ClearCache();
                 _lastSessionNumForLog = -1;
+                // Reset frame-gap baseline so the wall-clock gap across a disconnect
+                // doesn't get reported as a single huge gap on the first frame after reconnect.
+                _lastTickTs = 0;
             }
             CheckPrimedStateChange();
         }
