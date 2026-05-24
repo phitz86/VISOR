@@ -290,28 +290,47 @@ namespace VISOR.Telemetry
             }
             _lastTickTs = now;
 
-            // Defensive detector #2: handler latency timer. Times the body below.
+            // Defensive detector #2: handler latency timer. Times the inline body below.
+            // Post-offload the inline cost is just dict-build + snapshot construction;
+            // a warning here means something heavy crept back onto the SDK stream thread.
             var handlerStart = Stopwatch.GetTimestamp();
 
+            SVappsLABSnapshot snapshot = null;
             try
             {
                 var telemetryDict = _dataBuilder.BuildTelemetryDictionary(telemetryData);
-                _latestSnapshot = new SVappsLABSnapshot(
+                snapshot = new SVappsLABSnapshot(
                     telemetryDict,
                     _sessionCoordinator.GetCachedSessionYaml(),
                     DateTime.UtcNow
                 );
-
-#if DEBUG
-                // Log telemetry data for analysis (internally throttled to 1Hz)
-                _telemetryLogger?.LogSnapshot(_latestSnapshot, _sessionCoordinator);
-#endif
-
-                SnapshotAvailable?.Invoke(_latestSnapshot);
+                _latestSnapshot = snapshot;
             }
             catch (Exception ex)
             {
                 Log.Error("Telemetry update error", ex);
+            }
+
+            // Offload the fan-out and DEBUG-only file I/O so the SDK stream thread isn't
+            // blocked on consumer work. In SDK 1.x the channel has a 60-sample ring buffer
+            // and oldest samples are silently dropped when consumption is slow; keeping
+            // the on-thread cost minimal is the prescribed mitigation.
+            if (snapshot != null)
+            {
+                _ = Task.Run(() =>
+                {
+                    try
+                    {
+#if DEBUG
+                        _telemetryLogger?.LogSnapshot(snapshot, _sessionCoordinator);
+#endif
+                        SnapshotAvailable?.Invoke(snapshot);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error("[SnapshotFanout] error in offloaded snapshot fan-out", ex);
+                    }
+                });
             }
 
             var elapsedMs = (Stopwatch.GetTimestamp() - handlerStart) * 1000.0 / Stopwatch.Frequency;
