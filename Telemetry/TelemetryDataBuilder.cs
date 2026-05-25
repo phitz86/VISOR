@@ -1,6 +1,5 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Linq;
 using SVappsLAB.iRacingTelemetrySDK;
 using VISOR.Diagnostics;
 
@@ -10,6 +9,11 @@ namespace VISOR.Telemetry
     {
         private readonly SessionDataCoordinator _coordinator;
         private string _lastSessionInfo = "";
+
+        // Defensive detector #4: first-time-null logger. Tracks which declared telemetry
+        // variables have ever been observed null so we log each at most once per process.
+        private readonly HashSet<string> _observedNullFields = new();
+        private readonly object _firstNullLock = new();
 
         public TelemetryDataBuilder(SessionDataCoordinator coordinator)
         {
@@ -38,59 +42,67 @@ namespace VISOR.Telemetry
 
         private void AddLapTimingData(Dictionary<string, object> dict, TelemetryData data)
         {
-            dict["LapCurrentLapTime"] = data.LapCurrentLapTime;
-            dict["LapLastLapTime"] = data.LapLastLapTime;
-            dict["LapBestLapTime"] = data.LapBestLapTime;
-            dict["LapDeltaToBestLap"] = data.LapDeltaToBestLap;
-            dict["LapDeltaToOptimalLap"] = data.LapDeltaToOptimalLap;
-            dict["LapDeltaToSessionBestLap"] = data.LapDeltaToSessionBestLap;
-            dict["Lap"] = data.Lap;
+            Set(dict, "LapCurrentLapTime", data.LapCurrentLapTime);
+            Set(dict, "LapLastLapTime", data.LapLastLapTime);
+            Set(dict, "LapBestLapTime", data.LapBestLapTime);
+            Set(dict, "LapDeltaToBestLap", data.LapDeltaToBestLap);
+            Set(dict, "LapDeltaToOptimalLap", data.LapDeltaToOptimalLap);
+            Set(dict, "LapDeltaToSessionBestLap", data.LapDeltaToSessionBestLap);
+            Set(dict, "Lap", data.Lap);
         }
 
         private void AddCarStateData(Dictionary<string, object> dict, TelemetryData data)
         {
-            dict["FuelLevel"] = data.FuelLevel;
-            dict["FuelUsePerHour"] = data.FuelUsePerHour;
-            dict["Gear"] = data.Gear;
-            dict["Speed"] = data.Speed;
-            dict["RPM"] = data.RPM;
+            Set(dict, "FuelLevel", data.FuelLevel);
+            Set(dict, "FuelUsePerHour", data.FuelUsePerHour);
+            Set(dict, "Gear", data.Gear);
+            Set(dict, "Speed", data.Speed);
+            Set(dict, "RPM", data.RPM);
         }
 
         private void AddPositioningData(Dictionary<string, object> dict, TelemetryData data)
         {
-            dict["CarIdxLapDistPct"] = data.CarIdxLapDistPct;
-            dict["CarIdxPosition"] = data.CarIdxPosition;
-            dict["CarIdxClassPosition"] = data.CarIdxClassPosition;
-            dict["CarIdxTrackSurface"] = data.CarIdxTrackSurface;
-            dict["CarIdxLap"] = data.CarIdxLap;
-            dict["CarIdxLapCompleted"] = data.CarIdxLapCompleted;
-            dict["CarIdxLastLapTime"] = data.CarIdxLastLapTime;
-            dict["CarIdxBestLapTime"] = data.CarIdxBestLapTime;
-            dict["CarIdxOnPitRoad"] = SafeGetFieldValue(data, "CarIdxOnPitRoad", new bool[64]);
-            dict["CarIdxEstTime"] = SafeGetFieldValue(data, "CarIdxEstTime", new float[64]);
+            SetArray(dict, "CarIdxLapDistPct", data.CarIdxLapDistPct);
+            SetArray(dict, "CarIdxPosition", data.CarIdxPosition);
+            SetArray(dict, "CarIdxClassPosition", data.CarIdxClassPosition);
+            SetArray(dict, "CarIdxTrackSurface", data.CarIdxTrackSurface);
+            SetArray(dict, "CarIdxLap", data.CarIdxLap);
+            SetArray(dict, "CarIdxLapCompleted", data.CarIdxLapCompleted);
+            SetArray(dict, "CarIdxLastLapTime", data.CarIdxLastLapTime);
+            SetArray(dict, "CarIdxBestLapTime", data.CarIdxBestLapTime);
+            SetArray(dict, "CarIdxOnPitRoad", data.CarIdxOnPitRoad);
+            SetArray(dict, "CarIdxEstTime", data.CarIdxEstTime);
         }
 
         private void AddSessionData(Dictionary<string, object> dict, TelemetryData data)
         {
+            // SessionState compiled as non-nullable enum under SDK 1.2.1; keep the direct cast.
             dict["SessionState"] = (int)data.SessionState;
-            dict["SessionTime"] = data.SessionTime;
-            dict["SessionTimeRemain"] = data.SessionTimeRemain;
-            dict["SessionLapsRemain"] = data.SessionLapsRemain;
-            dict["SessionLapsTotal"] = data.SessionLapsTotal;
-            dict["SessionNum"] = data.SessionNum;
-            dict["SessionFlags"] = Convert.ToInt32(SafeGetFieldValue<object>(data, "SessionFlags", 0));
+            Set(dict, "SessionTime", data.SessionTime);
+            Set(dict, "SessionTimeRemain", data.SessionTimeRemain);
+            Set(dict, "SessionLapsRemain", data.SessionLapsRemain);
+            Set(dict, "SessionLapsTotal", data.SessionLapsTotal);
+            Set(dict, "SessionNum", data.SessionNum);
+            dict["SessionFlags"] = Convert.ToInt32(data.SessionFlags);
         }
 
         private void AddPlayerData(Dictionary<string, object> dict, TelemetryData data)
         {
-            dict["PlayerCarIdx"] = data.PlayerCarIdx;
+            // -1 sentinel matches SVappsLABSnapshot.PlayerCarIdx default for "no player".
+            Set(dict, "PlayerCarIdx", data.PlayerCarIdx, defaultValue: -1);
         }
 
         private void AddRadarData(Dictionary<string, object> dict, TelemetryData data)
         {
-            dict["CarLeftRight"] = SafeGetFieldValue<object>(data, "CarLeftRight", null);
-            dict["CarIdxF2Time"] = SafeGetFieldValue(data, "CarIdxF2Time", new float[64]);
-            dict["TrackLength"] = SafeGetFieldValue(data, "TrackLength", 0f);
+            // CarLeftRight is an enum on TelemetryData; box into the dict and let
+            // downstream consumers cast. Detect nulls in case it becomes nullable.
+            if (data.CarLeftRight is null) NotifyFirstNull("CarLeftRight");
+            dict["CarLeftRight"] = data.CarLeftRight;
+
+            SetArray(dict, "CarIdxF2Time", data.CarIdxF2Time);
+            // Note: TrackLength is sourced from session YAML in AddYamlData; the prior
+            // reflection read against TelemetryData always fell back to 0f (not declared
+            // in [RequiredTelemetryVars]), so dropping it is a no-op.
         }
 
         private void AddYamlData(Dictionary<string, object> dict)
@@ -119,34 +131,48 @@ namespace VISOR.Telemetry
             }
         }
 
-        private T SafeGetFieldValue<T>(TelemetryData data, string fieldName, T defaultValue)
+        private void Set(Dictionary<string, object> dict, string name, float? value, float defaultValue = 0f)
         {
-            try
+            if (!value.HasValue) NotifyFirstNull(name);
+            dict[name] = value ?? defaultValue;
+        }
+
+        private void Set(Dictionary<string, object> dict, string name, int? value, int defaultValue = 0)
+        {
+            if (!value.HasValue) NotifyFirstNull(name);
+            dict[name] = value ?? defaultValue;
+        }
+
+        private void Set(Dictionary<string, object> dict, string name, double? value, double defaultValue = 0.0)
+        {
+            if (!value.HasValue) NotifyFirstNull(name);
+            dict[name] = value ?? defaultValue;
+        }
+
+        private void SetArray<T>(Dictionary<string, object> dict, string name, T[] value, int expectedLength = 64)
+        {
+            if (value is null)
             {
-                var field = data.GetType().GetField(fieldName);
-                if (field != null)
-                {
-                    var value = field.GetValue(data);
-                    if (value is T tValue)
-                        return tValue;
-                }
-
-                var property = data.GetType().GetProperty(fieldName);
-                if (property != null)
-                {
-                    var value = property.GetValue(data);
-                    if (value is T tValue)
-                        return tValue;
-                }
-
-                Log.Debug($"[DataBuilder] Field '{fieldName}' not found on TelemetryData, using default");
+                NotifyFirstNull(name);
+                dict[name] = new T[expectedLength];
             }
-            catch (Exception ex)
+            else
             {
-                Log.Error($"[DataBuilder] Error accessing field '{fieldName}': {ex.Message}");
+                dict[name] = value;
             }
+        }
 
-            return defaultValue;
+        private void NotifyFirstNull(string fieldName)
+        {
+            bool firstObservation;
+            lock (_firstNullLock)
+            {
+                firstObservation = _observedNullFields.Add(fieldName);
+            }
+            if (firstObservation)
+            {
+                Log.Warning($"[FirstNull] {fieldName} observed null for the first time");
+            }
         }
 
         public bool ValidateSnapshot(Dictionary<string, object> data)
