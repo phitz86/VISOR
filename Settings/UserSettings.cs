@@ -185,7 +185,7 @@ namespace VISOR.Settings
         /// When true, only the SDK adapter runs.
         /// </summary>
         [UserScopedSetting]
-        [DefaultSettingValue("false")]
+        [DefaultSettingValue("true")]
         public bool UseSdkParser
         {
             get => (bool)this["UseSdkParser"];
