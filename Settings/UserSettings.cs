@@ -179,6 +179,19 @@ namespace VISOR.Settings
             set => this["DebugModeEnabled"] = value;
         }
 
+        /// <summary>
+        /// Use SDK's parsed TelemetrySessionInfo instead of VISOR's hand-rolled YAML parsers.
+        /// When false, both parsers run side-by-side and divergences log as [ParserDiff].
+        /// When true, only the SDK adapter runs.
+        /// </summary>
+        [UserScopedSetting]
+        [DefaultSettingValue("false")]
+        public bool UseSdkParser
+        {
+            get => (bool)this["UseSdkParser"];
+            set => this["UseSdkParser"] = value;
+        }
+
         #endregion
 
         #region Helper Methods

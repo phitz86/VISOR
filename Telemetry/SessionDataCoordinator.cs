@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using SVappsLAB.iRacingTelemetrySDK;
 using VISOR.Diagnostics;
 
 namespace VISOR.Telemetry
@@ -14,6 +15,13 @@ namespace VISOR.Telemetry
         private readonly StaticEventData _staticData = new();
         private readonly SessionTransitionData _transitionData = new();
         private readonly LiveSessionData _liveData = new();
+
+        // Shadow state: populated by the SDK adapter when running side-by-side with
+        // the YAML parser. Compared against main state by ParserDiffComparator.
+        private readonly StaticEventData _shadowStaticData = new();
+        private readonly SessionTransitionData _shadowTransitionData = new();
+        private readonly LiveSessionData _shadowLiveData = new();
+        private readonly ParserDiffComparator _diffComparator = new();
 
         private string _lastDataHash = string.Empty;
         private readonly object _parseLock = new();
@@ -356,6 +364,88 @@ namespace VISOR.Telemetry
             return false;
         }
 
+        /// <summary>
+        /// Drives the main coordinator state from the SDK's parsed TelemetrySessionInfo
+        /// via SessionDataAdapter. Used when UserSettings.UseSdkParser is true.
+        /// </summary>
+        public bool ApplySdkSessionToMain(TelemetrySessionInfo info)
+        {
+            if (info == null) return false;
+
+            try
+            {
+                lock (_parseLock)
+                {
+                    SessionDataAdapter.Apply(info, _staticData, _transitionData, _liveData);
+
+                    bool ready = _staticData.Drivers.Count > 0 && _staticData.Schedule.Sessions.Count > 0;
+                    if (!ready) return false;
+
+                    UpdateDriverDataCaches();
+                    IsDataReady = true;
+
+                    var trackName = !string.IsNullOrEmpty(_staticData.Weekend.TrackDisplayName)
+                        ? _staticData.Weekend.TrackDisplayName
+                        : _staticData.Weekend.TrackName;
+                    var sessions = string.Join(", ", _staticData.Schedule.Sessions.Values.Select(s => s.SessionType));
+                    var summary = $"Session data parsed (SDK adapter): {trackName}, {_staticData.Drivers.Count} drivers, sessions: [{sessions}]";
+                    if (summary != _lastParseSummary)
+                    {
+                        Log.Info(summary);
+                        _lastParseSummary = summary;
+                    }
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("SessionDataCoordinator ApplySdkSessionToMain error", ex);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Populates the shadow state from the SDK's parsed TelemetrySessionInfo
+        /// without touching main state. Used in shadow mode (flag off) to feed
+        /// the diff comparator.
+        /// </summary>
+        public void ApplySdkSessionToShadow(TelemetrySessionInfo info)
+        {
+            if (info == null) return;
+            try
+            {
+                lock (_parseLock)
+                {
+                    SessionDataAdapter.Apply(info, _shadowStaticData, _shadowTransitionData, _shadowLiveData);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("SessionDataCoordinator ApplySdkSessionToShadow error", ex);
+            }
+        }
+
+        /// <summary>
+        /// Runs the diff comparator against main vs shadow state. Caller should
+        /// invoke this once both sides have at least one update for the current
+        /// session; called on each onSessionInfoUpdate while shadow mode is active.
+        /// </summary>
+        public void RunParserDiff()
+        {
+            lock (_parseLock)
+            {
+                // Skip until the old parser has populated main state at least once;
+                // otherwise the first SDK update would diff a fully-populated shadow
+                // against an empty main and report spurious [ParserDiff] noise.
+                if (!IsDataReady) return;
+
+                _diffComparator.Compare(
+                    _staticData, _shadowStaticData,
+                    _transitionData, _shadowTransitionData,
+                    _liveData, _shadowLiveData);
+            }
+        }
+
         private void UpdateDriverDataCaches()
         {
             var newUserNames = new string[64];
@@ -425,6 +515,24 @@ namespace VISOR.Telemetry
                 _lastParseSummary = string.Empty;
                 IsDataReady = false;
 
+                _shadowStaticData.Drivers.Clear();
+                _shadowStaticData.Schedule.Sessions.Clear();
+                _shadowStaticData.IncidentLimit = 0;
+                _shadowStaticData.Weekend.TrackName = string.Empty;
+                _shadowStaticData.Weekend.TrackConfig = string.Empty;
+                _shadowStaticData.Weekend.TrackLength = 0f;
+                _shadowStaticData.Weekend.TrackDisplayName = string.Empty;
+                _shadowStaticData.Weekend.TrackDisplayShortName = string.Empty;
+                _shadowTransitionData.DriverIncidentCounts.Clear();
+                _shadowTransitionData.CurrentSessionNum = -1;
+                _shadowTransitionData.CurrentSessionType = string.Empty;
+                _shadowTransitionData.CurrentSessionName = string.Empty;
+                _shadowLiveData.SessionResultsPositions.Clear();
+                _shadowLiveData.SessionFastestLaps.Clear();
+                _shadowLiveData.QualifyPositions.Clear();
+                _shadowLiveData.QualifyFastestTimes.Clear();
+                _diffComparator.Reset();
+
                 UpdateDriverDataCaches();
             }
         }
@@ -437,6 +545,14 @@ namespace VISOR.Telemetry
             lock (_parseLock)
             {
                 return _cachedSessionYaml;
+            }
+        }
+
+        public void SetCachedSessionYaml(string yaml)
+        {
+            lock (_parseLock)
+            {
+                _cachedSessionYaml = yaml ?? string.Empty;
             }
         }
 

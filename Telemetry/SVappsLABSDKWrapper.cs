@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using VISOR.Diagnostics;
+using VISOR.Settings;
 using VISOR.ViewModels;
 
 namespace VISOR.Telemetry
@@ -125,6 +126,7 @@ namespace VISOR.Telemetry
                     var subscriptionTask = _client.SubscribeToAllStreams(
                         onTelemetryUpdate: data => { OnTelemetryUpdate(data); return Task.CompletedTask; },
                         onRawSessionInfoUpdate: yaml => { OnRawSessionInfoUpdate(yaml); return Task.CompletedTask; },
+                        onSessionInfoUpdate: info => { OnSessionInfoUpdate(info); return Task.CompletedTask; },
                         onConnectStateChanged: state => { OnConnectStateChanged(state); return Task.CompletedTask; },
                         onError: ex => { Log.Error("[SDK Stream] error from SDK", ex); return Task.CompletedTask; },
                         cancellationToken: ct);
@@ -217,7 +219,43 @@ namespace VISOR.Telemetry
         private void OnRawSessionInfoUpdate(string sessionInfo)
         {
             _lastRawYaml = sessionInfo ?? string.Empty;
+            if (UserSettings.Instance.UseSdkParser)
+            {
+                // Cache the raw YAML so the snapshot's RawSessionData and the
+                // DEBUG session logger stay useful when the SDK parser owns
+                // the main path; just skip the hand-rolled parse + retry timer.
+                _sessionCoordinator.SetCachedSessionYaml(_lastRawYaml);
+                return;
+            }
             ProcessSessionYaml(_lastRawYaml);
+        }
+
+        private void OnSessionInfoUpdate(TelemetrySessionInfo info)
+        {
+            try
+            {
+                if (UserSettings.Instance.UseSdkParser)
+                {
+                    // SDK parser owns the main coordinator state.
+                    if (_sessionCoordinator.ApplySdkSessionToMain(info))
+                    {
+                        CheckPrimedStateChange();
+                        CheckForSessionTransitionLog();
+                    }
+                }
+                else
+                {
+                    // Shadow mode: populate parallel state from the SDK adapter and
+                    // diff against the YAML parser's output. Logs [ParserDiff] for
+                    // each field-level divergence (deduped per CurrentSessionNum).
+                    _sessionCoordinator.ApplySdkSessionToShadow(info);
+                    _sessionCoordinator.RunParserDiff();
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("OnSessionInfoUpdate error", ex);
+            }
         }
 
         private void ProcessSessionYaml(string sessionInfo)
