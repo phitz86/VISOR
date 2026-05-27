@@ -7,8 +7,6 @@ namespace VISOR.Telemetry
     /// <summary>
     /// Maps the SDK's parsed TelemetrySessionInfo into VISOR's existing
     /// StaticEventData / SessionTransitionData / LiveSessionData shapes.
-    /// Mirrors the old YAML parsers' field-level behavior (default values,
-    /// upsert vs clear semantics) so shadow-mode comparison stays signal-only.
     /// </summary>
     internal static class SessionDataAdapter
     {
@@ -40,8 +38,7 @@ namespace VISOR.Telemetry
 
         private static void ApplyDrivers(DriverInfo src, StaticEventData dst, SessionTransitionData transition)
         {
-            // Old parser clears Drivers on each parse (rebuild from scratch);
-            // mirror so shadow-mode never reports phantom stale rows.
+            // Rebuild from scratch so a driver leaving the session doesn't linger.
             dst.Drivers.Clear();
             if (src?.Drivers == null) return;
 
@@ -64,8 +61,6 @@ namespace VISOR.Telemetry
 
         private static void ApplySchedule(SessionInfo src, StaticEventData dst)
         {
-            // Old parser upserts (no clear). Match: stale entries linger if a YAML
-            // ever drops a session, but that's the existing behavior we're shadowing.
             if (src?.Sessions == null) return;
             foreach (var s in src.Sessions)
             {
@@ -138,7 +133,6 @@ namespace VISOR.Telemetry
 
             if (info.QualifyResultsInfo?.Results != null)
             {
-                // Old parser upserts (doesn't clear). Match.
                 foreach (var r in info.QualifyResultsInfo.Results)
                 {
                     if (r.CarIdx < 0) continue;
@@ -158,8 +152,7 @@ namespace VISOR.Telemetry
 
         private static int ParseIncidentLimit(string raw)
         {
-            // Old parser left IncidentLimit at default 0 when it couldn't int-parse
-            // (which is what happens with "unlimited"). Match so shadow stays clean.
+            // "unlimited" or any non-numeric value → 0 (treated as no cap by consumers).
             if (string.IsNullOrEmpty(raw)) return 0;
             return int.TryParse(raw.Trim(), out var v) ? v : 0;
         }
@@ -170,8 +163,8 @@ namespace VISOR.Telemetry
             var s = raw.Trim();
             var isKm = s.EndsWith(" km", System.StringComparison.Ordinal);
             var numStr = s.Replace(" km", "").Replace(" m", "");
-            // Old parser used default-culture float.TryParse. Match for shadow fidelity.
-            if (!float.TryParse(numStr, out var v)) return 0f;
+            // iRacing YAML uses period as decimal separator regardless of system locale.
+            if (!float.TryParse(numStr, NumberStyles.Float, CultureInfo.InvariantCulture, out var v)) return 0f;
             return isKm ? v * 1000f : v;
         }
 
@@ -187,8 +180,7 @@ namespace VISOR.Telemetry
         {
             if (string.IsNullOrEmpty(raw)) return 0.0;
             var s = raw.Replace(" sec", "").Trim();
-            // Old parser used default-culture double.TryParse. Match.
-            return double.TryParse(s, out var v) ? v : 0.0;
+            return double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 0.0;
         }
     }
 }

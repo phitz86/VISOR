@@ -7,7 +7,6 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using VISOR.Diagnostics;
-using VISOR.Settings;
 using VISOR.ViewModels;
 
 namespace VISOR.Telemetry
@@ -38,11 +37,10 @@ namespace VISOR.Telemetry
         private Task _monitoringTask;
         private bool _isConnected = false;
 
-        private System.Timers.Timer _yamlRetryTimer;
-        private readonly object _retryLock = new();
-        private bool _isRetryingYaml = false;
-        private int _yamlRetryCount = 0;
-        private string _lastRawYaml = string.Empty;
+        // Cached raw YAML from onRawSessionInfoUpdate; consumed only by the
+        // DEBUG SessionDataLogger. Reference assignment is atomic in C#, so
+        // the lock-free read pattern matches the volatile driver-cache arrays.
+        private volatile string _cachedRawYaml = string.Empty;
 
         private int _lastSessionNumForLog = -1;
         private bool _lastPrimedState = false;
@@ -82,14 +80,11 @@ namespace VISOR.Telemetry
 
 #if DEBUG
             _sessionLogger = new SessionDataLogger(
-                () => _sessionCoordinator.GetCachedSessionYaml(),
+                () => _cachedRawYaml,
                 () => GetFieldTypes()
             );
             _telemetryLogger = new TelemetryCSVLogger();
 #endif
-
-            _yamlRetryTimer = new System.Timers.Timer(1000) { AutoReset = true };
-            _yamlRetryTimer.Elapsed += OnYamlRetryTimer;
 
             _frameGapFlushTimer = new System.Timers.Timer(5000) { AutoReset = true };
             _frameGapFlushTimer.Elapsed += OnFrameGapFlushTimer;
@@ -193,8 +188,8 @@ namespace VISOR.Telemetry
 
             if (!_isConnected)
             {
-                StopYamlRetryTimer();
                 _sessionCoordinator.ClearCache();
+                _cachedRawYaml = string.Empty;
                 _lastSessionNumForLog = -1;
                 // Reset frame-gap baseline so the wall-clock gap across a disconnect
                 // doesn't get reported as a single huge gap on the first frame after reconnect.
@@ -218,77 +213,23 @@ namespace VISOR.Telemetry
 
         private void OnRawSessionInfoUpdate(string sessionInfo)
         {
-            _lastRawYaml = sessionInfo ?? string.Empty;
-            if (UserSettings.Instance.UseSdkParser)
-            {
-                // Cache the raw YAML so the snapshot's RawSessionData and the
-                // DEBUG session logger stay useful when the SDK parser owns
-                // the main path; just skip the hand-rolled parse + retry timer.
-                _sessionCoordinator.SetCachedSessionYaml(_lastRawYaml);
-                return;
-            }
-            ProcessSessionYaml(_lastRawYaml);
+            // Stash for the DEBUG-only SessionDataLogger; parsing happens in OnSessionInfoUpdate.
+            _cachedRawYaml = sessionInfo ?? string.Empty;
         }
 
         private void OnSessionInfoUpdate(TelemetrySessionInfo info)
         {
             try
             {
-                if (UserSettings.Instance.UseSdkParser)
+                if (_sessionCoordinator.ApplySdkSession(info))
                 {
-                    // SDK parser owns the main coordinator state.
-                    if (_sessionCoordinator.ApplySdkSessionToMain(info))
-                    {
-                        CheckPrimedStateChange();
-                        CheckForSessionTransitionLog();
-                    }
-                }
-                else
-                {
-                    // Shadow mode: populate parallel state from the SDK adapter and
-                    // diff against the YAML parser's output. Logs [ParserDiff] for
-                    // each field-level divergence (deduped per CurrentSessionNum).
-                    _sessionCoordinator.ApplySdkSessionToShadow(info);
-                    _sessionCoordinator.RunParserDiff();
+                    CheckPrimedStateChange();
+                    CheckForSessionTransitionLog();
                 }
             }
             catch (Exception ex)
             {
                 Log.Error("OnSessionInfoUpdate error", ex);
-            }
-        }
-
-        private void ProcessSessionYaml(string sessionInfo)
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(sessionInfo))
-                {
-                    Log.Warning("Session YAML is empty, retrying...");
-                    StartYamlRetryTimer();
-                    return;
-                }
-
-                StopYamlRetryTimer();
-                if (_sessionCoordinator.HasSessionDataChanged(sessionInfo))
-                {
-                    if (_sessionCoordinator.ParseSessionData(sessionInfo))
-                    {
-                        Log.Debug("Session YAML retrieved and parsed successfully");
-                        CheckPrimedStateChange();
-                        CheckForSessionTransitionLog();
-                    }
-                    else
-                    {
-                        Log.Warning("Failed to parse session YAML, retrying...");
-                        StartYamlRetryTimer();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Error("Error in ProcessSessionYaml", ex);
-                StartYamlRetryTimer();
             }
         }
 
@@ -337,11 +278,7 @@ namespace VISOR.Telemetry
             try
             {
                 var telemetryDict = _dataBuilder.BuildTelemetryDictionary(telemetryData);
-                snapshot = new SVappsLABSnapshot(
-                    telemetryDict,
-                    _sessionCoordinator.GetCachedSessionYaml(),
-                    DateTime.UtcNow
-                );
+                snapshot = new SVappsLABSnapshot(telemetryDict, DateTime.UtcNow);
                 _latestSnapshot = snapshot;
             }
             catch (Exception ex)
@@ -398,52 +335,11 @@ namespace VISOR.Telemetry
             Log.Warning($"[FrameGap] {count} gap(s) >{FrameGapThresholdMs:F0}ms between telemetry samples in last 5s (worst: {worst:F1}ms)");
         }
 
-        private void StartYamlRetryTimer()
-        {
-            lock (_retryLock)
-            {
-                if (!_isRetryingYaml && _isConnected && !_sessionCoordinator.IsDataReady)
-                {
-                    _isRetryingYaml = true;
-                    _yamlRetryCount = 0;
-                    _yamlRetryTimer.Start();
-                }
-            }
-        }
-
-        private void StopYamlRetryTimer()
-        {
-            lock (_retryLock)
-            {
-                if (_isRetryingYaml)
-                {
-                    _yamlRetryTimer.Stop();
-                    _isRetryingYaml = false;
-                    _yamlRetryCount = 0;
-                }
-            }
-        }
-
-        private void OnYamlRetryTimer(object sender, System.Timers.ElapsedEventArgs e)
-        {
-            if (!_isConnected || _sessionCoordinator.IsDataReady)
-            {
-                StopYamlRetryTimer();
-                return;
-            }
-            _yamlRetryCount++;
-            if (_yamlRetryCount == 10)
-                Log.Error($"Session YAML still empty after 10 retries — possible iRacing issue");
-            ProcessSessionYaml(_lastRawYaml);
-        }
-
         public void Shutdown()
         {
             try
             {
                 Log.Info("SVappsLAB SDK shutdown initiated");
-                StopYamlRetryTimer();
-                _yamlRetryTimer?.Dispose();
                 _frameGapFlushTimer?.Stop();
                 _frameGapFlushTimer?.Dispose();
 

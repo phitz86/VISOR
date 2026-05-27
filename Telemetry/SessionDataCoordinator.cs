@@ -8,22 +8,10 @@ namespace VISOR.Telemetry
 {
     public class SessionDataCoordinator : ISessionDataProvider
     {
-        private readonly StaticEventParser _staticParser = new();
-        private readonly SessionTransitionParser _transitionParser = new();
-        private readonly LiveSessionParser _liveParser = new();
-
         private readonly StaticEventData _staticData = new();
         private readonly SessionTransitionData _transitionData = new();
         private readonly LiveSessionData _liveData = new();
 
-        // Shadow state: populated by the SDK adapter when running side-by-side with
-        // the YAML parser. Compared against main state by ParserDiffComparator.
-        private readonly StaticEventData _shadowStaticData = new();
-        private readonly SessionTransitionData _shadowTransitionData = new();
-        private readonly LiveSessionData _shadowLiveData = new();
-        private readonly ParserDiffComparator _diffComparator = new();
-
-        private string _lastDataHash = string.Empty;
         private readonly object _parseLock = new();
 
         public bool IsDataReady { get; private set; }
@@ -307,68 +295,7 @@ namespace VISOR.Telemetry
             return result;
         }
 
-        public bool ParseSessionData(string sessionData)
-        {
-            if (string.IsNullOrEmpty(sessionData))
-                return false;
-
-            try
-            {
-                lock (_parseLock)
-                {
-                    var currentHash = sessionData.GetHashCode().ToString();
-
-                    if (currentHash == _lastDataHash)
-                    {
-                        return false;
-                    }
-
-                    var lines = sessionData.Split('\n');
-
-                    bool staticSuccess = _staticParser.ParseStaticData(lines, _staticData);
-                    bool transitionSuccess = _transitionParser.ParseTransitionData(lines, _transitionData, _staticData);
-                    bool liveSuccess = _liveParser.ParseLiveData(lines, _liveData, _transitionData.CurrentSessionNum);
-
-                    if (staticSuccess && transitionSuccess)
-                    {
-                        if (!liveSuccess)
-                            Log.Warning("Live session data parse failed — qualifying results and fastest laps may be unavailable");
-
-                        _lastDataHash = currentHash;
-                        _cachedSessionYaml = sessionData;
-
-                        UpdateDriverDataCaches();
-
-                        IsDataReady = true;
-
-                        var trackName = !string.IsNullOrEmpty(_staticData.Weekend.TrackDisplayName)
-                            ? _staticData.Weekend.TrackDisplayName
-                            : _staticData.Weekend.TrackName;
-                        var sessions = string.Join(", ", _staticData.Schedule.Sessions.Values.Select(s => s.SessionType));
-                        var summary = $"Session data parsed: {trackName}, {_staticData.Drivers.Count} drivers, sessions: [{sessions}]";
-                        if (summary != _lastParseSummary)
-                        {
-                            Log.Info(summary);
-                            _lastParseSummary = summary;
-                        }
-
-                        return true;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Error("SessionDataCoordinator parse error", ex);
-            }
-
-            return false;
-        }
-
-        /// <summary>
-        /// Drives the main coordinator state from the SDK's parsed TelemetrySessionInfo
-        /// via SessionDataAdapter. Used when UserSettings.UseSdkParser is true.
-        /// </summary>
-        public bool ApplySdkSessionToMain(TelemetrySessionInfo info)
+        public bool ApplySdkSession(TelemetrySessionInfo info)
         {
             if (info == null) return false;
 
@@ -388,7 +315,7 @@ namespace VISOR.Telemetry
                         ? _staticData.Weekend.TrackDisplayName
                         : _staticData.Weekend.TrackName;
                     var sessions = string.Join(", ", _staticData.Schedule.Sessions.Values.Select(s => s.SessionType));
-                    var summary = $"Session data parsed (SDK adapter): {trackName}, {_staticData.Drivers.Count} drivers, sessions: [{sessions}]";
+                    var summary = $"Session data parsed: {trackName}, {_staticData.Drivers.Count} drivers, sessions: [{sessions}]";
                     if (summary != _lastParseSummary)
                     {
                         Log.Info(summary);
@@ -399,50 +326,8 @@ namespace VISOR.Telemetry
             }
             catch (Exception ex)
             {
-                Log.Error("SessionDataCoordinator ApplySdkSessionToMain error", ex);
+                Log.Error("SessionDataCoordinator ApplySdkSession error", ex);
                 return false;
-            }
-        }
-
-        /// <summary>
-        /// Populates the shadow state from the SDK's parsed TelemetrySessionInfo
-        /// without touching main state. Used in shadow mode (flag off) to feed
-        /// the diff comparator.
-        /// </summary>
-        public void ApplySdkSessionToShadow(TelemetrySessionInfo info)
-        {
-            if (info == null) return;
-            try
-            {
-                lock (_parseLock)
-                {
-                    SessionDataAdapter.Apply(info, _shadowStaticData, _shadowTransitionData, _shadowLiveData);
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Error("SessionDataCoordinator ApplySdkSessionToShadow error", ex);
-            }
-        }
-
-        /// <summary>
-        /// Runs the diff comparator against main vs shadow state. Caller should
-        /// invoke this once both sides have at least one update for the current
-        /// session; called on each onSessionInfoUpdate while shadow mode is active.
-        /// </summary>
-        public void RunParserDiff()
-        {
-            lock (_parseLock)
-            {
-                // Skip until the old parser has populated main state at least once;
-                // otherwise the first SDK update would diff a fully-populated shadow
-                // against an empty main and report spurious [ParserDiff] noise.
-                if (!IsDataReady) return;
-
-                _diffComparator.Compare(
-                    _staticData, _shadowStaticData,
-                    _transitionData, _shadowTransitionData,
-                    _liveData, _shadowLiveData);
             }
         }
 
@@ -511,61 +396,13 @@ namespace VISOR.Telemetry
                 _liveData.SessionFastestLaps.Clear();
                 _liveData.QualifyPositions.Clear();
                 _liveData.QualifyFastestTimes.Clear();
-                _lastDataHash = string.Empty;
                 _lastParseSummary = string.Empty;
                 IsDataReady = false;
-
-                _shadowStaticData.Drivers.Clear();
-                _shadowStaticData.Schedule.Sessions.Clear();
-                _shadowStaticData.IncidentLimit = 0;
-                _shadowStaticData.Weekend.TrackName = string.Empty;
-                _shadowStaticData.Weekend.TrackConfig = string.Empty;
-                _shadowStaticData.Weekend.TrackLength = 0f;
-                _shadowStaticData.Weekend.TrackDisplayName = string.Empty;
-                _shadowStaticData.Weekend.TrackDisplayShortName = string.Empty;
-                _shadowTransitionData.DriverIncidentCounts.Clear();
-                _shadowTransitionData.CurrentSessionNum = -1;
-                _shadowTransitionData.CurrentSessionType = string.Empty;
-                _shadowTransitionData.CurrentSessionName = string.Empty;
-                _shadowLiveData.SessionResultsPositions.Clear();
-                _shadowLiveData.SessionFastestLaps.Clear();
-                _shadowLiveData.QualifyPositions.Clear();
-                _shadowLiveData.QualifyFastestTimes.Clear();
-                _diffComparator.Reset();
 
                 UpdateDriverDataCaches();
             }
         }
 
-        private string _cachedSessionYaml = string.Empty;
         private string _lastParseSummary = string.Empty;
-
-        public string GetCachedSessionYaml()
-        {
-            lock (_parseLock)
-            {
-                return _cachedSessionYaml;
-            }
-        }
-
-        public void SetCachedSessionYaml(string yaml)
-        {
-            lock (_parseLock)
-            {
-                _cachedSessionYaml = yaml ?? string.Empty;
-            }
-        }
-
-        public bool HasSessionDataChanged(string sessionData)
-        {
-            if (string.IsNullOrEmpty(sessionData))
-                return false;
-
-            lock (_parseLock)
-            {
-                var currentHash = sessionData.GetHashCode().ToString();
-                return currentHash != _lastDataHash;
-            }
-        }
     }
 }
