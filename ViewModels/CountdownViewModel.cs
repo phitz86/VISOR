@@ -85,10 +85,10 @@ namespace VISOR.ViewModels
         /// </summary>
         public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
-            int lapsRemaining = snapshot.GetValue<int>("SessionLapsRemain", 0);
-            double timeRemain = snapshot.GetValue<double>("SessionTimeRemain", 0.0);
-            int currentLap = snapshot.GetValue<int>("Lap", 0);
-            int sessionFlagsValue = snapshot.GetValue<int>("SessionFlags", 0);
+            int lapsRemaining = snapshot.SessionLapsRemain;
+            double timeRemain = snapshot.SessionTimeRemain;
+            int currentLap = snapshot.Lap;
+            int sessionFlagsValue = snapshot.SessionFlags;
 
             bool isTimedSession = false;
             if (sessionDataProvider != null && sessionDataProvider.IsDataReady)
