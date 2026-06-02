@@ -31,6 +31,7 @@ namespace VISOR.Telemetry
 #if DEBUG
         private readonly SessionDataLogger _sessionLogger;
         private readonly TelemetryCSVLogger _telemetryLogger;
+        private readonly SnapshotConsistencyChecker _snapshotChecker;
 #endif
         private SVappsLABSnapshot _latestSnapshot;
         private CancellationTokenSource _cancellationTokenSource;
@@ -84,6 +85,7 @@ namespace VISOR.Telemetry
                 () => GetFieldTypes()
             );
             _telemetryLogger = new TelemetryCSVLogger();
+            _snapshotChecker = new SnapshotConsistencyChecker();
 #endif
 
             _frameGapFlushTimer = new System.Timers.Timer(5000) { AutoReset = true };
@@ -298,6 +300,7 @@ namespace VISOR.Telemetry
                     {
 #if DEBUG
                         _telemetryLogger?.LogSnapshot(snapshot, _sessionCoordinator);
+                        _snapshotChecker?.Check(snapshot);
 #endif
                         SnapshotAvailable?.Invoke(snapshot);
                     }
