@@ -81,9 +81,11 @@ namespace VISOR.Telemetry
 
         // Deferred to the Radar/Position migration step (SDK enum-typed):
         //   CarIdxTrackSurface is TrackLocation[]; CarLeftRight is an enum.
-        // Note: today's dict stores CarIdxTrackSurface as TrackLocation[], so consumers reading
-        // GetValue<int[]>("CarIdxTrackSurface") currently get null (type mismatch). Going typed
-        // will hand them real data, which is a behavior change to verify, not a blind swap.
+        // Note: the dict stores CarIdxTrackSurface as TrackLocation[], and GetValue<int[]> still
+        // works today because the CLR treats an enum array and its underlying-type array as
+        // element-compatible (TrackLocation[] is int[] == true). So this is NOT broken now; the
+        // open decision is whether to expose it typed as int[] (cast, zero consumer change) or as
+        // TrackLocation[] (cleaner, small consumer edit). Decide at the Radar step.
 
         #endregion
 
