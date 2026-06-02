@@ -1,21 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using SVappsLAB.iRacingTelemetrySDK;
 using VISOR.Diagnostics;
 
 namespace VISOR.Telemetry
 {
     public class SessionDataCoordinator : ISessionDataProvider
     {
-        private readonly StaticEventParser _staticParser = new();
-        private readonly SessionTransitionParser _transitionParser = new();
-        private readonly LiveSessionParser _liveParser = new();
-
         private readonly StaticEventData _staticData = new();
         private readonly SessionTransitionData _transitionData = new();
         private readonly LiveSessionData _liveData = new();
 
-        private string _lastDataHash = string.Empty;
         private readonly object _parseLock = new();
 
         public bool IsDataReady { get; private set; }
@@ -299,61 +295,40 @@ namespace VISOR.Telemetry
             return result;
         }
 
-        public bool ParseSessionData(string sessionData)
+        public bool ApplySdkSession(TelemetrySessionInfo info)
         {
-            if (string.IsNullOrEmpty(sessionData))
-                return false;
+            if (info == null) return false;
 
             try
             {
                 lock (_parseLock)
                 {
-                    var currentHash = sessionData.GetHashCode().ToString();
+                    SessionDataAdapter.Apply(info, _staticData, _transitionData, _liveData);
 
-                    if (currentHash == _lastDataHash)
+                    bool ready = _staticData.Drivers.Count > 0 && _staticData.Schedule.Sessions.Count > 0;
+                    if (!ready) return false;
+
+                    UpdateDriverDataCaches();
+                    IsDataReady = true;
+
+                    var trackName = !string.IsNullOrEmpty(_staticData.Weekend.TrackDisplayName)
+                        ? _staticData.Weekend.TrackDisplayName
+                        : _staticData.Weekend.TrackName;
+                    var sessions = string.Join(", ", _staticData.Schedule.Sessions.Values.Select(s => s.SessionType));
+                    var summary = $"Session data parsed: {trackName}, {_staticData.Drivers.Count} drivers, sessions: [{sessions}]";
+                    if (summary != _lastParseSummary)
                     {
-                        return false;
+                        Log.Info(summary);
+                        _lastParseSummary = summary;
                     }
-
-                    var lines = sessionData.Split('\n');
-
-                    bool staticSuccess = _staticParser.ParseStaticData(lines, _staticData);
-                    bool transitionSuccess = _transitionParser.ParseTransitionData(lines, _transitionData, _staticData);
-                    bool liveSuccess = _liveParser.ParseLiveData(lines, _liveData, _transitionData.CurrentSessionNum);
-
-                    if (staticSuccess && transitionSuccess)
-                    {
-                        if (!liveSuccess)
-                            Log.Warning("Live session data parse failed — qualifying results and fastest laps may be unavailable");
-
-                        _lastDataHash = currentHash;
-                        _cachedSessionYaml = sessionData;
-
-                        UpdateDriverDataCaches();
-
-                        IsDataReady = true;
-
-                        var trackName = !string.IsNullOrEmpty(_staticData.Weekend.TrackDisplayName)
-                            ? _staticData.Weekend.TrackDisplayName
-                            : _staticData.Weekend.TrackName;
-                        var sessions = string.Join(", ", _staticData.Schedule.Sessions.Values.Select(s => s.SessionType));
-                        var summary = $"Session data parsed: {trackName}, {_staticData.Drivers.Count} drivers, sessions: [{sessions}]";
-                        if (summary != _lastParseSummary)
-                        {
-                            Log.Info(summary);
-                            _lastParseSummary = summary;
-                        }
-
-                        return true;
-                    }
+                    return true;
                 }
             }
             catch (Exception ex)
             {
-                Log.Error("SessionDataCoordinator parse error", ex);
+                Log.Error("SessionDataCoordinator ApplySdkSession error", ex);
+                return false;
             }
-
-            return false;
         }
 
         private void UpdateDriverDataCaches()
@@ -421,7 +396,6 @@ namespace VISOR.Telemetry
                 _liveData.SessionFastestLaps.Clear();
                 _liveData.QualifyPositions.Clear();
                 _liveData.QualifyFastestTimes.Clear();
-                _lastDataHash = string.Empty;
                 _lastParseSummary = string.Empty;
                 IsDataReady = false;
 
@@ -429,27 +403,6 @@ namespace VISOR.Telemetry
             }
         }
 
-        private string _cachedSessionYaml = string.Empty;
         private string _lastParseSummary = string.Empty;
-
-        public string GetCachedSessionYaml()
-        {
-            lock (_parseLock)
-            {
-                return _cachedSessionYaml;
-            }
-        }
-
-        public bool HasSessionDataChanged(string sessionData)
-        {
-            if (string.IsNullOrEmpty(sessionData))
-                return false;
-
-            lock (_parseLock)
-            {
-                var currentHash = sessionData.GetHashCode().ToString();
-                return currentHash != _lastDataHash;
-            }
-        }
     }
 }
