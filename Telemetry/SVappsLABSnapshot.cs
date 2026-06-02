@@ -59,9 +59,10 @@ namespace VISOR.Telemetry
         public int SessionLapsTotal => Data.SessionLapsTotal ?? 0;
         public int SessionNum => Data.SessionNum ?? 0;
 
-        // SessionState compiles as a non-nullable enum under SDK 1.2.1; the builder casts it
-        // straight to int and so do we.
-        public int SessionState => (int)Data.SessionState;
+        // SessionState is a nullable enum under SDK 1.2.1. The builder casts it straight to int
+        // (and throws on null, caught upstream -> consumers then see their -1 default); we make
+        // that explicit and null-safe here while preserving the -1 "unknown" fallback.
+        public int SessionState => (int?)Data.SessionState ?? -1;
 
         // SessionFlags is an enum (flags); the builder normalizes it via Convert.ToInt32.
         public int SessionFlags => Convert.ToInt32(Data.SessionFlags);
@@ -78,8 +79,11 @@ namespace VISOR.Telemetry
         public int[] CarIdxPosition => Data.CarIdxPosition ?? EmptyInt64;
         public int[] CarIdxClassPosition => Data.CarIdxClassPosition ?? EmptyInt64;
 
-        // Deferred to the Radar/Position migration step (likely SDK enum types whose names
-        // need compiler confirmation): CarIdxTrackSurface, CarLeftRight.
+        // Deferred to the Radar/Position migration step (SDK enum-typed):
+        //   CarIdxTrackSurface is TrackLocation[]; CarLeftRight is an enum.
+        // Note: today's dict stores CarIdxTrackSurface as TrackLocation[], so consumers reading
+        // GetValue<int[]>("CarIdxTrackSurface") currently get null (type mismatch). Going typed
+        // will hand them real data, which is a behavior change to verify, not a blind swap.
 
         #endregion
 
