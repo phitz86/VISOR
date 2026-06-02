@@ -96,19 +96,19 @@ namespace VISOR.ViewModels
                 return;
             }
 
-            var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx", -1);
+            var playerCarIdx = snapshot.PlayerCarIdx;
             if (playerCarIdx == -1) return;
 
-            _trackLength = GetTrackLength(snapshot, sessionDataProvider);
+            _trackLength = GetTrackLength(sessionDataProvider);
             if (_trackLength <= 0) return;
 
-            var lapDistPct = snapshot.GetValue<float[]>("CarIdxLapDistPct");
-            var trackSurface = snapshot.GetValue<int[]>("CarIdxTrackSurface");
+            var lapDistPct = snapshot.CarIdxLapDistPct;
+            var trackSurface = snapshot.CarIdxTrackSurface;
             var carNumbers = sessionDataProvider.CarNumbers;
             var userNames = sessionDataProvider.UserNames;
             var carClassIDs = sessionDataProvider.CarClassIDs;
             var carClassColors = sessionDataProvider.CarClassColors;
-            var onPitRoad = snapshot.GetValue<bool[]>("CarIdxOnPitRoad");
+            var onPitRoad = snapshot.CarIdxOnPitRoad;
 
             if (lapDistPct == null || trackSurface == null) return;
 
@@ -148,8 +148,7 @@ namespace VISOR.ViewModels
                 }
             }
 
-            var carLeftRightEnum = snapshot.GetValue<object>("CarLeftRight", null);
-            var carLeftRightState = carLeftRightEnum?.ToString() ?? "Off";
+            var carLeftRightState = snapshot.CarLeftRightState;
             UpdateZoneAssignments(visibleCars, carLeftRightState);
 
             UpdateRadarDisplay(carsContainer, visibleCars, carClassColors, carClassIDs);
@@ -267,18 +266,16 @@ namespace VISOR.ViewModels
             }
         }
 
-        private float GetTrackLength(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        private float GetTrackLength(ISessionDataProvider sessionDataProvider)
         {
+            // TrackLength is coordinator-derived, not telemetry. The old snapshot-dict fallback
+            // was just this same coordinator value re-packed, so it has been dropped as redundant.
             if (sessionDataProvider is SessionDataCoordinator coordinator)
             {
                 float trackLength = coordinator.GetTrackLength();
                 if (trackLength > 0)
                     return trackLength;
             }
-
-            float trackLengthFromSnapshot = snapshot.GetValue<float>("TrackLength", 0f);
-            if (trackLengthFromSnapshot > 0)
-                return trackLengthFromSnapshot;
 
             return 5000f;
         }

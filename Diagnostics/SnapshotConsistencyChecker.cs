@@ -56,6 +56,11 @@ namespace VISOR.Diagnostics
             CompareInt(s, "SessionState", s.SessionState, -1);
             CompareInt(s, "SessionFlags", s.SessionFlags, 0);
 
+            // CarLeftRightState is the .ToString() of the typed enum; the dict path boxed the same
+            // enum and stringified it. Both default to "Off" when the SDK value is null.
+            CompareString(s, "CarLeftRight", s.CarLeftRightState,
+                s.GetValue<object>("CarLeftRight", null)?.ToString() ?? "Off");
+
             _framesChecked++;
             if (++_framesSinceHeartbeat >= HeartbeatFrames)
             {
@@ -80,6 +85,11 @@ namespace VISOR.Diagnostics
         {
             double dict = s.GetValue<double>(field, dictDefault);
             if (Math.Abs(typed - dict) > FloatTolerance) Report(field, typed.ToString("R"), dict.ToString("R"));
+        }
+
+        private void CompareString(SVappsLABSnapshot s, string field, string typed, string dict)
+        {
+            if (!string.Equals(typed, dict, StringComparison.Ordinal)) Report(field, typed, dict);
         }
 
         private void Report(string field, string typed, string dict)

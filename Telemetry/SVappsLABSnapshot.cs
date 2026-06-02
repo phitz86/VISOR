@@ -79,13 +79,14 @@ namespace VISOR.Telemetry
         public int[] CarIdxPosition => Data.CarIdxPosition ?? EmptyInt64;
         public int[] CarIdxClassPosition => Data.CarIdxClassPosition ?? EmptyInt64;
 
-        // Deferred to the Radar/Position migration step (SDK enum-typed):
-        //   CarIdxTrackSurface is TrackLocation[]; CarLeftRight is an enum.
-        // Note: the dict stores CarIdxTrackSurface as TrackLocation[], and GetValue<int[]> still
-        // works today because the CLR treats an enum array and its underlying-type array as
-        // element-compatible (TrackLocation[] is int[] == true). So this is NOT broken now; the
-        // open decision is whether to expose it typed as int[] (cast, zero consumer change) or as
-        // TrackLocation[] (cleaner, small consumer edit). Decide at the Radar step.
+        // SDK enum-typed fields, resolved without naming the SDK enum types directly.
+        // CarIdxTrackSurface is TrackLocation[]; the CLR lets an enum array be read through an
+        // int[] reference (same underlying storage), so expose it as int[] for zero consumer
+        // change. CarLeftRight is a nullable enum; both radar consumers only use its name string
+        // (compared against "CarLeft"/"CarRight"/"Clear"/"Off"/...), so expose .ToString()
+        // directly — dropping the boxing + object-cast the dict path required.
+        public int[] CarIdxTrackSurface => (int[])(object)Data.CarIdxTrackSurface ?? EmptyInt64;
+        public string CarLeftRightState => Data.CarLeftRight?.ToString() ?? "Off";
 
         #endregion
 

@@ -46,7 +46,7 @@ namespace VISOR.Diagnostics
 
             try
             {
-                int currentSessionNum = snapshot.GetValue<int>("SessionNum", -1);
+                int currentSessionNum = snapshot.SessionNum;
 
                 if (currentSessionNum != _lastSessionNum)
                 {
@@ -118,17 +118,17 @@ namespace VISOR.Diagnostics
         {
             try
             {
-                int playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx", -1);
+                int playerCarIdx = snapshot.PlayerCarIdx;
                 if (playerCarIdx < 0) return;
 
-                float sessionTime = snapshot.GetValue<float>("SessionTime", 0f);
+                float sessionTime = (float)snapshot.SessionTime;
                 string timestampStr = timestamp.ToString("yyyyMMdd HH:mm:ss.fff");
 
-                var carIdxEstTime = snapshot.GetValue<float[]>("CarIdxEstTime");
-                var carIdxLapDistPct = snapshot.GetValue<float[]>("CarIdxLapDistPct");
-                var carIdxLap = snapshot.GetValue<int[]>("CarIdxLap");
-                var carIdxLastLapTime = snapshot.GetValue<float[]>("CarIdxLastLapTime");
-                var carIdxOnPitRoad = snapshot.GetValue<bool[]>("CarIdxOnPitRoad");
+                var carIdxEstTime = snapshot.CarIdxEstTime;
+                var carIdxLapDistPct = snapshot.CarIdxLapDistPct;
+                var carIdxLap = snapshot.CarIdxLap;
+                var carIdxLastLapTime = snapshot.CarIdxLastLapTime;
+                var carIdxOnPitRoad = snapshot.CarIdxOnPitRoad;
                 var carNumbers = dataProvider.CarNumbers;
                 var userNames = dataProvider.UserNames;
 
