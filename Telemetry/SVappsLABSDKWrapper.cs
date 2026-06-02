@@ -278,7 +278,7 @@ namespace VISOR.Telemetry
             try
             {
                 var telemetryDict = _dataBuilder.BuildTelemetryDictionary(telemetryData);
-                snapshot = new SVappsLABSnapshot(telemetryDict, DateTime.UtcNow);
+                snapshot = new SVappsLABSnapshot(telemetryDict, telemetryData, DateTime.UtcNow);
                 _latestSnapshot = snapshot;
             }
             catch (Exception ex)
