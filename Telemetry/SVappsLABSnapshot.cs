@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using SVappsLAB.iRacingTelemetrySDK;
 
 namespace VISOR.Telemetry
@@ -9,34 +8,29 @@ namespace VISOR.Telemetry
         public DateTime Timestamp { get; init; }
         public bool IsValid { get; init; }
 
-        // Legacy dictionary path. Retained during the Option Y typed-snapshot migration so
-        // consumers that still call GetValue<T> keep working while we migrate them one class
-        // at a time. Removed in the final cleanup step once nothing reads it.
-        public Dictionary<string, object> RawTelemetryData { get; init; } = new();
-
-        // Typed live-telemetry source (Option Y). The accessors below read from this and
-        // mirror TelemetryDataBuilder's null/default handling exactly, so a typed read is
-        // value-identical to the GetValue<T> dict read it replaces.
+        // Strongly-typed live telemetry from the SDK's source generator. All reads go through the
+        // typed accessors below, which normalize nulls/defaults centrally.
         public TelemetryData Data { get; init; }
 
-        public SVappsLABSnapshot(Dictionary<string, object> telemetry, TelemetryData data, DateTime timestamp)
+        public SVappsLABSnapshot(TelemetryData data, DateTime timestamp)
         {
             Timestamp = timestamp;
-            IsValid = telemetry != null;
-            RawTelemetryData = telemetry ?? new();
+            // The wrapper only constructs a snapshot from a delivered telemetry frame, so it is
+            // always usable. (The former dict was likewise always non-null, i.e. IsValid==true.)
+            IsValid = true;
             Data = data;
         }
 
-        #region Typed accessors (Option Y)
+        #region Typed accessors
 
-        // Shared, length-64 empty arrays so a null SDK array normalizes the same way
-        // TelemetryDataBuilder.SetArray did (null -> new T[64]). Consumers only read these.
+        // Shared, length-64 empty arrays so a null SDK array normalizes to a fixed-size,
+        // non-null array (iRacing addresses 64 car slots). Consumers only read these.
         private static readonly float[] EmptyFloat64 = new float[64];
         private static readonly int[] EmptyInt64 = new int[64];
         private static readonly bool[] EmptyBool64 = new bool[64];
 
         // --- Scalars ---
-        // PlayerCarIdx uses the -1 "no player" sentinel, matching the builder's default.
+        // PlayerCarIdx uses the -1 "no player" sentinel.
         public int PlayerCarIdx => Data.PlayerCarIdx ?? -1;
 
         public float FuelLevel => Data.FuelLevel ?? 0f;
@@ -59,15 +53,14 @@ namespace VISOR.Telemetry
         public int SessionLapsTotal => Data.SessionLapsTotal ?? 0;
         public int SessionNum => Data.SessionNum ?? 0;
 
-        // SessionState is a nullable enum under SDK 1.2.1. The builder casts it straight to int
-        // (and throws on null, caught upstream -> consumers then see their -1 default); we make
-        // that explicit and null-safe here while preserving the -1 "unknown" fallback.
+        // SessionState is a nullable enum under SDK 1.2.1; cast to int with a -1 "unknown"
+        // fallback so the accessor is null-safe and never throws.
         public int SessionState => (int?)Data.SessionState ?? -1;
 
-        // SessionFlags is an enum (flags); the builder normalizes it via Convert.ToInt32.
+        // SessionFlags is an enum (flags); normalize to its underlying int.
         public int SessionFlags => Convert.ToInt32(Data.SessionFlags);
 
-        // --- Per-car arrays (padded to length 64 on null, as the builder did) ---
+        // --- Per-car arrays (normalized to length 64 on null) ---
         public float[] CarIdxLapDistPct => Data.CarIdxLapDistPct ?? EmptyFloat64;
         public int[] CarIdxLap => Data.CarIdxLap ?? EmptyInt64;
         public int[] CarIdxLapCompleted => Data.CarIdxLapCompleted ?? EmptyInt64;
@@ -89,25 +82,5 @@ namespace VISOR.Telemetry
         public string CarLeftRightState => Data.CarLeftRight?.ToString() ?? "Off";
 
         #endregion
-
-        /// <summary>
-        /// A robust method to get a value from the telemetry data, handling type conversions safely.
-        /// </summary>
-        public T GetValue<T>(string fieldName, T defaultValue = default)
-        {
-            if (RawTelemetryData == null || !RawTelemetryData.TryGetValue(fieldName, out var value))
-                return defaultValue;
-
-            if (value is T tVal) return tVal;
-
-            try
-            {
-                return (T)Convert.ChangeType(value, typeof(T));
-            }
-            catch
-            {
-                return defaultValue;
-            }
-        }
     }
 }

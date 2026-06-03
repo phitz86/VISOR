@@ -15,12 +15,10 @@ namespace VISOR.Diagnostics
         private bool _isDisposed = false;
 
         private readonly Func<string> _getSessionYaml;
-        private readonly Func<Dictionary<string, Type>> _getFieldTypes;
 
-        public SessionDataLogger(Func<string> getSessionYaml, Func<Dictionary<string, Type>> getFieldTypes)
+        public SessionDataLogger(Func<string> getSessionYaml)
         {
             _getSessionYaml = getSessionYaml;
-            _getFieldTypes = getFieldTypes;
 
             _outputDirectory = Path.Combine(Log.GetDiagnosticsDirectory(), "SessionData");
             Directory.CreateDirectory(_outputDirectory);
@@ -122,11 +120,6 @@ namespace VISOR.Diagnostics
                 string sessionName = GetSessionName(sessionNum);
 
                 await LogSessionYaml(sessionName, timestamp, suffix);
-
-                if (suffix == "early" || suffix == "simple")
-                {
-                    await LogTelemetryFields(sessionName, timestamp);
-                }
                 Log.Debug($"[SessionLogger] Files saved to: {_outputDirectory}");
             }
             catch (Exception ex)
@@ -150,35 +143,6 @@ namespace VISOR.Diagnostics
             catch (Exception ex)
             {
                 Log.Error($"[SessionLogger] Error writing {suffix} YAML", ex);
-            }
-        }
-
-        private async Task LogTelemetryFields(string sessionName, string timestamp)
-        {
-            try
-            {
-                var fieldTypes = _getFieldTypes?.Invoke();
-                if (fieldTypes != null && fieldTypes.Count > 0)
-                {
-                    string filename = $"Session_{sessionName}_{timestamp}_fields.txt";
-                    string filepath = Path.Combine(_outputDirectory, filename);
-
-                    using (var writer = new StreamWriter(filepath))
-                    {
-                        await writer.WriteLineAsync($"VISOR Telemetry Fields - {sessionName} Session");
-                        await writer.WriteLineAsync($"Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                        await writer.WriteLineAsync();
-                        foreach (var kvp in fieldTypes)
-                        {
-                            string typeName = kvp.Value.IsArray ? $"{kvp.Value.GetElementType()?.Name ?? "Unknown"}[]" : kvp.Value.Name;
-                            await writer.WriteLineAsync($"{kvp.Key,-30}\t{typeName}");
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Error($"[SessionLogger] Error writing field data", ex);
             }
         }
 
