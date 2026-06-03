@@ -95,14 +95,14 @@ namespace VISOR.ViewModels
 
             _positionCalculator.Update(snapshot, sessionDataProvider);
 
-            FuelVM.Update(snapshot.GetValue<float>("FuelLevel"), snapshot.GetValue<int>("Lap"));
+            FuelVM.Update(snapshot.FuelLevel, snapshot.Lap);
             RelativeVM.Update(snapshot, sessionDataProvider);
             DeltaBarVM.Update(snapshot);
             CountdownVM.Update(snapshot, sessionDataProvider);
 
             if (sessionDataProvider != null && sessionDataProvider.IsDataReady)
             {
-                var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx", -1);
+                var playerCarIdx = snapshot.PlayerCarIdx;
                 if (playerCarIdx >= 0)
                 {
                     var incidentCounts = sessionDataProvider.CurDriverIncidentCount;
@@ -120,7 +120,7 @@ namespace VISOR.ViewModels
                 OnPropertyChanged(nameof(ClassPositionNumber));
             }
 
-            float currentSpeed = snapshot.GetValue<float>("Speed");
+            float currentSpeed = snapshot.Speed;
             if (currentSpeed > _topSpeedBaseline)
             {
                 _topSpeedBaseline = currentSpeed;
@@ -130,7 +130,7 @@ namespace VISOR.ViewModels
                 _currentLapTopSpeed = currentSpeed;
             }
 
-            float lastLap = snapshot.GetValue<float>("LapLastLapTime");
+            float lastLap = snapshot.LapLastLapTime;
             if (lastLap > 0)
             {
                 LastLapTime = FormatLapTime(lastLap);
@@ -139,13 +139,14 @@ namespace VISOR.ViewModels
                 _lastLapTopSpeed = _currentLapTopSpeed;
                 _currentLapTopSpeed = 0f;
 
-                bool onPitRoad = snapshot.GetValue<bool[]>("CarIdxOnPitRoad")?[snapshot.GetValue<int>("PlayerCarIdx")] ?? false;
-                int lapsRemaining = snapshot.GetValue<int>("SessionLapsRemain");
+                int playerIdx = snapshot.PlayerCarIdx;
+                bool onPitRoad = playerIdx >= 0 && snapshot.CarIdxOnPitRoad[playerIdx];
+                int lapsRemaining = snapshot.SessionLapsRemain;
 
                 WarningsVM.CheckPace(lastLap, _lastLapTopSpeed, _topSpeedBaseline, lapsRemaining, onPitRoad);
             }
 
-            float bestLap = snapshot.GetValue<float>("LapBestLapTime");
+            float bestLap = snapshot.LapBestLapTime;
             if (bestLap > 0)
             {
                 BestLapTime = FormatLapTime(bestLap);
@@ -163,14 +164,14 @@ namespace VISOR.ViewModels
 
             if (dataProvider.ShouldUseFastestLapPositioning())
             {
-                var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx", -1);
+                var playerCarIdx = snapshot.PlayerCarIdx;
                 var fastestLapData = dataProvider.GetFastestLapPositioning();
                 var playerData = fastestLapData.FirstOrDefault(d => d.carIdx == playerCarIdx);
                 newPosition = playerData.position > 0 ? playerData.position.ToString() : "--";
             }
             else
             {
-                var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx", -1);
+                var playerCarIdx = snapshot.PlayerCarIdx;
                 var carClassIDs = dataProvider.CarClassIDs;
 
                 if (playerCarIdx >= 0 && playerCarIdx < carClassIDs.Length)
@@ -197,7 +198,7 @@ namespace VISOR.ViewModels
 
         private void UpdateGearDisplay(SVappsLABSnapshot snapshot)
         {
-            int gear = snapshot.GetValue<int>("Gear");
+            int gear = snapshot.Gear;
             string newGearDisplay = gear switch { -1 => "R", 0 => "N", _ => gear.ToString() };
             if (GearDisplay != newGearDisplay)
             {
@@ -220,7 +221,7 @@ namespace VISOR.ViewModels
 
         private void CheckSessionStateTransitions(SVappsLABSnapshot snapshot)
         {
-            int currentSessionState = snapshot.GetValue<int>("SessionState", -1);
+            int currentSessionState = snapshot.SessionState;
             if (currentSessionState != _lastSessionState)
             {
                 Log.Info($"Session state transition: {GetStateName(_lastSessionState)} -> {GetStateName(currentSessionState)}");
@@ -253,7 +254,7 @@ namespace VISOR.ViewModels
 
         private void CheckForSessionTransition(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
-            int currentSessionNum = snapshot.GetValue<int>("SessionNum", -1);
+            int currentSessionNum = snapshot.SessionNum;
             if (currentSessionNum != _lastSessionNum && _lastSessionNum != -1)
             {
                 ResetSessionData();
