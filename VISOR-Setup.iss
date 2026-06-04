@@ -52,7 +52,7 @@ PrivilegesRequired=admin
 
 ; Visual style
 WizardStyle=modern
-WizardImageFile=VISOR Install Banner Logo.bmp
+WizardImageFile=VISOR Install Banner logo.bmp
 WizardSmallImageFile=VISOR Install Logo.bmp
 
 [Messages]

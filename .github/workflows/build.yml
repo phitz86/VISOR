@@ -1,0 +1,89 @@
+name: Build & Sign
+
+# Builds VISOR and the Inno Setup installer on Windows.
+#
+# - On pushes/PRs to main, and manual runs: builds and uploads the UNSIGNED
+#   installer as a workflow artifact (CI sanity + something to download).
+# - On a version tag (e.g. v0.9.10.0): builds, then submits the installer to
+#   SignPath for signing and attaches the SIGNED installer to the GitHub Release.
+#
+# The signing job stays dormant until the SignPath repository variables/secret
+# are configured (see the env block + repo settings), so this file is safe to
+# merge before your SignPath project is approved.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to attach the signed installer to the Release
+
+env:
+  # ---- SignPath configuration -------------------------------------------------
+  # Set SIGNPATH_ORGANIZATION_ID as a repository *variable* and SIGNPATH_API_TOKEN
+  # as a repository *secret* (Settings -> Secrets and variables -> Actions).
+  # Adjust the slugs below to match what you create in the SignPath portal.
+  SIGNPATH_PROJECT_SLUG: VISOR
+  SIGNPATH_SIGNING_POLICY_SLUG: release-signing
+  DOTNET_VERSION: '8.0.x'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    outputs:
+      installer-artifact-id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore VISOR.sln
+
+      - name: Build (Release)
+        run: dotnet build VISOR.sln --configuration Release --no-restore
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "VISOR-Setup.iss"
+
+      - name: Upload unsigned installer
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: VISOR-installer-unsigned
+          path: installer/VISOR-Setup-*.exe
+          if-no-files-found: error
+
+  sign:
+    needs: build
+    runs-on: ubuntu-latest
+    # Only sign tagged releases, and only once the SignPath org id is configured.
+    if: startsWith(github.ref, 'refs/tags/v') && vars.SIGNPATH_ORGANIZATION_ID != ''
+    steps:
+      - name: Submit to SignPath and download signed installer
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ env.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ needs.build.outputs.installer-artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+
+      - name: Attach signed installer to the Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: signed/VISOR-Setup-*.exe
