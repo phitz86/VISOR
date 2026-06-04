@@ -2,10 +2,15 @@ name: Build & Sign
 
 # Builds VISOR and the Inno Setup installer on Windows.
 #
-# - On pushes/PRs to main, and manual runs: builds and uploads the UNSIGNED
-#   installer as a workflow artifact (CI sanity + something to download).
+# - On pushes/PRs to main/master, and manual runs: builds and uploads the
+#   UNSIGNED installer as a workflow artifact (CI sanity + something to download).
 # - On a version tag (e.g. v0.9.10.0): builds, then submits the installer to
 #   SignPath for signing and attaches the SIGNED installer to the GitHub Release.
+#
+# Version validation runs on every build: the three .csproj version fields must
+# agree with each other (and be four-part), the compiled exe must report that
+# same version, and the installer filename must match it. On a tag build the tag
+# must equal that version too. Any mismatch fails the build.
 #
 # The signing job stays dormant until the SignPath repository variables/secret
 # are configured (see the env block + repo settings), so this file is safe to
@@ -36,6 +41,7 @@ jobs:
     runs-on: windows-latest
     outputs:
       installer-artifact-id: ${{ steps.upload.outputs.artifact-id }}
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,6 +50,46 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # Fail fast (before the build) if versions are inconsistent or the tag
+      # doesn't match the project version.
+      - name: Determine and validate version
+        id: version
+        shell: pwsh
+        run: |
+          [xml]$proj = Get-Content "VISOR.csproj"
+          function Get-Prop($name) {
+            foreach ($g in $proj.Project.PropertyGroup) {
+              if ($g.$name) { return ([string]$g.$name).Trim() }
+            }
+            return $null
+          }
+          $version         = Get-Prop 'Version'
+          $fileVersion     = Get-Prop 'FileVersion'
+          $assemblyVersion = Get-Prop 'AssemblyVersion'
+          Write-Host "csproj  Version=$version  FileVersion=$fileVersion  AssemblyVersion=$assemblyVersion"
+
+          if (-not $version) { Write-Error "No <Version> found in VISOR.csproj"; exit 1 }
+          if ($version -ne $fileVersion -or $version -ne $assemblyVersion) {
+            Write-Error "Version mismatch in VISOR.csproj: Version=$version, FileVersion=$fileVersion, AssemblyVersion=$assemblyVersion. All three must be identical."
+            exit 1
+          }
+          if ($version -notmatch '^\d+\.\d+\.\d+\.\d+$') {
+            Write-Error "Version '$version' must be four-part (e.g. 1.2.3.4) so it matches the installer filename Inno Setup derives from the exe."
+            exit 1
+          }
+
+          if ($env:GITHUB_REF -like 'refs/tags/v*') {
+            $tag = $env:GITHUB_REF_NAME.TrimStart('v')
+            if ($tag -ne $version) {
+              Write-Error "Tag version '$tag' does not match csproj version '$version'. Bump <Version>/<FileVersion>/<AssemblyVersion> to match the tag before tagging."
+              exit 1
+            }
+            Write-Host "Tag $($env:GITHUB_REF_NAME) matches csproj version $version."
+          }
+
+          "EXPECTED_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "version=$version"          | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Restore
         run: dotnet restore VISOR.sln
@@ -58,12 +104,33 @@ jobs:
         run: |
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "VISOR-Setup.iss"
 
+      # Confirm the artifacts the build actually produced carry the expected version.
+      - name: Verify build outputs match version
+        shell: pwsh
+        run: |
+          $expected = $env:EXPECTED_VERSION
+          $exe = "bin\Release\net8.0-windows8.0\VISOR.exe"
+          if (-not (Test-Path $exe)) { Write-Error "Built exe not found at $exe"; exit 1 }
+          $exeVer = (Get-Item $exe).VersionInfo.FileVersion
+          Write-Host "Built exe FileVersion=$exeVer (expected $expected)"
+          if ($exeVer -ne $expected) {
+            Write-Error "Built exe version '$exeVer' does not match expected '$expected'."
+            exit 1
+          }
+          $installer = "installer\VISOR-Setup-$expected.exe"
+          if (-not (Test-Path $installer)) {
+            Write-Error "Expected installer '$installer' not found. Files present in installer\:"
+            Get-ChildItem installer | ForEach-Object { Write-Host "  $($_.Name)" }
+            exit 1
+          }
+          Write-Host "Verified installer $installer"
+
       - name: Upload unsigned installer
         id: upload
         uses: actions/upload-artifact@v4
         with:
           name: VISOR-installer-unsigned
-          path: installer/VISOR-Setup-*.exe
+          path: installer/VISOR-Setup-${{ env.EXPECTED_VERSION }}.exe
           if-no-files-found: error
 
   sign:
@@ -83,7 +150,17 @@ jobs:
           wait-for-completion: true
           output-artifact-directory: signed
 
+      - name: Verify signed installer matches version
+        run: |
+          f="signed/VISOR-Setup-${{ needs.build.outputs.version }}.exe"
+          if [ ! -f "$f" ]; then
+            echo "Signed installer '$f' not found. Files in signed/:"
+            ls -la signed
+            exit 1
+          fi
+          echo "Verified signed installer $f"
+
       - name: Attach signed installer to the Release
         uses: softprops/action-gh-release@v2
         with:
-          files: signed/VISOR-Setup-*.exe
+          files: signed/VISOR-Setup-${{ needs.build.outputs.version }}.exe
