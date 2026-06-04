@@ -80,7 +80,7 @@ namespace VISOR.ViewModels
 
             _historyManager.Update(snapshot, dataProvider);
 
-            var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx");
+            var playerCarIdx = snapshot.PlayerCarIdx;
 
             var carClassIDs = dataProvider.CarClassIDs;
             var carClassColors = dataProvider.CarClassColors;
@@ -88,8 +88,8 @@ namespace VISOR.ViewModels
             var carNumbers = dataProvider.CarNumbers;
             var carIsAI = dataProvider.CarIsAI;
             var incidentCounts = dataProvider.CurDriverIncidentCount;
-            var currentLap = snapshot.GetValue<int[]>("CarIdxLap");
-            var onPitRoad = snapshot.GetValue<bool[]>("CarIdxOnPitRoad");
+            var currentLap = snapshot.CarIdxLap;
+            var onPitRoad = snapshot.CarIdxOnPitRoad;
 
             var validCarIndices = _positionCalculator.ValidCarIndices;
 
@@ -331,7 +331,7 @@ namespace VISOR.ViewModels
             // current track position; for a car behind, search the player's buffer for the opponent's.
             // Fallback to the other buffer when the primary search misses — at close range the
             // ahead/behind flag can flip frame-to-frame, making the "wrong" buffer get tried first.
-            double sessionTime = snapshot.GetValue<double>("SessionTime", 0.0);
+            double sessionTime = snapshot.SessionTime;
             float nativeTimeGap = 0f;
             bool isAhead = isGeometricallyAhead;
             string gapSource = "buffer";
@@ -442,7 +442,7 @@ namespace VISOR.ViewModels
             RelativeRowViewModel playerRow, float distDelta, bool isGeometricallyAhead, string gapSource,
             float displayGap, string gapText)
         {
-            float sessionTime = snapshot.GetValue<float>("SessionTime", 0f);
+            float sessionTime = (float)snapshot.SessionTime;
             _gapLogger?.LogRow(
                 sessionTime, slotIndex, row.CarNum,
                 playerRow.LapDistPct, row.LapDistPct,

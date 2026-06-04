@@ -52,7 +52,7 @@ namespace VISOR.ViewModels
         public void Update(SVappsLABSnapshot snapshot)
         {
             // Positive = slower than session best, negative = faster.
-            float deltaToSessionBest = snapshot.GetValue<float>("LapDeltaToSessionBestLap", 0f);
+            float deltaToSessionBest = snapshot.LapDeltaToSessionBestLap;
 
             float clampedDelta = Math.Max(-MaxDeltaSeconds, Math.Min(MaxDeltaSeconds, deltaToSessionBest));
 

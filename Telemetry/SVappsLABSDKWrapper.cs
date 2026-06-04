@@ -26,7 +26,6 @@ namespace VISOR.Telemetry
         #region Private Fields
         private ITelemetryClient<TelemetryData> _client;
         private readonly ILogger _logger;
-        private readonly TelemetryDataBuilder _dataBuilder;
         private readonly SessionDataCoordinator _sessionCoordinator;
 #if DEBUG
         private readonly SessionDataLogger _sessionLogger;
@@ -76,13 +75,9 @@ namespace VISOR.Telemetry
         {
             _logger = new VisorSdkLogger<SVappsLABSDKWrapper>();
             _sessionCoordinator = new SessionDataCoordinator();
-            _dataBuilder = new TelemetryDataBuilder(_sessionCoordinator);
 
 #if DEBUG
-            _sessionLogger = new SessionDataLogger(
-                () => _cachedRawYaml,
-                () => GetFieldTypes()
-            );
+            _sessionLogger = new SessionDataLogger(() => _cachedRawYaml);
             _telemetryLogger = new TelemetryCSVLogger();
 #endif
 
@@ -160,9 +155,6 @@ namespace VISOR.Telemetry
         }
 
         public SVappsLABSnapshot GetSnapshot() => _latestSnapshot;
-        public HashSet<string> GetSupportedFields() => TelemetryFieldRegistry.GetAllSupportedFields();
-        public Dictionary<string, Type> GetFieldTypes() => new Dictionary<string, Type>(TelemetryFieldRegistry.FieldTypes);
-        public bool SupportsField(string fieldName) => TelemetryFieldRegistry.IsFieldSupported(fieldName);
 
         private void OnConnectStateChanged(ConnectState state)
         {
@@ -270,15 +262,14 @@ namespace VISOR.Telemetry
             _lastTickTs = now;
 
             // Defensive detector #2: handler latency timer. Times the inline body below.
-            // Post-offload the inline cost is just dict-build + snapshot construction;
+            // Post-offload the inline cost is just snapshot construction (a thin typed wrapper);
             // a warning here means something heavy crept back onto the SDK stream thread.
             var handlerStart = Stopwatch.GetTimestamp();
 
             SVappsLABSnapshot snapshot = null;
             try
             {
-                var telemetryDict = _dataBuilder.BuildTelemetryDictionary(telemetryData);
-                snapshot = new SVappsLABSnapshot(telemetryDict, DateTime.UtcNow);
+                snapshot = new SVappsLABSnapshot(telemetryData, DateTime.UtcNow);
                 _latestSnapshot = snapshot;
             }
             catch (Exception ex)

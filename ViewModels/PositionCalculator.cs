@@ -210,7 +210,7 @@ namespace VISOR.ViewModels
         /// </summary>
         private void DetectSessionTransition(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
-            int currentSessionNum = snapshot.GetValue<int>("SessionNum", -1);
+            int currentSessionNum = snapshot.SessionNum;
 
             if (_lastSessionNum != -1 && currentSessionNum != _lastSessionNum)
             {
@@ -231,7 +231,7 @@ namespace VISOR.ViewModels
         /// </summary>
         private void TrackCheckeredFlagState(SVappsLABSnapshot snapshot)
         {
-            int sessionState = snapshot.GetValue<int>("SessionState", -1);
+            int sessionState = snapshot.SessionState;
             bool wasCheckeredFlag = _isCheckeredFlag;
 
             _isCheckeredFlag = (sessionState == 5 || sessionState == 6);
@@ -256,7 +256,7 @@ namespace VISOR.ViewModels
 
             var carClassIDs = sessionDataProvider.CarClassIDs;
             var carNumbers = sessionDataProvider.CarNumbers;
-            var carLapCompleted = snapshot.GetValue<int[]>("CarIdxLapCompleted");
+            var carLapCompleted = snapshot.CarIdxLapCompleted;
 
             if (carClassIDs == null || carNumbers == null || carLapCompleted == null)
             {
@@ -359,9 +359,9 @@ namespace VISOR.ViewModels
         #region Private Methods - Predictive Cache
         private void UpdatePredictiveCache(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
-            var lapDistPct = snapshot.GetValue<float[]>("CarIdxLapDistPct");
-            var currentLap = snapshot.GetValue<int[]>("CarIdxLap");
-            var onPitRoad = snapshot.GetValue<bool[]>("CarIdxOnPitRoad");
+            var lapDistPct = snapshot.CarIdxLapDistPct;
+            var currentLap = snapshot.CarIdxLap;
+            var onPitRoad = snapshot.CarIdxOnPitRoad;
             var carNumbers = sessionDataProvider.CarNumbers;
 
             if (lapDistPct == null || currentLap == null || onPitRoad == null || carNumbers == null)
@@ -380,10 +380,10 @@ namespace VISOR.ViewModels
                 // Log once per invalid stretch so mid-race telemetry gaps are captured without spamming.
                 if (!hasValidData && !_carsWithInvalidLapDistPctLogged.Contains(i))
                 {
-                    var trackSurface = snapshot.GetValue<int[]>("CarIdxTrackSurface");
-                    var carLaps = snapshot.GetValue<int[]>("CarIdxLap");
-                    var bestLaps = snapshot.GetValue<float[]>("CarIdxBestLapTime");
-                    var estTime = snapshot.GetValue<float[]>("CarIdxEstTime");
+                    var trackSurface = snapshot.CarIdxTrackSurface;
+                    var carLaps = snapshot.CarIdxLap;
+                    var bestLaps = snapshot.CarIdxBestLapTime;
+                    var estTime = snapshot.CarIdxEstTime;
 
                     int surface = (trackSurface != null && i < trackSurface.Length) ? trackSurface[i] : -999;
                     int lap = (carLaps != null && i < carLaps.Length) ? carLaps[i] : -999;
@@ -498,8 +498,8 @@ namespace VISOR.ViewModels
         private void CalculateRacePositions(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
             var carClassIDs = sessionDataProvider.CarClassIDs;
-            var currentLap = snapshot.GetValue<int[]>("CarIdxLap");
-            var lapDistPct = snapshot.GetValue<float[]>("CarIdxLapDistPct");
+            var currentLap = snapshot.CarIdxLap;
+            var lapDistPct = snapshot.CarIdxLapDistPct;
 
             if (carClassIDs == null || currentLap == null || lapDistPct == null)
                 return;

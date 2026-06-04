@@ -322,7 +322,7 @@ namespace VISOR.Views
                 return;
             }
 
-            var playerCarIdx = snapshot.GetValue<int>("PlayerCarIdx", -1);
+            var playerCarIdx = snapshot.PlayerCarIdx;
             if (playerCarIdx >= 0)
             {
                 var carNumbers = _sdk.Coordinator.CarNumbers;
@@ -335,8 +335,7 @@ namespace VISOR.Views
 
         private void UpdateZoneHighlights(SVappsLABSnapshot snapshot)
         {
-            var carLeftRightEnum = snapshot.GetValue<object>("CarLeftRight", null);
-            var carLeftRight = carLeftRightEnum?.ToString() ?? "Off";
+            var carLeftRight = snapshot.CarLeftRightState;
 
             ResetZoneHighlights();
 

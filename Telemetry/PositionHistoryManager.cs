@@ -45,13 +45,11 @@ namespace VISOR.Telemetry
         {
             if (_trackLengthMeters <= 0f)
             {
+                // TrackLength is coordinator-derived, not telemetry; the former snapshot-dict
+                // fallback was the same coordinator value re-packed, so it has been dropped.
                 if (dataProvider is SessionDataCoordinator coordinator)
                 {
                     _trackLengthMeters = coordinator.GetTrackLength();
-                }
-                if (_trackLengthMeters <= 0f)
-                {
-                    _trackLengthMeters = snapshot.GetValue<float>("TrackLength", 0f);
                 }
 
                 if (_trackLengthMeters > 0f)
@@ -61,7 +59,7 @@ namespace VISOR.Telemetry
                 }
             }
 
-            var onPitRoad = snapshot.GetValue<bool[]>("CarIdxOnPitRoad");
+            var onPitRoad = snapshot.CarIdxOnPitRoad;
             if (onPitRoad != null)
             {
                 for (int i = 0; i < Math.Min(onPitRoad.Length, MaxCars); i++)
@@ -79,8 +77,8 @@ namespace VISOR.Telemetry
             if (_frameCounter % DecimationInterval != 0)
                 return;
 
-            var lapDistPcts = snapshot.GetValue<float[]>("CarIdxLapDistPct");
-            double sessionTime = snapshot.GetValue<double>("SessionTime", 0.0);
+            var lapDistPcts = snapshot.CarIdxLapDistPct;
+            double sessionTime = snapshot.SessionTime;
 
             if (lapDistPcts == null || sessionTime <= 0.0)
                 return;

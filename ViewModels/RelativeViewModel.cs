@@ -38,7 +38,7 @@ namespace VISOR.ViewModels
 
         public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
-            if (snapshot.GetValue<int>("PlayerCarIdx", -1) == -1 ||
+            if (snapshot.PlayerCarIdx == -1 ||
                 sessionDataProvider == null ||
                 !sessionDataProvider.IsDataReady)
             {
