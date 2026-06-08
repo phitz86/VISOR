@@ -78,7 +78,7 @@ namespace VISOR.Telemetry
         // change. CarLeftRight is a nullable enum; both radar consumers only use its name string
         // (compared against "CarLeft"/"CarRight"/"Clear"/"Off"/...), so expose .ToString()
         // directly — dropping the boxing + object-cast the dict path required.
-        public int[] CarIdxTrackSurface => (int[])(object)Data.CarIdxTrackSurface ?? EmptyInt64;
+        public int[] CarIdxTrackSurface => (int[]?)(object?)Data.CarIdxTrackSurface ?? EmptyInt64;
         public string CarLeftRightState => Data.CarLeftRight?.ToString() ?? "Off";
 
         #endregion

@@ -20,7 +20,7 @@ namespace VISOR.Settings
         private const double WINDOW_PADDING = 20.0;
 
         private readonly UserSettings _settings;
-        private static SettingsManager _instance;
+        private static SettingsManager _instance = null!;
 
         public static SettingsManager Instance
         {
@@ -32,10 +32,10 @@ namespace VISOR.Settings
             }
         }
 
-        public event EventHandler<SettingsChangedEventArgs> SettingsChanged;
-        public event EventHandler<WindowSizeChangedEventArgs> WindowSizeChanged;
-        public event EventHandler<ElementVisibilityChangedEventArgs> ElementVisibilityChanged;
-        public event EventHandler<RadarVisibilityChangedEventArgs> RadarVisibilityChanged;
+        public event EventHandler<SettingsChangedEventArgs>? SettingsChanged;
+        public event EventHandler<WindowSizeChangedEventArgs>? WindowSizeChanged;
+        public event EventHandler<ElementVisibilityChangedEventArgs>? ElementVisibilityChanged;
+        public event EventHandler<RadarVisibilityChangedEventArgs>? RadarVisibilityChanged;
 
         private SettingsManager()
         {
@@ -44,7 +44,7 @@ namespace VISOR.Settings
 
         #region Window Dimensions
 
-        public Size GetMainWindowSize(ISessionDataProvider sessionDataProvider = null)
+        public Size GetMainWindowSize(ISessionDataProvider? sessionDataProvider = null)
         {
             double dynamicHeight = CalculateDynamicMainWindowHeight(sessionDataProvider);
             double baseWidth = MAIN_WINDOW_WIDTH_LARGE;
@@ -61,7 +61,7 @@ namespace VISOR.Settings
             return GetBaseDimensions(_settings.WindowSize, isMainWindow: false);
         }
 
-        private double CalculateDynamicMainWindowHeight(ISessionDataProvider sessionDataProvider = null)
+        private double CalculateDynamicMainWindowHeight(ISessionDataProvider? sessionDataProvider = null)
         {
             double totalHeight = WINDOW_PADDING;
 

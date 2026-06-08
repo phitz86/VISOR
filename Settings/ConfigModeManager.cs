@@ -10,7 +10,7 @@ namespace VISOR.Settings
     /// </summary>
     public class ConfigModeManager
     {
-        private static ConfigModeManager _instance;
+        private static ConfigModeManager _instance = null!;
         private static readonly object _lock = new object();
 
         private bool _isInConfigMode;
@@ -18,7 +18,7 @@ namespace VISOR.Settings
         /// <summary>
         /// Event raised when config mode state changes
         /// </summary>
-        public event EventHandler<ConfigModeChangedEventArgs> ConfigModeChanged;
+        public event EventHandler<ConfigModeChangedEventArgs>? ConfigModeChanged;
 
         /// <summary>
         /// Gets whether the application is currently in configuration mode

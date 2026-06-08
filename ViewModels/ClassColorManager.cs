@@ -34,7 +34,7 @@ namespace VISOR.ViewModels
         /// <param name="carClassColors">Array of hex colors from YAML (indexed by carIdx)</param>
         /// <param name="carClassIDs">Array of class IDs (indexed by carIdx)</param>
         /// <returns>The brush color for this class</returns>
-        public Brush GetClassColor(int classID, int[] carClassColors = null, int[] carClassIDs = null)
+        public Brush GetClassColor(int classID, int[]? carClassColors = null, int[]? carClassIDs = null)
         {
             if (classID == 0)
                 return Brushes.Transparent;

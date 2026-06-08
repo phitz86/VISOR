@@ -28,7 +28,7 @@ namespace VISOR.ViewModels
 
         private bool _greenFlagSeen;
         private int _lastLap;
-        private string _currentLapDisplay;
+        private string _currentLapDisplay = "-- Laps";
         private int _totalQualifyingLaps;
         private int _qualifyingLapsCompleted;
         private bool _isFirstQualiLap;

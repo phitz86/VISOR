@@ -48,7 +48,7 @@ namespace VISOR.Views
 
         private void ApplyWindowSizing()
         {
-            ISessionDataProvider sessionProvider = null;
+            ISessionDataProvider? sessionProvider = null;
             if (_sdk?.IsSessionDataReady == true)
             {
                 sessionProvider = _sdk.Coordinator;
@@ -66,7 +66,7 @@ namespace VISOR.Views
             Top = windowPosition.Y;
         }
 
-        private void OnElementVisibilityChanged(object sender, ElementVisibilityChangedEventArgs e)
+        private void OnElementVisibilityChanged(object? sender, ElementVisibilityChangedEventArgs e)
         {
             Dispatcher.Invoke(() =>
             {
@@ -76,7 +76,7 @@ namespace VISOR.Views
             });
         }
 
-        private void OnWindowSizeChanged(object sender, WindowSizeChangedEventArgs e)
+        private void OnWindowSizeChanged(object? sender, WindowSizeChangedEventArgs e)
         {
             Dispatcher.Invoke(() =>
             {
@@ -86,7 +86,7 @@ namespace VISOR.Views
             });
         }
 
-        private void OnConfigModeChanged(object sender, ConfigModeChangedEventArgs e)
+        private void OnConfigModeChanged(object? sender, ConfigModeChangedEventArgs e)
         {
             Dispatcher.Invoke(() =>
             {
@@ -95,7 +95,7 @@ namespace VISOR.Views
             });
         }
 
-        private void DragHandle_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        private void DragHandle_MouseLeftButtonDown(object? sender, MouseButtonEventArgs e)
         {
             if (_configModeManager.IsInConfigMode)
             {
@@ -103,7 +103,7 @@ namespace VISOR.Views
             }
         }
 
-        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        private void MainWindow_Loaded(object? sender, RoutedEventArgs e)
         {
             try
             {
@@ -225,12 +225,12 @@ namespace VISOR.Views
             catch (TaskCanceledException) { }
         }
 
-        private void ExitButton_Click(object sender, RoutedEventArgs e)
+        private void ExitButton_Click(object? sender, RoutedEventArgs e)
         {
             Application.Current.Shutdown();
         }
 
-        private void ConfigButton_Click(object sender, RoutedEventArgs e)
+        private void ConfigButton_Click(object? sender, RoutedEventArgs e)
         {
             foreach (Window window in Application.Current.Windows)
             {

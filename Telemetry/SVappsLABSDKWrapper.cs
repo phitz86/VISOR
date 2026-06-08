@@ -24,16 +24,16 @@ namespace VISOR.Telemetry
     public class SVappsLABSDKWrapper : IDisposable
     {
         #region Private Fields
-        private ITelemetryClient<TelemetryData> _client;
+        private ITelemetryClient<TelemetryData> _client = null!;
         private readonly ILogger _logger;
         private readonly SessionDataCoordinator _sessionCoordinator;
 #if DEBUG
         private readonly SessionDataLogger _sessionLogger;
         private readonly TelemetryCSVLogger _telemetryLogger;
 #endif
-        private SVappsLABSnapshot _latestSnapshot;
-        private CancellationTokenSource _cancellationTokenSource;
-        private Task _monitoringTask;
+        private SVappsLABSnapshot _latestSnapshot = null!;
+        private CancellationTokenSource _cancellationTokenSource = null!;
+        private Task _monitoringTask = null!;
         private bool _isConnected = false;
 
         // Cached raw YAML from onRawSessionInfoUpdate; consumed only by the
@@ -66,9 +66,9 @@ namespace VISOR.Telemetry
         #endregion
 
         #region Events
-        public event Action<SVappsLABSnapshot> SnapshotAvailable;
-        public event Action<bool> ConnectionStateChanged;
-        public event Action<bool> PrimedStateChanged;
+        public event Action<SVappsLABSnapshot>? SnapshotAvailable;
+        public event Action<bool>? ConnectionStateChanged;
+        public event Action<bool>? PrimedStateChanged;
         #endregion
 
         public SVappsLABSDKWrapper()
@@ -311,7 +311,7 @@ namespace VISOR.Telemetry
             }
         }
 
-        private void OnFrameGapFlushTimer(object sender, System.Timers.ElapsedEventArgs e)
+        private void OnFrameGapFlushTimer(object? sender, System.Timers.ElapsedEventArgs e)
         {
             int count;
             double worst;
@@ -369,12 +369,12 @@ namespace VISOR.Telemetry
     /// </summary>
     public class VisorSdkLogger<T> : ILogger<T>
     {
-        public IDisposable BeginScope<TState>(TState state) => null;
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
         public bool IsEnabled(LogLevel logLevel) =>
             logLevel >= LogLevel.Warning || Diagnostics.Log.DebugModeEnabled;
 
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
         {
             if (!IsEnabled(logLevel)) return;
             if (formatter == null) return;

@@ -439,8 +439,8 @@ namespace VISOR.ViewModels
 
         private class RadarCarElement
         {
-            public Rectangle Rectangle { get; set; }
-            public TextBlock NumberText { get; set; }
+            public required Rectangle Rectangle { get; set; }
+            public required TextBlock NumberText { get; set; }
             public int CarIdx { get; set; }
         }
     }

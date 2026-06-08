@@ -15,8 +15,8 @@ namespace VISOR.Diagnostics
     public class TelemetryCSVLogger : IDisposable
     {
         private readonly string _outputDirectory;
-        private string _currentCsvPath;
-        private StreamWriter _writer;
+        private string _currentCsvPath = null!;
+        private StreamWriter _writer = null!;
         private DateTime _lastLogTime = DateTime.MinValue;
         private readonly TimeSpan _logInterval = TimeSpan.FromSeconds(1.0); // 1Hz sampling
         private int _lastSessionNum = -1;
