@@ -29,7 +29,6 @@ namespace VISOR.ViewModels
 
         private int _lastSessionNum = -1;
         private int _lastSessionState = -999;
-        private float _topSpeedBaseline = 0f;
         private float _currentLapTopSpeed = 0f;
         private float _lastLapTopSpeed = 0f;
 
@@ -121,10 +120,6 @@ namespace VISOR.ViewModels
             }
 
             float currentSpeed = snapshot.Speed;
-            if (currentSpeed > _topSpeedBaseline)
-            {
-                _topSpeedBaseline = currentSpeed;
-            }
             if (currentSpeed > _currentLapTopSpeed)
             {
                 _currentLapTopSpeed = currentSpeed;
@@ -143,7 +138,13 @@ namespace VISOR.ViewModels
                 bool onPitRoad = playerIdx >= 0 && snapshot.CarIdxOnPitRoad[playerIdx];
                 int lapsRemaining = snapshot.SessionLapsRemain;
 
-                WarningsVM.CheckPace(lastLap, _lastLapTopSpeed, _topSpeedBaseline, lapsRemaining, onPitRoad);
+                // Green racing only: SessionState 4 is Racing; the caution bits mark a full-course
+                // yellow, during which lap times are pace-distorted and not a health signal.
+                const int CAUTION_FLAGS = 0x4000 | 0x8000; // irsdk caution | cautionWaving
+                bool isRacingGreen = snapshot.SessionState == 4 && (snapshot.SessionFlags & CAUTION_FLAGS) == 0;
+
+                WarningsVM.CheckPace(lastLap, _lastLapTopSpeed, lapsRemaining,
+                    snapshot.SessionTimeRemain, onPitRoad, isRacingGreen);
             }
 
             float bestLap = snapshot.LapBestLapTime;
@@ -238,7 +239,6 @@ namespace VISOR.ViewModels
         {
             LastLapTime = "-:--.---";
             BestLapTime = "-:--.---";
-            _topSpeedBaseline = 0f;
             FuelVM.Reset();
             DeltaBarVM.Reset();
             RelativeVM.Reset();
@@ -271,7 +271,6 @@ namespace VISOR.ViewModels
         {
             LastLapTime = "-:--.---";
             BestLapTime = "-:--.---";
-            _topSpeedBaseline = 0f;
             DeltaBarVM.Reset();
             FuelVM.Reset();
             WarningsVM.Reset();
