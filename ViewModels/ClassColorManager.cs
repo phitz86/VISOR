@@ -13,6 +13,19 @@ namespace VISOR.ViewModels
     {
         private readonly Dictionary<int, Brush> _classColorMap = new();
 
+        // iRacing reports no class colour in some session types (custom league races, offline
+        // events) — either the class is absent from the colour data or it comes back as a literal
+        // 0x000000. Fall back to a light grey so radar cars stay visible and car numbers stay
+        // legible against the relative display's dark background instead of rendering transparent.
+        private static readonly SolidColorBrush DefaultClassBrush = CreateFrozenBrush(Color.FromRgb(0xDD, 0xDD, 0xDD));
+
+        private static SolidColorBrush CreateFrozenBrush(Color color)
+        {
+            var brush = new SolidColorBrush(color);
+            brush.Freeze();
+            return brush;
+        }
+
         /// <summary>
         /// Gets the color assigned to a specific car class.
         /// Uses CarClassColor from YAML data for accurate iRacing class colors.
@@ -35,6 +48,11 @@ namespace VISOR.ViewModels
                 {
                     if (carClassIDs[i] == classID)
                     {
+                        // 0x000000 means iRacing didn't assign this class a colour; fall through
+                        // to the light-grey default rather than rendering an invisible black swatch.
+                        if (carClassColors[i] == 0)
+                            break;
+
                         var brush = ConvertHexColorToBrush(carClassColors[i]);
                         _classColorMap[classID] = brush;
 
@@ -44,9 +62,9 @@ namespace VISOR.ViewModels
                 }
             }
 
-            Log.Warning($"[ClassColorManager] No YAML color found for class {classID}, using Transparent");
-            _classColorMap[classID] = Brushes.Transparent;
-            return Brushes.Transparent;
+            Log.Warning($"[ClassColorManager] No YAML color found for class {classID}, using default light grey");
+            _classColorMap[classID] = DefaultClassBrush;
+            return DefaultClassBrush;
         }
 
         /// <summary>
