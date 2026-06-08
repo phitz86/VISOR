@@ -215,7 +215,7 @@
 
     <p><strong>Row 4: Relative Positioning Table</strong> - Shows 3 cars ahead and 3 behind you. Car number with class color background, proximity bar shows distance. Your car highlighted in yellow. Automatically hidden in Lone Qualifying sessions.</p>
 
-    <p><strong>Row 5: Warnings</strong> - Incident count with color coding (white/yellow/orange/red), pace warning (📉) for significant lap time drops, red dot for ongoing issues, and flashing "PIT" warning when repairs are strategically beneficial.</p>
+    <p><strong>Row 5: Warnings</strong> - Incident count that shifts from white to yellow to red as you approach the session's incident limit, a pace warning (📉) when your lap pace drops and stays down, a red dot (•) confirming contact damage, and a flashing "PIT" warning when stopping for repairs would save you time.</p>
 
     <p><strong>Radar Window</strong> - Toggle proximity radar showing nearby cars in 5 lateral zones with spotter-style zone highlighting.</p>
 
@@ -246,7 +246,11 @@
     <p>Shows 7 rows: 3 ahead, your car (yellow), 3 behind. Sorted by proximity, not position. <strong>Visual Indicators:</strong> Yellow = you, White = same lap, Blue = lapped by you, Red = lapping you, Italic = on pit road. <strong>Proximity Bar:</strong> Cyan gradient (ahead/close), Orange gradient (behind/close), Gray (nearby). Automatically filters disconnected drivers.</p>
 
     <h3>Warnings Row</h3>
-    <p><strong>Incident Counter:</strong> Session incidents (0x, 4x, etc.) with color progression. <strong>Pace Warning (📉):</strong> Appears when lap times and top speed drop significantly. <strong>Persistent Dot (•):</strong> Remains until lap within 1% of best pace. <strong>PIT Warning:</strong> Flashing yellow when time lost/lap exceeds pit stop cost.</p>
+    <p><strong>Incident Counter:</strong> Session incidents (0x, 4x, etc.). The color tracks how close you are to the session's incident limit rather than a fixed count, so it means the same thing whether your limit is 4x or 25x: <strong>white</strong> below ~30% of the limit, <strong>yellow</strong> from there to ~60%, and <strong>red</strong> beyond ~60% (roughly one bad incident from a DQ). Unlimited sessions use a gentle informational scale.</p>
+    <p><strong>Pace Warning (📉):</strong> Lights when your lap pace drops and <em>stays</em> down compared to your own established clean pace &mdash; flagging real lost time from damage, tire wear, or changing track conditions, rather than a single off lap. It needs the loss to hold for a couple of laps; after contact it reacts a lap sooner (see below). It clears once your pace returns to normal.</p>
+    <p><strong>Persistent Dot (•):</strong> Confirms <em>contact damage</em> &mdash; it appears when a hard hit (a 4x incident) is accompanied by lost pace. Unlike the pace warning, it stays lit until you pit, because damage doesn't heal by driving. A spin or off-track that doesn't involve contact won't trigger it.</p>
+    <p><strong>PIT Warning:</strong> Flashes when the time you'd lose limping to the finish outweighs the cost of pitting to fix the car. It waits for the pace loss to be confirmed (and not recovering) before recommending a stop, so it won't cry wolf over a momentary slow lap.</p>
+    <p><strong>After contact:</strong> A hard hit primes the system &mdash; if the first full lap afterward is slow, the pace warning and dot appear immediately, and a second slow lap throws PIT. If that first lap is fine, the car is treated as undamaged and nothing fires.</p>
 
     <h2>Radar Window</h2>
     <p>Top-down proximity view with 5 vertical zones (far left, near left, center, near right, far right). Your car: green rectangle in center. Other cars: colored by class. Detection range: ~5 car lengths ahead/behind.</p>
@@ -274,7 +278,7 @@
         <li><strong>Testing:</strong> Changes apply in real-time, no restart needed</li>
         <li><strong>Positions:</strong> Saved automatically on "Done"</li>
         <li><strong>Fuel:</strong> Most accurate after 3+ consistent laps</li>
-        <li><strong>Pace Warnings:</strong> Useful for catching damage early in endurance races</li>
+        <li><strong>Pace Warnings:</strong> Catch lost time from damage, tire wear, or track conditions &mdash; most valuable over longer runs, and quickest to react right after contact</li>
     </ul>
 
     <div class="contact-box">
