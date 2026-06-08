@@ -30,6 +30,13 @@ namespace VISOR.ViewModels
         private const int STINT_WARMUP_SKIP = 1;        // ignore the cold first lap of each stint
         private const int CLEAN_LAP_POOL_CAP = 50;      // bound the baseline sample list
 
+        // Damage = contact. iRacing scores contact as 4x; off-tracks (1x) and clean spins (2x)
+        // aren't damage, so only an incident jump this large flags the damage dot.
+        private const int DAMAGE_INCIDENT_JUMP = 4;
+        // Pace loss must persist this many laps inside the loss state before PIT can arm — stops a
+        // still-settling deficit from screaming PIT early in a race when laps-remaining is huge.
+        private const int PIT_CONFIRM_LAPS = 2;
+
         // Cost side of the pit decision. PIT_COST_BASE is a road-course-ballpark pit-lane delta plus
         // minimal service; it is the least track-independent number here and the prime tuning knob.
         private const float PIT_COST_BASE_SEC = 30f;
@@ -75,6 +82,12 @@ namespace VISOR.ViewModels
         private int _incidentCountWhenHealthy = 0;
         private bool _damageLatched = false;
 
+        // Incident count at the previous completed lap, to detect a lap that was contaminated by a
+        // spin/off/contact (those laps are not clean pace samples and are excluded).
+        private int _incidentCountPrevLap = 0;
+        // Consecutive qualifying laps spent in the pace-loss state (gates the PIT recommendation).
+        private int _paceLossLaps = 0;
+
         private int _stintLap = 0;
         private bool _prevOnPitRoad = false;
         #endregion
@@ -108,16 +121,29 @@ namespace VISOR.ViewModels
 
             _stintLap++;
 
+            // A lap on which the incident count rose was contaminated by a spin/off/contact — not a
+            // clean pace sample. Detect it before the qualifying gate (and keep the per-lap marker
+            // current for every completed lap, qualifying or not).
+            bool incidentThisLap = _incidentCount > _incidentCountPrevLap;
+            _incidentCountPrevLap = _incidentCount;
+
             // Only clean green racing laps drive the pace math. Non-qualifying laps hold all current
             // warning states untouched (incidents are still tracked via UpdateIncidentCount).
             bool isOutlier = _baseline > 0 && lastLapTime > _baseline * (1f + OUTLIER_PCT);
-            bool qualifying = !isOnPitRoad && isRacingGreen && _stintLap > STINT_WARMUP_SKIP && !isOutlier;
+            bool qualifying = !isOnPitRoad && isRacingGreen && _stintLap > STINT_WARMUP_SKIP
+                              && !isOutlier && !incidentThisLap;
             if (!qualifying)
                 return;
 
             _recentLapTimes.Add(lastLapTime);
             while (_recentLapTimes.Count > SUSTAIN_LAPS) _recentLapTimes.RemoveAt(0);
             float recentPace = _recentLapTimes.Average();
+
+            // The pace-loss streak keys on each lap *individually* clearing the threshold, not on a
+            // smoothed average — so a single slow lap (e.g. a spin you recover from) can never build
+            // a streak, while a genuine sustained loss produces back-to-back slow laps.
+            float lapDeficit = lastLapTime - _baseline;
+            bool lapOver = _baseline > 0 && (lapDeficit / _baseline) >= GRAPH_ON_PCT && lapDeficit >= ABS_FLOOR_SEC;
 
             switch (_state)
             {
@@ -132,15 +158,12 @@ namespace VISOR.ViewModels
                     break;
 
                 case HealthState.Healthy:
-                {
-                    float deficit = recentPace - _baseline;
-                    bool over = (deficit / _baseline) >= GRAPH_ON_PCT && deficit >= ABS_FLOOR_SEC;
-                    if (over)
+                    if (lapOver)
                     {
                         // Baseline + incident marker freeze here — do NOT absorb the dropping laps.
                         _graphOnStreak++;
                         if (_graphOnStreak >= SUSTAIN_LAPS)
-                            EnterPaceLoss(recentPace, lastLapTopSpeed, lapsRemaining, sessionTimeRemain);
+                            EnterPaceLoss(lastLapTime, recentPace, lastLapTopSpeed, lapsRemaining, sessionTimeRemain);
                     }
                     else
                     {
@@ -149,10 +172,10 @@ namespace VISOR.ViewModels
                         RecomputeBaseline();
                     }
                     break;
-                }
 
                 case HealthState.PaceLoss:
-                    EvaluatePaceLoss(recentPace, lastLapTopSpeed, lapsRemaining, sessionTimeRemain);
+                    _paceLossLaps++;
+                    EvaluatePaceLoss(lastLapTime, recentPace, lastLapTopSpeed, lapsRemaining, sessionTimeRemain);
                     break;
             }
         }
@@ -173,22 +196,23 @@ namespace VISOR.ViewModels
             _baseline = _cleanLapTimes.Where(t => t <= threshold).Average();
         }
 
-        private void EnterPaceLoss(float recentPace, float topSpeed, int lapsRemaining, double timeRemain)
+        private void EnterPaceLoss(float lastLapTime, float recentPace, float topSpeed, int lapsRemaining, double timeRemain)
         {
             _state = HealthState.PaceLoss;
             IsPaceWarningVisible = true;
             _graphOffStreak = 0;
+            _paceLossLaps = 1;
             Log.Debug($"[Warnings] Pace loss: {recentPace:F2}s vs baseline {_baseline:F2}s (+{(recentPace / _baseline - 1f) * 100f:F1}%)");
-            EvaluatePaceLoss(recentPace, topSpeed, lapsRemaining, timeRemain);
+            EvaluatePaceLoss(lastLapTime, recentPace, topSpeed, lapsRemaining, timeRemain);
         }
 
-        private void EvaluatePaceLoss(float recentPace, float topSpeed, int lapsRemaining, double timeRemain)
+        private void EvaluatePaceLoss(float lastLapTime, float recentPace, float topSpeed, int lapsRemaining, double timeRemain)
         {
             float deficit = recentPace - _baseline;
-            float deficitPct = deficit / _baseline;
 
-            // Damage: any incident since we were last healthy means the pace loss came from contact.
-            if (!_damageLatched && _incidentCount > _incidentCountWhenHealthy)
+            // Damage = contact. Only an incident jump of DAMAGE_INCIDENT_JUMP (4x) since we were last
+            // healthy counts; a 1x off-track or a clean 2x spin is not damage. Latched until a pit.
+            if (!_damageLatched && (_incidentCount - _incidentCountWhenHealthy) >= DAMAGE_INCIDENT_JUMP)
             {
                 _damageLatched = true;
                 IsPersistentDotVisible = true;
@@ -196,9 +220,10 @@ namespace VISOR.ViewModels
                 Log.Debug($"[Warnings] Damage confirmed (incidents +{_incidentCount - _incidentCountWhenHealthy}, top speed {(topSpeedDown ? "down" : "normal")})");
             }
 
-            // PIT economics: would the time clawed back over the rest of the race beat a stop?
+            // PIT economics: would the time clawed back over the rest of the race beat a stop? Only
+            // once the loss has held for PIT_CONFIRM_LAPS, so a still-settling deficit can't trip it.
             int lapsRem = EffectiveLapsRemaining(lapsRemaining, timeRemain);
-            if (lapsRem > 0 && deficit > 0)
+            if (_paceLossLaps >= PIT_CONFIRM_LAPS && lapsRem > 0 && deficit > 0)
             {
                 float pitCost = PIT_COST_BASE_SEC + (_damageLatched ? PIT_COST_REPAIR_ADDER_SEC : 0f);
                 float projectedLoss = deficit * lapsRem;
@@ -210,9 +235,10 @@ namespace VISOR.ViewModels
                 SetPitNow(false);
             }
 
-            // Recovery: pace back to baseline clears the graph and PIT, and resumes baseline updates.
-            // The dot stays — damage doesn't heal without a pit stop.
-            if (deficitPct <= GRAPH_OFF_PCT)
+            // Recovery keys on the latest lap individually returning to baseline (mirrors the per-lap
+            // trigger). The graph and PIT clear; the dot stays — damage doesn't heal without a pit.
+            float lapDeficitPct = (lastLapTime - _baseline) / _baseline;
+            if (lapDeficitPct <= GRAPH_OFF_PCT)
             {
                 _graphOffStreak++;
                 if (_graphOffStreak >= SUSTAIN_LAPS)
@@ -231,6 +257,7 @@ namespace VISOR.ViewModels
             SetPitNow(false);
             _graphOnStreak = 0;
             _graphOffStreak = 0;
+            _paceLossLaps = 0;
             _incidentCountWhenHealthy = _incidentCount;
             Log.Debug("[Warnings] Pace recovered to baseline");
         }
@@ -244,9 +271,11 @@ namespace VISOR.ViewModels
             _state = (_baseline > 0) ? HealthState.Healthy : HealthState.Warmup;
             _graphOnStreak = 0;
             _graphOffStreak = 0;
+            _paceLossLaps = 0;
             _recentLapTimes.Clear();
             _stintLap = 0;
             _incidentCountWhenHealthy = _incidentCount;
+            _incidentCountPrevLap = _incidentCount;
             Log.Debug("[Warnings] Pit stop — pace warnings reset for new stint");
         }
 
@@ -316,6 +345,8 @@ namespace VISOR.ViewModels
             _graphOnStreak = 0;
             _graphOffStreak = 0;
             _incidentCountWhenHealthy = 0;
+            _incidentCountPrevLap = 0;
+            _paceLossLaps = 0;
             _damageLatched = false;
             _stintLap = 0;
             _prevOnPitRoad = false;
