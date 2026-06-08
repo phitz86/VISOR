@@ -136,13 +136,22 @@ namespace VISOR.ViewModels
                     !string.IsNullOrEmpty(carNumbers[i]) &&
                     !string.IsNullOrEmpty(userNames[i]))
                 {
-                    // Class ID 11 is the pace car — hide it while it sits in pit lane.
+                    // Class ID 11 is the pace car. Show it only while it's actively pacing
+                    // the field (on track and moving); hide it once it parks. Keying on motion
+                    // rather than location handles parking anywhere — in pit lane, past the
+                    // pit-exit line, on the apron — since CarIdxOnPitRoad goes false the moment
+                    // it rolls beyond the pit surface.
                     bool isPaceCar = (carClassIDs[i] == 11);
                     bool isOnPitRoad = (onPitRoad != null && i < onPitRoad.Length) && onPitRoad[i];
 
-                    if (isPaceCar && isOnPitRoad)
+                    if (isPaceCar)
                     {
-                        continue;
+                        var paceBuffer = _historyManager.GetBuffer(i);
+                        bool isStationary = paceBuffer != null && paceBuffer.IsStationary();
+                        if (isOnPitRoad || isStationary)
+                        {
+                            continue;
+                        }
                     }
 
                     string displayName = carIsAI[i] ? $"🤖 {userNames[i]}" : userNames[i];
