@@ -30,7 +30,9 @@ namespace VISOR.Views
 
             // Set version display from assembly
             var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-            VersionText.Text = $"Version {version.Major}.{version.Minor}.{version.Build}";
+            VersionText.Text = version != null
+                ? $"Version {version.Major}.{version.Minor}.{version.Build}"
+                : "Version unknown";
 
             _configModeManager.EnterConfigMode();
 

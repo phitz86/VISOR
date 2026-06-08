@@ -83,7 +83,7 @@ namespace VISOR.ViewModels
         /// <summary>
         /// Processes a new telemetry snapshot to update the timer display.
         /// </summary>
-        public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider? sessionDataProvider)
         {
             int lapsRemaining = snapshot.SessionLapsRemain;
             double timeRemain = snapshot.SessionTimeRemain;

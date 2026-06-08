@@ -264,7 +264,7 @@ namespace VISOR.Diagnostics
                     writer.WriteLine("[SYSTEM] === LOG TRUNCATED - KEEPING RECENT ENTRIES ===");
 
                     long skipped = 0;
-                    string line;
+                    string? line;
                     while ((line = reader.ReadLine()) != null)
                     {
                         if (skipped < linesToSkip)

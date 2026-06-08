@@ -87,7 +87,7 @@ namespace VISOR.ViewModels
             OnPropertyChanged(nameof(ScaleFactor));
         }
 
-        public void UpdateFromTelemetry(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        public void UpdateFromTelemetry(SVappsLABSnapshot snapshot, ISessionDataProvider? sessionDataProvider)
         {
             CheckSessionStateTransitions(snapshot);
             CheckForSessionTransition(snapshot, sessionDataProvider);
@@ -252,7 +252,7 @@ namespace VISOR.ViewModels
             OnPropertyChanged(string.Empty);
         }
 
-        private void CheckForSessionTransition(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        private void CheckForSessionTransition(SVappsLABSnapshot snapshot, ISessionDataProvider? sessionDataProvider)
         {
             int currentSessionNum = snapshot.SessionNum;
             if (currentSessionNum != _lastSessionNum && _lastSessionNum != -1)

@@ -266,7 +266,7 @@ namespace VISOR.Telemetry
             // a warning here means something heavy crept back onto the SDK stream thread.
             var handlerStart = Stopwatch.GetTimestamp();
 
-            SVappsLABSnapshot snapshot = null;
+            SVappsLABSnapshot? snapshot = null;
             try
             {
                 snapshot = new SVappsLABSnapshot(telemetryData, DateTime.UtcNow);
