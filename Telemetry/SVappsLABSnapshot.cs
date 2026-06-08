@@ -60,16 +60,6 @@ namespace VISOR.Telemetry
         // SessionFlags is an enum (flags); normalize to its underlying int.
         public int SessionFlags => Convert.ToInt32(Data.SessionFlags);
 
-        // --- Damage-signal probes (DEBUG diagnostic) ---
-        // Repair times iRacing reports for the player's car. We're confirming whether these
-        // read non-zero while on track or only once in the pits. Seconds.
-        public float PitRepairLeft => Data.PitRepairLeft ?? 0f;
-        public float PitOptRepairLeft => Data.PitOptRepairLeft ?? 0f;
-        // Non-zero (seconds) while the car is being towed.
-        public float PlayerCarTowTime => Data.PlayerCarTowTime ?? 0f;
-        // True once the player's car is in its pit stall (distinct from being on pit road).
-        public bool PlayerCarInPitStall => Data.PlayerCarInPitStall ?? false;
-
         // --- Per-car arrays (normalized to length 64 on null) ---
         public float[] CarIdxLapDistPct => Data.CarIdxLapDistPct ?? EmptyFloat64;
         public int[] CarIdxLap => Data.CarIdxLap ?? EmptyInt64;

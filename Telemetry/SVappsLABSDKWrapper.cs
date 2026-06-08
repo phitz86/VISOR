@@ -19,11 +19,7 @@ namespace VISOR.Telemetry
         TelemetryVar.CarIdxLap, TelemetryVar.CarIdxLastLapTime, TelemetryVar.CarIdxBestLapTime, TelemetryVar.CarIdxOnPitRoad,
         TelemetryVar.SessionState, TelemetryVar.SessionTime, TelemetryVar.SessionTimeRemain, TelemetryVar.SessionLapsRemain,
         TelemetryVar.SessionLapsTotal, TelemetryVar.SessionNum, TelemetryVar.PlayerCarIdx, TelemetryVar.SessionFlags,
-        TelemetryVar.CarLeftRight, TelemetryVar.CarIdxF2Time, TelemetryVar.CarIdxEstTime, TelemetryVar.CarIdxLapCompleted,
-        // Damage-signal probes (DEBUG DamageSignalLogger): confirm whether repair times
-        // are readable on track or only populate in the pits.
-        TelemetryVar.PitRepairLeft, TelemetryVar.PitOptRepairLeft, TelemetryVar.PlayerCarTowTime,
-        TelemetryVar.PlayerCarInPitStall
+        TelemetryVar.CarLeftRight, TelemetryVar.CarIdxF2Time, TelemetryVar.CarIdxEstTime, TelemetryVar.CarIdxLapCompleted
     ])]
     public class SVappsLABSDKWrapper : IDisposable
     {
@@ -34,7 +30,6 @@ namespace VISOR.Telemetry
 #if DEBUG
         private readonly SessionDataLogger _sessionLogger;
         private readonly TelemetryCSVLogger _telemetryLogger;
-        private readonly DamageSignalLogger _damageLogger;
 #endif
         private SVappsLABSnapshot _latestSnapshot;
         private CancellationTokenSource _cancellationTokenSource;
@@ -84,7 +79,6 @@ namespace VISOR.Telemetry
 #if DEBUG
             _sessionLogger = new SessionDataLogger(() => _cachedRawYaml);
             _telemetryLogger = new TelemetryCSVLogger();
-            _damageLogger = new DamageSignalLogger();
 #endif
 
             _frameGapFlushTimer = new System.Timers.Timer(5000) { AutoReset = true };
@@ -295,7 +289,6 @@ namespace VISOR.Telemetry
                     {
 #if DEBUG
                         _telemetryLogger?.LogSnapshot(snapshot, _sessionCoordinator);
-                        _damageLogger?.LogSnapshot(snapshot);
 #endif
                         SnapshotAvailable?.Invoke(snapshot);
                     }
@@ -344,7 +337,6 @@ namespace VISOR.Telemetry
 #if DEBUG
                 _sessionLogger?.Dispose();
                 _telemetryLogger?.Dispose();
-                _damageLogger?.Dispose();
 #endif
 
                 _cancellationTokenSource?.Cancel();
