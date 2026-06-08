@@ -36,6 +36,9 @@ namespace VISOR.ViewModels
         // Pace loss must persist this many laps inside the loss state before PIT can arm — stops a
         // still-settling deficit from screaming PIT early in a race when laps-remaining is huge.
         private const int PIT_CONFIRM_LAPS = 2;
+        // After a contact, the confirming lap must be "just as slow or slower" — at least this
+        // fraction of the lap that first raised the graph — before PIT fires.
+        private const float PACELOSS_NOT_IMPROVING_FRAC = 0.9f;
 
         // Cost side of the pit decision. PIT_COST_BASE is a road-course-ballpark pit-lane delta plus
         // minimal service; it is the least track-independent number here and the prime tuning knob.
@@ -88,6 +91,12 @@ namespace VISOR.ViewModels
         // Consecutive qualifying laps spent in the pace-loss state (gates the PIT recommendation).
         private int _paceLossLaps = 0;
 
+        // A contact (4x) "arms" a fast-track: the spotter analogue — react to the hit, not just lap
+        // times — so the first complete lap after contact can raise the graph on its own.
+        private bool _contactArmed = false;
+        // Per-lap deficit on the lap that first raised the graph, for the "not improving" PIT gate.
+        private float _paceLossOnsetDeficit = 0f;
+
         private int _stintLap = 0;
         private bool _prevOnPitRoad = false;
         #endregion
@@ -124,8 +133,14 @@ namespace VISOR.ViewModels
             // A lap on which the incident count rose was contaminated by a spin/off/contact — not a
             // clean pace sample. Detect it before the qualifying gate (and keep the per-lap marker
             // current for every completed lap, qualifying or not).
-            bool incidentThisLap = _incidentCount > _incidentCountPrevLap;
+            int lapIncidentJump = _incidentCount - _incidentCountPrevLap;
+            bool incidentThisLap = lapIncidentJump > 0;
             _incidentCountPrevLap = _incidentCount;
+
+            // A contact this lap (4x) arms the fast-track. The contact lap itself is excluded below;
+            // the next clean lap alone can then raise the graph.
+            if (lapIncidentJump >= DAMAGE_INCIDENT_JUMP)
+                _contactArmed = true;
 
             // Only clean green racing laps drive the pace math. Non-qualifying laps hold all current
             // warning states untouched (incidents are still tracked via UpdateIncidentCount).
@@ -161,13 +176,17 @@ namespace VISOR.ViewModels
                     if (lapOver)
                     {
                         // Baseline + incident marker freeze here — do NOT absorb the dropping laps.
+                        // After a contact, a single slow lap is enough; otherwise it takes two.
                         _graphOnStreak++;
-                        if (_graphOnStreak >= SUSTAIN_LAPS)
+                        int graphLapsNeeded = _contactArmed ? 1 : SUSTAIN_LAPS;
+                        if (_graphOnStreak >= graphLapsNeeded)
                             EnterPaceLoss(lastLapTime, recentPace, lastLapTopSpeed, lapsRemaining, sessionTimeRemain);
                     }
                     else
                     {
+                        // The first clean lap after a contact means the car is fine — stand down.
                         _graphOnStreak = 0;
+                        _contactArmed = false;
                         AddHealthyLap(lastLapTime, lastLapTopSpeed);
                         RecomputeBaseline();
                     }
@@ -202,6 +221,8 @@ namespace VISOR.ViewModels
             IsPaceWarningVisible = true;
             _graphOffStreak = 0;
             _paceLossLaps = 1;
+            _paceLossOnsetDeficit = lastLapTime - _baseline;
+            _contactArmed = false; // fast-track has done its job (the graph is up)
             Log.Debug($"[Warnings] Pace loss: {recentPace:F2}s vs baseline {_baseline:F2}s (+{(recentPace / _baseline - 1f) * 100f:F1}%)");
             EvaluatePaceLoss(lastLapTime, recentPace, topSpeed, lapsRemaining, timeRemain);
         }
@@ -221,9 +242,12 @@ namespace VISOR.ViewModels
             }
 
             // PIT economics: would the time clawed back over the rest of the race beat a stop? Only
-            // once the loss has held for PIT_CONFIRM_LAPS, so a still-settling deficit can't trip it.
+            // once the loss has held for PIT_CONFIRM_LAPS (so a still-settling deficit can't trip it)
+            // and the confirming lap is "just as slow or slower" than the onset (not recovering).
             int lapsRem = EffectiveLapsRemaining(lapsRemaining, timeRemain);
-            if (_paceLossLaps >= PIT_CONFIRM_LAPS && lapsRem > 0 && deficit > 0)
+            float thisLapDeficit = lastLapTime - _baseline;
+            bool notImproving = thisLapDeficit >= _paceLossOnsetDeficit * PACELOSS_NOT_IMPROVING_FRAC;
+            if (_paceLossLaps >= PIT_CONFIRM_LAPS && notImproving && lapsRem > 0 && deficit > 0)
             {
                 float pitCost = PIT_COST_BASE_SEC + (_damageLatched ? PIT_COST_REPAIR_ADDER_SEC : 0f);
                 float projectedLoss = deficit * lapsRem;
@@ -258,6 +282,8 @@ namespace VISOR.ViewModels
             _graphOnStreak = 0;
             _graphOffStreak = 0;
             _paceLossLaps = 0;
+            _paceLossOnsetDeficit = 0f;
+            _contactArmed = false;
             _incidentCountWhenHealthy = _incidentCount;
             Log.Debug("[Warnings] Pace recovered to baseline");
         }
@@ -272,6 +298,8 @@ namespace VISOR.ViewModels
             _graphOnStreak = 0;
             _graphOffStreak = 0;
             _paceLossLaps = 0;
+            _paceLossOnsetDeficit = 0f;
+            _contactArmed = false;
             _recentLapTimes.Clear();
             _stintLap = 0;
             _incidentCountWhenHealthy = _incidentCount;
@@ -347,6 +375,8 @@ namespace VISOR.ViewModels
             _incidentCountWhenHealthy = 0;
             _incidentCountPrevLap = 0;
             _paceLossLaps = 0;
+            _paceLossOnsetDeficit = 0f;
+            _contactArmed = false;
             _damageLatched = false;
             _stintLap = 0;
             _prevOnPitRoad = false;
