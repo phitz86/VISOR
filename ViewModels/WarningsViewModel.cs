@@ -85,9 +85,9 @@ namespace VISOR.ViewModels
             {
                 _incidentCount = newCount;
                 IncidentDisplay = $"{newCount}x";
-                IncidentColor = GetIncidentColor(newCount);
-                string severity = newCount == 0 ? "clear" : newCount <= 4 ? "yellow" : newCount <= 8 ? "orange" : "red";
-                Log.Debug($"[Warnings] Incident count: {newCount}x ({severity})");
+                var severity = GetIncidentSeverity(newCount, incidentLimit);
+                IncidentColor = SeverityToBrush(severity);
+                Log.Debug($"[Warnings] Incident count: {newCount}x / {(incidentLimit > 0 ? incidentLimit.ToString() : "unlimited")} ({severity})");
             }
         }
 
@@ -267,13 +267,40 @@ namespace VISOR.ViewModels
             Log.Debug(on ? "[Warnings] PIT recommended" : "[Warnings] PIT cleared");
         }
 
-        private Brush GetIncidentColor(int count)
+        private enum IncidentSeverity { Clear, Caution, Danger }
+
+        // Colour by how close the count is to the session's incident limit, not by an absolute
+        // count — so the meaning ("getting dangerous") holds whether the cap is 4x, 17x or 25x.
+        // Yellow at 30% of the limit, red at 60% (roughly one worst-case incident from a DQ at a
+        // 17x limit). Unlimited sessions (limit 0) have no DQ stakes, so fall back to a gentle
+        // absolute scale that's purely informational.
+        private const float INCIDENT_CAUTION_FRACTION = 0.30f;
+        private const float INCIDENT_DANGER_FRACTION = 0.60f;
+
+        private static IncidentSeverity GetIncidentSeverity(int count, int limit)
         {
-            if (count == 0) return Brushes.White;
-            if (count <= 4) return Brushes.Yellow;
-            if (count <= 8) return Brushes.Orange;
-            return Brushes.Red;
+            if (count <= 0) return IncidentSeverity.Clear;
+
+            if (limit > 0)
+            {
+                float fraction = (float)count / limit;
+                if (fraction >= INCIDENT_DANGER_FRACTION) return IncidentSeverity.Danger;
+                if (fraction >= INCIDENT_CAUTION_FRACTION) return IncidentSeverity.Caution;
+                return IncidentSeverity.Clear;
+            }
+
+            // Unlimited: no cap to measure against.
+            if (count > 12) return IncidentSeverity.Danger;
+            if (count > 4) return IncidentSeverity.Caution;
+            return IncidentSeverity.Clear;
         }
+
+        private static Brush SeverityToBrush(IncidentSeverity severity) => severity switch
+        {
+            IncidentSeverity.Danger => Brushes.Red,
+            IncidentSeverity.Caution => Brushes.Yellow,
+            _ => Brushes.White
+        };
 
         public void Reset()
         {
