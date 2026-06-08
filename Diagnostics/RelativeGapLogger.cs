@@ -13,7 +13,7 @@ namespace VISOR.Diagnostics
     public class RelativeGapLogger : IDisposable
     {
         private readonly string _outputDirectory;
-        private StreamWriter _writer = null!;
+        private StreamWriter? _writer;
         private DateTime _lastLogTime = DateTime.MinValue;
         private readonly TimeSpan _logInterval = TimeSpan.FromSeconds(1.0);
         private bool _isDisposed = false;
@@ -103,6 +103,7 @@ namespace VISOR.Diagnostics
 
         private void WriteHeader()
         {
+            if (_writer == null) return;
             var header = new StringBuilder();
             header.Append("SessionTime,");
             header.Append("SlotIndex,");

@@ -16,7 +16,7 @@ namespace VISOR.Diagnostics
     {
         private readonly string _outputDirectory;
         private string _currentCsvPath = null!;
-        private StreamWriter _writer = null!;
+        private StreamWriter? _writer;
         private DateTime _lastLogTime = DateTime.MinValue;
         private readonly TimeSpan _logInterval = TimeSpan.FromSeconds(1.0); // 1Hz sampling
         private int _lastSessionNum = -1;
@@ -96,6 +96,7 @@ namespace VISOR.Diagnostics
 
         private void WriteHeader()
         {
+            if (_writer == null) return;
             var header = new StringBuilder();
             header.Append("Timestamp,");
             header.Append("SessionTime,");
@@ -116,6 +117,7 @@ namespace VISOR.Diagnostics
 
         private void WriteDataRows(SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider, DateTime timestamp)
         {
+            if (_writer == null) return;
             try
             {
                 int playerCarIdx = snapshot.PlayerCarIdx;
