@@ -191,7 +191,7 @@ namespace VISOR.Views
             }
         }
 
-        private void OnWindowSizeChanged(object sender, WindowSizeChangedEventArgs e)
+        private void OnWindowSizeChanged(object? sender, WindowSizeChangedEventArgs e)
         {
             Dispatcher.Invoke(() =>
             {
@@ -200,7 +200,7 @@ namespace VISOR.Views
             });
         }
 
-        private void OnConfigModeChanged(object sender, ConfigModeChangedEventArgs e)
+        private void OnConfigModeChanged(object? sender, ConfigModeChangedEventArgs e)
         {
             Dispatcher.Invoke(() =>
             {
@@ -210,7 +210,7 @@ namespace VISOR.Views
             });
         }
 
-        private void DragHandle_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        private void DragHandle_MouseLeftButtonDown(object? sender, MouseButtonEventArgs e)
         {
             if (_configModeManager.IsInConfigMode)
             {
@@ -218,7 +218,7 @@ namespace VISOR.Views
             }
         }
 
-        private async void RadarWindow_Loaded(object sender, RoutedEventArgs e)
+        private async void RadarWindow_Loaded(object? sender, RoutedEventArgs e)
         {
             try
             {
@@ -314,7 +314,7 @@ namespace VISOR.Views
             });
         }
 
-        private void UpdatePlayerCarDisplay(SVappsLABSnapshot snapshot = null)
+        private void UpdatePlayerCarDisplay(SVappsLABSnapshot? snapshot = null)
         {
             if (snapshot == null || !_sdk.IsSessionDataReady)
             {

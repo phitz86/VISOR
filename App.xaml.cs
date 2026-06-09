@@ -10,12 +10,12 @@ namespace VISOR
 {
     public partial class App : Application
     {
-        private SVappsLABSDKWrapper _sdkWrapper;
-        private MainWindow _mainWindow;
-        private RadarWindow _radarWindow;
-        private ConfigWindow _configWindow;
+        private SVappsLABSDKWrapper _sdkWrapper = null!;
+        private MainWindow _mainWindow = null!;
+        private RadarWindow? _radarWindow;
+        private ConfigWindow _configWindow = null!;
 
-        public RadarWindow CurrentRadarWindow => _radarWindow;
+        public RadarWindow? CurrentRadarWindow => _radarWindow;
 
         protected override async void OnStartup(StartupEventArgs e)
         {
@@ -115,23 +115,23 @@ namespace VISOR
             }
         }
 
-        private void OnMainWindowClosed(object sender, EventArgs e)
+        private void OnMainWindowClosed(object? sender, EventArgs e)
         {
             Log.Info("MainWindow closed - shutting down application");
             Shutdown();
         }
 
-        private void OnRadarWindowClosed(object sender, EventArgs e)
+        private void OnRadarWindowClosed(object? sender, EventArgs e)
         {
             Log.Info("RadarWindow closed independently");
         }
 
-        private void OnConfigWindowClosed(object sender, EventArgs e)
+        private void OnConfigWindowClosed(object? sender, EventArgs e)
         {
             Log.Info("ConfigWindow closed independently");
         }
 
-        private void OnConfigExitRequested(object sender, EventArgs e)
+        private void OnConfigExitRequested(object? sender, EventArgs e)
         {
             Log.Info("Config window requested application exit");
             Shutdown();

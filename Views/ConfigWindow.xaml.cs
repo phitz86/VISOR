@@ -17,7 +17,7 @@ namespace VISOR.Views
         private readonly ConfigModeManager _configModeManager;
         private bool _isInitialized = false;
 
-        public event EventHandler ExitRequested;
+        public event EventHandler? ExitRequested;
 
         public ConfigWindow(SVappsLABSDKWrapper telemetry, MainWindow mainWindow)
         {
@@ -30,7 +30,9 @@ namespace VISOR.Views
 
             // Set version display from assembly
             var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-            VersionText.Text = $"Version {version.Major}.{version.Minor}.{version.Build}";
+            VersionText.Text = version != null
+                ? $"Version {version.Major}.{version.Minor}.{version.Build}"
+                : "Version unknown";
 
             _configModeManager.EnterConfigMode();
 
@@ -47,7 +49,7 @@ namespace VISOR.Views
             Log.Info("ConfigWindow opened - config mode enabled");
         }
 
-        private RadarWindow GetCurrentRadarWindow()
+        private RadarWindow? GetCurrentRadarWindow()
         {
             return ((App)Application.Current).CurrentRadarWindow;
         }
@@ -90,7 +92,7 @@ namespace VISOR.Views
             }
         }
 
-        private void WindowSizeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void WindowSizeCombo_SelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
             if (!_isInitialized || _settingsManager == null)
                 return;
@@ -110,7 +112,7 @@ namespace VISOR.Views
             }
         }
 
-        private void DebugModeCheckBox_Checked(object sender, RoutedEventArgs e)
+        private void DebugModeCheckBox_Checked(object? sender, RoutedEventArgs e)
         {
             if (!_isInitialized)
                 return;
@@ -123,7 +125,7 @@ namespace VISOR.Views
             UpdateDebugModeDisplay();
         }
 
-        private void DebugModeCheckBox_Unchecked(object sender, RoutedEventArgs e)
+        private void DebugModeCheckBox_Unchecked(object? sender, RoutedEventArgs e)
         {
             if (!_isInitialized)
                 return;
@@ -136,7 +138,7 @@ namespace VISOR.Views
             UpdateDebugModeDisplay();
         }
 
-        private void OpenLogsFolderButton_Click(object sender, RoutedEventArgs e)
+        private void OpenLogsFolderButton_Click(object? sender, RoutedEventArgs e)
         {
             try
             {
@@ -162,7 +164,7 @@ namespace VISOR.Views
             }
         }
 
-        private void RowCheckBox_Changed(object sender, RoutedEventArgs e)
+        private void RowCheckBox_Changed(object? sender, RoutedEventArgs e)
         {
             if (!_isInitialized || _settingsManager == null)
                 return;
@@ -181,7 +183,7 @@ namespace VISOR.Views
                 showRow0, showRow1, showRow2, showRow3, showRow4, showRow5, showRadar);
         }
 
-        private void RadarCheckBox_Changed(object sender, RoutedEventArgs e)
+        private void RadarCheckBox_Changed(object? sender, RoutedEventArgs e)
         {
             if (!_isInitialized || _settingsManager == null)
                 return;
@@ -211,13 +213,13 @@ namespace VISOR.Views
             RowCheckBox_Changed(sender, e);
         }
 
-        private void DoneButton_Click(object sender, RoutedEventArgs e)
+        private void DoneButton_Click(object? sender, RoutedEventArgs e)
         {
             Log.Debug("Done button clicked - closing config window");
             Close();
         }
 
-        private void ExitButton_Click(object sender, RoutedEventArgs e)
+        private void ExitButton_Click(object? sender, RoutedEventArgs e)
         {
             Log.Debug("Exit button clicked - requesting application shutdown");
             ExitRequested?.Invoke(this, EventArgs.Empty);

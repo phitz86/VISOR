@@ -150,7 +150,7 @@ namespace VISOR.Telemetry
                 dst.SessionFastestLaps[sessionNum] = new List<LiveSessionData.FastestLapResult>();
         }
 
-        private static int ParseIncidentLimit(string raw)
+        private static int ParseIncidentLimit(string? raw)
         {
             // "unlimited" or any non-numeric value → 0 (treated as no cap by consumers).
             if (string.IsNullOrEmpty(raw)) return 0;

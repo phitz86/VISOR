@@ -30,7 +30,7 @@ namespace VISOR.Telemetry
         /// <summary>
         /// Gets the position history buffer for a specific car.
         /// </summary>
-        public PositionHistoryBuffer GetBuffer(int carIdx)
+        public PositionHistoryBuffer? GetBuffer(int carIdx)
         {
             if (carIdx < 0 || carIdx >= MaxCars)
                 return null;

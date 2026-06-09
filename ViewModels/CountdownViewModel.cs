@@ -28,7 +28,7 @@ namespace VISOR.ViewModels
 
         private bool _greenFlagSeen;
         private int _lastLap;
-        private string _currentLapDisplay;
+        private string _currentLapDisplay = "-- Laps";
         private int _totalQualifyingLaps;
         private int _qualifyingLapsCompleted;
         private bool _isFirstQualiLap;
@@ -83,7 +83,7 @@ namespace VISOR.ViewModels
         /// <summary>
         /// Processes a new telemetry snapshot to update the timer display.
         /// </summary>
-        public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider? sessionDataProvider)
         {
             int lapsRemaining = snapshot.SessionLapsRemain;
             double timeRemain = snapshot.SessionTimeRemain;

@@ -229,10 +229,11 @@
     <p><strong>Proximity Bar:</strong> Features a dynamic 5-segment warning system that fills as cars get closer, scaling from an informational 8.0-second gap down to a critical 0.6-second gap. Automatically filters disconnected drivers.</p>
 
     <h3>Row 5: Warnings Row</h3>
-    <p><strong>Incident Counter:</strong> Session incidents (0x, 4x, etc.) with color progression.</p>
-    <p><strong>Pace Warning (📉):</strong> Appears when lap times and top speed drop significantly.</p>
-    <p><strong>Persistent Dot (•):</strong> Remains until your lap is within 1% of best pace.</p>
-    <p><strong>PIT Warning:</strong> Flashing yellow when time lost per lap exceeds pit stop cost. (This feature is still in development).</p>
+    <p><strong>Incident Counter:</strong> Session incidents (0x, 4x, etc.). The color tracks how close you are to the session's incident limit rather than a fixed count, so it means the same thing whether your limit is 4x or 25x: <strong>white</strong> below ~30% of the limit, <strong>yellow</strong> from there to ~60%, and <strong>red</strong> beyond ~60% (roughly one bad incident from a DQ). Unlimited sessions use a gentle informational scale.</p>
+    <p><strong>Pace Warning (📉):</strong> Lights when your lap pace drops and <em>stays</em> down compared to your own established clean pace &mdash; flagging real lost time from damage, tire wear, or changing track conditions, rather than a single off lap. It needs the loss to hold for a couple of laps; after contact it reacts a lap sooner (see below). It clears once your pace returns to normal.</p>
+    <p><strong>Persistent Dot (•):</strong> Confirms <em>contact damage</em> &mdash; it appears when a hard hit (a 4x incident) is accompanied by lost pace. Unlike the pace warning, it stays lit until you pit, because damage doesn't heal by driving. A spin or off-track that doesn't involve contact won't trigger it.</p>
+    <p><strong>PIT Warning:</strong> Flashes when the time you'd lose limping to the finish outweighs the cost of pitting to fix the car. It waits for the pace loss to be confirmed (and not recovering) before recommending a stop, so it won't cry wolf over a momentary slow lap.</p>
+    <p><strong>After contact:</strong> A hard hit primes the system &mdash; if the first full lap afterward is slow, the pace warning and dot appear immediately, and a second slow lap throws PIT. If that first lap is fine, the car is treated as undamaged and nothing fires.</p>
 
     <h2>Radar Window</h2>
     <p>Top-down proximity view with 5 vertical zones (far left, near left, center, near right, far right). Your car: green rectangle in center. Other cars: colored by class. Detection range: ~5 car lengths ahead/behind. Can be toggled on/off in the Configuration window.</p>

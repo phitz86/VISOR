@@ -22,8 +22,8 @@ namespace VISOR.Diagnostics
 
         private static readonly BlockingCollection<string> _logQueue = new BlockingCollection<string>();
         private static readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
-        private static Task _writerTask;
-        private static string _currentLogFilePath;
+        private static Task _writerTask = null!;
+        private static string _currentLogFilePath = null!;
         private static readonly object _fileLock = new object();
         private static bool _isInitialized = false;
 
@@ -152,7 +152,7 @@ namespace VISOR.Diagnostics
         /// <summary>
         /// Log an error message with optional exception details.
         /// </summary>
-        public static void Error(string message, Exception ex = null)
+        public static void Error(string message, Exception? ex = null)
         {
             string fullMessage = message;
 
@@ -264,7 +264,7 @@ namespace VISOR.Diagnostics
                     writer.WriteLine("[SYSTEM] === LOG TRUNCATED - KEEPING RECENT ENTRIES ===");
 
                     long skipped = 0;
-                    string line;
+                    string? line;
                     while ((line = reader.ReadLine()) != null)
                     {
                         if (skipped < linesToSkip)

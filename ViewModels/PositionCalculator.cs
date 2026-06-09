@@ -76,7 +76,7 @@ namespace VISOR.ViewModels
         /// Update the position calculator with the latest telemetry snapshot.
         /// Processes every frame (60Hz) with prediction for smooth display.
         /// </summary>
-        public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider? sessionDataProvider)
         {
             if (snapshot == null || sessionDataProvider == null || !sessionDataProvider.IsDataReady)
                 return;

@@ -36,7 +36,7 @@ namespace VISOR.ViewModels
             _builder = new RelativeDisplayBuilder(_carCache, classColorManager, positionCalculator, _historyManager);
         }
 
-        public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider? sessionDataProvider)
         {
             if (snapshot.PlayerCarIdx == -1 ||
                 sessionDataProvider == null ||

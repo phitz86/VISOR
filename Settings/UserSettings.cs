@@ -11,7 +11,7 @@ namespace VISOR.Settings
     /// </summary>
     public sealed class UserSettings : ApplicationSettingsBase
     {
-        private static UserSettings _instance;
+        private static UserSettings _instance = null!;
 
         /// <summary>
         /// Singleton instance of user settings

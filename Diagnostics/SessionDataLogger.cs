@@ -132,7 +132,7 @@ namespace VISOR.Diagnostics
         {
             try
             {
-                string yamlData = _getSessionYaml?.Invoke();
+                string? yamlData = _getSessionYaml?.Invoke();
                 if (!string.IsNullOrEmpty(yamlData))
                 {
                     string filename = $"Session_{sessionName}_{timestamp}_{suffix}.yaml";
