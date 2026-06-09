@@ -343,7 +343,9 @@ namespace VISOR.ViewModels
             double sessionTime = snapshot.SessionTime;
             float nativeTimeGap = 0f;
             bool isAhead = isGeometricallyAhead;
+#if DEBUG
             string gapSource = "buffer";
+#endif
 
             double? crossingTime = null;
             var playerBuffer = _historyManager.GetBuffer(playerRow.CarIdx);
