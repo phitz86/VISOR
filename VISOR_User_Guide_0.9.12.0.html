@@ -163,13 +163,13 @@
         <div class="title-block">
             <h1>VISOR User Guide</h1>
             <div class="subtitle">Virtual Intelligence Simulator Overlay & Radar</div>
-            <div class="meta">Version 0.9.3 Beta | CephasMedia LLC | info@cephasmedia.com</div>
+            <div class="meta">Version 0.9.12.0 Beta | CephasMedia LLC | info@cephasmedia.com</div>
         </div>
     </header>
 
     <div class="section-intro">
         <h2 style="margin-top: 0; border-bottom: none;">What is VISOR?</h2>
-        <p style="margin-bottom: 0;">VISOR (Virtual Intelligence Simulator Overlay & Radar) is a real-time telemetry overlay for iRacing that displays race-critical information including position tracking, fuel calculations, lap delta analysis, and proximity radar.</p>
+        <p style="margin-bottom: 0;">VISOR (Virtual Intelligence Simulator Overlay & Radar) is a real-time telemetry overlay for iRacing that includes only essential information such as position, fuel remaining, relative gaps, and a radar.</p>
     </div>
 
     <div class="important">
@@ -192,7 +192,7 @@
     </ol>
 
     <h2>Configuration Window</h2>
-    <p>The Configuration Window lets you customize VISOR's display and controls which information appears during your race.</p>
+    <p>The Configuration Window lets you customize VISOR's display layout. Here you can toggle individual elements (Rows 0-5 and the Radar window) on or off based on what information you want visible during your race.</p>
 
     <h3>Window Size Presets</h3>
     <p>Choose from three size options that scale both the Main Window and Radar Window:</p>
@@ -202,54 +202,41 @@
         <li><strong>Large (100% scale):</strong> Maximum readability (default)</li>
     </ul>
 
-    <h3>Display Elements</h3>
-    <p>Toggle individual rows on or off based on what information you want visible:</p>
-
-    <p><strong>Row 0: Gear Indicator + Class Position</strong> - Current gear (R/N/1-6) and your position within your class (not overall position).</p>
-
-    <p><strong>Row 1: Time Remaining + Fuel Remaining</strong> - Session time or laps remaining, and estimated laps of fuel based on your recent fuel consumption.</p>
-
-    <p><strong>Row 2: Lap Delta Bar</strong> - Visual bar showing performance against your session best lap. Green (right): faster, Red (left): slower. Updates in real-time.</p>
-
-    <p><strong>Row 3: Last Lap Time + Best Lap Time</strong> - Your most recently completed lap time and fastest lap this session.</p>
-
-    <p><strong>Row 4: Relative Positioning Table</strong> - Shows 3 cars ahead and 3 behind you. Car number with class color background, proximity bar shows distance. Your car highlighted in yellow. Automatically hidden in Lone Qualifying sessions.</p>
-
-    <p><strong>Row 5: Warnings</strong> - Incident count with color coding (white/yellow/orange/red), pace warning (📉) for significant lap time drops, red dot for ongoing issues, and flashing "PIT" warning when repairs are strategically beneficial.</p>
-
-    <p><strong>Radar Window</strong> - Toggle proximity radar showing nearby cars in 5 lateral zones with spotter-style zone highlighting.</p>
-
     <h3>Drag and Position</h3>
     <p>When the Configuration Window is open, both Main and Radar Windows display drag handles in the top-left corner. Click and drag to reposition. Positions save when you click "Done."</p>
 
     <h2>Main Window Display Elements</h2>
 
-    <h3>Gear Indicator</h3>
-    <p>Displays current gear: "R" for reverse, "N" for neutral, numbers for forward gears. Uses digital-style font for quick readability.</p>
+    <h3>Row 0: Gear Indicator & Class Position</h3>
+    <p><strong>Gear Indicator:</strong> Displays current gear ("R" for reverse, "N" for neutral, numbers for forward gears) using a digital-style font for quick readability.</p>
+    <p><strong>Class Position:</strong> Shows your position within your car class (not overall). In practice/qualifying: based on fastest lap times. In races: real-time track position.</p>
 
-    <h3>Class Position</h3>
-    <p>Shows your position within your car class (not overall). In practice/qualifying: based on fastest lap times. In races: real-time track position.</p>
+    <h3>Row 1: Time & Fuel Remaining</h3>
+    <p><strong>Time/Laps Remaining:</strong> In timed sessions, shows time remaining (HH:MM:SS or MM:SS). In lap-limited sessions, shows laps remaining for leader (+1 to iRacing's value). In qualifying, shows personal laps completed/total allowed. Displays "Final Lap" on the white flag and "FINISHED" on the checkered flag.</p>
+    <p><strong>Fuel Remaining:</strong> Estimates laps of fuel using a rolling 3-lap average of consumption. Updates after each lap (Format: "X.X Laps"). Most accurate after 3+ consistent laps.</p>
 
-    <h3>Time/Laps Remaining</h3>
-    <p><strong>Timed Sessions:</strong> Time remaining in HH:MM:SS or MM:SS format. <strong>Lap-Limited:</strong> Laps remaining for leader (+1 to iRacing's value). <strong>Qualifying:</strong> Personal laps completed/total allowed. Shows "Final Lap" on white flag, "FINISHED" on checkered.</p>
+    <h3>Row 2: Lap Delta Bar</h3>
+    <p>Real-time visual comparison vs. your session best lap. The bar grows from the center: <strong>Right (green):</strong> faster, <strong>Left (red):</strong> slower, <strong>Center:</strong> matching pace. Range is ±3 seconds.</p>
 
-    <h3>Fuel Remaining</h3>
-    <p>Estimates laps of fuel using rolling 3-lap average of consumption. Updates after each lap. Format: "X.X Laps". Most accurate after 3+ consistent laps.</p>
+    <h3>Row 3: Lap Times</h3>
+    <p><strong>Last Lap:</strong> Your most recently completed lap time (M:SS.mmm). <strong>Best Lap:</strong> Your fastest valid lap this session (M:SS.mmm). Both values reset on a new session.</p>
 
-    <h3>Lap Delta Bar</h3>
-    <p>Real-time comparison vs. session best. Bar grows from center: <strong>Right (green):</strong> faster, <strong>Left (red):</strong> slower, <strong>Center:</strong> matching pace. Range: ±3 seconds.</p>
+    <h3>Row 4: Relative Positioning Table</h3>
+    <p>Shows 7 rows: 3 cars ahead, your car (yellow), and 3 behind. Gap times are calculated like a physical transponder loop to measure true time gaps between cars. Automatically hidden in Lone Qualifying sessions.</p>
+    <p><strong>Visual Indicators:</strong> Yellow = you, White = same lap, Blue = lapped by you, Red = lapping you.</p>
+    <p><strong>Pit Road:</strong> Cars on pit road display a "PIT" label and use gray proximity segments.</p>
+    <p><strong>Stationary Cars:</strong> Stopped vehicles on track display their physical distance in feet (capped at 999ft) in bold yellow text.</p>
+    <p><strong>Proximity Bar:</strong> Features a dynamic 5-segment warning system that fills as cars get closer, scaling from an informational 8.0-second gap down to a critical 0.6-second gap. Automatically filters disconnected drivers.</p>
 
-    <h3>Lap Times</h3>
-    <p><strong>Last Lap:</strong> Most recent lap (M:SS.mmm). <strong>Best Lap:</strong> Fastest valid lap this session (M:SS.mmm). Both reset on new session.</p>
-
-    <h3>Relative Positioning Table</h3>
-    <p>Shows 7 rows: 3 ahead, your car (yellow), 3 behind. Sorted by proximity, not position. <strong>Visual Indicators:</strong> Yellow = you, White = same lap, Blue = lapped by you, Red = lapping you, Italic = on pit road. <strong>Proximity Bar:</strong> Cyan gradient (ahead/close), Orange gradient (behind/close), Gray (nearby). Automatically filters disconnected drivers.</p>
-
-    <h3>Warnings Row</h3>
-    <p><strong>Incident Counter:</strong> Session incidents (0x, 4x, etc.) with color progression. <strong>Pace Warning (📉):</strong> Appears when lap times and top speed drop significantly. <strong>Persistent Dot (•):</strong> Remains until lap within 1% of best pace. <strong>PIT Warning:</strong> Flashing yellow when time lost/lap exceeds pit stop cost.</p>
+    <h3>Row 5: Warnings Row</h3>
+    <p><strong>Incident Counter:</strong> Session incidents (0x, 4x, etc.). The color tracks how close you are to the session's incident limit rather than a fixed count, so it means the same thing whether your limit is 4x or 25x: <strong>white</strong> below ~30% of the limit, <strong>yellow</strong> from there to ~60%, and <strong>red</strong> beyond ~60% (roughly one bad incident from a DQ). Unlimited sessions use a gentle informational scale.</p>
+    <p><strong>Pace Warning (📉):</strong> Lights when your lap pace drops and <em>stays</em> down compared to your own established clean pace &mdash; flagging real lost time from damage, tire wear, or changing track conditions, rather than a single off lap. It needs the loss to hold for a couple of laps; after contact it reacts a lap sooner (see below). It clears once your pace returns to normal.</p>
+    <p><strong>Persistent Dot (•):</strong> Confirms <em>contact damage</em> &mdash; it appears when a hard hit (a 4x incident) is accompanied by lost pace. Unlike the pace warning, it stays lit until you pit, because damage doesn't heal by driving. A spin or off-track that doesn't involve contact won't trigger it.</p>
+    <p><strong>PIT Warning:</strong> Flashes when the time you'd lose limping to the finish outweighs the cost of pitting to fix the car. It waits for the pace loss to be confirmed (and not recovering) before recommending a stop, so it won't cry wolf over a momentary slow lap.</p>
+    <p><strong>After contact:</strong> A hard hit primes the system &mdash; if the first full lap afterward is slow, the pace warning and dot appear immediately, and a second slow lap throws PIT. If that first lap is fine, the car is treated as undamaged and nothing fires.</p>
 
     <h2>Radar Window</h2>
-    <p>Top-down proximity view with 5 vertical zones (far left, near left, center, near right, far right). Your car: green rectangle in center. Other cars: colored by class. Detection range: ~5 car lengths ahead/behind.</p>
+    <p>Top-down proximity view with 5 vertical zones (far left, near left, center, near right, far right). Your car: green rectangle in center. Other cars: colored by class. Detection range: ~5 car lengths ahead/behind. Can be toggled on/off in the Configuration window.</p>
 
     <h3>Zone Highlighting</h3>
     <p>Zones highlight based on iRacing spotter: left zone = car left, right zone = car right, both = cars both sides, two zones = multiple cars. Matches native spotter calls.</p>
@@ -272,9 +259,8 @@
     <ul style="margin-bottom: 0;">
         <li><strong>First Launch:</strong> Drag windows using handles while Configuration Window is open</li>
         <li><strong>Testing:</strong> Changes apply in real-time, no restart needed</li>
-        <li><strong>Positions:</strong> Saved automatically on "Done"</li>
+        <li><strong>Window Positions:</strong> Saved automatically on "Done"</li>
         <li><strong>Fuel:</strong> Most accurate after 3+ consistent laps</li>
-        <li><strong>Pace Warnings:</strong> Useful for catching damage early in endurance races</li>
     </ul>
 
     <div class="contact-box">

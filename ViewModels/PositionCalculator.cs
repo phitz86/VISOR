@@ -43,6 +43,14 @@ namespace VISOR.ViewModels
         private readonly Dictionary<int, int> _lastLapCompleted = new();
         #endregion
 
+        #region Private Fields - Green Flag Tracking
+        // Per-car latch: a car enters here once it has taken the green flag. Until then its live
+        // LapDistPct is ambiguous on the starting grid (cars staged ahead of S/F read ~0.99 while
+        // cars behind it read ~0.01, all on lap 0), so the running-order sort uses grid order for
+        // any car not yet in this set. Latched for the session; cleared on reset/session change.
+        private readonly HashSet<int> _carsHavingTakenGreen = new();
+        #endregion
+
         #region Private Fields - Prediction System
         // Tier 1: gate keeper — once a car has valid data it stays eligible for display.
         private readonly HashSet<int> _carsWithValidDataHistory = new();
@@ -178,6 +186,7 @@ namespace VISOR.ViewModels
             _leaderHasFinished = false;
             _lastSessionNum = -1;
             _lastLapCompleted.Clear();
+            _carsHavingTakenGreen.Clear();
 
             Log.Info("PositionCalculator reset - all state cleared");
         }
@@ -195,6 +204,7 @@ namespace VISOR.ViewModels
 
             if (!sessionDataProvider.ShouldUseFastestLapPositioning())
             {
+                UpdateGreenFlagStatus(snapshot, sessionDataProvider);
                 CalculateRacePositions(snapshot, sessionDataProvider);
             }
             else
@@ -220,6 +230,7 @@ namespace VISOR.ViewModels
                 _isCheckeredFlag = false;
                 _leaderHasFinished = false;
                 _lastLapCompleted.Clear();
+                _carsHavingTakenGreen.Clear();
             }
 
             _lastSessionNum = currentSessionNum;
@@ -309,6 +320,69 @@ namespace VISOR.ViewModels
                     _lastLapCompleted[carIdx] = currentLapCompleted;
                 }
             }
+        }
+        #endregion
+
+        #region Private Methods - Green Flag Tracking
+        /// <summary>
+        /// Latch each car the first time it takes the green flag. iRacing reports CarIdxLapCompleted
+        /// as -1 while a car is on the grid / completing parade laps and 0 once it crosses S/F under
+        /// green, so a completed-lap count of 0+ (with a valid track position) is the per-car green
+        /// signal. The latch is per-car because a large multiclass field can take the green many
+        /// seconds apart - leaders are racing while the tail is still on the parade lap.
+        /// </summary>
+        private void UpdateGreenFlagStatus(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        {
+            var lapCompleted = snapshot.CarIdxLapCompleted;
+            var lapDistPct = snapshot.CarIdxLapDistPct;
+            var carNumbers = sessionDataProvider.CarNumbers;
+
+            if (lapCompleted == null || lapDistPct == null || carNumbers == null)
+                return;
+
+            for (int carIdx = 0; carIdx < lapCompleted.Length; carIdx++)
+            {
+                if (_carsHavingTakenGreen.Contains(carIdx))
+                    continue;
+
+                if (carIdx >= carNumbers.Length || string.IsNullOrEmpty(carNumbers[carIdx]))
+                    continue;
+
+                bool validDist = carIdx < lapDistPct.Length &&
+                                 lapDistPct[carIdx] >= 0f &&
+                                 lapDistPct[carIdx] <= 1f;
+
+                if (lapCompleted[carIdx] >= 0 && validDist)
+                {
+                    _carsHavingTakenGreen.Add(carIdx);
+                    Log.Debug($"Car #{carNumbers[carIdx]} (idx {carIdx}) took the green flag - switching to live position calc");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Sort key for a car that has not yet taken the green flag. Returns a negative value derived
+        /// from grid order so the whole pre-green block sorts behind any car already racing (whose key
+        /// is currentLap + LapDistPct, i.e. >= ~1), while preserving grid order within the block.
+        /// Grid order is taken from live CarIdxClassPosition (already per-class), falling back to
+        /// qualifying position, then to a deterministic last-place ordering if neither is available.
+        /// </summary>
+        private static float GetPreGreenSortKey(int carIdx, int[]? classPositions, int[]? qualPositions)
+        {
+            int grid = (classPositions != null && carIdx < classPositions.Length) ? classPositions[carIdx] : 0;
+
+            if (grid <= 0 && qualPositions != null && carIdx < qualPositions.Length)
+                grid = qualPositions[carIdx];
+
+            if (grid <= 0)
+            {
+                // No grid info at all - keep deterministic and dump to the back of the pre-green block.
+                return -1000f - carIdx;
+            }
+
+            // Lower grid position should sort ahead; negate so P1 (-1) outranks P2 (-2) under
+            // OrderByDescending, and the whole block stays below any green car's positive key.
+            return -grid;
         }
         #endregion
 
@@ -504,6 +578,10 @@ namespace VISOR.ViewModels
             if (carClassIDs == null || currentLap == null || lapDistPct == null)
                 return;
 
+            // Grid-order sources for cars that have not yet taken the green flag.
+            var classPositions = snapshot.CarIdxClassPosition;
+            var qualPositions = sessionDataProvider.GetQualifyResultsPositions();
+
             var carsWithPositions = new List<CarPositionData>();
 
             foreach (int carIdx in _validCarIndices)
@@ -534,13 +612,22 @@ namespace VISOR.ViewModels
                 if (effectiveLapDistPct < 0f)
                     continue;
 
+                float trackPosition = effectiveCurrentLap + effectiveLapDistPct;
+
+                // Until a car takes the green flag, its on-grid LapDistPct is ambiguous across the
+                // S/F line, so order it by grid position instead of live track position.
+                float sortKey = _carsHavingTakenGreen.Contains(carIdx)
+                    ? trackPosition
+                    : GetPreGreenSortKey(carIdx, classPositions, qualPositions);
+
                 carsWithPositions.Add(new CarPositionData
                 {
                     CarIdx = carIdx,
                     ClassId = carClassIDs[carIdx],
                     CurrentLap = effectiveCurrentLap,
                     LapDistPct = effectiveLapDistPct,
-                    TrackPosition = effectiveCurrentLap + effectiveLapDistPct
+                    TrackPosition = trackPosition,
+                    SortKey = sortKey
                 });
             }
 
@@ -558,7 +645,7 @@ namespace VISOR.ViewModels
 
                 // Assign live cars to the next available slot, skipping frozen positions.
                 // This prevents a lapped car frozen at P5 from pushing P3/P4 down.
-                var sortedCars = classGroup.OrderByDescending(c => c.TrackPosition).ToList();
+                var sortedCars = classGroup.OrderByDescending(c => c.SortKey).ToList();
                 int nextPosition = 1;
 
                 for (int i = 0; i < sortedCars.Count; i++)
@@ -582,6 +669,7 @@ namespace VISOR.ViewModels
             public int CurrentLap { get; set; }
             public float LapDistPct { get; set; }
             public float TrackPosition { get; set; }
+            public float SortKey { get; set; }
         }
         #endregion
     }
