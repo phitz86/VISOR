@@ -36,6 +36,8 @@ namespace VISOR.Views
 
             _configModeManager.EnterConfigMode();
 
+            CenterOnPrimaryScreen();
+
             var radarWindow = GetCurrentRadarWindow();
             if (radarWindow != null)
             {
@@ -52,6 +54,21 @@ namespace VISOR.Views
         private RadarWindow? GetCurrentRadarWindow()
         {
             return ((App)Application.Current).CurrentRadarWindow;
+        }
+
+        /// <summary>
+        /// Anchors the Config window to the center of the primary screen ("Screen 1")
+        /// on startup. WPF's CenterScreen centers on whichever monitor holds the mouse
+        /// cursor, which is unpredictable on multi-monitor sim rigs; this is
+        /// deterministic. The primary screen's work area always sits at the origin of
+        /// the virtual desktop, so this keeps the window on Screen 1 and clear of the
+        /// taskbar.
+        /// </summary>
+        private void CenterOnPrimaryScreen()
+        {
+            var workArea = SystemParameters.WorkArea;
+            Left = workArea.Left + (workArea.Width - Width) / 2;
+            Top = workArea.Top + (workArea.Height - Height) / 2;
         }
 
         private void LoadCurrentSettings()

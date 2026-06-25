@@ -4,7 +4,7 @@
         Title="VISOR Configuration" Height="760" Width="540"
         MinHeight="480" MinWidth="460"
         Background="#F3F3F3"
-        WindowStartupLocation="CenterScreen"
+        WindowStartupLocation="Manual"
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display">
 
