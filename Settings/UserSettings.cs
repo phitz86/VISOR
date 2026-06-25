@@ -164,6 +164,18 @@ namespace VISOR.Settings
             set => this["ShowRadar"] = value;
         }
 
+        /// <summary>
+        /// Hide cars that are on pit road from the Row 4 relative display.
+        /// Affects only the relative display; the player's own row is always shown.
+        /// </summary>
+        [UserScopedSetting]
+        [DefaultSettingValue("false")]
+        public bool HideCarsInPits
+        {
+            get => (bool)this["HideCarsInPits"];
+            set => this["HideCarsInPits"] = value;
+        }
+
         #endregion
 
         #region Debug Settings
