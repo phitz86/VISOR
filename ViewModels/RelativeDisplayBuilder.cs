@@ -30,6 +30,10 @@ namespace VISOR.ViewModels
         private const float METERS_TO_FEET = 3.28084f;
         private const int MAX_DISTANCE_FEET = 999;
 
+        // Upper sanity bound for the time-gap readout. The history buffer is the real limiter
+        // (it can only return a gap as deep as the history it stores); beyond this is noise.
+        private const float MAX_TIME_GAP_SECONDS = 600f;
+
         private const int DEBUG_LOG_INTERVAL = 60; // ~1s at 60Hz
 
         private static readonly Color NeutralColor = (Color)ColorConverter.ConvertFromString("#80404040");
@@ -396,8 +400,9 @@ namespace VISOR.ViewModels
             row.UpdateSmoothedGap(nativeTimeGap);
             float displayGap = row.SmoothedGap;
 
-            // Buffer depth is 30s, so anything above that is out of range.
-            if (displayGap > 0 && displayGap < 30f)
+            // Show the gap whenever it's in a sane range. The history buffer naturally limits how
+            // far back a crossing can be found, so this just guards against garbage values.
+            if (displayGap > 0 && displayGap < MAX_TIME_GAP_SECONDS)
             {
                 string sign = isAhead ? "+" : "-";
                 row.GapText = $"{sign}{displayGap:F1}";
