@@ -35,9 +35,18 @@
 
             <GroupBox Header="Display Elements" Margin="0,0,0,15">
                 <StackPanel Margin="10">
-                    <CheckBox x:Name="Row0CheckBox" Content="Row 0: Gear Indicator + Class Position" 
+                    <CheckBox x:Name="Row0CheckBox" Content="Row 0: Gear Indicator + Position"
                               IsChecked="True" Margin="0,0,0,8" Checked="RowCheckBox_Changed" Unchecked="RowCheckBox_Changed"/>
-                    <CheckBox x:Name="Row1CheckBox" Content="Row 1: Time Remaining + Fuel Remaining" 
+                    <StackPanel Orientation="Horizontal" Margin="20,0,0,8">
+                        <TextBlock Text="Position Display:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <RadioButton x:Name="PositionClassRadio" Content="Class" GroupName="PositionDisplay"
+                                     VerticalAlignment="Center" Margin="0,0,12,0"
+                                     Checked="PositionDisplayRadio_Changed"/>
+                        <RadioButton x:Name="PositionOverallRadio" Content="Overall" GroupName="PositionDisplay"
+                                     VerticalAlignment="Center"
+                                     Checked="PositionDisplayRadio_Changed"/>
+                    </StackPanel>
+                    <CheckBox x:Name="Row1CheckBox" Content="Row 1: Time Remaining + Fuel Remaining"
                               IsChecked="True" Margin="0,0,0,8" Checked="RowCheckBox_Changed" Unchecked="RowCheckBox_Changed"/>
                     <CheckBox x:Name="Row2CheckBox" Content="Row 2: Lap Delta Bar" 
                               IsChecked="True" Margin="0,0,0,8" Checked="RowCheckBox_Changed" Unchecked="RowCheckBox_Changed"/>

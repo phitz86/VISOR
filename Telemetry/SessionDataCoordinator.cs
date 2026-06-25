@@ -268,9 +268,9 @@ namespace VISOR.Telemetry
             return IsLoneQualifying(currentSession);
         }
 
-        public List<(int carIdx, float fastestTime, int position)> GetFastestLapPositioning()
+        public List<(int carIdx, float fastestTime, int classPosition, int overallPosition)> GetFastestLapPositioning()
         {
-            var result = new List<(int carIdx, float fastestTime, int position)>();
+            var result = new List<(int carIdx, float fastestTime, int classPosition, int overallPosition)>();
             int currentSession = CurrentSessionNum;
 
             if (IsPracticeSession(currentSession) || IsQualifyingSession(currentSession))
@@ -287,7 +287,9 @@ namespace VISOR.Telemetry
                 {
                     if (pos.FastestTime > 0)
                     {
-                        result.Add((pos.CarIdx, pos.FastestTime, pos.ClassPosition + 1));
+                        // ClassPosition is 0-based in the results YAML (needs +1); Position is
+                        // already 1-based, so it is used as-is.
+                        result.Add((pos.CarIdx, pos.FastestTime, pos.ClassPosition + 1, pos.Position));
                     }
                 }
             }

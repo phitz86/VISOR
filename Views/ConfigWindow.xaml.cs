@@ -75,6 +75,11 @@ namespace VISOR.Views
             RadarCheckBox.IsChecked = settings.ShowRadar;
             DebugModeCheckBox.IsChecked = settings.DebugModeEnabled;
 
+            if (settings.PositionDisplayMode == PositionDisplayMode.Overall)
+                PositionOverallRadio.IsChecked = true;
+            else
+                PositionClassRadio.IsChecked = true;
+
             Log.Debug("Loaded current settings into UI");
         }
 
@@ -181,6 +186,19 @@ namespace VISOR.Views
 
             _settingsManager.UpdateElementVisibility(
                 showRow0, showRow1, showRow2, showRow3, showRow4, showRow5, showRadar);
+        }
+
+        private void PositionDisplayRadio_Changed(object? sender, RoutedEventArgs e)
+        {
+            if (!_isInitialized || _settingsManager == null)
+                return;
+
+            var newMode = PositionOverallRadio.IsChecked == true
+                ? PositionDisplayMode.Overall
+                : PositionDisplayMode.Class;
+
+            Log.Info($"Position display mode changed to {newMode}");
+            _settingsManager.UpdatePositionDisplayMode(newMode);
         }
 
         private void RadarCheckBox_Changed(object? sender, RoutedEventArgs e)

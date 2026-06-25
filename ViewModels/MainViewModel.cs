@@ -162,13 +162,15 @@ namespace VISOR.ViewModels
         private void UpdatePlayerPosition(SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider)
         {
             string newPosition;
+            bool useOverall = _settingsManager.Settings.PositionDisplayMode == PositionDisplayMode.Overall;
 
             if (dataProvider.ShouldUseFastestLapPositioning())
             {
                 var playerCarIdx = snapshot.PlayerCarIdx;
                 var fastestLapData = dataProvider.GetFastestLapPositioning();
                 var playerData = fastestLapData.FirstOrDefault(d => d.carIdx == playerCarIdx);
-                newPosition = playerData.position > 0 ? playerData.position.ToString() : "--";
+                int position = useOverall ? playerData.overallPosition : playerData.classPosition;
+                newPosition = position > 0 ? position.ToString() : "--";
             }
             else
             {
@@ -178,7 +180,9 @@ namespace VISOR.ViewModels
                 if (playerCarIdx >= 0 && playerCarIdx < carClassIDs.Length)
                 {
                     int playerClassId = carClassIDs[playerCarIdx];
-                    int position = _positionCalculator.GetClassPosition(playerCarIdx, playerClassId);
+                    int position = useOverall
+                        ? _positionCalculator.GetOverallPosition(playerCarIdx)
+                        : _positionCalculator.GetClassPosition(playerCarIdx, playerClassId);
                     newPosition = position > 0 ? position.ToString() : "--";
                 }
                 else
