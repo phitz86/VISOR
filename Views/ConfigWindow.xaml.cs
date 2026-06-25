@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using VISOR.Diagnostics;
 using VISOR.Telemetry;
 using VISOR.Settings;
+using VISOR.Update;
 
 namespace VISOR.Views
 {
@@ -47,6 +48,13 @@ namespace VISOR.Views
             LoadCurrentSettings();
             UpdateDebugModeDisplay();
             _isInitialized = true;
+
+            // Surface an update if one was already found, and listen for one that
+            // arrives while this window is open. Storing the result statically means
+            // a Config window reopened after the check still shows the notification.
+            if (UpdateChecker.AvailableUpdate != null)
+                ShowUpdateAvailable(UpdateChecker.AvailableUpdate);
+            UpdateChecker.UpdateAvailable += OnUpdateAvailable;
 
             Log.Info("ConfigWindow opened - config mode enabled");
         }
@@ -273,9 +281,33 @@ namespace VISOR.Views
             ExitRequested?.Invoke(this, EventArgs.Empty);
         }
 
+        private void OnUpdateAvailable(Version latestVersion)
+        {
+            // The check may complete on a background continuation; marshal to the UI.
+            Dispatcher.Invoke(() => ShowUpdateAvailable(latestVersion));
+        }
+
+        /// <summary>
+        /// Reveals the green "Version x.y.z available" pill next to the version label.
+        /// </summary>
+        private void ShowUpdateAvailable(Version latestVersion)
+        {
+            UpdateButton.Content = $"Version {latestVersion.Major}.{latestVersion.Minor}.{latestVersion.Build} available";
+            UpdateButton.Visibility = Visibility.Visible;
+        }
+
+        private void UpdateButton_Click(object? sender, RoutedEventArgs e)
+        {
+            Log.Info("Update notification clicked - opening releases page");
+            UpdateChecker.OpenReleasesPage();
+        }
+
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
             Log.Info("ConfigWindow closing - saving window positions and exiting config mode");
+
+            // Static event would otherwise keep this closed window alive.
+            UpdateChecker.UpdateAvailable -= OnUpdateAvailable;
 
             SaveWindowPositions();
             _configModeManager.ExitConfigMode();

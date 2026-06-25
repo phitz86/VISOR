@@ -5,20 +5,33 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using System.Windows;
 using VISOR.Diagnostics;
 
 namespace VISOR.Update
 {
     /// <summary>
-    /// Checks GitHub Releases for a newer VISOR version and notifies the user.
-    /// Runs fire-and-forget on startup and fails silently on any network/parse
-    /// error so it never blocks or crashes the app.
+    /// Checks GitHub Releases for a newer VISOR version. Runs fire-and-forget on
+    /// startup and fails silently on any network/parse error so it never blocks or
+    /// crashes the app. When a newer version is found it is recorded in
+    /// <see cref="AvailableUpdate"/> and announced via <see cref="UpdateAvailable"/>
+    /// so the Config window can surface a non-intrusive notification.
     /// </summary>
     public static class UpdateChecker
     {
         private const string LatestReleaseApiUrl = "https://api.github.com/repos/phitz86/VISOR/releases/latest";
-        private const string ReleasesPageUrl = "https://github.com/phitz86/VISOR/releases/latest";
+        public const string ReleasesPageUrl = "https://github.com/phitz86/VISOR/releases/latest";
+
+        /// <summary>
+        /// The newer version found by the last check, or null if none/unknown.
+        /// Stored so a Config window opened after the check still sees it.
+        /// </summary>
+        public static Version? AvailableUpdate { get; private set; }
+
+        /// <summary>
+        /// Raised when a newer version becomes available. Lets a Config window that
+        /// is already open update itself when the check completes.
+        /// </summary>
+        public static event Action<Version>? UpdateAvailable;
 
         public static async Task CheckForUpdatesAsync()
         {
@@ -38,7 +51,8 @@ namespace VISOR.Update
                 if (latest > current)
                 {
                     Log.Info($"Update available: {latest} (current {current})");
-                    Application.Current?.Dispatcher.Invoke(() => PromptUpdate(current, latest));
+                    AvailableUpdate = latest;
+                    UpdateAvailable?.Invoke(latest);
                 }
                 else
                 {
@@ -49,6 +63,21 @@ namespace VISOR.Update
             {
                 // Update checks are best-effort; a failure should never surface to the user.
                 Log.Warning($"Update check failed: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Opens the GitHub releases page in the user's default browser.
+        /// </summary>
+        public static void OpenReleasesPage()
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(ReleasesPageUrl) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Failed to open releases page", ex);
             }
         }
 
@@ -95,29 +124,6 @@ namespace VISOR.Update
                 v.Minor < 0 ? 0 : v.Minor,
                 v.Build < 0 ? 0 : v.Build,
                 v.Revision < 0 ? 0 : v.Revision);
-        }
-
-        private static void PromptUpdate(Version current, Version latest)
-        {
-            var result = MessageBox.Show(
-                $"A new version of VISOR is available.\n\n" +
-                $"Installed: {current}\nLatest: {latest}\n\n" +
-                $"Open the download page?",
-                "VISOR Update Available",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Information);
-
-            if (result != MessageBoxResult.Yes)
-                return;
-
-            try
-            {
-                Process.Start(new ProcessStartInfo(ReleasesPageUrl) { UseShellExecute = true });
-            }
-            catch (Exception ex)
-            {
-                Log.Error("Failed to open releases page", ex);
-            }
         }
     }
 }
