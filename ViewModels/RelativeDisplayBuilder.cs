@@ -144,6 +144,14 @@ namespace VISOR.ViewModels
                     bool isPaceCar = (carClassIDs[i] == 11);
                     bool isOnPitRoad = (onPitRoad != null && i < onPitRoad.Length) && onPitRoad[i];
 
+                    // Optionally hide pit-road cars from the relative display only. Read live so the
+                    // config toggle takes effect immediately. The player's own row is never hidden,
+                    // so you still see yourself while serving your own stop.
+                    if (isOnPitRoad && i != playerCarIdx && Settings.UserSettings.Instance.HideCarsInPits)
+                    {
+                        continue;
+                    }
+
                     if (isPaceCar)
                     {
                         var paceBuffer = _historyManager.GetBuffer(i);
