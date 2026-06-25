@@ -178,6 +178,22 @@ namespace VISOR.Settings
 
         #endregion
 
+        #region Position Display Settings
+
+        /// <summary>
+        /// Whether position displays (Row 0 player position and the relative table)
+        /// show class position or overall (field-wide) position.
+        /// </summary>
+        [UserScopedSetting]
+        [DefaultSettingValue("Class")]
+        public PositionDisplayMode PositionDisplayMode
+        {
+            get => (PositionDisplayMode)this["PositionDisplayMode"];
+            set => this["PositionDisplayMode"] = value;
+        }
+
+        #endregion
+
         #region Debug Settings
 
         /// <summary>
@@ -287,5 +303,16 @@ namespace VISOR.Settings
         Small,
         Medium,
         Large
+    }
+
+    /// <summary>
+    /// How race positions are displayed throughout the overlay.
+    /// Class = position within the car's own class (default).
+    /// Overall = position across the entire field, regardless of class.
+    /// </summary>
+    public enum PositionDisplayMode
+    {
+        Class,
+        Overall
     }
 }

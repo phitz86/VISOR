@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Media;
 using VISOR.Diagnostics;
+using VISOR.Settings;
 using VISOR.Telemetry;
 
 namespace VISOR.ViewModels
@@ -251,15 +252,20 @@ namespace VISOR.ViewModels
             bool isFastestLapMode,
             ISessionDataProvider dataProvider)
         {
+            bool useOverall = SettingsManager.Instance.Settings.PositionDisplayMode == PositionDisplayMode.Overall;
+
             if (isFastestLapMode)
             {
                 var fastestLapData = dataProvider.GetFastestLapPositioning();
                 var carData = fastestLapData.FirstOrDefault(d => d.carIdx == row.CarIdx);
-                row.ClassPos = (carData.fastestTime > 0) ? $"{carData.position}" : "--";
+                int position = useOverall ? carData.overallPosition : carData.classPosition;
+                row.ClassPos = (carData.fastestTime > 0) ? $"{position}" : "--";
             }
             else
             {
-                int position = _positionCalculator.GetClassPosition(row.CarIdx, row.ClassID);
+                int position = useOverall
+                    ? _positionCalculator.GetOverallPosition(row.CarIdx)
+                    : _positionCalculator.GetClassPosition(row.CarIdx, row.ClassID);
                 row.ClassPos = (position > 0) ? $"{position}" : "--";
             }
         }

@@ -36,6 +36,7 @@ namespace VISOR.Settings
         public event EventHandler<WindowSizeChangedEventArgs>? WindowSizeChanged;
         public event EventHandler<ElementVisibilityChangedEventArgs>? ElementVisibilityChanged;
         public event EventHandler<RadarVisibilityChangedEventArgs>? RadarVisibilityChanged;
+        public event EventHandler<PositionDisplayModeChangedEventArgs>? PositionDisplayModeChanged;
 
         private SettingsManager()
         {
@@ -227,6 +228,19 @@ namespace VISOR.Settings
             SettingsChanged?.Invoke(this, new SettingsChangedEventArgs { ChangeType = SettingsChangeType.ElementVisibility });
         }
 
+        public void UpdatePositionDisplayMode(PositionDisplayMode newMode)
+        {
+            var oldMode = _settings.PositionDisplayMode;
+            _settings.PositionDisplayMode = newMode;
+            _settings.SaveSettings();
+
+            if (oldMode != newMode)
+            {
+                PositionDisplayModeChanged?.Invoke(this, new PositionDisplayModeChangedEventArgs { NewMode = newMode });
+                SettingsChanged?.Invoke(this, new SettingsChangedEventArgs { ChangeType = SettingsChangeType.PositionDisplayMode });
+            }
+        }
+
         public void UpdateWindowSize(WindowSizePreset newSize)
         {
             var oldSize = _settings.WindowSize;
@@ -284,11 +298,17 @@ namespace VISOR.Settings
         public bool IsVisible { get; set; }
     }
 
+    public class PositionDisplayModeChangedEventArgs : EventArgs
+    {
+        public PositionDisplayMode NewMode { get; set; }
+    }
+
     public enum SettingsChangeType
     {
         ElementVisibility,
         WindowSize,
-        WindowPosition
+        WindowPosition,
+        PositionDisplayMode
     }
 
     #endregion

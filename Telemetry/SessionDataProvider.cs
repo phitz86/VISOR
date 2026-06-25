@@ -28,7 +28,7 @@ namespace VISOR.Telemetry
         // Session-aware helper methods for positioning logic
         bool ShouldUseFastestLapPositioning();
         bool ShouldHideRelativeDisplay();
-        List<(int carIdx, float fastestTime, int position)> GetFastestLapPositioning();
+        List<(int carIdx, float fastestTime, int classPosition, int overallPosition)> GetFastestLapPositioning();
 
         // Qualifying results for reference lap time cascade
         float[] GetQualifyResultsFastestTimes();
