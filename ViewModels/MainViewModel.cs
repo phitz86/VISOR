@@ -29,8 +29,6 @@ namespace VISOR.ViewModels
 
         private int _lastSessionNum = -1;
         private int _lastSessionState = -999;
-        private float _currentLapTopSpeed = 0f;
-        private float _lastLapTopSpeed = 0f;
 
         public string ClassPositionNumber { get; private set; } = "--";
         public string GearDisplay { get; private set; } = "N";
@@ -119,23 +117,23 @@ namespace VISOR.ViewModels
                 OnPropertyChanged(nameof(ClassPositionNumber));
             }
 
-            float currentSpeed = snapshot.Speed;
-            if (currentSpeed > _currentLapTopSpeed)
-            {
-                _currentLapTopSpeed = currentSpeed;
-            }
-
             float lastLap = snapshot.LapLastLapTime;
             if (lastLap > 0)
             {
                 LastLapTime = FormatLapTime(lastLap);
                 OnPropertyChanged(nameof(LastLapTime));
+            }
 
-                _lastLapTopSpeed = _currentLapTopSpeed;
-                _currentLapTopSpeed = 0f;
-
-                int playerIdx = snapshot.PlayerCarIdx;
-                bool onPitRoad = playerIdx >= 0 && snapshot.CarIdxOnPitRoad[playerIdx];
+            // Vehicle-health warnings are fed every frame. WarningsViewModel gates its lap-level math
+            // (baseline, PIT economics) to once per completed lap internally, and runs the responsive
+            // sub-lap segment and contact logic on the per-frame stream.
+            int playerIdx = snapshot.PlayerCarIdx;
+            if (playerIdx >= 0)
+            {
+                var lapDistArr = snapshot.CarIdxLapDistPct;
+                var pitRoadArr = snapshot.CarIdxOnPitRoad;
+                float lapDistPct = playerIdx < lapDistArr.Length ? lapDistArr[playerIdx] : 0f;
+                bool onPitRoad = playerIdx < pitRoadArr.Length && pitRoadArr[playerIdx];
                 int lapsRemaining = snapshot.SessionLapsRemain;
 
                 // Green racing only: SessionState 4 is Racing; the caution bits mark a full-course
@@ -143,8 +141,8 @@ namespace VISOR.ViewModels
                 const int CAUTION_FLAGS = 0x4000 | 0x8000; // irsdk caution | cautionWaving
                 bool isRacingGreen = snapshot.SessionState == 4 && (snapshot.SessionFlags & CAUTION_FLAGS) == 0;
 
-                WarningsVM.CheckPace(lastLap, _lastLapTopSpeed, lapsRemaining,
-                    snapshot.SessionTimeRemain, onPitRoad, isRacingGreen);
+                WarningsVM.Update(snapshot.Lap, lapDistPct, snapshot.LapCurrentLapTime, lastLap,
+                    snapshot.Speed, lapsRemaining, snapshot.SessionTimeRemain, onPitRoad, isRacingGreen);
             }
 
             float bestLap = snapshot.LapBestLapTime;
