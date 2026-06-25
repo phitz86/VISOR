@@ -4,7 +4,7 @@
         Title="VISOR Configuration" Height="760" Width="540"
         MinHeight="480" MinWidth="460"
         Background="#F3F3F3"
-        WindowStartupLocation="CenterScreen"
+        WindowStartupLocation="Manual"
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display">
 
@@ -280,6 +280,36 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Green "update available" pill shown in the footer next to the version. -->
+        <Style x:Key="UpdateButton" TargetType="Button">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="#FF107C10"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="13"
+                                Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#FF0E700E"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#FF0C600C"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <!-- Header (fixed) | Scrollable content | Footer (fixed) -->
@@ -401,8 +431,13 @@
         <!-- ============ Footer (fixed) ============ -->
         <Border Grid.Row="2" Background="#FFFAFAFA" BorderBrush="{StaticResource CardBorder}" BorderThickness="0,1,0,0">
             <Grid Margin="24,14">
-                <TextBlock x:Name="VersionText" VerticalAlignment="Center" HorizontalAlignment="Left"
-                           FontSize="11" Foreground="{StaticResource TextSecondary}" Text="Version 1.0.0"/>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left">
+                    <TextBlock x:Name="VersionText" VerticalAlignment="Center"
+                               FontSize="11" Foreground="{StaticResource TextSecondary}" Text="Version 1.0.0"/>
+                    <Button x:Name="UpdateButton" Style="{StaticResource UpdateButton}"
+                            Visibility="Collapsed" Margin="12,0,0,0"
+                            Click="UpdateButton_Click"/>
+                </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Content="Done" Click="DoneButton_Click" IsDefault="True"
                             Style="{StaticResource PrimaryButton}" Margin="0,0,10,0"/>

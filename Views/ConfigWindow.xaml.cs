@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using VISOR.Diagnostics;
 using VISOR.Telemetry;
 using VISOR.Settings;
+using VISOR.Update;
 
 namespace VISOR.Views
 {
@@ -36,6 +37,8 @@ namespace VISOR.Views
 
             _configModeManager.EnterConfigMode();
 
+            CenterOnPrimaryScreen();
+
             var radarWindow = GetCurrentRadarWindow();
             if (radarWindow != null)
             {
@@ -46,12 +49,34 @@ namespace VISOR.Views
             UpdateDebugModeDisplay();
             _isInitialized = true;
 
+            // Surface an update if one was already found, and listen for one that
+            // arrives while this window is open. Storing the result statically means
+            // a Config window reopened after the check still shows the notification.
+            if (UpdateChecker.AvailableUpdate != null)
+                ShowUpdateAvailable(UpdateChecker.AvailableUpdate);
+            UpdateChecker.UpdateAvailable += OnUpdateAvailable;
+
             Log.Info("ConfigWindow opened - config mode enabled");
         }
 
         private RadarWindow? GetCurrentRadarWindow()
         {
             return ((App)Application.Current).CurrentRadarWindow;
+        }
+
+        /// <summary>
+        /// Anchors the Config window to the center of the primary screen ("Screen 1")
+        /// on startup. WPF's CenterScreen centers on whichever monitor holds the mouse
+        /// cursor, which is unpredictable on multi-monitor sim rigs; this is
+        /// deterministic. The primary screen's work area always sits at the origin of
+        /// the virtual desktop, so this keeps the window on Screen 1 and clear of the
+        /// taskbar.
+        /// </summary>
+        private void CenterOnPrimaryScreen()
+        {
+            var workArea = SystemParameters.WorkArea;
+            Left = workArea.Left + (workArea.Width - Width) / 2;
+            Top = workArea.Top + (workArea.Height - Height) / 2;
         }
 
         private void LoadCurrentSettings()
@@ -256,9 +281,33 @@ namespace VISOR.Views
             ExitRequested?.Invoke(this, EventArgs.Empty);
         }
 
+        private void OnUpdateAvailable(Version latestVersion)
+        {
+            // The check may complete on a background continuation; marshal to the UI.
+            Dispatcher.Invoke(() => ShowUpdateAvailable(latestVersion));
+        }
+
+        /// <summary>
+        /// Reveals the green "Version x.y.z available" pill next to the version label.
+        /// </summary>
+        private void ShowUpdateAvailable(Version latestVersion)
+        {
+            UpdateButton.Content = $"Version {latestVersion.Major}.{latestVersion.Minor}.{latestVersion.Build} available";
+            UpdateButton.Visibility = Visibility.Visible;
+        }
+
+        private void UpdateButton_Click(object? sender, RoutedEventArgs e)
+        {
+            Log.Info("Update notification clicked - opening releases page");
+            UpdateChecker.OpenReleasesPage();
+        }
+
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
             Log.Info("ConfigWindow closing - saving window positions and exiting config mode");
+
+            // Static event would otherwise keep this closed window alive.
+            UpdateChecker.UpdateAvailable -= OnUpdateAvailable;
 
             SaveWindowPositions();
             _configModeManager.ExitConfigMode();
