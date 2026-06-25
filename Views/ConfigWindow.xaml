@@ -302,6 +302,25 @@
                       Padding="24,4,24,4" CanContentScroll="False">
             <StackPanel>
 
+                <!-- Important notice -->
+                <Border Background="#FFFFF8E6" BorderBrush="#FFF2D98A" BorderThickness="1"
+                        CornerRadius="8" Padding="16,12" Margin="0,0,0,14">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="&#x26A0;" FontSize="18" Foreground="#FFB8860B"
+                                   VerticalAlignment="Top" Margin="0,1,12,0"/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Important" FontFamily="Segoe UI Semibold" FontSize="13"
+                                       Foreground="#FF7A5C00" Margin="0,0,0,2"/>
+                            <TextBlock Text="VISOR will only display over iRacing if the simulator is running in borderless windowed mode."
+                                       FontSize="12" Foreground="#FF7A5C00" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
                 <!-- Window Size -->
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
@@ -371,21 +390,6 @@
                                 Margin="0,0,0,10" Click="OpenLogsFolderButton_Click"/>
                         <TextBlock x:Name="CurrentLogFileText" FontSize="11"
                                    Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- Important notice -->
-                <Border Background="#FFFFF8E6" BorderBrush="#FFF2D98A" BorderThickness="1"
-                        CornerRadius="8" Padding="16,12" Margin="0,0,0,14">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#x26A0;" FontSize="18" Foreground="#FFB8860B"
-                                   VerticalAlignment="Top" Margin="0,1,12,0"/>
-                        <StackPanel>
-                            <TextBlock Text="Important" FontFamily="Segoe UI Semibold" FontSize="13"
-                                       Foreground="#FF7A5C00" Margin="0,0,0,2"/>
-                            <TextBlock Text="VISOR will only display over iRacing if the simulator is running in borderless windowed mode."
-                                       FontSize="12" Foreground="#FF7A5C00" TextWrapping="Wrap"/>
-                        </StackPanel>
                     </StackPanel>
                 </Border>
 
