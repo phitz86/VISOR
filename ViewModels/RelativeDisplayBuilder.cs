@@ -30,8 +30,8 @@ namespace VISOR.ViewModels
         private const float METERS_TO_FEET = 3.28084f;
         private const int MAX_DISTANCE_FEET = 999;
 
-        // Upper bound for the time-gap readout. The ring buffer tops out at 30s of history;
-        // the EstTime fallback extends well past that, but anything beyond this is noise.
+        // Upper sanity bound for the time-gap readout. The history buffer is the real limiter
+        // (it can only return a gap as deep as the history it stores); beyond this is noise.
         private const float MAX_TIME_GAP_SECONDS = 600f;
 
         private const int DEBUG_LOG_INTERVAL = 60; // ~1s at 60Hz
@@ -375,26 +375,11 @@ namespace VISOR.ViewModels
             }
             else
             {
-                // Buffer miss: the cars are farther apart than the 30s ring buffer can reach.
-                // This is the normal case on long tracks (Le Mans, Nordschleife) where a gap can
-                // run to minutes. Fall back to iRacing's CarIdxEstTime curve, which maps track
-                // position to time along a reference lap and is valid across a full lap.
-                float? estGap = TryEstTimeGap(snapshot, row.CarIdx, playerRow.CarIdx, row.LapDistPct, playerRow.LapDistPct);
-                if (estGap.HasValue)
-                {
-                    nativeTimeGap = Math.Abs(estGap.Value);
+                // Buffer miss — hold previous display state instead of blanking the row.
 #if DEBUG
-                    gapSource = "esttime";
+                LogDiagnosticRow(snapshot, slotIndex, row, playerRow, distDelta, isGeometricallyAhead, "none", 0f, row.GapText);
 #endif
-                }
-                else
-                {
-                    // No EstTime reference yet (early session) — hold previous display state.
-#if DEBUG
-                    LogDiagnosticRow(snapshot, slotIndex, row, playerRow, distDelta, isGeometricallyAhead, "none", 0f, row.GapText);
-#endif
-                    return;
-                }
+                return;
             }
 
             // Drop smoothing if the car disappeared from telemetry for 1-2 seconds.
@@ -407,8 +392,8 @@ namespace VISOR.ViewModels
             row.UpdateSmoothedGap(nativeTimeGap);
             float displayGap = row.SmoothedGap;
 
-            // Show the gap whenever it's in a sane range. The ring buffer caps at 30s; the
-            // EstTime fallback carries it the rest of the way up to MAX_TIME_GAP_SECONDS.
+            // Show the gap whenever it's in a sane range. The history buffer naturally limits how
+            // far back a crossing can be found, so this just guards against garbage values.
             if (displayGap > 0 && displayGap < MAX_TIME_GAP_SECONDS)
             {
                 string sign = isAhead ? "+" : "-";
@@ -481,68 +466,6 @@ namespace VISOR.ViewModels
                 gapSource, displayGap, gapText);
         }
 #endif
-
-        /// <summary>
-        /// Computes the signed relative time gap (+ ahead / - behind) from iRacing's CarIdxEstTime,
-        /// the estimated time each car needs to reach its current track position along a reference
-        /// lap. Used as a fallback when the cars are too far apart for the 30s history buffer.
-        /// Returns null when no reference lap time is established yet, or the gap can't be resolved.
-        /// </summary>
-        private static float? TryEstTimeGap(SVappsLABSnapshot snapshot, int oppIdx, int playerIdx,
-            float oppPct, float playerPct)
-        {
-            var estTimes = snapshot.CarIdxEstTime;
-            if (estTimes == null || oppIdx < 0 || playerIdx < 0 ||
-                oppIdx >= estTimes.Length || playerIdx >= estTimes.Length)
-                return null;
-
-            float oppEst = estTimes[oppIdx];
-            float playerEst = estTimes[playerIdx];
-
-            // EstTime is 0 until the sim has a reference lap for a car; without it the gap is bogus.
-            if (oppEst <= 0f || playerEst <= 0f)
-                return null;
-
-            float gap = oppEst - playerEst;
-
-            // EstTime resets to 0 at the start/finish line, so the raw difference always measures
-            // the *direct* (non-wrapped) track path between the cars. When that direct path is the
-            // long way around — raw track-position difference exceeds half a lap — the shorter arc
-            // crosses S/F, and the raw gap reads ~one lap too large. Subtract a reference lap to
-            // recover the true short-arc gap. (Detected geometrically, not by EstTime sign, so it
-            // stays correct across car classes whose EstTime scales differ.)
-            if (Math.Abs(oppPct - playerPct) > 0.5f)
-            {
-                float lapTime = GetReferenceLapTime(snapshot, playerIdx);
-                if (lapTime <= 0f)
-                    return null;
-                gap += (gap > 0f) ? -lapTime : lapTime;
-            }
-
-            return gap;
-        }
-
-        /// <summary>
-        /// Best available reference lap time (seconds) for resolving the EstTime S/F wrap.
-        /// Prefers the player's own best, then last lap, then the session-scalar equivalents.
-        /// </summary>
-        private static float GetReferenceLapTime(SVappsLABSnapshot snapshot, int playerIdx)
-        {
-            var best = snapshot.CarIdxBestLapTime;
-            if (best != null && playerIdx < best.Length && best[playerIdx] > 0f)
-                return best[playerIdx];
-
-            var last = snapshot.CarIdxLastLapTime;
-            if (last != null && playerIdx < last.Length && last[playerIdx] > 0f)
-                return last[playerIdx];
-
-            if (snapshot.LapBestLapTime > 0f)
-                return snapshot.LapBestLapTime;
-            if (snapshot.LapLastLapTime > 0f)
-                return snapshot.LapLastLapTime;
-
-            return 0f;
-        }
 
         private Color BlendColors(Color color1, Color color2, double ratio)
         {
