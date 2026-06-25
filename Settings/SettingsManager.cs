@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Windows;
+using VISOR.Diagnostics;
 using VISOR.Telemetry;
 
 namespace VISOR.Settings
@@ -142,7 +143,8 @@ namespace VISOR.Settings
         {
             if (_settings.MainWindowX >= 0 && _settings.MainWindowY >= 0)
             {
-                return new Point(_settings.MainWindowX, _settings.MainWindowY);
+                var saved = new Point(_settings.MainWindowX, _settings.MainWindowY);
+                return ClampToVisibleArea(saved, GetMainWindowSize());
             }
 
             double centerX = SystemParameters.PrimaryScreenWidth / 2;
@@ -161,7 +163,8 @@ namespace VISOR.Settings
         {
             if (_settings.RadarWindowX >= 0 && _settings.RadarWindowY >= 0)
             {
-                return new Point(_settings.RadarWindowX, _settings.RadarWindowY);
+                var saved = new Point(_settings.RadarWindowX, _settings.RadarWindowY);
+                return ClampToVisibleArea(saved, GetRadarWindowSize());
             }
 
             double centerX = SystemParameters.PrimaryScreenWidth / 2;
@@ -179,6 +182,48 @@ namespace VISOR.Settings
                 top = 20;
 
             return new Point(left, top);
+        }
+
+        /// <summary>
+        /// Ensures a saved window position still lands on the current virtual desktop.
+        /// If a monitor was removed or the resolution changed, a previously-saved
+        /// position can be entirely off-screen, leaving the overlay invisible and
+        /// unreachable. This pulls the window back so a usable portion stays visible.
+        /// </summary>
+        private static Point ClampToVisibleArea(Point position, Size windowSize)
+        {
+            // VirtualScreen* spans the bounding box of all connected monitors.
+            double virtualLeft = SystemParameters.VirtualScreenLeft;
+            double virtualTop = SystemParameters.VirtualScreenTop;
+            double virtualRight = virtualLeft + SystemParameters.VirtualScreenWidth;
+            double virtualBottom = virtualTop + SystemParameters.VirtualScreenHeight;
+
+            // Keep at least this many pixels of the window on-screen so the user can
+            // always grab and reposition it.
+            const double minVisible = 80.0;
+
+            double x = position.X;
+            double y = position.Y;
+
+            // Off the right/bottom: pull back so the whole window fits when possible.
+            if (x > virtualRight - minVisible)
+                x = virtualRight - windowSize.Width;
+            if (y > virtualBottom - minVisible)
+                y = virtualBottom - windowSize.Height;
+
+            // Off the left/top: snap to the edge of the virtual desktop.
+            if (x + windowSize.Width < virtualLeft + minVisible)
+                x = virtualLeft;
+            if (y + windowSize.Height < virtualTop + minVisible)
+                y = virtualTop;
+
+            if (x != position.X || y != position.Y)
+            {
+                Log.Info($"Saved window position ({position.X},{position.Y}) was off-screen; " +
+                         $"clamped to ({x},{y})");
+            }
+
+            return new Point(x, y);
         }
 
         public void SaveWindowPositions(Point mainWindowPos, Point radarWindowPos)

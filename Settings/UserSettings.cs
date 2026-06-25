@@ -1,5 +1,7 @@
-﻿using System.ComponentModel;
+﻿using System;
+using System.ComponentModel;
 using System.Configuration;
+using System.IO;
 using VISOR.Diagnostics;
 
 namespace VISOR.Settings
@@ -21,8 +23,73 @@ namespace VISOR.Settings
             get
             {
                 if (_instance == null)
-                    _instance = new UserSettings();
+                    _instance = CreateWithRecovery();
                 return _instance;
+            }
+        }
+
+        /// <summary>
+        /// Creates the settings instance, recovering automatically if the underlying
+        /// user.config file is corrupt. A corrupt config otherwise throws
+        /// ConfigurationErrorsException on first property access, which would crash
+        /// VISOR at startup on every launch until the file is manually deleted.
+        /// </summary>
+        private static UserSettings CreateWithRecovery()
+        {
+            var settings = new UserSettings();
+            try
+            {
+                // Force the user.config to load by touching a persisted value.
+                _ = settings.WindowSize;
+                return settings;
+            }
+            catch (ConfigurationErrorsException ex)
+            {
+                Log.Error("User settings file is corrupt; backing up and resetting to defaults", ex);
+                BackupCorruptConfig(ex);
+
+                // Re-create against the now-removed file so defaults load cleanly.
+                settings = new UserSettings();
+                try
+                {
+                    settings.Reset();
+                    settings.Save();
+                }
+                catch (Exception inner)
+                {
+                    Log.Error("Failed to reset settings after corruption recovery", inner);
+                }
+                return settings;
+            }
+        }
+
+        /// <summary>
+        /// Moves a corrupt user.config aside (renamed with a timestamp) so the next
+        /// load starts fresh while preserving the bad file for diagnostics.
+        /// </summary>
+        private static void BackupCorruptConfig(ConfigurationErrorsException ex)
+        {
+            // The offending path is sometimes on the inner exception rather than the outer.
+            string? path = ex.Filename;
+            if (string.IsNullOrEmpty(path) && ex.InnerException is ConfigurationErrorsException inner)
+                path = inner.Filename;
+
+            if (string.IsNullOrEmpty(path) || !File.Exists(path))
+            {
+                Log.Warning("Could not determine corrupt settings file path; skipping backup");
+                return;
+            }
+
+            try
+            {
+                string backupPath = $"{path}.corrupt-{DateTime.Now:yyyyMMdd_HHmmss}.bak";
+                File.Copy(path, backupPath, overwrite: true);
+                File.Delete(path);
+                Log.Info($"Backed up corrupt settings to {backupPath}");
+            }
+            catch (Exception bex)
+            {
+                Log.Error("Failed to back up corrupt settings file", bex);
             }
         }
 
@@ -190,6 +257,22 @@ namespace VISOR.Settings
         {
             get => (PositionDisplayMode)this["PositionDisplayMode"];
             set => this["PositionDisplayMode"] = value;
+        }
+
+        #endregion
+
+        #region Update Settings
+
+        /// <summary>
+        /// Whether VISOR checks GitHub for a newer release on startup and notifies
+        /// the user when one is available.
+        /// </summary>
+        [UserScopedSetting]
+        [DefaultSettingValue("true")]
+        public bool CheckForUpdatesOnStartup
+        {
+            get => (bool)this["CheckForUpdatesOnStartup"];
+            set => this["CheckForUpdatesOnStartup"] = value;
         }
 
         #endregion

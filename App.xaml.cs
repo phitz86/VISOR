@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Threading;
 using VISOR.Diagnostics;
 using VISOR.Telemetry;
+using VISOR.Update;
 using VISOR.Views;
 using VISOR.Settings;
 
@@ -48,6 +51,10 @@ namespace VISOR
                 Log.DebugModeEnabled = settings.DebugModeEnabled;
                 Log.StartNewSession();
 
+                // Register global handlers now that logging is live, so any runtime
+                // exception is captured rather than crashing silently.
+                RegisterGlobalExceptionHandlers();
+
                 var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "Unknown";
                 Log.Info($"VISOR started - Version: {version}");
 
@@ -79,6 +86,12 @@ namespace VISOR
                 }
 
                 LaunchAllWindows();
+
+                if (settings.CheckForUpdatesOnStartup)
+                {
+                    // Fire-and-forget: never block startup on the network.
+                    _ = UpdateChecker.CheckForUpdatesAsync();
+                }
             }
             catch (Exception ex)
             {
@@ -86,6 +99,55 @@ namespace VISOR
                 MessageBox.Show($"Application startup error: {ex.Message}\n\nFull details:\n{ex}", "Startup Error");
                 Shutdown();
             }
+        }
+
+        /// <summary>
+        /// Wires up the three sources of unhandled exceptions so they are logged
+        /// (and, where recoverable, suppressed) instead of crashing VISOR with a
+        /// generic Windows error and no diagnostic trail.
+        /// </summary>
+        private void RegisterGlobalExceptionHandlers()
+        {
+            // Exceptions on the WPF UI thread (event handlers, data binding, etc.).
+            DispatcherUnhandledException += OnDispatcherUnhandledException;
+
+            // Exceptions on any thread that go unhandled; these are typically fatal.
+            AppDomain.CurrentDomain.UnhandledException += OnAppDomainUnhandledException;
+
+            // Exceptions in faulted Tasks whose result was never observed.
+            TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+        }
+
+        private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+        {
+            Log.Error("Unhandled UI-thread exception", e.Exception);
+
+            // Keep the overlay alive: a single faulting handler shouldn't kill a
+            // session mid-race. The error is logged for diagnosis.
+            e.Handled = true;
+
+            MessageBox.Show(
+                $"VISOR encountered an unexpected error and tried to recover.\n\n" +
+                $"{e.Exception.Message}\n\nDetails were written to the log file:\n{Log.GetCurrentLogPath()}",
+                "VISOR Error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+
+        private void OnAppDomainUnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+            // These generally terminate the process, so log synchronously and flush.
+            var ex = e.ExceptionObject as Exception;
+            Log.Error($"Unhandled exception (terminating={e.IsTerminating})", ex);
+            Log.Shutdown();
+        }
+
+        private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+        {
+            Log.Error("Unobserved task exception", e.Exception);
+
+            // Prevent the unobserved exception from escalating to a process crash.
+            e.SetObserved();
         }
 
         /// <summary>
