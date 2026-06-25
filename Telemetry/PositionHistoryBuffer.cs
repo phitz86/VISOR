@@ -9,9 +9,9 @@ namespace VISOR.Telemetry
     ///
     /// Buffer is designed for 10Hz sampling. Its depth sets the maximum gap that can be resolved:
     /// the relative display shows the nearest cars ahead/behind, which may be up to half a lap away,
-    /// and half a lap on the longest tracks (Le Mans, Nordschleife) runs to several minutes. Sized
-    /// for 8 minutes of history so those gaps measure correctly instead of saturating at the depth.
-    /// Memory per buffer: 4800 × 16 bytes ≈ 75 KB (≈ 4.8 MB across all 64 cars).
+    /// and half a lap on the longest tracks (Le Mans, Nordschleife) runs to a few minutes. Sized for
+    /// 4 minutes of history so those gaps measure correctly instead of saturating at the depth.
+    /// Memory per buffer: 2400 × 16 bytes ≈ 38 KB (≈ 2.4 MB across all 64 cars).
     /// </summary>
     public class PositionHistoryBuffer
     {
@@ -25,8 +25,8 @@ namespace VISOR.Telemetry
         }
 
         private const int SampleRateHz = 10;
-        private const int HistorySeconds = 480; // 8 min — covers a half-lap even on the longest tracks
-        private const int BufferSize = SampleRateHz * HistorySeconds; // 4800 entries
+        private const int HistorySeconds = 240; // 4 min — covers a half-lap on long tracks (Le Mans, Nordschleife)
+        private const int BufferSize = SampleRateHz * HistorySeconds; // 2400 entries
         private const float TeleportThreshold = 0.25f;
         private const float SFWrapHighThreshold = 0.9f;
         private const float SFWrapLowThreshold = 0.1f;
