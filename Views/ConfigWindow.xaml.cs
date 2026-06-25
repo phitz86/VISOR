@@ -71,6 +71,7 @@ namespace VISOR.Views
             Row2CheckBox.IsChecked = settings.ShowRow2;
             Row3CheckBox.IsChecked = settings.ShowRow3;
             Row4CheckBox.IsChecked = settings.ShowRow4;
+            HidePitsCheckBox.IsChecked = settings.HideCarsInPits;
             Row5CheckBox.IsChecked = settings.ShowRow5;
             RadarCheckBox.IsChecked = settings.ShowRadar;
             DebugModeCheckBox.IsChecked = settings.DebugModeEnabled;
@@ -199,6 +200,18 @@ namespace VISOR.Views
 
             Log.Info($"Position display mode changed to {newMode}");
             _settingsManager.UpdatePositionDisplayMode(newMode);
+        }
+
+        private void HidePitsCheckBox_Changed(object? sender, RoutedEventArgs e)
+        {
+            if (!_isInitialized || _settingsManager == null)
+                return;
+
+            var settings = _settingsManager.Settings;
+            settings.HideCarsInPits = HidePitsCheckBox.IsChecked ?? false;
+            settings.SaveSettings();
+
+            Log.Info($"Hide cars in pits changed to {settings.HideCarsInPits}");
         }
 
         private void RadarCheckBox_Changed(object? sender, RoutedEventArgs e)

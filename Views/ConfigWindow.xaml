@@ -52,9 +52,13 @@
                               IsChecked="True" Margin="0,0,0,8" Checked="RowCheckBox_Changed" Unchecked="RowCheckBox_Changed"/>
                     <CheckBox x:Name="Row3CheckBox" Content="Row 3: Last Lap Time + Best Lap Time" 
                               IsChecked="True" Margin="0,0,0,8" Checked="RowCheckBox_Changed" Unchecked="RowCheckBox_Changed"/>
-                    <CheckBox x:Name="Row4CheckBox" Content="Row 4: Relative Positioning Table" 
+                    <CheckBox x:Name="Row4CheckBox" Content="Row 4: Relative Positioning Table"
                               IsChecked="True" Margin="0,0,0,8" Checked="RowCheckBox_Changed" Unchecked="RowCheckBox_Changed"/>
-                    <CheckBox x:Name="Row5CheckBox" Content="Row 5: Warnings (Incidents, Pace, Pit Cue)" 
+                    <CheckBox x:Name="HidePitsCheckBox" Content="Hide cars in the pits"
+                              IsChecked="False" Margin="20,0,0,8"
+                              IsEnabled="{Binding IsChecked, ElementName=Row4CheckBox}"
+                              Checked="HidePitsCheckBox_Changed" Unchecked="HidePitsCheckBox_Changed"/>
+                    <CheckBox x:Name="Row5CheckBox" Content="Row 5: Warnings (Incidents, Pace, Pit Cue)"
                               IsChecked="True" Margin="0,0,0,8" Checked="RowCheckBox_Changed" Unchecked="RowCheckBox_Changed"/>
                 </StackPanel>
             </GroupBox>
