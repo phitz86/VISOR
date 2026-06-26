@@ -138,7 +138,7 @@ namespace VISOR.Views
                     _ => WindowSizePreset.Large
                 };
 
-                Log.Info($"Window size changed to {newSize}");
+                Log.Debug($"Window size changed to {newSize}");
                 _settingsManager.UpdateWindowSize(newSize);
             }
         }

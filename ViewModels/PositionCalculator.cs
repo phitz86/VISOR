@@ -512,7 +512,7 @@ namespace VISOR.ViewModels
             if (!_carsWithValidDataHistory.Contains(carIdx))
             {
                 _carsWithValidDataHistory.Add(carIdx);
-                Log.Info($"Car #{carNumbers[carIdx]} first valid data - added to history");
+                Log.Debug($"Car #{carNumbers[carIdx]} first valid data - added to history");
             }
 
             _carsWithInvalidLapDistPctLogged.Remove(carIdx);
@@ -569,7 +569,7 @@ namespace VISOR.ViewModels
             if (framesSinceValid == MAX_CACHE_AGE_FRAMES &&
                 _carsWithValidDataHistory.Contains(carIdx))
             {
-                Log.Info($"Car #{carNumbers[carIdx]} cache expired after {MAX_CACHE_AGE_FRAMES} frames (3 seconds)");
+                Log.Debug($"Car #{carNumbers[carIdx]} cache expired after {MAX_CACHE_AGE_FRAMES} frames (3 seconds)");
             }
         }
 

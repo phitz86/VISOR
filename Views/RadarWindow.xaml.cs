@@ -195,7 +195,7 @@ namespace VISOR.Views
         {
             Dispatcher.Invoke(() =>
             {
-                Log.Info($"[RadarWindow] Window size preset changed to {e.NewSize} - resizing");
+                Log.Debug($"[RadarWindow] Window size preset changed to {e.NewSize} - resizing");
                 ApplyWindowSizing();
             });
         }
@@ -204,7 +204,7 @@ namespace VISOR.Views
         {
             Dispatcher.Invoke(() =>
             {
-                Log.Info($"[RadarWindow] Config mode changed to: {e.IsInConfigMode}");
+                Log.Debug($"[RadarWindow] Config mode changed to: {e.IsInConfigMode}");
 
                 DragHandle.Visibility = e.IsInConfigMode ? Visibility.Visible : Visibility.Collapsed;
             });
