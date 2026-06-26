@@ -29,6 +29,7 @@ namespace VISOR.ViewModels
 
         private int _lastSessionNum = -1;
         private int _lastSessionState = -999;
+        private bool? _playerWasOnPitRoad = null;
 
         public string ClassPositionNumber { get; private set; } = "--";
         public string GearDisplay { get; private set; } = "N";
@@ -136,6 +137,8 @@ namespace VISOR.ViewModels
                 bool onPitRoad = playerIdx < pitRoadArr.Length && pitRoadArr[playerIdx];
                 int lapsRemaining = snapshot.SessionLapsRemain;
 
+                CheckPlayerPitRoadTransition(onPitRoad, snapshot.Lap);
+
                 // Green racing only: SessionState 4 is Racing; the caution bits mark a full-course
                 // yellow, during which lap times are pace-distorted and not a health signal.
                 const int CAUTION_FLAGS = 0x4000 | 0x8000; // irsdk caution | cautionWaving
@@ -191,10 +194,26 @@ namespace VISOR.ViewModels
 
             if (ClassPositionNumber != newPosition)
             {
-                Log.Debug($"Player position changed: '{ClassPositionNumber}' -> '{newPosition}'");
+                Log.Info($"Player position changed: '{ClassPositionNumber}' -> '{newPosition}'");
                 ClassPositionNumber = newPosition;
                 OnPropertyChanged(nameof(ClassPositionNumber));
             }
+        }
+
+        // Logs the player crossing onto or off pit road. The first observation only seeds the
+        // state (no log) so we don't emit a spurious "entered" when a session begins with the
+        // player already in the pits.
+        private void CheckPlayerPitRoadTransition(bool onPitRoad, int lap)
+        {
+            if (_playerWasOnPitRoad == onPitRoad) return;
+
+            if (_playerWasOnPitRoad != null)
+            {
+                Log.Info(onPitRoad
+                    ? $"Player entered pit road (lap {lap})"
+                    : $"Player exited pit road (lap {lap})");
+            }
+            _playerWasOnPitRoad = onPitRoad;
         }
 
         #endregion
@@ -247,6 +266,7 @@ namespace VISOR.ViewModels
             CountdownVM.Reset();
             GearDisplay = "N";
             ClassPositionNumber = "--";
+            _playerWasOnPitRoad = null;
 
             _classColorManager.Reset();
             _positionCalculator.Reset();
@@ -278,6 +298,7 @@ namespace VISOR.ViewModels
             WarningsVM.Reset();
             CountdownVM.Reset();
             RelativeVM.Reset();
+            _playerWasOnPitRoad = null;
             _classColorManager.Reset();
             _positionCalculator.Reset();
             OnPropertyChanged(string.Empty);

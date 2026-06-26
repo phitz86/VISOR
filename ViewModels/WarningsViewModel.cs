@@ -138,7 +138,7 @@ namespace VISOR.ViewModels
                 IncidentDisplay = $"{newCount}x";
                 var severity = GetIncidentSeverity(newCount, incidentLimit);
                 IncidentColor = SeverityToBrush(severity);
-                Log.Debug($"[Warnings] Incident count: {newCount}x / {(incidentLimit > 0 ? incidentLimit.ToString() : "unlimited")} ({severity})");
+                Log.Info($"[Warnings] Incident count: {newCount}x / {(incidentLimit > 0 ? incidentLimit.ToString() : "unlimited")} ({severity})");
             }
         }
 
@@ -285,7 +285,7 @@ namespace VISOR.ViewModels
             IsPaceWarningVisible = true;
             _underStreak = 0;
             _paceLossLapCount = 0; // counted at lap closes from here
-            Log.Debug($"[Warnings] Pace loss raised (baseline {_baseline:F2}s)");
+            Log.Info($"[Warnings] Pace loss raised (baseline {_baseline:F2}s)");
         }
 
         private void ClearGraph()
@@ -297,7 +297,7 @@ namespace VISOR.ViewModels
             _paceLossLapCount = 0;
             _paceLossOnsetDeficit = 0f;
             // The dot stays: physical damage doesn't heal without a pit.
-            Log.Debug("[Warnings] Pace recovered to baseline");
+            Log.Info("[Warnings] Pace recovered to baseline");
         }
 
         private void LatchDamage(string reason)
@@ -306,7 +306,7 @@ namespace VISOR.ViewModels
             _damageLatched = true;
             IsPersistentDotVisible = true;
             _contactArmed = false; // corroborated — close the window
-            Log.Debug($"[Warnings] Damage confirmed ({reason})");
+            Log.Info($"[Warnings] Damage confirmed ({reason})");
         }
 
         /// <summary>Per-lap clock: runs exactly once per newly completed lap.</summary>
@@ -506,7 +506,7 @@ namespace VISOR.ViewModels
         {
             if (on == IsPitNowVisible) return;
             IsPitNowVisible = on;
-            Log.Debug(on ? "[Warnings] PIT recommended" : "[Warnings] PIT cleared");
+            Log.Info(on ? "[Warnings] PIT recommended" : "[Warnings] PIT cleared");
         }
 
         private enum IncidentSeverity { Clear, Caution, Danger }
