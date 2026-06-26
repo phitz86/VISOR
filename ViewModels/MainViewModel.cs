@@ -31,10 +31,12 @@ namespace VISOR.ViewModels
         private int _lastSessionState = -999;
         private bool? _playerWasOnPitRoad = null;
 
+        private const string LapTimePlaceholder = "-:--.---";
+
         public string ClassPositionNumber { get; private set; } = "--";
         public string GearDisplay { get; private set; } = "N";
-        public string LastLapTime { get; private set; } = "-:--.---";
-        public string BestLapTime { get; private set; } = "-:--.---";
+        public string LastLapTime { get; private set; } = LapTimePlaceholder;
+        public string BestLapTime { get; private set; } = LapTimePlaceholder;
 
         public bool ShowGear => _settingsManager.Settings.ShowRow0;
         public bool ShowPosition => _settingsManager.Settings.ShowRow0;
@@ -119,11 +121,6 @@ namespace VISOR.ViewModels
             }
 
             float lastLap = snapshot.LapLastLapTime;
-            if (lastLap > 0)
-            {
-                LastLapTime = FormatLapTime(lastLap);
-                OnPropertyChanged(nameof(LastLapTime));
-            }
 
             // Vehicle-health warnings are fed every frame. WarningsViewModel gates its lap-level math
             // (baseline, PIT economics) to once per completed lap internally, and runs the responsive
@@ -148,12 +145,12 @@ namespace VISOR.ViewModels
                     snapshot.Speed, lapsRemaining, snapshot.SessionTimeRemain, onPitRoad, isRacingGreen);
             }
 
-            float bestLap = snapshot.LapBestLapTime;
-            if (bestLap > 0)
-            {
-                BestLapTime = FormatLapTime(bestLap);
-                OnPropertyChanged(nameof(BestLapTime));
-            }
+            // Lap-time fields mirror telemetry directly (like the rest of the live UI) instead of
+            // latching the last non-zero value. iRacing zeroes LapLastLapTime/LapBestLapTime at every
+            // session boundary, so following them clears the display on any new session — including
+            // transitions (e.g. open practice -> session practice) that don't change SessionNum and so
+            // never hit the ResetSessionData path.
+            UpdateLapTimeDisplays(lastLap, snapshot.LapBestLapTime);
 
             UpdateGearDisplay(snapshot);
         }
@@ -258,8 +255,8 @@ namespace VISOR.ViewModels
 
         private void ClearSessionUI()
         {
-            LastLapTime = "-:--.---";
-            BestLapTime = "-:--.---";
+            LastLapTime = LapTimePlaceholder;
+            BestLapTime = LapTimePlaceholder;
             FuelVM.Reset();
             DeltaBarVM.Reset();
             RelativeVM.Reset();
@@ -291,8 +288,8 @@ namespace VISOR.ViewModels
 
         private void ResetSessionData()
         {
-            LastLapTime = "-:--.---";
-            BestLapTime = "-:--.---";
+            LastLapTime = LapTimePlaceholder;
+            BestLapTime = LapTimePlaceholder;
             DeltaBarVM.Reset();
             FuelVM.Reset();
             WarningsVM.Reset();
@@ -313,6 +310,23 @@ namespace VISOR.ViewModels
         }
 
         public ClassColorManager ClassColorManager => _classColorManager;
+
+        private void UpdateLapTimeDisplays(float lastLap, float bestLap)
+        {
+            string last = lastLap > 0 ? FormatLapTime(lastLap) : LapTimePlaceholder;
+            if (LastLapTime != last)
+            {
+                LastLapTime = last;
+                OnPropertyChanged(nameof(LastLapTime));
+            }
+
+            string best = bestLap > 0 ? FormatLapTime(bestLap) : LapTimePlaceholder;
+            if (BestLapTime != best)
+            {
+                BestLapTime = best;
+                OnPropertyChanged(nameof(BestLapTime));
+            }
+        }
 
         private string FormatLapTime(float timeInSeconds)
         {
