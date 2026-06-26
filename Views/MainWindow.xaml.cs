@@ -90,7 +90,7 @@ namespace VISOR.Views
         {
             Dispatcher.Invoke(() =>
             {
-                Log.Info($"[MainWindow] Config mode changed to: {e.IsInConfigMode}");
+                Log.Debug($"[MainWindow] Config mode changed to: {e.IsInConfigMode}");
                 DragHandle.Visibility = e.IsInConfigMode ? Visibility.Visible : Visibility.Collapsed;
             });
         }

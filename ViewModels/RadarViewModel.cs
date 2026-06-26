@@ -197,7 +197,7 @@ namespace VISOR.ViewModels
 
             if (stateChanged)
             {
-                Log.Info($"[Radar] CarLeftRight state changed to {carLeftRightState}, {visibleCars.Count} visible cars");
+                Log.Debug($"[Radar] CarLeftRight state changed to {carLeftRightState}, {visibleCars.Count} visible cars");
             }
 
             foreach (var car in visibleCars)
