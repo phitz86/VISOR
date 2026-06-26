@@ -29,6 +29,7 @@ namespace VISOR.ViewModels
 
         private int _lastSessionNum = -1;
         private int _lastSessionState = -999;
+        private string _lastSubSessionId = string.Empty;
         private bool? _playerWasOnPitRoad = null;
 
         private const string LapTimePlaceholder = "-:--.---";
@@ -145,11 +146,6 @@ namespace VISOR.ViewModels
                     snapshot.Speed, lapsRemaining, snapshot.SessionTimeRemain, onPitRoad, isRacingGreen);
             }
 
-            // Lap-time fields mirror telemetry directly (like the rest of the live UI) instead of
-            // latching the last non-zero value. iRacing zeroes LapLastLapTime/LapBestLapTime at every
-            // session boundary, so following them clears the display on any new session — including
-            // transitions (e.g. open practice -> session practice) that don't change SessionNum and so
-            // never hit the ResetSessionData path.
             UpdateLapTimeDisplays(lastLap, snapshot.LapBestLapTime);
 
             UpdateGearDisplay(snapshot);
@@ -274,8 +270,28 @@ namespace VISOR.ViewModels
         private void CheckForSessionTransition(SVappsLABSnapshot snapshot, ISessionDataProvider? sessionDataProvider)
         {
             int currentSessionNum = snapshot.SessionNum;
-            if (currentSessionNum != _lastSessionNum && _lastSessionNum != -1)
+
+            // SubSessionID uniquely identifies the iRacing session and changes on any move to a
+            // genuinely new one — including open practice -> a race weekend's practice, which can keep
+            // SessionNum == 0 and so slip past the SessionNum check. Only meaningful once data is ready;
+            // otherwise carry the last value forward so we don't read a transient empty as a change.
+            string currentSubSessionId = (sessionDataProvider != null && sessionDataProvider.IsDataReady)
+                ? sessionDataProvider.SubSessionId
+                : _lastSubSessionId;
+
+            bool sessionNumChanged = currentSessionNum != _lastSessionNum && _lastSessionNum != -1;
+            // First non-empty reading only seeds _lastSubSessionId (empty -> set), never a transition.
+            bool subSessionChanged = !string.IsNullOrEmpty(currentSubSessionId)
+                && !string.IsNullOrEmpty(_lastSubSessionId)
+                && currentSubSessionId != _lastSubSessionId;
+
+            if (sessionNumChanged || subSessionChanged)
             {
+                if (subSessionChanged)
+                {
+                    Log.Info($"New subsession detected ({_lastSubSessionId} -> {currentSubSessionId}); resetting session UI");
+                }
+
                 ResetSessionData();
 
                 if (sessionDataProvider != null && sessionDataProvider.IsDataReady)
@@ -283,7 +299,12 @@ namespace VISOR.ViewModels
                     CountdownVM.OnSessionTransition(sessionDataProvider, currentSessionNum);
                 }
             }
+
             _lastSessionNum = currentSessionNum;
+            if (!string.IsNullOrEmpty(currentSubSessionId))
+            {
+                _lastSubSessionId = currentSubSessionId;
+            }
         }
 
         private void ResetSessionData()
@@ -305,6 +326,7 @@ namespace VISOR.ViewModels
         {
             _lastSessionNum = -1;
             _lastSessionState = -999;
+            _lastSubSessionId = string.Empty;
             ClearSessionUI();
             WarningsVM.Reset();
         }
@@ -313,18 +335,28 @@ namespace VISOR.ViewModels
 
         private void UpdateLapTimeDisplays(float lastLap, float bestLap)
         {
-            string last = lastLap > 0 ? FormatLapTime(lastLap) : LapTimePlaceholder;
-            if (LastLapTime != last)
+            // Latch the last non-zero value rather than mirroring telemetry: iRacing intermittently
+            // drops last/best lap to zero mid-session, and the display shouldn't flicker to the
+            // placeholder. The latch is cleared explicitly on a real session change (ResetSessionData,
+            // driven by SessionNum or SubSessionID in CheckForSessionTransition).
+            if (lastLap > 0)
             {
-                LastLapTime = last;
-                OnPropertyChanged(nameof(LastLapTime));
+                string last = FormatLapTime(lastLap);
+                if (LastLapTime != last)
+                {
+                    LastLapTime = last;
+                    OnPropertyChanged(nameof(LastLapTime));
+                }
             }
 
-            string best = bestLap > 0 ? FormatLapTime(bestLap) : LapTimePlaceholder;
-            if (BestLapTime != best)
+            if (bestLap > 0)
             {
-                BestLapTime = best;
-                OnPropertyChanged(nameof(BestLapTime));
+                string best = FormatLapTime(bestLap);
+                if (BestLapTime != best)
+                {
+                    BestLapTime = best;
+                    OnPropertyChanged(nameof(BestLapTime));
+                }
             }
         }
 

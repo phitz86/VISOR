@@ -19,6 +19,10 @@ namespace VISOR.Telemetry
         int IncidentLimit { get; }
         int CurrentSessionNum { get; }
 
+        // Stable identifier for the current iRacing session (from WeekendInfo.SubSessionID). Changes
+        // whenever the player moves to a genuinely different session, even if SessionNum repeats.
+        string SubSessionId { get; }
+
         // Session definition queries
         int GetSessionLaps(int sessionNum);
         double GetSessionTimeSeconds(int sessionNum);

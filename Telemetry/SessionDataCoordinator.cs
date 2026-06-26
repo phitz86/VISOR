@@ -62,6 +62,11 @@ namespace VISOR.Telemetry
             get { lock (_parseLock) { return _transitionData.CurrentSessionNum; } }
         }
 
+        public string SubSessionId
+        {
+            get { lock (_parseLock) { return _staticData.Weekend.SubSessionId; } }
+        }
+
         public string GetSessionType(int sessionNum)
         {
             lock (_parseLock)
@@ -389,6 +394,8 @@ namespace VISOR.Telemetry
                 _staticData.Weekend.TrackLength = 0f;
                 _staticData.Weekend.TrackDisplayName = string.Empty;
                 _staticData.Weekend.TrackDisplayShortName = string.Empty;
+                _staticData.Weekend.EventType = string.Empty;
+                _staticData.Weekend.SubSessionId = string.Empty;
 
                 _transitionData.DriverIncidentCounts.Clear();
                 _transitionData.CurrentSessionNum = -1;
