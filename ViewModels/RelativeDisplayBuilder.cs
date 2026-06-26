@@ -135,6 +135,11 @@ namespace VISOR.ViewModels
         {
             var allValidCars = new List<RelativeRowViewModel>();
 
+            // When the user is on pit road, show pit-road cars even if "hide cars in pits"
+            // is enabled, so you can see who you're stopped near during your own stop.
+            bool playerOnPitRoad = (onPitRoad != null && playerCarIdx >= 0
+                && playerCarIdx < onPitRoad.Length) && onPitRoad[playerCarIdx];
+
             foreach (int i in validCarIndices)
             {
                 if (i >= 0 && i < carNumbers.Length &&
@@ -151,8 +156,10 @@ namespace VISOR.ViewModels
 
                     // Optionally hide pit-road cars from the relative display only. Read live so the
                     // config toggle takes effect immediately. The player's own row is never hidden,
-                    // so you still see yourself while serving your own stop.
-                    if (isOnPitRoad && i != playerCarIdx && Settings.UserSettings.Instance.HideCarsInPits)
+                    // so you still see yourself while serving your own stop. Pit-road cars also stay
+                    // visible whenever the player is on pit road.
+                    if (isOnPitRoad && i != playerCarIdx && !playerOnPitRoad
+                        && Settings.UserSettings.Instance.HideCarsInPits)
                     {
                         continue;
                     }
