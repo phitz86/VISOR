@@ -50,6 +50,19 @@ ArchitecturesInstallIn64BitMode=x64compatible
 ; Privileges (install to Program Files requires admin)
 PrivilegesRequired=admin
 
+; Detect a running VISOR during install/uninstall so an upgrade can close it
+; before its files are replaced (otherwise the locked VISOR.exe can't be removed).
+; The name must match SingleInstanceMutexName in App.xaml.cs; it's in the Global\
+; namespace so this elevated (admin) installer can see the mutex created by the
+; app running as the normal user.
+AppMutex=Global\VISOR_SingleInstance_Mutex
+
+; Use the Windows Restart Manager to close VISOR automatically if it's running
+; (falls back to the AppMutex "please close it" prompt if it can't). Don't
+; auto-relaunch afterward — the optional post-install "Launch VISOR" task owns that.
+CloseApplications=yes
+RestartApplications=no
+
 ; Visual style
 WizardStyle=modern
 WizardImageFile=VISOR Install Banner logo.bmp
