@@ -118,9 +118,9 @@ namespace VISOR.ViewModels
             // larger than the still-64-sized session caches. Indexing every parallel array by the same
             // i past the shortest one throws IndexOutOfRangeException, so bound the loop by the minimum.
             int carCount = Math.Min(trackSurface.Length, lapDistPct.Length);
-            if (carNumbers != null) carCount = Math.Min(carCount, carNumbers.Length);
-            if (carClassIDs != null) carCount = Math.Min(carCount, carClassIDs.Length);
-            if (onPitRoad != null) carCount = Math.Min(carCount, onPitRoad.Length);
+            carCount = Math.Min(carCount, carNumbers.Length);
+            carCount = Math.Min(carCount, carClassIDs.Length);
+            carCount = Math.Min(carCount, onPitRoad.Length);
 
             if (playerCarIdx < 0 || playerCarIdx >= carCount)
             {
