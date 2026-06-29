@@ -119,7 +119,6 @@ namespace VISOR.ViewModels
 
         // Damage.
         private bool _damageLatched = false;
-        private int _incidentCountWhenHealthy = 0; // incident count as of the last genuinely-healthy lap
 
         // Contact corroboration window (all counters in segments).
         private bool _contactArmed = false;
@@ -416,7 +415,6 @@ namespace VISOR.ViewModels
                     AddBaselineLap(lastLapTime, lapTopSpeed);
                     RecomputeBaseline();
                     RecomputeSegmentCount();
-                    _incidentCountWhenHealthy = _incidentCount;
                 }
             }
         }
@@ -447,7 +445,6 @@ namespace VISOR.ViewModels
             _cleanLapTimes.Add(lapTime);
             if (_cleanLapTimes.Count > CLEAN_LAP_POOL_CAP) _cleanLapTimes.RemoveAt(0);
             if (topSpeed > _topSpeedBaseline) _topSpeedBaseline = topSpeed;
-            _incidentCountWhenHealthy = _incidentCount;
         }
 
         private void RecomputeBaseline()
@@ -491,7 +488,6 @@ namespace VISOR.ViewModels
             _segStartLapTime = 0f;
             _pendingSegments.Clear();
             _stintLap = 0;
-            _incidentCountWhenHealthy = _incidentCount;
             _incidentCountAtLapStart = _incidentCount;
             _incidentCountPrevFrame = _incidentCount;
             Log.Debug("[Warnings] Pit stop — pace warnings reset for new stint");
@@ -567,7 +563,6 @@ namespace VISOR.ViewModels
             _lapTopSpeed = 0f;
 
             _damageLatched = false;
-            _incidentCountWhenHealthy = 0;
 
             _contactArmed = false;
             _contactBlackoutRemaining = 0;
