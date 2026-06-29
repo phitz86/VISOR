@@ -27,6 +27,7 @@ namespace VISOR.ViewModels
         private const int LOG_PREDICTION_THRESHOLD = 30; // Log predictions lasting >30 frames
         private const float MIN_VELOCITY_THRESHOLD = 0.00001f; // Minimum velocity to use prediction
         private const int PACE_CAR_CLASS_ID = 11; // iRacing pace/safety car class - excluded from overall field positions
+        private const int SESSION_STATE_RACING = 4; // irsdk SessionState: green flag is out (ParadeLaps=3 -> Racing=4)
         #endregion
 
         #region Private Fields - Core State
@@ -354,14 +355,26 @@ namespace VISOR.ViewModels
 
         #region Private Methods - Green Flag Tracking
         /// <summary>
-        /// Latch each car the first time it takes the green flag. iRacing reports CarIdxLapCompleted
-        /// as -1 while a car is on the grid / completing parade laps and 0 once it crosses S/F under
-        /// green, so a completed-lap count of 0+ (with a valid track position) is the per-car green
-        /// signal. The latch is per-car because a large multiclass field can take the green many
-        /// seconds apart - leaders are racing while the tail is still on the parade lap.
+        /// Latch each car the first time it takes the green flag. Two conditions must both hold:
+        /// the session itself must be green (SessionState >= Racing), AND the car must have crossed
+        /// S/F (CarIdxLapCompleted >= 0 with a valid track position).
+        ///
+        /// The SessionState gate matters because CarIdxLapCompleted ticks to 0 during the *parade*
+        /// lap too - without the gate, cars latch one-by-one as they cross S/F under formation and
+        /// flip from stable grid order to live (and on-grid-ambiguous) LapDistPct sorting, which
+        /// makes the running order churn before the race has even started.
+        ///
+        /// The per-car half of the latch still earns its keep once green: a large multiclass field
+        /// takes the green many seconds apart, so leaders latch and race while the tail stays on grid
+        /// order until each car actually reaches S/F.
         /// </summary>
         private void UpdateGreenFlagStatus(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
+            // No car can take the green before the green flag is out. Until then everyone stays on
+            // grid order (handled by GetPreGreenSortKey), which is steady through the parade lap.
+            if (snapshot.SessionState < SESSION_STATE_RACING)
+                return;
+
             var lapCompleted = snapshot.CarIdxLapCompleted;
             var lapDistPct = snapshot.CarIdxLapDistPct;
             var carNumbers = sessionDataProvider.CarNumbers;
