@@ -64,6 +64,11 @@ namespace VISOR.ViewModels
         internal bool _hasInitializedGap = false;
         internal int _lastActiveSegmentCount = 0;
 
+        // Hysteretic ahead/behind latch relative to the player: +1 ahead, -1 behind, 0 unknown.
+        // Held inside a small dead-band so a car running dead-even with the player doesn't swap the
+        // row slot (and gap sign) every frame. Resolved once per frame in BuildProximityBasedRows.
+        internal sbyte _proximitySide = 0;
+
         public void UpdateSmoothedGap(float newGap, float smoothingFactor = 0.3f)
         {
             if (!_hasInitializedGap)
@@ -92,6 +97,7 @@ namespace VISOR.ViewModels
             _smoothedGap = 0f;
             _hasInitializedGap = false;
             _lastActiveSegmentCount = 0;
+            _proximitySide = 0; // re-seed direction from raw geometry when a car returns from a gap
         }
 
         private static bool BrushEquals(Brush a, Brush b)
