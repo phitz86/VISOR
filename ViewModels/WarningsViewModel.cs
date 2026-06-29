@@ -21,10 +21,8 @@ namespace VISOR.ViewModels
 
         private const int MIN_BASELINE_LAPS = 3;        // clean laps before any warning can fire
         private const float BASELINE_CLUSTER_PCT = 0.015f; // laps within 1.5% of fastest define "good pace"
-        private const float GRAPH_ON_PCT = 0.020f;      // deficit to raise the pace-loss graph
-        private const float GRAPH_OFF_PCT = 0.012f;     // deficit to clear it (hysteresis)
         private const float OUTLIER_PCT = 0.10f;        // laps >10% over baseline are junk (spin/off)
-        private const float TOPSPEED_DROP_PCT = 0.03f;  // top-speed loss that corroborates damage
+        private const float TOPSPEED_DROP_PCT = 0.03f;  // top-speed loss that corroborates damage (aero)
         private const float ABS_FLOOR_SEC = 0.5f;       // absolute lap deficit floor, keeps short tracks calm
         private const int STINT_WARMUP_SKIP = 1;        // ignore the cold first lap of each stint
         private const int CLEAN_LAP_POOL_CAP = 50;      // bound the baseline sample list
@@ -37,16 +35,31 @@ namespace VISOR.ViewModels
         private const int MIN_SEGMENTS = 2;             // never fewer than this (short ovals)
         private const int MAX_SEGMENTS = 24;            // cap the bookkeeping on very long tracks
         private const int MIN_SEGMENT_SAMPLES = 2;      // clean samples before a segment baseline is usable
-        private const int SEGMENTS_TO_RAISE = 2;        // consecutive over-threshold checkpoints to raise the graph
-        private const int SEGMENTS_TO_CLEAR = 2;        // consecutive recovered checkpoints to clear it (hysteresis)
 
-        // Damage = contact. iRacing scores contact as 4x; off-tracks (1x) and clean spins (2x) aren't
-        // damage. But a 4x is only *contact*, not proof your car is hurt — someone tagging you in a
-        // braking zone scores you 4x too. So a contact does not light anything; it opens a short
-        // corroboration window during which a follow-on pace/top-speed symptom can latch the dot.
-        private const int DAMAGE_INCIDENT_JUMP = 4;
-        private const int CONTACT_WINDOW_CHECKPOINTS = 2; // checkpoints a contact stays "armed" awaiting corroboration
-        private const int CONTACT_DEFICIT_SEGMENTS = 2;   // over-threshold checkpoints that corroborate damage by pace alone
+        // Damage = contact, and *only* contact. iRacing doesn't model gradual health fade (no slow
+        // punctures until a tire is at 0%), so a cold pace deficit is never a health signal on its
+        // own — it's traffic, tires or the driver. Nothing lights without a contact first. A contact
+        // arms a corroboration window; pace/top-speed symptoms inside that window confirm damage.
+        //
+        // Arm on a +2 incident jump as well as +4: a wall/object tag scores 2x and can still do
+        // non-trivial aero damage. Off-tracks (+1) never arm. A +2 also covers clean spins, which
+        // arm harmlessly and stand down when no symptom shows.
+        private const int DAMAGE_INCIDENT_JUMP = 2;
+
+        // The corroboration window is measured in *segments* (not laps) so it spans the start/finish
+        // line cleanly: a spin in the last segment recovers over the same number of segments wherever
+        // the line happens to fall. After arming we blank the contaminated incident segment plus the
+        // settling segments right after it, then watch a fixed span for a real symptom.
+        private const int CONTACT_RECOVERY_SEGMENTS = 2; // segments blanked after the hit (incident + settling)
+        private const int CONTACT_WATCH_SEGMENTS = 4;    // segments watched for a symptom once recovered
+        private const int CONTACT_DEFICIT_SEGMENTS = 2;  // over-threshold segments in the window that confirm by pace
+
+        // Confirmation thresholds, set to clear the traffic band. A GT4 stuck behind a ~1.5s/lap-slower
+        // TCR car bleeds most of it in 2-3 corners — roughly 3-4% on a single segment, ~1.3% over the
+        // whole lap. So the segment bar sits at 5% (and needs two of them) and the lap bar at 3%, both
+        // above what traffic can fake; real contact damage lives above that band.
+        private const float CONTACT_CONFIRM_PCT = 0.05f; // per-segment deficit that corroborates damage
+        private const float LAP_CONFIRM_PCT = 0.03f;     // whole-lap deficit that corroborates damage
 
         // Pace loss must persist this many completed laps before PIT can arm — stops a still-settling
         // deficit from screaming PIT early in a race when laps-remaining is huge.
@@ -73,7 +86,7 @@ namespace VISOR.ViewModels
         #endregion
 
         #region Warning indicators
-        private bool _isPaceWarningVisible = false; // 📉 graph: you're losing time (any cause)
+        private bool _isPaceWarningVisible = false; // 📉 graph: confirmed damage is costing you pace
         private bool _isPersistentDotVisible = false; // • dot: confirmed damage, latched until pit
         private bool _isPitNowVisible = false;      // PIT: the time math says box now
 
@@ -84,9 +97,9 @@ namespace VISOR.ViewModels
         #endregion
 
         #region Pace state
-        // Two clocks share this state. The per-frame clock (segments + contact) drives the responsive
-        // graph and the damage dot; the per-lap clock (gated to one tick per completed lap) owns the
-        // baseline and the PIT economics, which genuinely need full-lap numbers.
+        // Two clocks share this state. The per-frame clock (segments + contact) watches for damage
+        // symptoms inside a contact window; the per-lap clock (gated to one tick per completed lap)
+        // owns the baseline, the top-speed/whole-lap corroboration and the PIT economics.
         private enum HealthState { Warmup, Monitoring }
         private HealthState _state = HealthState.Warmup;
 
@@ -101,11 +114,6 @@ namespace VISOR.ViewModels
         private int _segIndex = -1;          // segment currently being timed this lap (-1 = not started)
         private float _segStartLapTime = 0f; // LapCurrentLapTime when the current segment began
 
-        // Checkpoint streaks drive the graph (a checkpoint is a ready segment, or a whole lap before
-        // any segment baselines exist).
-        private int _overStreak = 0;
-        private int _underStreak = 0;
-
         // Top speed achieved on the lap in progress (max of per-frame speed), for damage corroboration.
         private float _lapTopSpeed = 0f;
 
@@ -113,9 +121,11 @@ namespace VISOR.ViewModels
         private bool _damageLatched = false;
         private int _incidentCountWhenHealthy = 0; // incident count as of the last genuinely-healthy lap
 
-        // Contact corroboration window.
+        // Contact corroboration window (all counters in segments).
         private bool _contactArmed = false;
-        private int _contactWindowRemaining = 0;
+        private int _contactBlackoutRemaining = 0; // segments left to blank after the hit (recovery)
+        private int _contactWatchRemaining = 0;    // segments left to watch for a symptom
+        private int _contactOverSegments = 0;      // over-threshold segments seen in the watch span
 
         // PIT (per-lap).
         private int _paceLossLapCount = 0;       // completed laps spent with the graph up
@@ -174,10 +184,13 @@ namespace VISOR.ViewModels
             _incidentCountPrevFrame = _incidentCount;
             if (incJump >= DAMAGE_INCIDENT_JUMP && isRacingGreen && !isOnPitRoad)
             {
-                // Contact: arm a corroboration window. Nothing lights yet.
+                // Contact: arm (or re-arm) the corroboration window. Nothing lights yet — we blank the
+                // recovery segments first, then watch for a pace/top-speed symptom.
                 _contactArmed = true;
-                _contactWindowRemaining = CONTACT_WINDOW_CHECKPOINTS;
-                Log.Debug($"[Warnings] Contact (+{incJump}x) — watching {CONTACT_WINDOW_CHECKPOINTS} checkpoints for pace/top-speed symptoms");
+                _contactBlackoutRemaining = CONTACT_RECOVERY_SEGMENTS;
+                _contactWatchRemaining = CONTACT_WATCH_SEGMENTS;
+                _contactOverSegments = 0;
+                Log.Debug($"[Warnings] Contact (+{incJump}x) — blanking {CONTACT_RECOVERY_SEGMENTS} segs, then watching {CONTACT_WATCH_SEGMENTS} for damage symptoms");
             }
 
             // --- New completed lap? -----------------------------------------------------------------
@@ -228,51 +241,51 @@ namespace VISOR.ViewModels
             // Bank for possible commit to the baseline at the line (only if the whole lap stays clean).
             _pendingSegments.Add((idx, segTime));
 
+            // Only the contact window cares about live segment times now (pace alone never triggers).
             // Score against this segment's baseline if it has enough clean samples to be trusted.
             var samples = _segmentSamples[idx];
             if (samples.Count >= MIN_SEGMENT_SAMPLES)
             {
-                float segBaseline = samples.Min();
+                float segBaseline = ClusterBaseline(samples);
                 if (segBaseline <= 0f) return;
                 float deficit = segTime - segBaseline;
                 float segFloor = ABS_FLOOR_SEC / _segmentCount; // proportional floor for a fraction of the lap
-                OnCheckpoint(deficit / segBaseline, deficit, segFloor);
+                EvaluateContactSegment(deficit / segBaseline, deficit, segFloor);
             }
         }
 
         /// <summary>
-        /// A pace observation at a checkpoint (a ready segment, or a whole lap during segment warmup).
-        /// Drives the graph streaks, the contact corroboration, and the contact window countdown.
+        /// Per-segment step of the contact corroboration window. Does nothing unless a contact is armed.
+        /// Blanks the recovery segments, then looks for a sustained over-threshold corner deficit.
         /// </summary>
-        private void OnCheckpoint(float deficitPct, float deficit, float floor)
+        private void EvaluateContactSegment(float deficitPct, float deficit, float floor)
         {
-            bool over = deficitPct >= GRAPH_ON_PCT && deficit >= floor;
-            bool under = deficitPct <= GRAPH_OFF_PCT;
+            if (!_contactArmed || _damageLatched) return;
 
-            if (over) { _overStreak++; _underStreak = 0; }
-            else if (under) { _underStreak++; _overStreak = 0; }
-            else { _overStreak = 0; } // in the hysteresis band: stop arming, but don't clear either
-
-            if (!IsPaceWarningVisible)
+            // Recovery blackout: the segment the hit landed in is contaminated by the spin/impact, and
+            // the next one or two are you rebuilding speed. Ignore them — measure the recovered car.
+            if (_contactBlackoutRemaining > 0)
             {
-                // A live contact fast-tracks the graph: one over-threshold checkpoint is enough.
-                int needed = _contactArmed ? 1 : SEGMENTS_TO_RAISE;
-                if (_overStreak >= needed) RaiseGraph();
-            }
-            else if (_underStreak >= SEGMENTS_TO_CLEAR)
-            {
-                ClearGraph();
+                _contactBlackoutRemaining--;
+                return;
             }
 
-            // Contact corroboration: a sustained deficit after a hit is damage even with normal top
-            // speed (the Suzuka case — corner time only). Top-speed corroboration is checked at the line.
-            if (_contactArmed)
+            // Watch phase: a sustained corner deficit after a hit is mechanical/suspension damage even
+            // when top speed looks normal (the Suzuka case — corner time only).
+            if (deficitPct >= CONTACT_CONFIRM_PCT && deficit >= floor)
             {
-                if (!_damageLatched && _overStreak >= CONTACT_DEFICIT_SEGMENTS)
-                    LatchDamage("sustained pace deficit after contact");
+                _contactOverSegments++;
+                if (_contactOverSegments >= CONTACT_DEFICIT_SEGMENTS)
+                {
+                    ConfirmDamage("sustained corner deficit after contact");
+                    return;
+                }
+            }
 
-                _contactWindowRemaining--;
-                if (_contactWindowRemaining <= 0 && !_damageLatched)
+            if (_contactWatchRemaining > 0)
+            {
+                _contactWatchRemaining--;
+                if (_contactWatchRemaining <= 0 && !_damageLatched)
                 {
                     _contactArmed = false;
                     Log.Debug("[Warnings] Contact window expired clean — no damage, standing down");
@@ -280,32 +293,27 @@ namespace VISOR.ViewModels
             }
         }
 
-        private void RaiseGraph()
+        // Robust baseline: average the cluster within BASELINE_CLUSTER_PCT of the fastest sample rather
+        // than trusting a single best-ever time. A one-off perfect corner shouldn't make every normal
+        // run through that segment look like a deficit.
+        private static float ClusterBaseline(List<float> samples)
         {
-            IsPaceWarningVisible = true;
-            _underStreak = 0;
-            _paceLossLapCount = 0; // counted at lap closes from here
-            Log.Info($"[Warnings] Pace loss raised (baseline {_baseline:F2}s)");
+            if (samples.Count == 0) return 0f;
+            float fastest = samples.Min();
+            float threshold = fastest * (1f + BASELINE_CLUSTER_PCT);
+            return samples.Where(t => t <= threshold).Average();
         }
 
-        private void ClearGraph()
-        {
-            IsPaceWarningVisible = false;
-            SetPitNow(false);
-            _overStreak = 0;
-            _underStreak = 0;
-            _paceLossLapCount = 0;
-            _paceLossOnsetDeficit = 0f;
-            // The dot stays: physical damage doesn't heal without a pit.
-            Log.Info("[Warnings] Pace recovered to baseline");
-        }
-
-        private void LatchDamage(string reason)
+        // Confirmed damage: latch the dot and light the pace graph (which drives the PIT economics).
+        // Both stay up until a pit stop — physical damage doesn't heal on track.
+        private void ConfirmDamage(string reason)
         {
             if (_damageLatched) return;
             _damageLatched = true;
             IsPersistentDotVisible = true;
+            IsPaceWarningVisible = true;
             _contactArmed = false; // corroborated — close the window
+            _paceLossLapCount = 0; // counted at lap closes from here, for the PIT math
             Log.Info($"[Warnings] Damage confirmed ({reason})");
         }
 
@@ -316,6 +324,10 @@ namespace VISOR.ViewModels
             // Snapshot then reset the per-lap top speed.
             float lapTopSpeed = _lapTopSpeed;
             _lapTopSpeed = 0f;
+
+            // Snapshot the contact-watch state *before* closing the final segment, so a window that
+            // expires on this lap's last segment can't rob this lap's top-speed/whole-lap corroboration.
+            bool contactWatching = _contactArmed && !_damageLatched && _contactBlackoutRemaining == 0;
 
             // Close the final segment of the lap that just ended (LapCurrentLapTime has reset, so use
             // the completed lap total).
@@ -370,18 +382,23 @@ namespace VISOR.ViewModels
 
             // --- Monitoring ---
 
-            // Top-speed corroboration of damage (the fast aero/mechanical signature).
-            if (_contactArmed && !_damageLatched && _topSpeedBaseline > 0f && lapTopSpeed > 0f
-                && lapTopSpeed < _topSpeedBaseline * (1f - TOPSPEED_DROP_PCT))
+            // Whole-lap corroboration of damage, only while a contact window is watching (recovery
+            // already blanked). Two independent symptoms, either confirms:
+            //   - top-speed drop: the fast aero signature (traffic can't fake it — top speed is the
+            //     lap max, so one clean straight resets it; a damaged car never hits its number).
+            //   - whole-lap deficit on a clean lap: a sustained, lap-wide loss past the traffic band.
+            if (contactWatching && !_damageLatched)
             {
-                LatchDamage("top-speed drop after contact");
-            }
-
-            // Backstop while segment baselines are still warming: treat the whole lap as one checkpoint.
-            if (SegmentsReadyCount() == 0 && _baseline > 0f && qualifying)
-            {
-                float deficit = lastLapTime - _baseline;
-                OnCheckpoint(deficit / _baseline, deficit, ABS_FLOOR_SEC);
+                if (_topSpeedBaseline > 0f && lapTopSpeed > 0f
+                    && lapTopSpeed < _topSpeedBaseline * (1f - TOPSPEED_DROP_PCT))
+                {
+                    ConfirmDamage("top-speed drop after contact");
+                }
+                else if (qualifying && _baseline > 0f
+                         && lastLapTime >= _baseline * (1f + LAP_CONFIRM_PCT))
+                {
+                    ConfirmDamage("whole-lap deficit after contact");
+                }
             }
 
             if (IsPaceWarningVisible)
@@ -436,9 +453,7 @@ namespace VISOR.ViewModels
         private void RecomputeBaseline()
         {
             if (_cleanLapTimes.Count == 0) return;
-            float fastest = _cleanLapTimes.Min();
-            float threshold = fastest * (1f + BASELINE_CLUSTER_PCT);
-            _baseline = _cleanLapTimes.Where(t => t <= threshold).Average();
+            _baseline = ClusterBaseline(_cleanLapTimes);
         }
 
         // Segment count scales with lap *time* so the seconds-between-checkpoints stays roughly constant
@@ -455,17 +470,7 @@ namespace VISOR.ViewModels
             for (int i = 0; i < n; i++) _segmentSamples[i] = new List<float>();
             _pendingSegments.Clear();
             _segIndex = -1;
-            _overStreak = 0;
-            _underStreak = 0;
             Log.Debug($"[Warnings] Segments = {n} (~{_baseline / n:F1}s each at {_baseline:F1}s/lap)");
-        }
-
-        private int SegmentsReadyCount()
-        {
-            int ready = 0;
-            for (int i = 0; i < _segmentSamples.Length; i++)
-                if (_segmentSamples[i].Count >= MIN_SEGMENT_SAMPLES) ready++;
-            return ready;
         }
 
         private void OnPitEntry()
@@ -475,12 +480,12 @@ namespace VISOR.ViewModels
             IsPaceWarningVisible = false;
             SetPitNow(false);
             _state = (_baseline > 0f) ? HealthState.Monitoring : HealthState.Warmup;
-            _overStreak = 0;
-            _underStreak = 0;
             _paceLossLapCount = 0;
             _paceLossOnsetDeficit = 0f;
             _contactArmed = false;
-            _contactWindowRemaining = 0;
+            _contactBlackoutRemaining = 0;
+            _contactWatchRemaining = 0;
+            _contactOverSegments = 0;
             _lapTopSpeed = 0f;
             _segIndex = -1;
             _segStartLapTime = 0f;
@@ -559,15 +564,15 @@ namespace VISOR.ViewModels
             _pendingSegments.Clear();
             _segIndex = -1;
             _segStartLapTime = 0f;
-            _overStreak = 0;
-            _underStreak = 0;
             _lapTopSpeed = 0f;
 
             _damageLatched = false;
             _incidentCountWhenHealthy = 0;
 
             _contactArmed = false;
-            _contactWindowRemaining = 0;
+            _contactBlackoutRemaining = 0;
+            _contactWatchRemaining = 0;
+            _contactOverSegments = 0;
 
             _paceLossLapCount = 0;
             _paceLossOnsetDeficit = 0f;
