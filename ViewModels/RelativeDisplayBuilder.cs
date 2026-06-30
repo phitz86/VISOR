@@ -42,6 +42,13 @@ namespace VISOR.ViewModels
         private const float AHEAD_BEHIND_HYSTERESIS_METERS = 2.0f;
         private const float AHEAD_BEHIND_HYSTERESIS_DEFAULT_PCT = 0.0004f; // ~2 m on a ~5 km track
 
+        // DEBUG diagnostic gate: the relative-gap CSV logs a row only while a car is within this
+        // geometric distance of the player (~3 car lengths, ~0.2-0.3s at racing speed). Gating on
+        // distance (not the time-gap readout) keeps the flicker frames — where the gap glitches to a
+        // full lap — inside the window instead of filtering them out. Tighten/loosen to taste.
+        private const float LOG_PROXIMITY_METERS = 15f;
+        private const float LOG_PROXIMITY_FALLBACK_PCT = 0.003f; // ~15 m on a ~5 km track when length unknown
+
         private const int DEBUG_LOG_INTERVAL = 60; // ~1s at 60Hz
 
         private static readonly Color NeutralColor = (Color)ColorConverter.ConvertFromString("#80404040");
@@ -520,15 +527,30 @@ namespace VISOR.ViewModels
 
 #if DEBUG
         private void LogDiagnosticRow(SVappsLABSnapshot snapshot, int slotIndex, RelativeRowViewModel row,
-            RelativeRowViewModel playerRow, float distDelta, bool isGeometricallyAhead, string gapSource,
+            RelativeRowViewModel playerRow, float distDelta, bool isAhead, string gapSource,
             float displayGap, string gapText)
         {
+            // Proximity gate: only log while a car is near the player, measured geometrically so the
+            // window stays valid even when the time-gap readout glitches to a full lap.
+            float trackLengthMeters = _historyManager.TrackLengthMeters;
+            bool isClose = (trackLengthMeters > 0f)
+                ? Math.Abs(distDelta) * trackLengthMeters <= LOG_PROXIMITY_METERS
+                : Math.Abs(distDelta) <= LOG_PROXIMITY_FALLBACK_PCT;
+            if (!isClose) return;
+
+            // Position-number path (the sort the relative slot can't show): assigned positions and the
+            // trackPosition that drives PositionCalculator's ordering.
+            int classPos = _positionCalculator.GetClassPosition(row.CarIdx, row.ClassID);
+            int overallPos = _positionCalculator.GetOverallPosition(row.CarIdx);
+            float trackPosition = row.CurrentLap + row.LapDistPct;
+
             float sessionTime = (float)snapshot.SessionTime;
             _gapLogger?.LogRow(
                 sessionTime, slotIndex, row.CarNum,
                 playerRow.LapDistPct, row.LapDistPct,
-                distDelta, isGeometricallyAhead,
-                gapSource, displayGap, gapText);
+                distDelta, isAhead,
+                gapSource, displayGap, gapText,
+                classPos, overallPos, trackPosition);
         }
 #endif
 
