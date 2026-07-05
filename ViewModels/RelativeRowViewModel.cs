@@ -69,25 +69,57 @@ namespace VISOR.ViewModels
         // row slot (and gap sign) every frame. Resolved once per frame in BuildProximityBasedRows.
         internal sbyte _proximitySide = 0;
 
+        // Reject-and-hold latch state: consecutive frames a big gap jump has been rejected.
+        internal int _gapRejectCount = 0;
+
+        // A gap jump larger than this in a single frame is physically impossible for two nearby cars
+        // (real gaps drift well under this per frame) — it's the history buffer's stale-lap crossing,
+        // which reads ~a full lap when two cars sit inside its 0.1s sample spacing. Reject and hold.
+        private const float GAP_JUMP_REJECT_SECONDS = 5.0f;
+        // ...unless the large value persists this many frames: then it's a real change (teleport /
+        // return from a dropout), so resync to it. Set above the longest reject run the flicker can
+        // produce — the good value reappears every buffer tick (~10Hz / ~6 frames), so runs are short.
+        private const int GAP_JUMP_RESYNC_FRAMES = 20;
+
         public void UpdateSmoothedGap(float newGap, float smoothingFactor = 0.3f)
         {
             if (!_hasInitializedGap)
             {
                 _smoothedGap = newGap;
                 _hasInitializedGap = true;
+                _gapRejectCount = 0;
+                return;
             }
-            else
+
+            float delta = newGap - _smoothedGap;
+
+            // Large UPWARD jump: the stale-lap glitch only ever reads too big (~a full lap), never too
+            // small, so a big jump up is the artifact, not real motion. Reject and hold the last good
+            // value; accept only if it persists (a genuine teleport / return from a dropout).
+            if (delta > GAP_JUMP_REJECT_SECONDS)
             {
-                // If gap jumped by more than 5 seconds, reset smoothing (likely data gap recovery)
-                if (System.Math.Abs(newGap - _smoothedGap) > 5.0f)
-                {
-                    _smoothedGap = newGap;
-                }
-                else
-                {
-                    _smoothedGap = (smoothingFactor * newGap) + ((1f - smoothingFactor) * _smoothedGap);
-                }
+                _gapRejectCount++;
+                if (_gapRejectCount < GAP_JUMP_RESYNC_FRAMES)
+                    return; // hold _smoothedGap
+
+                _smoothedGap = newGap;
+                _gapRejectCount = 0;
+                return;
             }
+
+            // Large DOWNWARD jump: the true (small) gap reappearing after a glitch — snap straight to
+            // it rather than crawling down through the EMA. Also self-corrects a latch that happened to
+            // initialize on a glitch frame. (A big drop is never the glitch, so it's always real.)
+            if (delta < -GAP_JUMP_REJECT_SECONDS)
+            {
+                _smoothedGap = newGap;
+                _gapRejectCount = 0;
+                return;
+            }
+
+            // Plausible change: smooth exactly as before (EMA), unchanged.
+            _gapRejectCount = 0;
+            _smoothedGap = (smoothingFactor * newGap) + ((1f - smoothingFactor) * _smoothedGap);
         }
 
         public float SmoothedGap => _smoothedGap;
@@ -97,6 +129,7 @@ namespace VISOR.ViewModels
             _smoothedGap = 0f;
             _hasInitializedGap = false;
             _lastActiveSegmentCount = 0;
+            _gapRejectCount = 0;
             _proximitySide = 0; // re-seed direction from raw geometry when a car returns from a gap
         }
 
