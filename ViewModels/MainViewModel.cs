@@ -123,27 +123,13 @@ namespace VISOR.ViewModels
 
             float lastLap = snapshot.LapLastLapTime;
 
-            // Vehicle-health warnings are fed every frame. WarningsViewModel gates its lap-level math
-            // (baseline, PIT economics) to once per completed lap internally, and runs the responsive
-            // sub-lap segment and contact logic on the per-frame stream.
+            // Log the player's pit-road entry/exit transitions.
             int playerIdx = snapshot.PlayerCarIdx;
             if (playerIdx >= 0)
             {
-                var lapDistArr = snapshot.CarIdxLapDistPct;
                 var pitRoadArr = snapshot.CarIdxOnPitRoad;
-                float lapDistPct = playerIdx < lapDistArr.Length ? lapDistArr[playerIdx] : 0f;
                 bool onPitRoad = playerIdx < pitRoadArr.Length && pitRoadArr[playerIdx];
-                int lapsRemaining = snapshot.SessionLapsRemain;
-
                 CheckPlayerPitRoadTransition(onPitRoad, snapshot.Lap);
-
-                // Green racing only: SessionState 4 is Racing; the caution bits mark a full-course
-                // yellow, during which lap times are pace-distorted and not a health signal.
-                const int CAUTION_FLAGS = 0x4000 | 0x8000; // irsdk caution | cautionWaving
-                bool isRacingGreen = snapshot.SessionState == 4 && (snapshot.SessionFlags & CAUTION_FLAGS) == 0;
-
-                WarningsVM.Update(snapshot.Lap, lapDistPct, snapshot.LapCurrentLapTime, lastLap,
-                    snapshot.Speed, lapsRemaining, snapshot.SessionTimeRemain, onPitRoad, isRacingGreen);
             }
 
             UpdateLapTimeDisplays(lastLap, snapshot.LapBestLapTime);
