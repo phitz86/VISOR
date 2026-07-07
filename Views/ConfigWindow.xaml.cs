@@ -106,6 +106,11 @@ namespace VISOR.Views
             else
                 PositionClassRadio.IsChecked = true;
 
+            if (settings.TemperatureUnit == TemperatureUnit.Celsius)
+                TempCelsiusRadio.IsChecked = true;
+            else
+                TempFahrenheitRadio.IsChecked = true;
+
             Log.Debug("Loaded current settings into UI");
         }
 
@@ -225,6 +230,20 @@ namespace VISOR.Views
 
             Log.Info($"Position display mode changed to {newMode}");
             _settingsManager.UpdatePositionDisplayMode(newMode);
+        }
+
+        private void TempUnitRadio_Changed(object? sender, RoutedEventArgs e)
+        {
+            if (!_isInitialized || _settingsManager == null)
+                return;
+
+            var settings = _settingsManager.Settings;
+            settings.TemperatureUnit = TempCelsiusRadio.IsChecked == true
+                ? TemperatureUnit.Celsius
+                : TemperatureUnit.Fahrenheit;
+            settings.SaveSettings();
+
+            Log.Info($"Temperature unit changed to {settings.TemperatureUnit}");
         }
 
         private void HidePitsCheckBox_Changed(object? sender, RoutedEventArgs e)

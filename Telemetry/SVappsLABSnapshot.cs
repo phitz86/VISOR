@@ -47,6 +47,10 @@ namespace VISOR.Telemetry
         public float LapDeltaToOptimalLap => Data.LapDeltaToOptimalLap ?? 0f;
         public float LapDeltaToSessionBestLap => Data.LapDeltaToSessionBestLap ?? 0f;
 
+        // Live track surface temperature in °C. TrackTempCrew is the value the crew reports and
+        // updates through the session under dynamic weather; the older TrackTemp var is static.
+        public float TrackTempCrew => Data.TrackTempCrew ?? 0f;
+
         public double SessionTime => Data.SessionTime ?? 0.0;
         public double SessionTimeRemain => Data.SessionTimeRemain ?? 0.0;
         public int SessionLapsRemain => Data.SessionLapsRemain ?? 0;
