@@ -241,11 +241,44 @@
                       Visibility="{Binding ShowWarnings, Converter={StaticResource BoolToVisibilityConverter}}"
                       Margin="0,5,0,0">
                     <Grid.ColumnDefinitions>
-                        <!-- Left third reserved for the upcoming pace graphic -->
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
+
+                    <!-- Pace graph: one diverging bar per lap vs. the class median (green up =
+                         faster than the field, red down = slower, grey tick = excluded lap). -->
+                    <Grid Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center"
+                          Visibility="{Binding PaceGraphVM.GraphVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Rectangle Width="196" Height="2" Fill="#FF555A60" VerticalAlignment="Center"/>
+                        <ItemsControl ItemsSource="{Binding PaceGraphVM.Slots}" Width="196" Height="52">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Rows="1"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Height="52">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="25"/>
+                                            <RowDefinition Height="2"/>
+                                            <RowDefinition Height="25"/>
+                                        </Grid.RowDefinitions>
+                                        <Rectangle Grid.Row="0" Width="10" RadiusX="2" RadiusY="2"
+                                                   VerticalAlignment="Bottom"
+                                                   Height="{Binding UpHeight}" Fill="{Binding BarBrush}"/>
+                                        <Rectangle Grid.Row="2" Width="10" RadiusX="2" RadiusY="2"
+                                                   VerticalAlignment="Top"
+                                                   Height="{Binding DownHeight}" Fill="{Binding BarBrush}"/>
+                                        <Rectangle Grid.RowSpan="3" Width="10" Height="3" RadiusX="1.5" RadiusY="1.5"
+                                                   VerticalAlignment="Center" Fill="Gray"
+                                                   Visibility="{Binding IsTick, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
                         <TextBlock Text="⚠️" FontSize="36" Margin="0,0,10,0" Foreground="{Binding WarningsVM.IncidentColor}" Style="{StaticResource NormalWeightSymbol}"/>

@@ -23,6 +23,7 @@ namespace VISOR.ViewModels
         public WarningsViewModel WarningsVM { get; private set; }
         public CountdownViewModel CountdownVM { get; private set; }
         public TrackTempViewModel TrackTempVM { get; private set; }
+        public PaceGraphViewModel PaceGraphVM { get; private set; }
 
         private readonly ClassColorManager _classColorManager;
         private readonly SettingsManager _settingsManager;
@@ -69,6 +70,7 @@ namespace VISOR.ViewModels
             WarningsVM = new WarningsViewModel();
             CountdownVM = new CountdownViewModel();
             TrackTempVM = new TrackTempViewModel();
+            PaceGraphVM = new PaceGraphViewModel();
         }
 
         private bool _isTelemetryConnected = false;
@@ -115,6 +117,8 @@ namespace VISOR.ViewModels
                         WarningsVM.UpdateIncidentCount(incidentCounts[playerCarIdx], sessionDataProvider.IncidentLimit);
                     }
                 }
+
+                PaceGraphVM.Update(snapshot, sessionDataProvider);
 
                 UpdatePlayerPosition(snapshot, sessionDataProvider);
             }
@@ -305,6 +309,7 @@ namespace VISOR.ViewModels
             WarningsVM.Reset();
             CountdownVM.Reset();
             TrackTempVM.Reset();
+            PaceGraphVM.Reset();
             RelativeVM.Reset();
             _playerWasOnPitRoad = null;
             _classColorManager.Reset();
@@ -320,6 +325,7 @@ namespace VISOR.ViewModels
             ClearSessionUI();
             WarningsVM.Reset();
             TrackTempVM.Reset();
+            PaceGraphVM.Reset();
         }
 
         public ClassColorManager ClassColorManager => _classColorManager;
