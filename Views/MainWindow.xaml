@@ -246,8 +246,9 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Pace graph: one diverging bar per lap vs. the class median (green up =
-                         faster than the field, red down = slower, grey tick = excluded lap). -->
+                    <!-- Pace graph: one diverging bar per lap showing the trend of the player's
+                         pace vs. the class (green up = gaining on your recent norm against the
+                         field, red down = losing, grey tick = excluded/pending lap). -->
                     <Grid Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center"
                           Visibility="{Binding PaceGraphVM.GraphVisible, Converter={StaticResource BoolToVisibilityConverter}}">
                         <Rectangle Width="196" Height="2" Fill="#FF555A60" VerticalAlignment="Center"/>

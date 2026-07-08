@@ -10,14 +10,19 @@ using VISOR.Telemetry;
 namespace VISOR.ViewModels
 {
     /// <summary>
-    /// Drives the Row 5 pace graph: one diverging bar per completed lap showing the player's
-    /// lap time against the class median for that same lap number — green up when faster than
-    /// the field, red down when slower (matching the Row 2 delta bar's colour semantics).
+    /// Drives the Row 5 pace graph: one diverging bar per completed lap showing how the
+    /// player's pace against the class is *trending* — green up when a lap beat the player's
+    /// own recent norm vs. the field, red down when it fell short (matching the Row 2 delta
+    /// bar's colour semantics).
     ///
-    /// This displays measured data, never an inference: each bar is "your lap N vs. what your
-    /// class actually ran on lap N". Comparing per lap number self-corrects for anything that
-    /// slows the whole field (track evolution, weather), so the graph isolates the strategic
-    /// signal — are *you* gaining or losing on the cars you race against.
+    /// The metric is deliberately second-order. A raw "you vs. the class median" delta mostly
+    /// encodes who is in the split: a 1600-iRating driver in a 4k split reads pinned slow every
+    /// lap, and the same driver in an even split reads mid-pack — neither says anything useful
+    /// mid-race. So each lap's delta to the class median is re-centred on the median of the
+    /// player's own deltas over their recent valid laps. What survives is the strategic signal:
+    /// a bar grows only when the player's relationship to the field CHANGES — holding on while
+    /// the field falls away, or fading while the field picks up. Comparing per lap number also
+    /// self-corrects for anything that slows everyone (track evolution, weather).
     ///
     /// Lap hygiene, so a pit cycle or caution can't masquerade as a pace change:
     ///  - Laps touched by pit road (in-lap and out-lap) are excluded on both sides.
@@ -36,11 +41,15 @@ namespace VISOR.ViewModels
 
         private const int MaxCars = 64;
         private const int DisplayLaps = 14;
-        private const int MinValidPlayerLaps = 3;    // graph stays hidden until this many
-        private const int MinReferencePool = 3;      // class laps needed before a bar can draw
-        private const int PoolRetentionLaps = 25;    // prune reference data older than this
+        private const int MinReferencePool = 3;      // class laps needed before a delta exists
+        private const int BaselineWindowLaps = 10;   // player's norm = median of this many recent deltas
+        private const int MinBaselineLaps = 3;       // deltas needed before a norm (and a bar) exists
+        private const int PlayerLapRetention = DisplayLaps + BaselineWindowLaps + 6;
+        private const int PoolRetentionLaps = DisplayLaps + BaselineWindowLaps + 8;
 
-        private const float MaxDeltaSeconds = 3.0f;
+        // Deviations from the player's own norm are small — tenths, not seconds — so the
+        // clamp is much tighter than a raw-delta scale would be.
+        private const float MaxDeviationSeconds = 1.5f;
         private const double HalfHeightPx = 25.0;    // bar area above/below the baseline
         private const double MinBarHeightPx = 2.0;   // a dead-even lap still shows a stub
 
@@ -110,7 +119,7 @@ namespace VISOR.ViewModels
                 if (i == playerIdx)
                 {
                     _playerLaps.Add((completed, lapTime, excluded: tainted || !hasTime));
-                    if (_playerLaps.Count > DisplayLaps + 2)
+                    if (_playerLaps.Count > PlayerLapRetention)
                         _playerLaps.RemoveAt(0);
                     Log.Debug($"[PaceGraph] Player lap {completed}: {lapTime:F3}s" +
                               (tainted || !hasTime ? " (excluded)" : ""));
@@ -157,44 +166,74 @@ namespace VISOR.ViewModels
 
         private void RebuildSlots(int playerIdx, int[] classIds)
         {
-            int validCount = _playerLaps.Count(l => !l.excluded);
-            if (validCount < MinValidPlayerLaps)
-            {
-                GraphVisible = false;
-                Slots = Array.Empty<PaceSlotViewModel>();
-                return;
-            }
-
             int playerClassId = playerIdx < classIds.Length ? classIds[playerIdx] : 0;
-            var slots = new List<PaceSlotViewModel>(DisplayLaps);
 
-            foreach (var (lap, time, excluded) in _playerLaps.Skip(Math.Max(0, _playerLaps.Count - DisplayLaps)))
+            // Pass 1: raw delta to the class median for every retained player lap (null when
+            // the lap is excluded or too few classmates have run that lap number yet — a later
+            // completion triggers another rebuild and fills these in).
+            var deltas = new float?[_playerLaps.Count];
+            for (int i = 0; i < _playerLaps.Count; i++)
             {
-                if (excluded)
-                {
-                    slots.Add(PaceSlotViewModel.Tick());
-                    continue;
-                }
-
+                var (lap, time, excluded) = _playerLaps[i];
+                if (excluded) continue;
                 float? median = GetClassMedian(lap, playerClassId);
-                if (median == null)
-                {
-                    // Not enough classmates have run this lap (yet) — a later completion
-                    // triggers another rebuild and the bar fills in.
-                    slots.Add(PaceSlotViewModel.Tick());
-                    continue;
-                }
-
-                float delta = Math.Clamp(time - median.Value, -MaxDeltaSeconds, MaxDeltaSeconds);
-                double height = Math.Max(MinBarHeightPx, Math.Abs(delta) / MaxDeltaSeconds * HalfHeightPx);
-                slots.Add(PaceSlotViewModel.Bar(fasterThanField: delta <= 0f, height));
+                if (median != null)
+                    deltas[i] = time - median.Value;
             }
 
-            bool becameVisible = !GraphVisible;
+            // Pass 2: each displayed lap is drawn as its deviation from the player's norm —
+            // the median of their previous valid deltas — so a constant skill gap to the split
+            // cancels out and only a *change* in pace vs. the field grows a bar.
+            var slots = new List<PaceSlotViewModel>(DisplayLaps);
+            int start = Math.Max(0, _playerLaps.Count - DisplayLaps);
+            int barCount = 0;
+
+            for (int i = start; i < _playerLaps.Count; i++)
+            {
+                float? norm = deltas[i] != null ? GetBaselineNorm(deltas, i) : null;
+                if (norm == null)
+                {
+                    slots.Add(PaceSlotViewModel.Tick());
+                    continue;
+                }
+
+                float deviation = Math.Clamp(deltas[i]!.Value - norm.Value,
+                    -MaxDeviationSeconds, MaxDeviationSeconds);
+                double height = Math.Max(MinBarHeightPx,
+                    Math.Abs(deviation) / MaxDeviationSeconds * HalfHeightPx);
+                slots.Add(PaceSlotViewModel.Bar(fasterThanField: deviation <= 0f, height));
+                barCount++;
+            }
+
+            bool becameVisible = !GraphVisible && barCount > 0;
             Slots = slots;
-            GraphVisible = true;
+            GraphVisible = barCount > 0;
             if (becameVisible)
-                Log.Info($"[PaceGraph] Visible with {validCount} valid laps");
+                Log.Info($"[PaceGraph] Visible with {barCount} trend bars");
+        }
+
+        /// <summary>
+        /// The player's norm for lap index <paramref name="i"/>: the median of their previous
+        /// valid deltas, newest-first, up to the baseline window. Null until enough history
+        /// exists. Excluding the lap itself keeps a one-lap swing from muting its own bar.
+        /// </summary>
+        private static float? GetBaselineNorm(float?[] deltas, int i)
+        {
+            var window = new List<float>(BaselineWindowLaps);
+            for (int j = i - 1; j >= 0 && window.Count < BaselineWindowLaps; j--)
+            {
+                if (deltas[j] != null)
+                    window.Add(deltas[j]!.Value);
+            }
+
+            if (window.Count < MinBaselineLaps)
+                return null;
+
+            window.Sort();
+            int mid = window.Count / 2;
+            return window.Count % 2 == 1
+                ? window[mid]
+                : (window[mid - 1] + window[mid]) / 2f;
         }
 
         private float? GetClassMedian(int lap, int playerClassId)
