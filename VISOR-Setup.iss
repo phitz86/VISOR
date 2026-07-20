@@ -88,6 +88,9 @@ Source: "bin\Release\net8.0-windows8.0\*.dll"; DestDir: "{app}"; Flags: ignoreve
 ; Configuration files
 Source: "bin\Release\net8.0-windows8.0\*.json"; DestDir: "{app}"; Flags: ignoreversion;
 
+; Track section catalog (named corners for the Row 5 location readout)
+Source: "bin\Release\net8.0-windows8.0\Data\TrackSections.json"; DestDir: "{app}\Data"; Flags: ignoreversion
+
 ; Runtime config
 Source: "bin\Release\net8.0-windows8.0\*.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
 

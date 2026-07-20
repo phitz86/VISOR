@@ -40,7 +40,8 @@ relative gaps, and surrounding traffic — without a cluttered screen.
   - Center-out **lap delta bar** versus your session-best lap
   - Last-lap and best-lap times
   - **Relative display** — a 7-car window (cars ahead, you, cars behind) with live gap times
-  - **Warnings row** — incident counter, pace/damage warning, and a "pit now" cue
+  - **Warnings row** — track-location readout, incident counter, and track
+    temperature with heating/cooling trend
 - **Proximity radar** — a real-time 2D view of nearby cars across five zones so you
   always know who's alongside you, color-coded by car class.
 - **Smart fuel calculation** — rolling multi-lap average burn translated into
@@ -48,8 +49,13 @@ relative gaps, and surrounding traffic — without a cluttered screen.
 - **Transponder-style gap timing** — gaps are measured from a position-history ring
   buffer (the time between two cars crossing the same point on track), not a crude
   straight-line estimate.
-- **Pace & damage detection** — flags abnormally slow laps combined with reduced top
-  speed, and estimates whether pitting for repairs is worth the time loss.
+- **Track-location readout** — the name of the corner or section you're in
+  ("Eau Rouge", "Kemmel Straight"), like a sign hanging over the track surface.
+  Driven by an editable catalog (`Data/TrackSections.json`) covering 66 layouts
+  out of the box — the Nordschleife, Le Mans, and most iRacing road courses —
+  tune boundaries or add tracks with a text editor. Measured turn positions and
+  many names imported from [lovely-track-data](https://github.com/Lovely-Sim-Racing/lovely-track-data)
+  by [Lovely Sim Racing](https://lsr.gg) (CC BY-NC-SA 4.0).
 - **AI driver detection** and per-driver incident counts pulled from session data.
 - **Configurable UI** — three size presets, per-row visibility toggles, and a
   drag-to-position config mode.

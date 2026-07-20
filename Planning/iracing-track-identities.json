@@ -1,0 +1,572 @@
+{
+  "_source": [
+    "iRacing layout identities: trackId is the telemetry TrackName slug,",
+    "trackName the display name. Compiled from the manifest of",
+    "https://github.com/Lovely-Sim-Racing/lovely-track-data (CC BY-NC-SA 4.0,",
+    "(c) Lovely Sim Racing, https://lsr.gg), retrieved 2026-07-20. Identity",
+    "facts only; no curated track data is reproduced here. TrackConfigName is",
+    "not part of this dump — the validator treats it as empty (worst case).",
+    "Entries marked verified:local were read from iRacing install folder names (tracks\\<venue>\\<config>) on 2026-07-20."
+  ],
+  "layouts": [
+    {
+      "slug": "adelaide",
+      "display": "Adelaide Street Circuit"
+    },
+    {
+      "slug": "algarve gp",
+      "display": "Autodromo Internacional do Algarve"
+    },
+    {
+      "slug": "barcelona gp",
+      "display": "Circuit de Barcelona-Catalunya - GP"
+    },
+    {
+      "slug": "barcelona historic",
+      "display": "Barcelona Historic"
+    },
+    {
+      "slug": "bathurst",
+      "display": "Mount Panorama Circuit"
+    },
+    {
+      "slug": "brandshatch grandprix",
+      "display": "Brands Hatch GP"
+    },
+    {
+      "slug": "cadwell club",
+      "display": "Cadwell Park Circuit - Club"
+    },
+    {
+      "slug": "cadwell full",
+      "display": "Cadwell Park Circuit - Full"
+    },
+    {
+      "slug": "cadwell moto",
+      "display": "Cadwell Park Circuit - Moto"
+    },
+    {
+      "slug": "cadwell woodlands",
+      "display": "Cadwell Park Circuit - Woodlands"
+    },
+    {
+      "slug": "charlotte 2018 2019 roval",
+      "display": "Charlotte Motor Speedway - Roval"
+    },
+    {
+      "slug": "cota-gp",
+      "display": "Circuit of the Americas"
+    },
+    {
+      "slug": "daytona 2011 road",
+      "display": "Daytona"
+    },
+    {
+      "slug": "donington gp",
+      "display": "Donington Park Racing Circuit - GP"
+    },
+    {
+      "slug": "donington national",
+      "display": "Donington Park Racing Circuit - National"
+    },
+    {
+      "slug": "fuji gp",
+      "display": "Fuji Speedway - Grand Prix",
+      "verified": "local"
+    },
+    {
+      "slug": "fuji nochicane",
+      "display": "Fuji Speedway - No Chicane",
+      "verified": "local"
+    },
+    {
+      "slug": "hockenheim gp",
+      "display": "Hockenheimring - GP"
+    },
+    {
+      "slug": "hockenheim nationala",
+      "display": "Hockenheimring Baden-Württemberg - National A"
+    },
+    {
+      "slug": "hockenheim nationalb",
+      "display": "Hockenheimring Baden-Württemberg - National B"
+    },
+    {
+      "slug": "hockenheim outer",
+      "display": "Hockenheimring Baden-Württemberg - Outer"
+    },
+    {
+      "slug": "hockenheim pec peceast",
+      "display": "Hockenheimring Baden-Württemberg - Porsche Experience Center - East"
+    },
+    {
+      "slug": "hockenheim pec pechandling",
+      "display": "Hockenheimring Baden-Württemberg - Porsche Experience Center - Handling"
+    },
+    {
+      "slug": "hockenheim pec pecouter",
+      "display": "Hockenheimring Baden-Württemberg - Porsche Experience Center - Outer"
+    },
+    {
+      "slug": "hockenheim pec pecwest",
+      "display": "Hockenheimring Baden-Württemberg - Porsche Experience Center - West"
+    },
+    {
+      "slug": "hockenheim shorta",
+      "display": "Hockenheimring Baden-Württemberg - Short A"
+    },
+    {
+      "slug": "hockenheim shortb",
+      "display": "Hockenheimring Baden-Württemberg - Short B"
+    },
+    {
+      "slug": "imola gp",
+      "display": "Imola"
+    },
+    {
+      "slug": "indianapolis 2022 road",
+      "display": "Indianapolis Motor Speedway - Road Course"
+    },
+    {
+      "slug": "interlagos gp",
+      "display": "Interlagos GP"
+    },
+    {
+      "slug": "jerez gp",
+      "display": "Circuito de Jerez - GP"
+    },
+    {
+      "slug": "jerez moto",
+      "display": "Circuito de Jerez - Moto"
+    },
+    {
+      "slug": "lagunaseca",
+      "display": "Laguna Seca - Full Course"
+    },
+    {
+      "slug": "lagunaseca school",
+      "display": "Laguna Seca - School"
+    },
+    {
+      "slug": "ledenon",
+      "display": "Circuit de Ledenon"
+    },
+    {
+      "slug": "lemans full",
+      "display": "Circuit des 24 Heures du Mans"
+    },
+    {
+      "slug": "lemans nochicane",
+      "display": "Circuit des 24 Heures du Mans"
+    },
+    {
+      "slug": "limerock 2019 chicanes",
+      "display": "Lime Rock Park - Chicanes"
+    },
+    {
+      "slug": "limerock 2019 chicanewestb",
+      "display": "Lime Rock Park - West Bend Chicane"
+    },
+    {
+      "slug": "limerock 2019 classic",
+      "display": "Limerock GP"
+    },
+    {
+      "slug": "limerock 2019 gp",
+      "display": "Limerock GP"
+    },
+    {
+      "slug": "limerock 2019 school",
+      "display": "Lime Rock Park - School"
+    },
+    {
+      "slug": "longbeach",
+      "display": "Longbeach"
+    },
+    {
+      "slug": "magnycours gp",
+      "display": "Magny-Cours"
+    },
+    {
+      "slug": "midohio altoval",
+      "display": "Mid-Ohio Sports Car Course - Alt Oval",
+      "verified": "local"
+    },
+    {
+      "slug": "midohio chicane",
+      "display": "Mid-Ohio Sports Car Course - Chicane",
+      "verified": "local"
+    },
+    {
+      "slug": "midohio full",
+      "display": "Mid-Ohio Sports Car Course - Full Course",
+      "verified": "local"
+    },
+    {
+      "slug": "midohio oval",
+      "display": "Mid-Ohio Sports Car Course - Oval",
+      "verified": "local"
+    },
+    {
+      "slug": "midohio short",
+      "display": "Mid-Ohio Sports Car Course - Short",
+      "verified": "local"
+    },
+    {
+      "slug": "misano gp",
+      "display": "Misano Grand Prix"
+    },
+    {
+      "slug": "montreal",
+      "display": "Circuit Gilles Villeneuve"
+    },
+    {
+      "slug": "monza combinedchicanes",
+      "display": "Autodromo Nazionale Monza - Combined"
+    },
+    {
+      "slug": "monza full",
+      "display": "Monza Full"
+    },
+    {
+      "slug": "monza junior",
+      "display": "Autodromo Nazionale Monza - Junior"
+    },
+    {
+      "slug": "monza nochicane",
+      "display": "Autodromo Nazionale Monza - GP without chicanes"
+    },
+    {
+      "slug": "mugello gp",
+      "display": "Mugello Grand Prix"
+    },
+    {
+      "slug": "mugello short",
+      "display": "Autodromo Internazionale del Mugello - Short"
+    },
+    {
+      "slug": "navara speedmedium",
+      "display": "Circuito de Navarra - Speed Circuit - Medium"
+    },
+    {
+      "slug": "navarra speedlong",
+      "display": "Circuito de Navarra Speed Circuit Long"
+    },
+    {
+      "slug": "navarra speedshort",
+      "display": "Circuito de Navarra - Speed Circuit - Short"
+    },
+    {
+      "slug": "nurburgring combined",
+      "display": "Nuerburgring Gesamtstrecke 24h"
+    },
+    {
+      "slug": "nurburgring gp",
+      "display": "Nuerburgring Grand-Prix-Strecke - Grand Prix"
+    },
+    {
+      "slug": "nurburgring gpnochicane",
+      "display": "Nuerburgring Grand-Prix-Strecke - BES/WEC"
+    },
+    {
+      "slug": "nurburgring gpshort",
+      "display": "Nuerburgring Grand-Prix-Strecke - Grand Prix w/out Arena"
+    },
+    {
+      "slug": "nurburgring nordschleife",
+      "display": "Nuerburgring Nordschleife"
+    },
+    {
+      "slug": "okayama full",
+      "display": "Okayama Full Course"
+    },
+    {
+      "slug": "okayama short",
+      "display": "Okayama International Circuit - Short"
+    },
+    {
+      "slug": "oran gp",
+      "display": "Oran Park Raceway - GP"
+    },
+    {
+      "slug": "oran moto",
+      "display": "Oran Park Raceway - Moto"
+    },
+    {
+      "slug": "oran north",
+      "display": "Oran Park Raceway - North"
+    },
+    {
+      "slug": "oran northa",
+      "display": "Oran Park Raceway - North A"
+    },
+    {
+      "slug": "oran northb",
+      "display": "Oran Park Raceway - North B"
+    },
+    {
+      "slug": "oran south",
+      "display": "Oran Park Raceway - South"
+    },
+    {
+      "slug": "oschersleben alt",
+      "display": "Motorsport Arena Oschersleben - Alternate"
+    },
+    {
+      "slug": "oschersleben bcourse",
+      "display": "Motorsport Arena Oschersleben - B Course"
+    },
+    {
+      "slug": "oschersleben ccourse",
+      "display": "Motorsport Arena Oschersleben - C Course"
+    },
+    {
+      "slug": "oschersleben gp",
+      "display": "Motorsport Arena Oschersleben - Grand Prix"
+    },
+    {
+      "slug": "oulton fosters",
+      "display": "Oulton Park Circuit - Fosters"
+    },
+    {
+      "slug": "oulton fosterswithhislop",
+      "display": "Oulton Park Circuit - Intl w/out Hislop"
+    },
+    {
+      "slug": "oulton international",
+      "display": "Oulton Park Circuit - International"
+    },
+    {
+      "slug": "oulton inthislop",
+      "display": "Oulton Park intl w/out Brittens"
+    },
+    {
+      "slug": "oulton intnochicane",
+      "display": "Oulton Park Circuit - Intl w/no Chicanes"
+    },
+    {
+      "slug": "oulton island",
+      "display": "Oulton Park Circuit - Island"
+    },
+    {
+      "slug": "oulton islandhistoric",
+      "display": "Oulton Park Circuit - Island Historic"
+    },
+    {
+      "slug": "outlon intbrittens",
+      "display": "Oulton Park Circuit - Intl w/out Brittens"
+    },
+    {
+      "slug": "phillipisland",
+      "display": "Phillip Island Circuit"
+    },
+    {
+      "slug": "roadamerica bend",
+      "display": "Road America Bend"
+    },
+    {
+      "slug": "roadamerica full",
+      "display": "Road America Full Course"
+    },
+    {
+      "slug": "roadatlanta full",
+      "display": "Road Atlanta - Full Course"
+    },
+    {
+      "slug": "rudskogen",
+      "display": "Rudskogen Motorsenter"
+    },
+    {
+      "slug": "sachsenring",
+      "display": "Sachsenring"
+    },
+    {
+      "slug": "sebring club",
+      "display": "Sebring International Raceway - Club"
+    },
+    {
+      "slug": "sebring international",
+      "display": "Sebring Int. Raceway"
+    },
+    {
+      "slug": "sebring modified",
+      "display": "Sebring International Raceway - Modified"
+    },
+    {
+      "slug": "silverstone 2019 gp",
+      "display": "Silverstone Circuit - Arena Grand Prix"
+    },
+    {
+      "slug": "snetterton 100",
+      "display": "Snetterton Circuit - 100"
+    },
+    {
+      "slug": "snetterton 200",
+      "display": "Snetterton Circuit - 200"
+    },
+    {
+      "slug": "snetterton 300",
+      "display": "Snetterton 300 Circuit"
+    },
+    {
+      "slug": "spa 2024 combined",
+      "display": "Spa Endurance"
+    },
+    {
+      "slug": "spa 2024 low",
+      "display": "Spa Classic Pits"
+    },
+    {
+      "slug": "spa 2024 up",
+      "display": "Spa Grand Prix Pits"
+    },
+    {
+      "slug": "spa combined",
+      "display": "Spa Endurance - 2010"
+    },
+    {
+      "slug": "spa low",
+      "display": "Spa Classic Pits - 2010"
+    },
+    {
+      "slug": "spa up",
+      "display": "Spa Grand Prix Pits - 2010"
+    },
+    {
+      "slug": "speilberg north",
+      "display": "Red Bull Ring - North"
+    },
+    {
+      "slug": "spielberg gp",
+      "display": "Red Bull Ring - GP"
+    },
+    {
+      "slug": "spielberg national",
+      "display": "Red Bull Ring - National"
+    },
+    {
+      "slug": "summit jefferson",
+      "display": "Summit Point Raceway - Jefferson Circuit"
+    },
+    {
+      "slug": "summit jefferson rev",
+      "display": "Summit Point Raceway - Jefferson Circuit Reverse"
+    },
+    {
+      "slug": "summit summit raceway",
+      "display": "Summit Point Raceway"
+    },
+    {
+      "slug": "summit summit raceway school",
+      "display": "Summit Point Raceway - School"
+    },
+    {
+      "slug": "summit summit short",
+      "display": "Summit Point Raceway - Short"
+    },
+    {
+      "slug": "suzuka grandprix",
+      "display": "Suzuka Int Racing Course - GP"
+    },
+    {
+      "slug": "tsukuba 1kchicane",
+      "display": "Tsukuba Circuit - 1000 Chicane"
+    },
+    {
+      "slug": "tsukuba 1kfull",
+      "display": "Tsukuba Circuit - 1000 Full"
+    },
+    {
+      "slug": "tsukuba 1kfullreverse",
+      "display": "Tsukuba Circuit - 1000 Full Reverse"
+    },
+    {
+      "slug": "tsukuba 1kouter",
+      "display": "Tsukuba Circuit - 1000 Outer"
+    },
+    {
+      "slug": "tsukuba 2kchicane",
+      "display": "Tsukuba Circuit - 2000 Moto"
+    },
+    {
+      "slug": "tsukuba 2kfull",
+      "display": "Tsukuba Circuit - 2000 Full"
+    },
+    {
+      "slug": "tsukuba 2kshort",
+      "display": "Tsukuba Circuit - 2000 Short"
+    },
+    {
+      "slug": "twinring east",
+      "display": "Mobility Resort Motegi - East"
+    },
+    {
+      "slug": "twinring fullrc",
+      "display": "Mobility Resort Motegi - Grand Prix"
+    },
+    {
+      "slug": "twinring oval",
+      "display": "Mobility Resort Motegi - Oval"
+    },
+    {
+      "slug": "twinring west",
+      "display": "Mobility Resort Motegi - West"
+    },
+    {
+      "slug": "virginia 2022 full",
+      "display": "Virginia International Raceway - Full Course"
+    },
+    {
+      "slug": "virginia 2022 grand",
+      "display": "Virginia International Raceway - Grand West Course"
+    },
+    {
+      "slug": "virginia 2022 north",
+      "display": "Virginia International Raceway - North Course"
+    },
+    {
+      "slug": "virginia 2022 patriot",
+      "display": "Virginia International Raceway - Patriot Course"
+    },
+    {
+      "slug": "virginia 2022 south",
+      "display": "Virginia International Raceway - South Course"
+    },
+    {
+      "slug": "watkinsglen 2021 classic",
+      "display": "Watkins Glen International - Classic"
+    },
+    {
+      "slug": "watkinsglen 2021 cupcircuit",
+      "display": "Watkins Glen International - Cup"
+    },
+    {
+      "slug": "watkinsglen 2021 fullcourse",
+      "display": "Watkins Glen"
+    },
+    {
+      "slug": "watkinsglen 2021 fullnoloop",
+      "display": "Watkins Glen International - Classic Boot"
+    },
+    {
+      "slug": "winton club",
+      "display": "Winton Motor Raceway - Club Circuit"
+    },
+    {
+      "slug": "winton national",
+      "display": "Winton National"
+    },
+    {
+      "slug": "zandvoort 2023 gp",
+      "display": "Circuit Zandvoort - GP"
+    },
+    {
+      "slug": "zolder alt",
+      "display": "Zolder Circuit - Alternate"
+    },
+    {
+      "slug": "zolder gp",
+      "display": "Zolder Circuit - Grand Prix"
+    }
+  ]
+}

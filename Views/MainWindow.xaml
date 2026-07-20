@@ -246,40 +246,19 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Pace graph: one diverging bar per lap showing the trend of the player's
-                         pace vs. the class (green up = gaining on your recent norm against the
-                         field, red down = losing, grey tick = excluded/pending lap). -->
-                    <Grid Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center"
-                          Visibility="{Binding PaceGraphVM.GraphVisible, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <Rectangle Width="196" Height="2" Fill="#FF555A60" VerticalAlignment="Center"/>
-                        <ItemsControl ItemsSource="{Binding PaceGraphVM.Slots}" Width="196" Height="52">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <UniformGrid Rows="1"/>
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid Height="52">
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="25"/>
-                                            <RowDefinition Height="2"/>
-                                            <RowDefinition Height="25"/>
-                                        </Grid.RowDefinitions>
-                                        <Rectangle Grid.Row="0" Width="10" RadiusX="2" RadiusY="2"
-                                                   VerticalAlignment="Bottom"
-                                                   Height="{Binding UpHeight}" Fill="{Binding BarBrush}"/>
-                                        <Rectangle Grid.Row="2" Width="10" RadiusX="2" RadiusY="2"
-                                                   VerticalAlignment="Top"
-                                                   Height="{Binding DownHeight}" Fill="{Binding BarBrush}"/>
-                                        <Rectangle Grid.RowSpan="3" Width="10" Height="3" RadiusX="1.5" RadiusY="1.5"
-                                                   VerticalAlignment="Center" Fill="Gray"
-                                                   Visibility="{Binding IsTick, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </Grid>
+                    <!-- Track location: the named corner/section of the circuit the player is
+                         currently in ("Eau Rouge", "Kemmel Straight"), from the editable
+                         Data/TrackSections.json catalog. Hidden on uncatalogued tracks.
+                         The DownOnly Viewbox keeps short names at full size while shrinking
+                         long ones ("International Horseshoe") to fit the column — a name can
+                         never clip, whatever the catalog grows to contain. -->
+                    <Viewbox Grid.Column="0" MaxWidth="196" MaxHeight="32"
+                             Stretch="Uniform" StretchDirection="DownOnly"
+                             HorizontalAlignment="Center" VerticalAlignment="Center"
+                             Visibility="{Binding TrackLocationVM.LocationVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="{Binding TrackLocationVM.SectionName}"
+                                   FontSize="24" Foreground="White" Style="{StaticResource SemiboldText}"/>
+                    </Viewbox>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
                         <TextBlock Text="⚠️" FontSize="36" Margin="0,0,10,0" Foreground="{Binding WarningsVM.IncidentColor}" Style="{StaticResource NormalWeightSymbol}"/>
