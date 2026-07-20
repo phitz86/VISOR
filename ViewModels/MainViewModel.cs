@@ -22,6 +22,8 @@ namespace VISOR.ViewModels
         public DeltaBarViewModel DeltaBarVM { get; private set; }
         public WarningsViewModel WarningsVM { get; private set; }
         public CountdownViewModel CountdownVM { get; private set; }
+        public TrackTempViewModel TrackTempVM { get; private set; }
+        public PaceGraphViewModel PaceGraphVM { get; private set; }
 
         private readonly ClassColorManager _classColorManager;
         private readonly SettingsManager _settingsManager;
@@ -67,6 +69,8 @@ namespace VISOR.ViewModels
             DeltaBarVM = new DeltaBarViewModel();
             WarningsVM = new WarningsViewModel();
             CountdownVM = new CountdownViewModel();
+            TrackTempVM = new TrackTempViewModel();
+            PaceGraphVM = new PaceGraphViewModel();
         }
 
         private bool _isTelemetryConnected = false;
@@ -100,6 +104,7 @@ namespace VISOR.ViewModels
             RelativeVM.Update(snapshot, sessionDataProvider);
             DeltaBarVM.Update(snapshot);
             CountdownVM.Update(snapshot, sessionDataProvider);
+            TrackTempVM.Update(snapshot.TrackTempCrew, snapshot.SessionTime);
 
             if (sessionDataProvider != null && sessionDataProvider.IsDataReady)
             {
@@ -112,6 +117,8 @@ namespace VISOR.ViewModels
                         WarningsVM.UpdateIncidentCount(incidentCounts[playerCarIdx], sessionDataProvider.IncidentLimit);
                     }
                 }
+
+                PaceGraphVM.Update(snapshot, sessionDataProvider);
 
                 UpdatePlayerPosition(snapshot, sessionDataProvider);
             }
@@ -301,6 +308,8 @@ namespace VISOR.ViewModels
             FuelVM.Reset();
             WarningsVM.Reset();
             CountdownVM.Reset();
+            TrackTempVM.Reset();
+            PaceGraphVM.Reset();
             RelativeVM.Reset();
             _playerWasOnPitRoad = null;
             _classColorManager.Reset();
@@ -315,6 +324,8 @@ namespace VISOR.ViewModels
             _lastSubSessionId = string.Empty;
             ClearSessionUI();
             WarningsVM.Reset();
+            TrackTempVM.Reset();
+            PaceGraphVM.Reset();
         }
 
         public ClassColorManager ClassColorManager => _classColorManager;

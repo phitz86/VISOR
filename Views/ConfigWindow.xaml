@@ -130,6 +130,9 @@
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Ring" Property="Stroke" Value="{StaticResource Accent}"/>
                             </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45"/>
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -392,8 +395,19 @@
                                   IsChecked="False" Margin="30,0,0,10"
                                   IsEnabled="{Binding IsChecked, ElementName=Row4CheckBox}"
                                   Checked="HidePitsCheckBox_Changed" Unchecked="HidePitsCheckBox_Changed"/>
-                        <CheckBox x:Name="Row5CheckBox" Content="Row 5: Warnings (Incidents, Pace, Pit Cue)"
-                                  IsChecked="True" Margin="0" Checked="RowCheckBox_Changed" Unchecked="RowCheckBox_Changed"/>
+                        <CheckBox x:Name="Row5CheckBox" Content="Row 5: Incident Counter + Track Temp"
+                                  IsChecked="True" Checked="RowCheckBox_Changed" Unchecked="RowCheckBox_Changed"/>
+                        <StackPanel Orientation="Horizontal" Margin="30,0,0,0"
+                                    IsEnabled="{Binding IsChecked, ElementName=Row5CheckBox}">
+                            <TextBlock Text="Track Temp:" VerticalAlignment="Center" Margin="0,0,12,0"
+                                       Foreground="{StaticResource TextSecondary}" FontSize="13"/>
+                            <RadioButton x:Name="TempFahrenheitRadio" Content="Fahrenheit (°F)" GroupName="TempUnit"
+                                         VerticalAlignment="Center" Margin="0,0,16,0"
+                                         Checked="TempUnitRadio_Changed"/>
+                            <RadioButton x:Name="TempCelsiusRadio" Content="Celsius (°C)" GroupName="TempUnit"
+                                         VerticalAlignment="Center"
+                                         Checked="TempUnitRadio_Changed"/>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 

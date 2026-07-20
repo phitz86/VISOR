@@ -259,6 +259,18 @@ namespace VISOR.Settings
             set => this["PositionDisplayMode"] = value;
         }
 
+        /// <summary>
+        /// Display unit for the Row 5 track temperature element.
+        /// Telemetry reports °C; Fahrenheit is a display-time conversion.
+        /// </summary>
+        [UserScopedSetting]
+        [DefaultSettingValue("Fahrenheit")]
+        public TemperatureUnit TemperatureUnit
+        {
+            get => (TemperatureUnit)this["TemperatureUnit"];
+            set => this["TemperatureUnit"] = value;
+        }
+
         #endregion
 
         #region Update Settings
@@ -397,5 +409,14 @@ namespace VISOR.Settings
     {
         Class,
         Overall
+    }
+
+    /// <summary>
+    /// Unit used to display temperatures (track temp in Row 5).
+    /// </summary>
+    public enum TemperatureUnit
+    {
+        Celsius,
+        Fahrenheit
     }
 }
