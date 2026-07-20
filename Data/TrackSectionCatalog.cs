@@ -46,7 +46,8 @@ namespace VISOR.TrackData
             if (tracks.Count == 0)
                 return null;
 
-            string haystack = ((trackName ?? "") + " " + (trackDisplayName ?? "")).ToLowerInvariant();
+            string slug = (trackName ?? "").Trim().ToLowerInvariant();
+            string haystack = slug + " " + (trackDisplayName ?? "").ToLowerInvariant();
 
             // Config keys match against TrackConfigName plus the TrackName slug: iRacing puts
             // the layout in the config on multi-config venues ("Road Course") but only in the
@@ -58,7 +59,13 @@ namespace VISOR.TrackData
             TrackSectionSet? configAgnostic = null;
             foreach (var track in tracks)
             {
-                if (!track.Match.Any(m => haystack.Contains(m)))
+                // A "=slug" key demands exact TrackName equality (used by imported
+                // per-layout entries, where substring venue matching would let e.g.
+                // "lagunaseca" swallow "lagunaseca school"). Plain keys are venue
+                // substrings matched against slug + display name.
+                if (!track.Match.Any(m => m.StartsWith('=')
+                        ? slug == m[1..]
+                        : haystack.Contains(m)))
                     continue;
 
                 if (track.Configs.Length == 0)

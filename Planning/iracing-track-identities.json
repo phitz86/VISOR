@@ -5,7 +5,8 @@
     "https://github.com/Lovely-Sim-Racing/lovely-track-data (CC BY-NC-SA 4.0,",
     "(c) Lovely Sim Racing, https://lsr.gg), retrieved 2026-07-20. Identity",
     "facts only; no curated track data is reproduced here. TrackConfigName is",
-    "not part of this dump — the validator treats it as empty (worst case)."
+    "not part of this dump — the validator treats it as empty (worst case).",
+    "Entries marked verified:local were read from iRacing install folder names (tracks\\<venue>\\<config>) on 2026-07-20."
   ],
   "layouts": [
     {
@@ -69,6 +70,16 @@
       "display": "Donington Park Racing Circuit - National"
     },
     {
+      "slug": "fuji gp",
+      "display": "Fuji Speedway - Grand Prix",
+      "verified": "local"
+    },
+    {
+      "slug": "fuji nochicane",
+      "display": "Fuji Speedway - No Chicane",
+      "verified": "local"
+    },
+    {
       "slug": "hockenheim gp",
       "display": "Hockenheimring - GP"
     },
@@ -129,12 +140,12 @@
       "display": "Circuito de Jerez - Moto"
     },
     {
-      "slug": "lagunaseca school",
-      "display": "Laguna Seca - School"
-    },
-    {
       "slug": "lagunaseca",
       "display": "Laguna Seca - Full Course"
+    },
+    {
+      "slug": "lagunaseca school",
+      "display": "Laguna Seca - School"
     },
     {
       "slug": "ledenon",
@@ -177,6 +188,31 @@
       "display": "Magny-Cours"
     },
     {
+      "slug": "midohio altoval",
+      "display": "Mid-Ohio Sports Car Course - Alt Oval",
+      "verified": "local"
+    },
+    {
+      "slug": "midohio chicane",
+      "display": "Mid-Ohio Sports Car Course - Chicane",
+      "verified": "local"
+    },
+    {
+      "slug": "midohio full",
+      "display": "Mid-Ohio Sports Car Course - Full Course",
+      "verified": "local"
+    },
+    {
+      "slug": "midohio oval",
+      "display": "Mid-Ohio Sports Car Course - Oval",
+      "verified": "local"
+    },
+    {
+      "slug": "midohio short",
+      "display": "Mid-Ohio Sports Car Course - Short",
+      "verified": "local"
+    },
+    {
       "slug": "misano gp",
       "display": "Misano Grand Prix"
     },
@@ -209,12 +245,12 @@
       "display": "Autodromo Internazionale del Mugello - Short"
     },
     {
-      "slug": "navarra speedlong",
-      "display": "Circuito de Navarra Speed Circuit Long"
-    },
-    {
       "slug": "navara speedmedium",
       "display": "Circuito de Navarra - Speed Circuit - Medium"
+    },
+    {
+      "slug": "navarra speedlong",
+      "display": "Circuito de Navarra Speed Circuit Long"
     },
     {
       "slug": "navarra speedshort",
@@ -297,10 +333,6 @@
       "display": "Oulton Park Circuit - Intl w/out Hislop"
     },
     {
-      "slug": "outlon intbrittens",
-      "display": "Oulton Park Circuit - Intl w/out Brittens"
-    },
-    {
       "slug": "oulton international",
       "display": "Oulton Park Circuit - International"
     },
@@ -313,12 +345,16 @@
       "display": "Oulton Park Circuit - Intl w/no Chicanes"
     },
     {
+      "slug": "oulton island",
+      "display": "Oulton Park Circuit - Island"
+    },
+    {
       "slug": "oulton islandhistoric",
       "display": "Oulton Park Circuit - Island Historic"
     },
     {
-      "slug": "oulton island",
-      "display": "Oulton Park Circuit - Island"
+      "slug": "outlon intbrittens",
+      "display": "Oulton Park Circuit - Intl w/out Brittens"
     },
     {
       "slug": "phillipisland",
@@ -397,6 +433,10 @@
       "display": "Spa Grand Prix Pits - 2010"
     },
     {
+      "slug": "speilberg north",
+      "display": "Red Bull Ring - North"
+    },
+    {
       "slug": "spielberg gp",
       "display": "Red Bull Ring - GP"
     },
@@ -405,24 +445,20 @@
       "display": "Red Bull Ring - National"
     },
     {
-      "slug": "speilberg north",
-      "display": "Red Bull Ring - North"
+      "slug": "summit jefferson",
+      "display": "Summit Point Raceway - Jefferson Circuit"
     },
     {
       "slug": "summit jefferson rev",
       "display": "Summit Point Raceway - Jefferson Circuit Reverse"
     },
     {
-      "slug": "summit jefferson",
-      "display": "Summit Point Raceway - Jefferson Circuit"
+      "slug": "summit summit raceway",
+      "display": "Summit Point Raceway"
     },
     {
       "slug": "summit summit raceway school",
       "display": "Summit Point Raceway - School"
-    },
-    {
-      "slug": "summit summit raceway",
-      "display": "Summit Point Raceway"
     },
     {
       "slug": "summit summit short",

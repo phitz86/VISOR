@@ -39,13 +39,21 @@ def contains_token(haystack: str, key: str) -> bool:
         start = i + 1
 
 
+def matches_venue(t, slug: str, haystack: str) -> bool:
+    """'=slug' keys demand exact TrackName equality; plain keys are substrings."""
+    return any(
+        slug == m[1:] if m.startswith("=") else m in haystack for m in t["match"]
+    )
+
+
 def resolve(tracks, slug: str, display: str, config: str = ""):
     """Mirror of TrackSectionCatalog.Resolve."""
-    haystack = f"{slug} {display}".lower()
+    slug = slug.strip().lower()
+    haystack = f"{slug} {display.lower()}"
     config_haystack = f"{config} {slug}".lower()
     config_agnostic = None
     for t in tracks:
-        if not any(m in haystack for m in t["match"]):
+        if not matches_venue(t, slug, haystack):
             continue
         if not t["configs"]:
             config_agnostic = config_agnostic or t
@@ -69,7 +77,8 @@ def main() -> int:
             resolved.append((slug, display, entry["track"]))
             continue
         venue_hit = any(
-            any(m in f"{slug} {display}".lower() for m in t["match"]) for t in tracks
+            matches_venue(t, slug.strip().lower(), f"{slug} {display}".lower())
+            for t in tracks
         )
         (guarded if venue_hit else no_venue).append((slug, display))
 
