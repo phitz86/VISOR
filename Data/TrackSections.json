@@ -2,10 +2,12 @@
   "_readme": [
     "Named track sections for the Row 5 location readout.",
     "Matching: an entry applies when ANY 'match' substring appears in iRacing's",
-    "TrackName or TrackDisplayName (case-insensitive), AND — if 'configs' is",
-    "non-empty — any 'configs' substring appears in TrackConfigName. An entry with",
-    "an empty 'configs' list applies to every configuration of that venue, and a",
-    "config-specific entry always wins over a config-agnostic one.",
+    "TrackName or TrackDisplayName (case-insensitive). If 'configs' is non-empty,",
+    "additionally some 'configs' substring must appear in TrackConfigName OR in the",
+    "TrackName slug — iRacing names the layout in the config on multi-config venues",
+    "('Road Course') but only in the slug on single-config content ('imola gp',",
+    "empty config). An entry with an empty 'configs' list applies to every layout",
+    "of the venue; a config-specific entry always wins over a config-agnostic one.",
     "Sections: ordered by 'pct', the fraction of lap distance (iRacing LapDistPct,",
     "0 = start/finish line) where the section begins. Each section runs until the",
     "next one starts; the last section wraps around to the first. Boundaries are",
@@ -44,7 +46,7 @@
     {
       "track": "Monza",
       "match": ["monza"],
-      "configs": ["grand prix"],
+      "configs": ["grand prix", "grandprix", "gp"],
       "sections": [
         { "pct": 0.000, "name": "Main Straight" },
         { "pct": 0.070, "name": "Variante del Rettifilo" },
@@ -62,7 +64,7 @@
     {
       "track": "Silverstone",
       "match": ["silverstone"],
-      "configs": ["grand prix"],
+      "configs": ["grand prix", "grandprix", "gp"],
       "sections": [
         { "pct": 0.000, "name": "Pit Straight" },
         { "pct": 0.025, "name": "Abbey" },
@@ -89,7 +91,7 @@
     {
       "track": "Nürburgring Grand-Prix-Strecke",
       "match": ["rburgring"],
-      "configs": ["grand prix"],
+      "configs": ["grand prix", "grandprix", "gp"],
       "sections": [
         { "pct": 0.000, "name": "Start/Finish Straight" },
         { "pct": 0.040, "name": "Castrol-S" },
@@ -259,7 +261,7 @@
     {
       "track": "Suzuka",
       "match": ["suzuka"],
-      "configs": ["grand prix"],
+      "configs": ["grand prix", "grandprix", "gp"],
       "sections": [
         { "pct": 0.000, "name": "Main Straight" },
         { "pct": 0.045, "name": "Turn 1" },
@@ -323,7 +325,7 @@
     {
       "track": "Brands Hatch",
       "match": ["brands hatch"],
-      "configs": ["grand prix"],
+      "configs": ["grand prix", "grandprix", "gp"],
       "sections": [
         { "pct": 0.000, "name": "Brabham Straight" },
         { "pct": 0.045, "name": "Paddock Hill Bend" },
@@ -345,7 +347,7 @@
     {
       "track": "Zandvoort",
       "match": ["zandvoort"],
-      "configs": ["grand prix"],
+      "configs": ["grand prix", "grandprix", "gp"],
       "sections": [
         { "pct": 0.000, "name": "Main Straight" },
         { "pct": 0.040, "name": "Tarzanbocht" },
@@ -364,7 +366,7 @@
     {
       "track": "Red Bull Ring",
       "match": ["red bull ring"],
-      "configs": ["grand prix"],
+      "configs": ["grand prix", "grandprix", "gp"],
       "sections": [
         { "pct": 0.000, "name": "Start/Finish" },
         { "pct": 0.050, "name": "Turn 1" },
@@ -383,7 +385,7 @@
     {
       "track": "Imola",
       "match": ["imola", "enzo e dino ferrari"],
-      "configs": ["grand prix"],
+      "configs": ["grand prix", "grandprix", "gp"],
       "sections": [
         { "pct": 0.000, "name": "Start/Finish Straight" },
         { "pct": 0.150, "name": "Tamburello" },
@@ -424,7 +426,7 @@
     {
       "track": "Circuit of the Americas",
       "match": ["americas", "cota"],
-      "configs": ["grand prix"],
+      "configs": ["grand prix", "grandprix", "gp"],
       "sections": [
         { "pct": 0.000, "name": "Main Straight" },
         { "pct": 0.040, "name": "Turn 1" },
@@ -522,7 +524,7 @@
     {
       "track": "Hockenheimring",
       "match": ["hockenheim"],
-      "configs": ["grand prix"],
+      "configs": ["grand prix", "grandprix", "gp"],
       "sections": [
         { "pct": 0.000, "name": "Start/Finish Straight" },
         { "pct": 0.045, "name": "Nordkurve" },
@@ -564,7 +566,7 @@
     {
       "track": "Circuit de Barcelona-Catalunya",
       "match": ["catalunya", "barcelona"],
-      "configs": ["grand prix"],
+      "configs": ["grand prix", "grandprix", "gp"],
       "sections": [
         { "pct": 0.000, "name": "Main Straight" },
         { "pct": 0.115, "name": "Elf (Turn 1)" },
@@ -639,7 +641,7 @@
     {
       "track": "Fuji Speedway",
       "match": ["fuji"],
-      "configs": ["grand prix"],
+      "configs": ["grand prix", "grandprix", "gp"],
       "sections": [
         { "pct": 0.000, "name": "Main Straight" },
         { "pct": 0.150, "name": "TGR Corner (T1)" },

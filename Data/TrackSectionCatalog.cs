@@ -47,7 +47,13 @@ namespace VISOR.TrackData
                 return null;
 
             string haystack = ((trackName ?? "") + " " + (trackDisplayName ?? "")).ToLowerInvariant();
-            string config = (trackConfig ?? "").ToLowerInvariant();
+
+            // Config keys match against TrackConfigName plus the TrackName slug: iRacing puts
+            // the layout in the config on multi-config venues ("Road Course") but only in the
+            // slug on single-config content ("imola gp" with an empty config). The display name
+            // stays out of this haystack — it is venue-wide ("Sebring International Raceway"),
+            // so including it would let every layout of a venue satisfy the guard.
+            string configHaystack = ((trackConfig ?? "") + " " + (trackName ?? "")).ToLowerInvariant();
 
             TrackSectionSet? configAgnostic = null;
             foreach (var track in tracks)
@@ -57,7 +63,7 @@ namespace VISOR.TrackData
 
                 if (track.Configs.Length == 0)
                     configAgnostic ??= track;
-                else if (track.Configs.Any(c => config.Contains(c)))
+                else if (track.Configs.Any(c => configHaystack.Contains(c)))
                     return track;
             }
             return configAgnostic;
