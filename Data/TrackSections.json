@@ -1,0 +1,394 @@
+{
+  "_readme": [
+    "Named track sections for the Row 5 location readout.",
+    "Matching: an entry applies when ANY 'match' substring appears in iRacing's",
+    "TrackName or TrackDisplayName (case-insensitive), AND — if 'configs' is",
+    "non-empty — any 'configs' substring appears in TrackConfigName. An entry with",
+    "an empty 'configs' list applies to every configuration of that venue, and a",
+    "config-specific entry always wins over a config-agnostic one.",
+    "Sections: ordered by 'pct', the fraction of lap distance (iRacing LapDistPct,",
+    "0 = start/finish line) where the section begins. Each section runs until the",
+    "next one starts; the last section wraps around to the first. Boundaries are",
+    "placed slightly BEFORE the corner so the name reads out during the approach",
+    "and braking zone, when the driver can still use it.",
+    "The pct values are hand-estimated from track maps and are meant to be tuned:",
+    "drive a lap with DEBUG logging on — every section transition is logged with",
+    "the live LapDistPct — and adjust the numbers here. No recompile needed."
+  ],
+  "tracks": [
+    {
+      "track": "Spa-Francorchamps",
+      "match": ["spa"],
+      "configs": [],
+      "sections": [
+        { "pct": 0.000, "name": "Pit Straight" },
+        { "pct": 0.030, "name": "La Source" },
+        { "pct": 0.070, "name": "Descent to Eau Rouge" },
+        { "pct": 0.130, "name": "Eau Rouge" },
+        { "pct": 0.160, "name": "Raidillon" },
+        { "pct": 0.190, "name": "Kemmel Straight" },
+        { "pct": 0.330, "name": "Les Combes" },
+        { "pct": 0.395, "name": "Malmedy" },
+        { "pct": 0.445, "name": "Rivage" },
+        { "pct": 0.495, "name": "No Name" },
+        { "pct": 0.555, "name": "Pouhon" },
+        { "pct": 0.640, "name": "Fagnes" },
+        { "pct": 0.695, "name": "Campus" },
+        { "pct": 0.730, "name": "Stavelot" },
+        { "pct": 0.765, "name": "Paul Frère" },
+        { "pct": 0.815, "name": "Blanchimont" },
+        { "pct": 0.925, "name": "Bus Stop" },
+        { "pct": 0.975, "name": "Pit Straight" }
+      ]
+    },
+    {
+      "track": "Monza",
+      "match": ["monza"],
+      "configs": ["grand prix"],
+      "sections": [
+        { "pct": 0.000, "name": "Main Straight" },
+        { "pct": 0.070, "name": "Variante del Rettifilo" },
+        { "pct": 0.115, "name": "Curva Grande" },
+        { "pct": 0.230, "name": "Variante della Roggia" },
+        { "pct": 0.295, "name": "Lesmo 1" },
+        { "pct": 0.365, "name": "Lesmo 2" },
+        { "pct": 0.430, "name": "Serraglio" },
+        { "pct": 0.560, "name": "Variante Ascari" },
+        { "pct": 0.640, "name": "Back Straight" },
+        { "pct": 0.810, "name": "Parabolica" },
+        { "pct": 0.890, "name": "Main Straight" }
+      ]
+    },
+    {
+      "track": "Silverstone",
+      "match": ["silverstone"],
+      "configs": ["grand prix"],
+      "sections": [
+        { "pct": 0.000, "name": "Pit Straight" },
+        { "pct": 0.025, "name": "Abbey" },
+        { "pct": 0.060, "name": "Farm Curve" },
+        { "pct": 0.100, "name": "Village" },
+        { "pct": 0.135, "name": "The Loop" },
+        { "pct": 0.160, "name": "Aintree" },
+        { "pct": 0.185, "name": "Wellington Straight" },
+        { "pct": 0.285, "name": "Brooklands" },
+        { "pct": 0.325, "name": "Luffield" },
+        { "pct": 0.370, "name": "Woodcote" },
+        { "pct": 0.410, "name": "National Straight" },
+        { "pct": 0.435, "name": "Copse" },
+        { "pct": 0.500, "name": "Maggotts" },
+        { "pct": 0.550, "name": "Becketts" },
+        { "pct": 0.600, "name": "Chapel" },
+        { "pct": 0.630, "name": "Hangar Straight" },
+        { "pct": 0.745, "name": "Stowe" },
+        { "pct": 0.800, "name": "Vale" },
+        { "pct": 0.855, "name": "Club" },
+        { "pct": 0.905, "name": "Pit Straight" }
+      ]
+    },
+    {
+      "track": "Nürburgring Grand-Prix-Strecke",
+      "match": ["rburgring"],
+      "configs": ["grand prix"],
+      "sections": [
+        { "pct": 0.000, "name": "Start/Finish Straight" },
+        { "pct": 0.040, "name": "Castrol-S" },
+        { "pct": 0.090, "name": "Mercedes-Arena" },
+        { "pct": 0.180, "name": "Run to Ford-Kurve" },
+        { "pct": 0.240, "name": "Ford-Kurve" },
+        { "pct": 0.330, "name": "Dunlop-Kehre" },
+        { "pct": 0.420, "name": "Michael-Schumacher-S" },
+        { "pct": 0.520, "name": "Warsteiner-Kurve" },
+        { "pct": 0.600, "name": "Advan-Bogen" },
+        { "pct": 0.680, "name": "Back Straight" },
+        { "pct": 0.810, "name": "NGK-Schikane" },
+        { "pct": 0.900, "name": "Coca-Cola-Kurve" },
+        { "pct": 0.950, "name": "Start/Finish Straight" }
+      ]
+    },
+    {
+      "track": "Watkins Glen (Boot)",
+      "match": ["watkins glen"],
+      "configs": ["boot"],
+      "sections": [
+        { "pct": 0.000, "name": "Front Straight" },
+        { "pct": 0.050, "name": "The Ninety" },
+        { "pct": 0.100, "name": "The Esses" },
+        { "pct": 0.185, "name": "Back Straight" },
+        { "pct": 0.360, "name": "Inner Loop" },
+        { "pct": 0.410, "name": "Outer Loop" },
+        { "pct": 0.460, "name": "The Chute" },
+        { "pct": 0.520, "name": "Boot Entry" },
+        { "pct": 0.570, "name": "Toe of the Boot" },
+        { "pct": 0.650, "name": "Heel of the Boot" },
+        { "pct": 0.740, "name": "Turn 9" },
+        { "pct": 0.830, "name": "Turn 10" },
+        { "pct": 0.900, "name": "Turn 11" },
+        { "pct": 0.950, "name": "Front Straight" }
+      ]
+    },
+    {
+      "track": "Road America",
+      "match": ["road america"],
+      "configs": ["full"],
+      "sections": [
+        { "pct": 0.000, "name": "Front Straight" },
+        { "pct": 0.050, "name": "Turn 1" },
+        { "pct": 0.090, "name": "Moraine Sweep" },
+        { "pct": 0.135, "name": "Turn 3" },
+        { "pct": 0.180, "name": "Hurry Downs" },
+        { "pct": 0.235, "name": "Turn 5" },
+        { "pct": 0.290, "name": "Turn 6" },
+        { "pct": 0.340, "name": "Turn 7" },
+        { "pct": 0.380, "name": "Turn 8" },
+        { "pct": 0.430, "name": "The Carousel" },
+        { "pct": 0.510, "name": "The Kink" },
+        { "pct": 0.570, "name": "Kettle Bottoms" },
+        { "pct": 0.660, "name": "Canada Corner" },
+        { "pct": 0.730, "name": "Turn 13" },
+        { "pct": 0.820, "name": "Turn 14" },
+        { "pct": 0.880, "name": "Front Straight" }
+      ]
+    },
+    {
+      "track": "Laguna Seca",
+      "match": ["laguna seca"],
+      "configs": [],
+      "sections": [
+        { "pct": 0.000, "name": "Start/Finish" },
+        { "pct": 0.050, "name": "Turn 1" },
+        { "pct": 0.090, "name": "Andretti Hairpin" },
+        { "pct": 0.200, "name": "Turn 3" },
+        { "pct": 0.300, "name": "Turn 4" },
+        { "pct": 0.400, "name": "Turn 5" },
+        { "pct": 0.510, "name": "Turn 6" },
+        { "pct": 0.600, "name": "Rahal Straight" },
+        { "pct": 0.665, "name": "The Corkscrew" },
+        { "pct": 0.770, "name": "Rainey Curve" },
+        { "pct": 0.860, "name": "Turn 10" },
+        { "pct": 0.920, "name": "Turn 11" },
+        { "pct": 0.960, "name": "Start/Finish" }
+      ]
+    },
+    {
+      "track": "Suzuka",
+      "match": ["suzuka"],
+      "configs": ["grand prix"],
+      "sections": [
+        { "pct": 0.000, "name": "Main Straight" },
+        { "pct": 0.045, "name": "Turn 1" },
+        { "pct": 0.075, "name": "Turn 2" },
+        { "pct": 0.120, "name": "S Curves" },
+        { "pct": 0.260, "name": "Dunlop Curve" },
+        { "pct": 0.330, "name": "Degner 1" },
+        { "pct": 0.370, "name": "Degner 2" },
+        { "pct": 0.440, "name": "Hairpin" },
+        { "pct": 0.500, "name": "Run to Spoon" },
+        { "pct": 0.620, "name": "Spoon Curve" },
+        { "pct": 0.700, "name": "Back Straight" },
+        { "pct": 0.820, "name": "130R" },
+        { "pct": 0.925, "name": "Casio Triangle" },
+        { "pct": 0.965, "name": "Main Straight" }
+      ]
+    },
+    {
+      "track": "Interlagos",
+      "match": ["interlagos", "carlos pace"],
+      "configs": [],
+      "sections": [
+        { "pct": 0.000, "name": "Main Straight" },
+        { "pct": 0.040, "name": "Senna S" },
+        { "pct": 0.100, "name": "Curva do Sol" },
+        { "pct": 0.150, "name": "Reta Oposta" },
+        { "pct": 0.270, "name": "Descida do Lago" },
+        { "pct": 0.400, "name": "Ferradura" },
+        { "pct": 0.520, "name": "Pinheirinho" },
+        { "pct": 0.620, "name": "Bico de Pato" },
+        { "pct": 0.700, "name": "Mergulho" },
+        { "pct": 0.750, "name": "Junção" },
+        { "pct": 0.800, "name": "Subida dos Boxes" },
+        { "pct": 0.900, "name": "Arquibancadas" },
+        { "pct": 0.960, "name": "Main Straight" }
+      ]
+    },
+    {
+      "track": "Mount Panorama",
+      "match": ["mount panorama", "bathurst"],
+      "configs": [],
+      "sections": [
+        { "pct": 0.000, "name": "Pit Straight" },
+        { "pct": 0.020, "name": "Hell Corner" },
+        { "pct": 0.050, "name": "Mountain Straight" },
+        { "pct": 0.210, "name": "Griffins' Bend" },
+        { "pct": 0.280, "name": "The Cutting" },
+        { "pct": 0.340, "name": "Reid Park" },
+        { "pct": 0.420, "name": "Sulman Park" },
+        { "pct": 0.460, "name": "McPhillamy Park" },
+        { "pct": 0.500, "name": "Skyline" },
+        { "pct": 0.530, "name": "The Esses" },
+        { "pct": 0.570, "name": "The Dipper" },
+        { "pct": 0.600, "name": "Forrest's Elbow" },
+        { "pct": 0.640, "name": "Conrod Straight" },
+        { "pct": 0.860, "name": "The Chase" },
+        { "pct": 0.940, "name": "Murray's Corner" },
+        { "pct": 0.975, "name": "Pit Straight" }
+      ]
+    },
+    {
+      "track": "Brands Hatch",
+      "match": ["brands hatch"],
+      "configs": ["grand prix"],
+      "sections": [
+        { "pct": 0.000, "name": "Brabham Straight" },
+        { "pct": 0.045, "name": "Paddock Hill Bend" },
+        { "pct": 0.100, "name": "Hailwood Hill" },
+        { "pct": 0.130, "name": "Druids" },
+        { "pct": 0.190, "name": "Graham Hill Bend" },
+        { "pct": 0.240, "name": "Cooper Straight" },
+        { "pct": 0.320, "name": "Surtees" },
+        { "pct": 0.370, "name": "Pilgrim's Drop" },
+        { "pct": 0.450, "name": "Hawthorn Bend" },
+        { "pct": 0.550, "name": "Westfield" },
+        { "pct": 0.640, "name": "Dingle Dell" },
+        { "pct": 0.710, "name": "Sheene Curve" },
+        { "pct": 0.780, "name": "Stirling's" },
+        { "pct": 0.860, "name": "Clearways" },
+        { "pct": 0.930, "name": "Brabham Straight" }
+      ]
+    },
+    {
+      "track": "Zandvoort",
+      "match": ["zandvoort"],
+      "configs": ["grand prix"],
+      "sections": [
+        { "pct": 0.000, "name": "Main Straight" },
+        { "pct": 0.040, "name": "Tarzanbocht" },
+        { "pct": 0.110, "name": "Gerlachbocht" },
+        { "pct": 0.160, "name": "Hugenholtzbocht" },
+        { "pct": 0.240, "name": "Hunzerug" },
+        { "pct": 0.300, "name": "Slotemakerbocht" },
+        { "pct": 0.380, "name": "Scheivlak" },
+        { "pct": 0.500, "name": "Mastersbocht" },
+        { "pct": 0.580, "name": "Back Section" },
+        { "pct": 0.680, "name": "Hans Ernst Bocht" },
+        { "pct": 0.860, "name": "Arie Luyendijkbocht" },
+        { "pct": 0.950, "name": "Main Straight" }
+      ]
+    },
+    {
+      "track": "Red Bull Ring",
+      "match": ["red bull ring"],
+      "configs": ["grand prix"],
+      "sections": [
+        { "pct": 0.000, "name": "Start/Finish" },
+        { "pct": 0.050, "name": "Turn 1" },
+        { "pct": 0.130, "name": "Uphill Run" },
+        { "pct": 0.240, "name": "Remus" },
+        { "pct": 0.330, "name": "Downhill Run" },
+        { "pct": 0.410, "name": "Schlossgold" },
+        { "pct": 0.500, "name": "Rauch" },
+        { "pct": 0.580, "name": "Würth" },
+        { "pct": 0.650, "name": "Run to Rindt" },
+        { "pct": 0.730, "name": "Rindt" },
+        { "pct": 0.840, "name": "Turn 10" },
+        { "pct": 0.920, "name": "Start/Finish" }
+      ]
+    },
+    {
+      "track": "Imola",
+      "match": ["imola", "enzo e dino ferrari"],
+      "configs": ["grand prix"],
+      "sections": [
+        { "pct": 0.000, "name": "Start/Finish Straight" },
+        { "pct": 0.150, "name": "Tamburello" },
+        { "pct": 0.240, "name": "Villeneuve" },
+        { "pct": 0.300, "name": "Tosa" },
+        { "pct": 0.380, "name": "Uphill to Piratella" },
+        { "pct": 0.430, "name": "Piratella" },
+        { "pct": 0.520, "name": "Acque Minerali" },
+        { "pct": 0.620, "name": "Variante Alta" },
+        { "pct": 0.700, "name": "Downhill to Rivazza" },
+        { "pct": 0.800, "name": "Rivazza" },
+        { "pct": 0.880, "name": "Start/Finish Straight" }
+      ]
+    },
+    {
+      "track": "Sebring",
+      "match": ["sebring"],
+      "configs": ["international"],
+      "sections": [
+        { "pct": 0.000, "name": "Front Straight" },
+        { "pct": 0.045, "name": "Turn 1" },
+        { "pct": 0.095, "name": "Turn 3" },
+        { "pct": 0.155, "name": "Turn 5" },
+        { "pct": 0.210, "name": "Turn 6" },
+        { "pct": 0.260, "name": "Hairpin" },
+        { "pct": 0.330, "name": "Turns 8-9" },
+        { "pct": 0.400, "name": "Cunningham" },
+        { "pct": 0.470, "name": "Turn 12" },
+        { "pct": 0.520, "name": "Back Straight" },
+        { "pct": 0.640, "name": "Tower Turn" },
+        { "pct": 0.700, "name": "Turn 14" },
+        { "pct": 0.760, "name": "Turn 15" },
+        { "pct": 0.830, "name": "Turn 16" },
+        { "pct": 0.880, "name": "Sunset Bend" },
+        { "pct": 0.950, "name": "Front Straight" }
+      ]
+    },
+    {
+      "track": "Circuit of the Americas",
+      "match": ["americas", "cota"],
+      "configs": ["grand prix"],
+      "sections": [
+        { "pct": 0.000, "name": "Main Straight" },
+        { "pct": 0.040, "name": "Turn 1" },
+        { "pct": 0.090, "name": "The Esses" },
+        { "pct": 0.240, "name": "Turns 7-9" },
+        { "pct": 0.330, "name": "Turn 10" },
+        { "pct": 0.420, "name": "Turn 11 Hairpin" },
+        { "pct": 0.500, "name": "Back Straight" },
+        { "pct": 0.640, "name": "Turn 12" },
+        { "pct": 0.700, "name": "Stadium Section" },
+        { "pct": 0.800, "name": "Triple Apex" },
+        { "pct": 0.880, "name": "Turn 19" },
+        { "pct": 0.930, "name": "Turn 20" },
+        { "pct": 0.965, "name": "Main Straight" }
+      ]
+    },
+    {
+      "track": "Daytona Road Course",
+      "match": ["daytona"],
+      "configs": ["road"],
+      "sections": [
+        { "pct": 0.000, "name": "Start/Finish" },
+        { "pct": 0.050, "name": "Turn 1" },
+        { "pct": 0.110, "name": "International Horseshoe" },
+        { "pct": 0.180, "name": "Turn 5" },
+        { "pct": 0.235, "name": "The Kink" },
+        { "pct": 0.270, "name": "NASCAR 1" },
+        { "pct": 0.340, "name": "NASCAR 2" },
+        { "pct": 0.420, "name": "Backstretch" },
+        { "pct": 0.540, "name": "Bus Stop" },
+        { "pct": 0.630, "name": "NASCAR 3" },
+        { "pct": 0.720, "name": "NASCAR 4" },
+        { "pct": 0.820, "name": "Tri-Oval" },
+        { "pct": 0.950, "name": "Start/Finish" }
+      ]
+    },
+    {
+      "track": "Lime Rock Park",
+      "match": ["lime rock"],
+      "configs": ["classic", "full"],
+      "sections": [
+        { "pct": 0.000, "name": "Main Straight" },
+        { "pct": 0.080, "name": "Big Bend" },
+        { "pct": 0.220, "name": "The Left Hander" },
+        { "pct": 0.320, "name": "No Name Straight" },
+        { "pct": 0.500, "name": "The Uphill" },
+        { "pct": 0.680, "name": "West Bend" },
+        { "pct": 0.800, "name": "The Downhill" },
+        { "pct": 0.900, "name": "Main Straight" }
+      ]
+    }
+  ]
+}

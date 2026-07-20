@@ -36,4 +36,12 @@
     <Resource Include="VISOR Logo.ico" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Ships beside the exe (not embedded) so users can tune section boundaries
+         and add tracks without a rebuild. -->
+    <None Update="Data\TrackSections.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
