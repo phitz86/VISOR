@@ -63,10 +63,33 @@ namespace VISOR.TrackData
 
                 if (track.Configs.Length == 0)
                     configAgnostic ??= track;
-                else if (track.Configs.Any(c => configHaystack.Contains(c)))
+                else if (track.Configs.Any(c => ContainsToken(configHaystack, c)))
                     return track;
             }
             return configAgnostic;
+        }
+
+        /// <summary>
+        /// Whole-word containment for config keys. Venue matching stays substring-based
+        /// (so "rburgring" covers Nürburgring/Nuerburgring/nurburgring), but config keys
+        /// must land on word boundaries: "gp" matches "nurburgring gp" yet not
+        /// "nurburgring gpshort" — the without-Arena layout must stay unresolved rather
+        /// than inherit full Grand Prix percentages. Digits count as word characters, so
+        /// "24" matches "24 heures" but not the year in "spa 2024 up".
+        /// </summary>
+        private static bool ContainsToken(string haystack, string key)
+        {
+            int start = 0;
+            while (true)
+            {
+                int i = haystack.IndexOf(key, start, StringComparison.Ordinal);
+                if (i < 0) return false;
+                int end = i + key.Length;
+                bool leftOk = i == 0 || !char.IsLetterOrDigit(haystack[i - 1]);
+                bool rightOk = end == haystack.Length || !char.IsLetterOrDigit(haystack[end]);
+                if (leftOk && rightOk) return true;
+                start = i + 1;
+            }
         }
 
         private static List<TrackSectionSet> GetTracks()
