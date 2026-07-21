@@ -104,7 +104,7 @@
     },
     {
       "track": "Nürburgring Grand-Prix-Strecke",
-      "source": "positions from 15 measured apexes; names user-confirmed T1/T5/T6/T10/T11, T7-T9 & T12-T15 inferred",
+      "source": "fully calibrated: positions from 15 measured apexes, all corner names driver-confirmed",
       "match": ["rburgring"],
       "configs": ["grand prix", "grandprix", "gp"],
       "sections": [
