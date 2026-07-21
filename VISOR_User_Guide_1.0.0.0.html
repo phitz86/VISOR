@@ -205,11 +205,23 @@
     <h3>Drag and Position</h3>
     <p>When the Configuration Window is open, both Main and Radar Windows display drag handles in the top-left corner. Click and drag to reposition. Positions save when you click "Done."</p>
 
+    <h3>Display Options</h3>
+    <p>Beyond the row toggles, the Configuration Window offers a few display preferences:</p>
+    <ul>
+        <li><strong>Position display:</strong> Show <strong>Class</strong> (within your car class, the default) or <strong>Overall</strong> (field-wide) position. Applies to both Row 0 and the Row 4 relative table.</li>
+        <li><strong>Temperature unit:</strong> Show the Row 5 track temperature in <strong>Fahrenheit</strong> (default) or <strong>Celsius</strong>.</li>
+        <li><strong>Row 5 elements:</strong> Track location, incident counter, and track temperature can each be shown or hidden independently.</li>
+        <li><strong>Hide cars in the pits:</strong> Remove pit-road cars from the Row 4 relative table (see Row 4 below for the exceptions).</li>
+    </ul>
+
+    <h3>Updates</h3>
+    <p>On startup VISOR quietly checks GitHub for a newer release. If one is available, a small notice appears in the Configuration Window with a link to the download &mdash; there are no pop-ups, and the check fails silently if you're offline.</p>
+
     <h2>Main Window Display Elements</h2>
 
-    <h3>Row 0: Gear Indicator & Class Position</h3>
+    <h3>Row 0: Gear Indicator & Position</h3>
     <p><strong>Gear Indicator:</strong> Displays current gear ("R" for reverse, "N" for neutral, numbers for forward gears) using a digital-style font for quick readability.</p>
-    <p><strong>Class Position:</strong> Shows your position within your car class (not overall). In practice/qualifying: based on fastest lap times. In races: real-time track position.</p>
+    <p><strong>Position:</strong> Shows your race position. By default this is your position within your car class; you can switch it to <strong>overall</strong> (field-wide) position in the Configuration Window. In practice/qualifying: based on fastest lap times. In races: real-time track position. The pace/safety car is excluded from overall counts.</p>
 
     <h3>Row 1: Time & Fuel Remaining</h3>
     <p><strong>Time/Laps Remaining:</strong> In timed sessions, shows time remaining (HH:MM:SS or MM:SS). In lap-limited sessions, shows laps remaining for leader (+1 to iRacing's value). In qualifying, shows personal laps completed/total allowed. Displays "Final Lap" on the white flag and "FINISHED" on the checkered flag.</p>
@@ -224,16 +236,16 @@
     <h3>Row 4: Relative Positioning Table</h3>
     <p>Shows 7 rows: 3 cars ahead, your car (yellow), and 3 behind. Gap times are calculated like a physical transponder loop to measure true time gaps between cars. Automatically hidden in Lone Qualifying sessions.</p>
     <p><strong>Visual Indicators:</strong> Yellow = you, White = same lap, Blue = lapped by you, Red = lapping you.</p>
-    <p><strong>Pit Road:</strong> Cars on pit road display a "PIT" label and use gray proximity segments.</p>
+    <p><strong>Pit Road:</strong> Cars on pit road display a "PIT" label and use gray proximity segments. An optional <strong>Hide cars in the pits</strong> setting (Configuration Window) removes pit-road cars from the table to reduce clutter &mdash; though you always see your own row, and pit-road cars reappear whenever you are on pit road yourself.</p>
+    <p><strong>Position numbers:</strong> The position shown for each car follows the same Class / Overall choice as Row 0 (set in the Configuration Window).</p>
     <p><strong>Stationary Cars:</strong> Stopped vehicles on track display their physical distance in feet (capped at 999ft) in bold yellow text.</p>
     <p><strong>Proximity Bar:</strong> Features a dynamic 5-segment warning system that fills as cars get closer, scaling from an informational 8.0-second gap down to a critical 0.6-second gap. Automatically filters disconnected drivers.</p>
 
-    <h3>Row 5: Warnings Row</h3>
+    <h3>Row 5: Info Row</h3>
+    <p>Row 5 holds three independent readouts. Each can be shown or hidden on its own in the Configuration Window, so you can keep just the ones you want.</p>
+    <p><strong>Track Location:</strong> The name of the corner or section of the circuit you're currently in &mdash; "Eau Rouge," "Kemmel Straight," and so on &mdash; like a sign hanging over the track. Names come from an editable catalog (<code>Data/TrackSections.json</code>) that ships alongside VISOR and covers 66 layouts out of the box, including the Nordschleife, Le Mans, and most iRacing road courses. On pit road it reads <strong>Pit Lane</strong>; on a track the catalog doesn't recognize (or when you're in the garage or being towed) the element simply hides. Advanced users can tune section boundaries or add tracks by editing the JSON file with a text editor &mdash; no rebuild required.</p>
     <p><strong>Incident Counter:</strong> Session incidents (0x, 4x, etc.). The color tracks how close you are to the session's incident limit rather than a fixed count, so it means the same thing whether your limit is 4x or 25x: <strong>white</strong> below ~30% of the limit, <strong>yellow</strong> from there to ~60%, and <strong>red</strong> beyond ~60% (roughly one bad incident from a DQ). Unlimited sessions use a gentle informational scale.</p>
-    <p><strong>Pace Warning (📉):</strong> Lights when your lap pace drops and <em>stays</em> down compared to your own established clean pace &mdash; flagging real lost time from damage, tire wear, or changing track conditions, rather than a single off lap. It needs the loss to hold for a couple of laps; after contact it reacts a lap sooner (see below). It clears once your pace returns to normal.</p>
-    <p><strong>Persistent Dot (•):</strong> Confirms <em>contact damage</em> &mdash; it appears when a hard hit (a 4x incident) is accompanied by lost pace. Unlike the pace warning, it stays lit until you pit, because damage doesn't heal by driving. A spin or off-track that doesn't involve contact won't trigger it.</p>
-    <p><strong>PIT Warning:</strong> Flashes when the time you'd lose limping to the finish outweighs the cost of pitting to fix the car. It waits for the pace loss to be confirmed (and not recovering) before recommending a stop, so it won't cry wolf over a momentary slow lap.</p>
-    <p><strong>After contact:</strong> A hard hit primes the system &mdash; if the first full lap afterward is slow, the pace warning and dot appear immediately, and a second slow lap throws PIT. If that first lap is fine, the car is treated as undamaged and nothing fires.</p>
+    <p><strong>Track Temperature:</strong> The current track-surface temperature, shown in °F or °C (your choice in the Configuration Window). A small arrow shows the trend: <strong>red up</strong> when the surface is heating, <strong>blue down</strong> when it's cooling. The trend is smoothed over several minutes, so the arrow reflects a genuine change in conditions rather than sensor jitter.</p>
 
     <h2>Radar Window</h2>
     <p>Top-down proximity view with 5 vertical zones (far left, near left, center, near right, far right). Your car: green rectangle in center. Other cars: colored by class. Detection range: ~5 car lengths ahead/behind. Can be toggled on/off in the Configuration window.</p>

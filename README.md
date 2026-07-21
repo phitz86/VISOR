@@ -64,13 +64,17 @@ relative gaps, and surrounding traffic — without a cluttered screen.
 
 ## Download & Install
 
-Download the latest signed installer from the
+Download the latest installer from the
 **[Releases page](https://github.com/phitz86/visor/releases)**.
 
 1. Download `VISOR-Setup-<version>.exe`.
-2. Run the installer. If the **.NET 8 Desktop Runtime** is not already present, the
-   installer will offer to download and install it for you.
-3. Launch VISOR, start iRacing, and the overlay will connect automatically when you
+2. Run the installer. Because VISOR is not yet code-signed, Windows may show a
+   **SmartScreen "Windows protected your PC"** prompt — this is expected for a new
+   independent app, not a sign of anything wrong. Click **More info → Run anyway**
+   to continue. (See [Code signing](#code-signing) below.)
+3. If the **.NET 8 Desktop Runtime** is not already present, the installer will offer
+   to download and install it for you.
+4. Launch VISOR, start iRacing, and the overlay will connect automatically when you
    enter a session.
 
 ### System requirements
@@ -156,10 +160,26 @@ is required for VISOR itself to function.
 
 ## Code signing
 
-The Windows installer and executable are digitally signed.
+**VISOR is not yet code-signed.** Because the installer and executable don't carry a
+publisher certificate, Windows SmartScreen will likely flag the download with a
+**"Windows protected your PC"** / **"unknown publisher"** warning the first time you
+run it. This is normal for a new, independent open-source app with no signing
+reputation yet — it isn't evidence that the file is unsafe.
 
-Free code signing is provided by [SignPath.io](https://signpath.io/), using a free
-code-signing certificate issued by the [SignPath Foundation](https://signpath.org/).
+To install anyway:
+
+1. When SmartScreen appears, click **More info**.
+2. Click **Run anyway**.
+
+If you'd rather not take our word for it, VISOR is fully open source — the complete
+build is right here in this repository, so you can read it or build the installer
+yourself.
+
+We'd love to remove this friction. Code signing is expensive for a free project, so
+we're actively looking for a code-signing sponsor — including free programs for
+open-source software such as the [SignPath Foundation](https://signpath.org/). If you
+can help, [get in touch](mailto:info@cephasmedia.com). This section will be updated the
+moment signed builds are available.
 
 ---
 
