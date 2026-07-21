@@ -395,18 +395,27 @@
                                   IsChecked="False" Margin="30,0,0,10"
                                   IsEnabled="{Binding IsChecked, ElementName=Row4CheckBox}"
                                   Checked="HidePitsCheckBox_Changed" Unchecked="HidePitsCheckBox_Changed"/>
-                        <CheckBox x:Name="Row5CheckBox" Content="Row 5: Incident Counter + Track Temp"
+                        <CheckBox x:Name="Row5CheckBox" Content="Row 5: Track Info"
                                   IsChecked="True" Checked="RowCheckBox_Changed" Unchecked="RowCheckBox_Changed"/>
-                        <StackPanel Orientation="Horizontal" Margin="30,0,0,0"
+                        <StackPanel Margin="30,0,0,0"
                                     IsEnabled="{Binding IsChecked, ElementName=Row5CheckBox}">
-                            <TextBlock Text="Track Temp:" VerticalAlignment="Center" Margin="0,0,12,0"
-                                       Foreground="{StaticResource TextSecondary}" FontSize="13"/>
-                            <RadioButton x:Name="TempFahrenheitRadio" Content="Fahrenheit (°F)" GroupName="TempUnit"
-                                         VerticalAlignment="Center" Margin="0,0,16,0"
-                                         Checked="TempUnitRadio_Changed"/>
-                            <RadioButton x:Name="TempCelsiusRadio" Content="Celsius (°C)" GroupName="TempUnit"
-                                         VerticalAlignment="Center"
-                                         Checked="TempUnitRadio_Changed"/>
+                            <CheckBox x:Name="TrackLocationCheckBox" Content="Track Location (corner names)"
+                                      IsChecked="True" Checked="Row5ElementCheckBox_Changed" Unchecked="Row5ElementCheckBox_Changed"/>
+                            <CheckBox x:Name="IncidentCheckBox" Content="Incident Counter"
+                                      IsChecked="True" Checked="Row5ElementCheckBox_Changed" Unchecked="Row5ElementCheckBox_Changed"/>
+                            <CheckBox x:Name="TrackTempCheckBox" Content="Track Temperature"
+                                      IsChecked="True" Checked="Row5ElementCheckBox_Changed" Unchecked="Row5ElementCheckBox_Changed"/>
+                            <StackPanel Orientation="Horizontal" Margin="30,0,0,0"
+                                        IsEnabled="{Binding IsChecked, ElementName=TrackTempCheckBox}">
+                                <TextBlock Text="Units:" VerticalAlignment="Center" Margin="0,0,12,0"
+                                           Foreground="{StaticResource TextSecondary}" FontSize="13"/>
+                                <RadioButton x:Name="TempFahrenheitRadio" Content="Fahrenheit (°F)" GroupName="TempUnit"
+                                             VerticalAlignment="Center" Margin="0,0,16,0"
+                                             Checked="TempUnitRadio_Changed"/>
+                                <RadioButton x:Name="TempCelsiusRadio" Content="Celsius (°C)" GroupName="TempUnit"
+                                             VerticalAlignment="Center"
+                                             Checked="TempUnitRadio_Changed"/>
+                            </StackPanel>
                         </StackPanel>
                     </StackPanel>
                 </Border>

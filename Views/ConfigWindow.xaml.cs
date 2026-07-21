@@ -98,6 +98,9 @@ namespace VISOR.Views
             Row4CheckBox.IsChecked = settings.ShowRow4;
             HidePitsCheckBox.IsChecked = settings.HideCarsInPits;
             Row5CheckBox.IsChecked = settings.ShowRow5;
+            TrackLocationCheckBox.IsChecked = settings.ShowTrackLocation;
+            IncidentCheckBox.IsChecked = settings.ShowIncidentCounter;
+            TrackTempCheckBox.IsChecked = settings.ShowTrackTemp;
             RadarCheckBox.IsChecked = settings.ShowRadar;
             DebugModeCheckBox.IsChecked = settings.DebugModeEnabled;
 
@@ -217,6 +220,19 @@ namespace VISOR.Views
 
             _settingsManager.UpdateElementVisibility(
                 showRow0, showRow1, showRow2, showRow3, showRow4, showRow5, showRadar);
+        }
+
+        private void Row5ElementCheckBox_Changed(object? sender, RoutedEventArgs e)
+        {
+            if (!_isInitialized || _settingsManager == null)
+                return;
+
+            bool showTrackLocation = TrackLocationCheckBox.IsChecked ?? false;
+            bool showIncident = IncidentCheckBox.IsChecked ?? false;
+            bool showTrackTemp = TrackTempCheckBox.IsChecked ?? false;
+
+            Log.Info($"Row 5 elements changed - location:{showTrackLocation} incident:{showIncident} temp:{showTrackTemp}");
+            _settingsManager.UpdateRow5ElementVisibility(showTrackLocation, showIncident, showTrackTemp);
         }
 
         private void PositionDisplayRadio_Changed(object? sender, RoutedEventArgs e)

@@ -221,6 +221,40 @@ namespace VISOR.Settings
         }
 
         /// <summary>
+        /// Show the Row 5 track-location readout (named corner/section of the circuit).
+        /// Gated by ShowRow5; only takes effect while Row 5 itself is visible.
+        /// </summary>
+        [UserScopedSetting]
+        [DefaultSettingValue("true")]
+        public bool ShowTrackLocation
+        {
+            get => (bool)this["ShowTrackLocation"];
+            set => this["ShowTrackLocation"] = value;
+        }
+
+        /// <summary>
+        /// Show the Row 5 incident counter. Gated by ShowRow5.
+        /// </summary>
+        [UserScopedSetting]
+        [DefaultSettingValue("true")]
+        public bool ShowIncidentCounter
+        {
+            get => (bool)this["ShowIncidentCounter"];
+            set => this["ShowIncidentCounter"] = value;
+        }
+
+        /// <summary>
+        /// Show the Row 5 track-temperature readout. Gated by ShowRow5.
+        /// </summary>
+        [UserScopedSetting]
+        [DefaultSettingValue("true")]
+        public bool ShowTrackTemp
+        {
+            get => (bool)this["ShowTrackTemp"];
+            set => this["ShowTrackTemp"] = value;
+        }
+
+        /// <summary>
         /// Show radar window
         /// </summary>
         [UserScopedSetting]
