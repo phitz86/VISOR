@@ -33,6 +33,10 @@ namespace VISOR.Telemetry
             dst.Weekend.TrackDisplayName = src.TrackDisplayName ?? string.Empty;
             dst.Weekend.TrackDisplayShortName = src.TrackDisplayShortName ?? string.Empty;
             dst.Weekend.TrackLength = ParseTrackLength(src.TrackLength);
+            dst.Weekend.EventType = src.EventType ?? string.Empty;
+            // SubSessionID is a bare integer in the YAML; Convert.ToString keeps this resilient to the
+            // SDK's exact numeric type (int/long/string/nullable) and normalizes it to a comparable key.
+            dst.Weekend.SubSessionId = System.Convert.ToString(src.SubSessionID, CultureInfo.InvariantCulture) ?? string.Empty;
             dst.IncidentLimit = ParseIncidentLimit(src.WeekendOptions?.IncidentLimit);
         }
 

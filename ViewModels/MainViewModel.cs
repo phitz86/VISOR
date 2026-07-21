@@ -22,6 +22,8 @@ namespace VISOR.ViewModels
         public DeltaBarViewModel DeltaBarVM { get; private set; }
         public WarningsViewModel WarningsVM { get; private set; }
         public CountdownViewModel CountdownVM { get; private set; }
+        public TrackTempViewModel TrackTempVM { get; private set; }
+        public TrackLocationViewModel TrackLocationVM { get; private set; }
 
         private readonly ClassColorManager _classColorManager;
         private readonly SettingsManager _settingsManager;
@@ -29,13 +31,15 @@ namespace VISOR.ViewModels
 
         private int _lastSessionNum = -1;
         private int _lastSessionState = -999;
-        private float _currentLapTopSpeed = 0f;
-        private float _lastLapTopSpeed = 0f;
+        private string _lastSubSessionId = string.Empty;
+        private bool? _playerWasOnPitRoad = null;
+
+        private const string LapTimePlaceholder = "-:--.---";
 
         public string ClassPositionNumber { get; private set; } = "--";
         public string GearDisplay { get; private set; } = "N";
-        public string LastLapTime { get; private set; } = "-:--.---";
-        public string BestLapTime { get; private set; } = "-:--.---";
+        public string LastLapTime { get; private set; } = LapTimePlaceholder;
+        public string BestLapTime { get; private set; } = LapTimePlaceholder;
 
         public bool ShowGear => _settingsManager.Settings.ShowRow0;
         public bool ShowPosition => _settingsManager.Settings.ShowRow0;
@@ -45,6 +49,13 @@ namespace VISOR.ViewModels
         public bool ShowLapTimes => _settingsManager.Settings.ShowRow3;
         public bool ShowRelative => _settingsManager.Settings.ShowRow4;
         public bool ShowWarnings => _settingsManager.Settings.ShowRow5;
+
+        // Individual Row 5 element toggles. The row grid is gated by ShowWarnings; these
+        // gate each element within it (the track-location element additionally hides itself
+        // when the current track isn't in the catalog, via TrackLocationVM.LocationVisible).
+        public bool ShowTrackLocationElement => _settingsManager.Settings.ShowTrackLocation;
+        public bool ShowIncidentElement => _settingsManager.Settings.ShowIncidentCounter;
+        public bool ShowTrackTempElement => _settingsManager.Settings.ShowTrackTemp;
 
         public double ScaleFactor => _settingsManager.Settings.WindowSize switch
         {
@@ -65,6 +76,8 @@ namespace VISOR.ViewModels
             DeltaBarVM = new DeltaBarViewModel();
             WarningsVM = new WarningsViewModel();
             CountdownVM = new CountdownViewModel();
+            TrackTempVM = new TrackTempViewModel();
+            TrackLocationVM = new TrackLocationViewModel();
         }
 
         private bool _isTelemetryConnected = false;
@@ -84,6 +97,9 @@ namespace VISOR.ViewModels
             OnPropertyChanged(nameof(ShowLapTimes));
             OnPropertyChanged(nameof(ShowRelative));
             OnPropertyChanged(nameof(ShowWarnings));
+            OnPropertyChanged(nameof(ShowTrackLocationElement));
+            OnPropertyChanged(nameof(ShowIncidentElement));
+            OnPropertyChanged(nameof(ShowTrackTempElement));
             OnPropertyChanged(nameof(ScaleFactor));
         }
 
@@ -98,6 +114,7 @@ namespace VISOR.ViewModels
             RelativeVM.Update(snapshot, sessionDataProvider);
             DeltaBarVM.Update(snapshot);
             CountdownVM.Update(snapshot, sessionDataProvider);
+            TrackTempVM.Update(snapshot.TrackTempCrew, snapshot.SessionTime);
 
             if (sessionDataProvider != null && sessionDataProvider.IsDataReady)
             {
@@ -111,6 +128,8 @@ namespace VISOR.ViewModels
                     }
                 }
 
+                TrackLocationVM.Update(snapshot, sessionDataProvider);
+
                 UpdatePlayerPosition(snapshot, sessionDataProvider);
             }
             else
@@ -119,40 +138,18 @@ namespace VISOR.ViewModels
                 OnPropertyChanged(nameof(ClassPositionNumber));
             }
 
-            float currentSpeed = snapshot.Speed;
-            if (currentSpeed > _currentLapTopSpeed)
-            {
-                _currentLapTopSpeed = currentSpeed;
-            }
-
             float lastLap = snapshot.LapLastLapTime;
-            if (lastLap > 0)
+
+            // Log the player's pit-road entry/exit transitions.
+            int playerIdx = snapshot.PlayerCarIdx;
+            if (playerIdx >= 0)
             {
-                LastLapTime = FormatLapTime(lastLap);
-                OnPropertyChanged(nameof(LastLapTime));
-
-                _lastLapTopSpeed = _currentLapTopSpeed;
-                _currentLapTopSpeed = 0f;
-
-                int playerIdx = snapshot.PlayerCarIdx;
-                bool onPitRoad = playerIdx >= 0 && snapshot.CarIdxOnPitRoad[playerIdx];
-                int lapsRemaining = snapshot.SessionLapsRemain;
-
-                // Green racing only: SessionState 4 is Racing; the caution bits mark a full-course
-                // yellow, during which lap times are pace-distorted and not a health signal.
-                const int CAUTION_FLAGS = 0x4000 | 0x8000; // irsdk caution | cautionWaving
-                bool isRacingGreen = snapshot.SessionState == 4 && (snapshot.SessionFlags & CAUTION_FLAGS) == 0;
-
-                WarningsVM.CheckPace(lastLap, _lastLapTopSpeed, lapsRemaining,
-                    snapshot.SessionTimeRemain, onPitRoad, isRacingGreen);
+                var pitRoadArr = snapshot.CarIdxOnPitRoad;
+                bool onPitRoad = playerIdx < pitRoadArr.Length && pitRoadArr[playerIdx];
+                CheckPlayerPitRoadTransition(onPitRoad, snapshot.Lap);
             }
 
-            float bestLap = snapshot.LapBestLapTime;
-            if (bestLap > 0)
-            {
-                BestLapTime = FormatLapTime(bestLap);
-                OnPropertyChanged(nameof(BestLapTime));
-            }
+            UpdateLapTimeDisplays(lastLap, snapshot.LapBestLapTime);
 
             UpdateGearDisplay(snapshot);
         }
@@ -162,13 +159,15 @@ namespace VISOR.ViewModels
         private void UpdatePlayerPosition(SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider)
         {
             string newPosition;
+            bool useOverall = _settingsManager.Settings.PositionDisplayMode == PositionDisplayMode.Overall;
 
             if (dataProvider.ShouldUseFastestLapPositioning())
             {
                 var playerCarIdx = snapshot.PlayerCarIdx;
                 var fastestLapData = dataProvider.GetFastestLapPositioning();
                 var playerData = fastestLapData.FirstOrDefault(d => d.carIdx == playerCarIdx);
-                newPosition = playerData.position > 0 ? playerData.position.ToString() : "--";
+                int position = useOverall ? playerData.overallPosition : playerData.classPosition;
+                newPosition = position > 0 ? position.ToString() : "--";
             }
             else
             {
@@ -178,7 +177,9 @@ namespace VISOR.ViewModels
                 if (playerCarIdx >= 0 && playerCarIdx < carClassIDs.Length)
                 {
                     int playerClassId = carClassIDs[playerCarIdx];
-                    int position = _positionCalculator.GetClassPosition(playerCarIdx, playerClassId);
+                    int position = useOverall
+                        ? _positionCalculator.GetOverallPosition(playerCarIdx)
+                        : _positionCalculator.GetClassPosition(playerCarIdx, playerClassId);
                     newPosition = position > 0 ? position.ToString() : "--";
                 }
                 else
@@ -189,10 +190,26 @@ namespace VISOR.ViewModels
 
             if (ClassPositionNumber != newPosition)
             {
-                Log.Debug($"Player position changed: '{ClassPositionNumber}' -> '{newPosition}'");
+                Log.Info($"Player position changed: '{ClassPositionNumber}' -> '{newPosition}'");
                 ClassPositionNumber = newPosition;
                 OnPropertyChanged(nameof(ClassPositionNumber));
             }
+        }
+
+        // Logs the player crossing onto or off pit road. The first observation only seeds the
+        // state (no log) so we don't emit a spurious "entered" when a session begins with the
+        // player already in the pits.
+        private void CheckPlayerPitRoadTransition(bool onPitRoad, int lap)
+        {
+            if (_playerWasOnPitRoad == onPitRoad) return;
+
+            if (_playerWasOnPitRoad != null)
+            {
+                Log.Info(onPitRoad
+                    ? $"Player entered pit road (lap {lap})"
+                    : $"Player exited pit road (lap {lap})");
+            }
+            _playerWasOnPitRoad = onPitRoad;
         }
 
         #endregion
@@ -237,14 +254,15 @@ namespace VISOR.ViewModels
 
         private void ClearSessionUI()
         {
-            LastLapTime = "-:--.---";
-            BestLapTime = "-:--.---";
+            LastLapTime = LapTimePlaceholder;
+            BestLapTime = LapTimePlaceholder;
             FuelVM.Reset();
             DeltaBarVM.Reset();
             RelativeVM.Reset();
             CountdownVM.Reset();
             GearDisplay = "N";
             ClassPositionNumber = "--";
+            _playerWasOnPitRoad = null;
 
             _classColorManager.Reset();
             _positionCalculator.Reset();
@@ -255,8 +273,28 @@ namespace VISOR.ViewModels
         private void CheckForSessionTransition(SVappsLABSnapshot snapshot, ISessionDataProvider? sessionDataProvider)
         {
             int currentSessionNum = snapshot.SessionNum;
-            if (currentSessionNum != _lastSessionNum && _lastSessionNum != -1)
+
+            // SubSessionID uniquely identifies the iRacing session and changes on any move to a
+            // genuinely new one — including open practice -> a race weekend's practice, which can keep
+            // SessionNum == 0 and so slip past the SessionNum check. Only meaningful once data is ready;
+            // otherwise carry the last value forward so we don't read a transient empty as a change.
+            string currentSubSessionId = (sessionDataProvider != null && sessionDataProvider.IsDataReady)
+                ? sessionDataProvider.SubSessionId
+                : _lastSubSessionId;
+
+            bool sessionNumChanged = currentSessionNum != _lastSessionNum && _lastSessionNum != -1;
+            // First non-empty reading only seeds _lastSubSessionId (empty -> set), never a transition.
+            bool subSessionChanged = !string.IsNullOrEmpty(currentSubSessionId)
+                && !string.IsNullOrEmpty(_lastSubSessionId)
+                && currentSubSessionId != _lastSubSessionId;
+
+            if (sessionNumChanged || subSessionChanged)
             {
+                if (subSessionChanged)
+                {
+                    Log.Info($"New subsession detected ({_lastSubSessionId} -> {currentSubSessionId}); resetting session UI");
+                }
+
                 ResetSessionData();
 
                 if (sessionDataProvider != null && sessionDataProvider.IsDataReady)
@@ -264,18 +302,26 @@ namespace VISOR.ViewModels
                     CountdownVM.OnSessionTransition(sessionDataProvider, currentSessionNum);
                 }
             }
+
             _lastSessionNum = currentSessionNum;
+            if (!string.IsNullOrEmpty(currentSubSessionId))
+            {
+                _lastSubSessionId = currentSubSessionId;
+            }
         }
 
         private void ResetSessionData()
         {
-            LastLapTime = "-:--.---";
-            BestLapTime = "-:--.---";
+            LastLapTime = LapTimePlaceholder;
+            BestLapTime = LapTimePlaceholder;
             DeltaBarVM.Reset();
             FuelVM.Reset();
             WarningsVM.Reset();
             CountdownVM.Reset();
+            TrackTempVM.Reset();
+            TrackLocationVM.Reset();
             RelativeVM.Reset();
+            _playerWasOnPitRoad = null;
             _classColorManager.Reset();
             _positionCalculator.Reset();
             OnPropertyChanged(string.Empty);
@@ -285,11 +331,41 @@ namespace VISOR.ViewModels
         {
             _lastSessionNum = -1;
             _lastSessionState = -999;
+            _lastSubSessionId = string.Empty;
             ClearSessionUI();
             WarningsVM.Reset();
+            TrackTempVM.Reset();
+            TrackLocationVM.Reset();
         }
 
         public ClassColorManager ClassColorManager => _classColorManager;
+
+        private void UpdateLapTimeDisplays(float lastLap, float bestLap)
+        {
+            // Latch the last non-zero value rather than mirroring telemetry: iRacing intermittently
+            // drops last/best lap to zero mid-session, and the display shouldn't flicker to the
+            // placeholder. The latch is cleared explicitly on a real session change (ResetSessionData,
+            // driven by SessionNum or SubSessionID in CheckForSessionTransition).
+            if (lastLap > 0)
+            {
+                string last = FormatLapTime(lastLap);
+                if (LastLapTime != last)
+                {
+                    LastLapTime = last;
+                    OnPropertyChanged(nameof(LastLapTime));
+                }
+            }
+
+            if (bestLap > 0)
+            {
+                string best = FormatLapTime(bestLap);
+                if (BestLapTime != best)
+                {
+                    BestLapTime = best;
+                    OnPropertyChanged(nameof(BestLapTime));
+                }
+            }
+        }
 
         private string FormatLapTime(float timeInSeconds)
         {

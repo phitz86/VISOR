@@ -68,6 +68,12 @@ namespace VISOR.Telemetry
             public float TrackLength { get; set; } = 0f;
             public string TrackDisplayName { get; set; } = string.Empty;
             public string TrackDisplayShortName { get; set; } = string.Empty;
+
+            // EventType ("Practice"/"Race"/...) and SubSessionID uniquely (the latter) identify the
+            // iRacing session you're in. A change in either signals a genuinely new session even when
+            // SessionNum is unchanged (e.g. open practice -> a race weekend's practice).
+            public string EventType { get; set; } = string.Empty;
+            public string SubSessionId { get; set; } = string.Empty;
         }
     }
 

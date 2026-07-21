@@ -50,6 +50,19 @@ ArchitecturesInstallIn64BitMode=x64compatible
 ; Privileges (install to Program Files requires admin)
 PrivilegesRequired=admin
 
+; Detect a running VISOR during install/uninstall so an upgrade can close it
+; before its files are replaced (otherwise the locked VISOR.exe can't be removed).
+; The name must match SingleInstanceMutexName in App.xaml.cs; it's in the Global\
+; namespace so this elevated (admin) installer can see the mutex created by the
+; app running as the normal user.
+AppMutex=Global\VISOR_SingleInstance_Mutex
+
+; Use the Windows Restart Manager to close VISOR automatically if it's running
+; (falls back to the AppMutex "please close it" prompt if it can't). Don't
+; auto-relaunch afterward — the optional post-install "Launch VISOR" task owns that.
+CloseApplications=yes
+RestartApplications=no
+
 ; Visual style
 WizardStyle=modern
 WizardImageFile=VISOR Install Banner logo.bmp
@@ -74,6 +87,9 @@ Source: "bin\Release\net8.0-windows8.0\*.dll"; DestDir: "{app}"; Flags: ignoreve
 
 ; Configuration files
 Source: "bin\Release\net8.0-windows8.0\*.json"; DestDir: "{app}"; Flags: ignoreversion;
+
+; Track section catalog (named corners for the Row 5 location readout)
+Source: "bin\Release\net8.0-windows8.0\Data\TrackSections.json"; DestDir: "{app}\Data"; Flags: ignoreversion
 
 ; Runtime config
 Source: "bin\Release\net8.0-windows8.0\*.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
@@ -215,14 +231,25 @@ begin
   end;
 end;
 
-// Handle upgrades - remove old version files before installing new
+// Handle upgrades: wipe the previous version's files before installing the new
+// set, so anything that shipped in an older release but not this one (orphaned
+// DLLs, renamed/removed dependencies, stale runtimes\ or satellite-resource
+// folders) doesn't linger in {app} and risk being loaded at runtime.
+//
+// ssInstall fires before Inno copies the new payload, so this is synchronous and
+// race-free. It is safe to clear {app}: all user data (settings, logs,
+// diagnostics) lives under %LOCALAPPDATA%\VISOR, never here. We only wipe {app}
+// when our own exe is present there — that confirms it's a prior VISOR install
+// rather than some unrelated folder the user may have chosen. Inno then recreates
+// {app}, installs the current files, and refreshes its own uninstaller; the
+// stable AppId keeps a single Programs-and-Features entry across upgrades.
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssInstall then
   begin
-    if DirExists(ExpandConstant('{app}')) then
+    if FileExists(ExpandConstant('{app}\{#MyAppExeName}')) then
     begin
-      DeleteFile(ExpandConstant('{app}\{#MyAppExeName}'));
+      DelTree(ExpandConstant('{app}'), True, True, True);
     end;
   end;
 end;

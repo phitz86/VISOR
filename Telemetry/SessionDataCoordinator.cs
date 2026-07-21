@@ -62,6 +62,11 @@ namespace VISOR.Telemetry
             get { lock (_parseLock) { return _transitionData.CurrentSessionNum; } }
         }
 
+        public string SubSessionId
+        {
+            get { lock (_parseLock) { return _staticData.Weekend.SubSessionId; } }
+        }
+
         public string GetSessionType(int sessionNum)
         {
             lock (_parseLock)
@@ -268,9 +273,9 @@ namespace VISOR.Telemetry
             return IsLoneQualifying(currentSession);
         }
 
-        public List<(int carIdx, float fastestTime, int position)> GetFastestLapPositioning()
+        public List<(int carIdx, float fastestTime, int classPosition, int overallPosition)> GetFastestLapPositioning()
         {
-            var result = new List<(int carIdx, float fastestTime, int position)>();
+            var result = new List<(int carIdx, float fastestTime, int classPosition, int overallPosition)>();
             int currentSession = CurrentSessionNum;
 
             if (IsPracticeSession(currentSession) || IsQualifyingSession(currentSession))
@@ -287,7 +292,9 @@ namespace VISOR.Telemetry
                 {
                     if (pos.FastestTime > 0)
                     {
-                        result.Add((pos.CarIdx, pos.FastestTime, pos.ClassPosition + 1));
+                        // ClassPosition is 0-based in the results YAML (needs +1); Position is
+                        // already 1-based, so it is used as-is.
+                        result.Add((pos.CarIdx, pos.FastestTime, pos.ClassPosition + 1, pos.Position));
                     }
                 }
             }
@@ -387,6 +394,8 @@ namespace VISOR.Telemetry
                 _staticData.Weekend.TrackLength = 0f;
                 _staticData.Weekend.TrackDisplayName = string.Empty;
                 _staticData.Weekend.TrackDisplayShortName = string.Empty;
+                _staticData.Weekend.EventType = string.Empty;
+                _staticData.Weekend.SubSessionId = string.Empty;
 
                 _transitionData.DriverIncidentCounts.Clear();
                 _transitionData.CurrentSessionNum = -1;

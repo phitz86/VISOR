@@ -31,7 +31,7 @@ namespace VISOR.Settings
                 if (_isInConfigMode != value)
                 {
                     _isInConfigMode = value;
-                    Log.Info($"[ConfigModeManager] Config mode changed to: {value}");
+                    Log.Debug($"[ConfigModeManager] Config mode changed to: {value}");
                     ConfigModeChanged?.Invoke(this, new ConfigModeChangedEventArgs(value));
                 }
             }
@@ -69,7 +69,7 @@ namespace VISOR.Settings
         /// </summary>
         public void EnterConfigMode()
         {
-            Log.Info("[ConfigModeManager] Entering config mode");
+            Log.Debug("[ConfigModeManager] Entering config mode");
             IsInConfigMode = true;
         }
 
@@ -78,7 +78,7 @@ namespace VISOR.Settings
         /// </summary>
         public void ExitConfigMode()
         {
-            Log.Info("[ConfigModeManager] Exiting config mode");
+            Log.Debug("[ConfigModeManager] Exiting config mode");
             IsInConfigMode = false;
         }
     }

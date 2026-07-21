@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Media;
 using VISOR.Diagnostics;
+using VISOR.Settings;
 using VISOR.Telemetry;
 
 namespace VISOR.ViewModels
@@ -29,6 +30,24 @@ namespace VISOR.ViewModels
 
         private const float METERS_TO_FEET = 3.28084f;
         private const int MAX_DISTANCE_FEET = 999;
+
+        // Upper sanity bound for the time-gap readout. The history buffer is the real limiter
+        // (it can only return a gap as deep as the history it stores); beyond this is noise.
+        private const float MAX_TIME_GAP_SECONDS = 600f;
+
+        // Ahead/behind hysteresis: a car must separate from the player by this much before its row
+        // slot (and gap sign) flips. Expressed in metres (converted via track length) so it stays a
+        // fixed physical distance on every track. ~2 m clears the real side-by-side longitudinal
+        // surge (~1-2 m) without lagging reality. Falls back to a pct when track length is unknown.
+        private const float AHEAD_BEHIND_HYSTERESIS_METERS = 2.0f;
+        private const float AHEAD_BEHIND_HYSTERESIS_DEFAULT_PCT = 0.0004f; // ~2 m on a ~5 km track
+
+        // DEBUG diagnostic gate: the relative-gap CSV logs a row only while a car is within this
+        // geometric distance of the player (~3 car lengths, ~0.2-0.3s at racing speed). Gating on
+        // distance (not the time-gap readout) keeps the flicker frames — where the gap glitches to a
+        // full lap — inside the window instead of filtering them out. Tighten/loosen to taste.
+        private const float LOG_PROXIMITY_METERS = 15f;
+        private const float LOG_PROXIMITY_FALLBACK_PCT = 0.003f; // ~15 m on a ~5 km track when length unknown
 
         private const int DEBUG_LOG_INTERVAL = 60; // ~1s at 60Hz
 
@@ -130,6 +149,11 @@ namespace VISOR.ViewModels
         {
             var allValidCars = new List<RelativeRowViewModel>();
 
+            // When the user is on pit road, show pit-road cars even if "hide cars in pits"
+            // is enabled, so you can see who you're stopped near during your own stop.
+            bool playerOnPitRoad = (onPitRoad != null && playerCarIdx >= 0
+                && playerCarIdx < onPitRoad.Length) && onPitRoad[playerCarIdx];
+
             foreach (int i in validCarIndices)
             {
                 if (i >= 0 && i < carNumbers.Length &&
@@ -143,6 +167,16 @@ namespace VISOR.ViewModels
                     // it rolls beyond the pit surface.
                     bool isPaceCar = (carClassIDs[i] == 11);
                     bool isOnPitRoad = (onPitRoad != null && i < onPitRoad.Length) && onPitRoad[i];
+
+                    // Optionally hide pit-road cars from the relative display only. Read live so the
+                    // config toggle takes effect immediately. The player's own row is never hidden,
+                    // so you still see yourself while serving your own stop. Pit-road cars also stay
+                    // visible whenever the player is on pit road.
+                    if (isOnPitRoad && i != playerCarIdx && !playerOnPitRoad
+                        && Settings.UserSettings.Instance.HideCarsInPits)
+                    {
+                        continue;
+                    }
 
                     if (isPaceCar)
                     {
@@ -189,12 +223,13 @@ namespace VISOR.ViewModels
             if (playerRow == null) return new List<RelativeRowViewModel>();
 
             float playerTrackPercent = playerRow.LapDistPct;
+            float hysteresisBandPct = GetHysteresisBandPct();
 
             var otherCars = allCars.Where(c => !c.IsPlayer).Select(car =>
             {
                 float directDistance = Math.Abs(car.LapDistPct - playerTrackPercent);
                 float proximity = Math.Min(directDistance, 1.0f - directDistance);
-                bool isAhead = (car.LapDistPct - playerTrackPercent + 1.5f) % 1.0f > 0.5f;
+                bool isAhead = ResolveAheadHysteretic(car, playerTrackPercent, hysteresisBandPct);
                 return new { Car = car, Proximity = proximity, IsAhead = isAhead };
             }).ToList();
 
@@ -208,6 +243,36 @@ namespace VISOR.ViewModels
             result.AddRange(carsBehind.Take(3));
 
             return result;
+        }
+
+        /// <summary>Hysteresis dead-band as a LapDistPct fraction, converted from metres via track length.</summary>
+        private float GetHysteresisBandPct()
+        {
+            float trackLengthMeters = _historyManager.TrackLengthMeters;
+            return (trackLengthMeters > 0f)
+                ? AHEAD_BEHIND_HYSTERESIS_METERS / trackLengthMeters
+                : AHEAD_BEHIND_HYSTERESIS_DEFAULT_PCT;
+        }
+
+        /// <summary>
+        /// Resolve whether a car is ahead of the player, with a small dead-band so a car running
+        /// dead-even doesn't flip slot/sign every frame. Flip to ahead only once it leads by +band,
+        /// to behind only once it trails by -band; hold the latched side in between. Seeds from raw
+        /// geometry the first time (or after a telemetry gap clears the latch).
+        /// </summary>
+        private bool ResolveAheadHysteretic(RelativeRowViewModel car, float playerTrackPercent, float bandPct)
+        {
+            // Shortest signed arc to the player: + = ahead, - = behind.
+            float signedDelta = car.LapDistPct - playerTrackPercent;
+            if (signedDelta > 0.5f) signedDelta -= 1.0f;
+            else if (signedDelta < -0.5f) signedDelta += 1.0f;
+
+            if (signedDelta > bandPct) car._proximitySide = 1;
+            else if (signedDelta < -bandPct) car._proximitySide = -1;
+            else if (car._proximitySide == 0) car._proximitySide = (sbyte)(signedDelta >= 0f ? 1 : -1);
+            // else: inside the dead-band — hold the previously latched side.
+
+            return car._proximitySide == 1;
         }
         #endregion
 
@@ -239,15 +304,20 @@ namespace VISOR.ViewModels
             bool isFastestLapMode,
             ISessionDataProvider dataProvider)
         {
+            bool useOverall = SettingsManager.Instance.Settings.PositionDisplayMode == PositionDisplayMode.Overall;
+
             if (isFastestLapMode)
             {
                 var fastestLapData = dataProvider.GetFastestLapPositioning();
                 var carData = fastestLapData.FirstOrDefault(d => d.carIdx == row.CarIdx);
-                row.ClassPos = (carData.fastestTime > 0) ? $"{carData.position}" : "--";
+                int position = useOverall ? carData.overallPosition : carData.classPosition;
+                row.ClassPos = (carData.fastestTime > 0) ? $"{position}" : "--";
             }
             else
             {
-                int position = _positionCalculator.GetClassPosition(row.CarIdx, row.ClassID);
+                int position = useOverall
+                    ? _positionCalculator.GetOverallPosition(row.CarIdx)
+                    : _positionCalculator.GetClassPosition(row.CarIdx, row.ClassID);
                 row.ClassPos = (position > 0) ? $"{position}" : "--";
             }
         }
@@ -287,12 +357,14 @@ namespace VISOR.ViewModels
                 return;
             }
 
-            // Wrap to the shortest arc around the lap (-0.5 to +0.5).
+            // Wrap to the shortest arc around the lap (-0.5 to +0.5). Used for the stationary feet
+            // readout; direction (ahead/behind) comes from the hysteretic side latched in
+            // BuildProximityBasedRows so the slot and the gap sign agree and don't twitch dead-even.
             float distDelta = row.LapDistPct - playerRow.LapDistPct;
             if (distDelta > 0.5f) distDelta -= 1.0f;
             else if (distDelta < -0.5f) distDelta += 1.0f;
 
-            bool isGeometricallyAhead = distDelta > 0;
+            bool isAhead = row._proximitySide >= 0;
 
             if (row.IsOnPitRoad)
             {
@@ -305,7 +377,7 @@ namespace VISOR.ViewModels
                 row.Segment5Color = PitGrayBrush;
 
 #if DEBUG
-                LogDiagnosticRow(snapshot, slotIndex, row, playerRow, distDelta, isGeometricallyAhead, "pit", 0f, row.GapText);
+                LogDiagnosticRow(snapshot, slotIndex, row, playerRow, distDelta, isAhead, "pit", 0f, row.GapText);
 #endif
                 return;
             }
@@ -331,49 +403,39 @@ namespace VISOR.ViewModels
                 ClearSegments(row);
 
 #if DEBUG
-                LogDiagnosticRow(snapshot, slotIndex, row, playerRow, distDelta, isGeometricallyAhead, "stationary", 0f, row.GapText);
+                LogDiagnosticRow(snapshot, slotIndex, row, playerRow, distDelta, isAhead, "stationary", 0f, row.GapText);
 #endif
                 return;
             }
 
-            // Buffer crossing lookup: for a car ahead, search the opponent's buffer for the player's
-            // current track position; for a car behind, search the player's buffer for the opponent's.
-            // Fallback to the other buffer when the primary search misses — at close range the
-            // ahead/behind flag can flip frame-to-frame, making the "wrong" buffer get tried first.
+            // Gap via the history buffers, measured BOTH ways, keeping the believable (smaller) one:
+            //   - "ahead" measure: how long ago the opponent passed the player's current spot.
+            //   - "behind" measure: how long ago the player passed the opponent's current spot.
+            // The current-lap crossing is always the small number; a lap-stale crossing (the
+            // side-by-side singularity, when a car sits right on the player's position) is always
+            // ~a full lap larger, so Min() discards it without having to guess direction. This is
+            // continuous through dead-even, killing the 0.0 <-> full-lap flicker.
             double sessionTime = snapshot.SessionTime;
-            float nativeTimeGap = 0f;
-            bool isAhead = isGeometricallyAhead;
+            var playerBuffer = _historyManager.GetBuffer(playerRow.CarIdx);
 #if DEBUG
             string gapSource = "buffer";
 #endif
 
-            double? crossingTime = null;
-            var playerBuffer = _historyManager.GetBuffer(playerRow.CarIdx);
+            float aheadGap = CrossingGap(oppBuffer, playerRow.LapDistPct, sessionTime);
+            float behindGap = CrossingGap(playerBuffer, row.LapDistPct, sessionTime);
 
-            if (isGeometricallyAhead)
-            {
-                if (oppBuffer != null)
-                    crossingTime = oppBuffer.FindCrossingTime(playerRow.LapDistPct);
-                if (!crossingTime.HasValue && playerBuffer != null)
-                    crossingTime = playerBuffer.FindCrossingTime(row.LapDistPct);
-            }
+            float nativeTimeGap;
+            if (aheadGap >= 0f && behindGap >= 0f)
+                nativeTimeGap = Math.Min(aheadGap, behindGap);
+            else if (aheadGap >= 0f)
+                nativeTimeGap = aheadGap;
+            else if (behindGap >= 0f)
+                nativeTimeGap = behindGap;
             else
             {
-                if (playerBuffer != null)
-                    crossingTime = playerBuffer.FindCrossingTime(row.LapDistPct);
-                if (!crossingTime.HasValue && oppBuffer != null)
-                    crossingTime = oppBuffer.FindCrossingTime(playerRow.LapDistPct);
-            }
-
-            if (crossingTime.HasValue && sessionTime > crossingTime.Value)
-            {
-                nativeTimeGap = (float)(sessionTime - crossingTime.Value);
-            }
-            else
-            {
-                // Buffer miss — hold previous display state instead of blanking the row.
+                // Both buffers missed — hold previous display state instead of blanking the row.
 #if DEBUG
-                LogDiagnosticRow(snapshot, slotIndex, row, playerRow, distDelta, isGeometricallyAhead, "none", 0f, row.GapText);
+                LogDiagnosticRow(snapshot, slotIndex, row, playerRow, distDelta, isAhead, "none", 0f, row.GapText);
 #endif
                 return;
             }
@@ -388,8 +450,9 @@ namespace VISOR.ViewModels
             row.UpdateSmoothedGap(nativeTimeGap);
             float displayGap = row.SmoothedGap;
 
-            // Buffer depth is 30s, so anything above that is out of range.
-            if (displayGap > 0 && displayGap < 30f)
+            // Show the gap whenever it's in a sane range. The history buffer naturally limits how
+            // far back a crossing can be found, so this just guards against garbage values.
+            if (displayGap > 0 && displayGap < MAX_TIME_GAP_SECONDS)
             {
                 string sign = isAhead ? "+" : "-";
                 row.GapText = $"{sign}{displayGap:F1}";
@@ -403,7 +466,7 @@ namespace VISOR.ViewModels
             row.GapFontWeight = FontWeights.SemiBold;
 
 #if DEBUG
-            LogDiagnosticRow(snapshot, slotIndex, row, playerRow, distDelta, isGeometricallyAhead, gapSource, displayGap, row.GapText);
+            LogDiagnosticRow(snapshot, slotIndex, row, playerRow, distDelta, isAhead, gapSource, displayGap, row.GapText);
 #endif
 
             if (_debugFrameCounter % DEBUG_LOG_INTERVAL == 0 && displayGap <= TIME_SEG2_AWARE)
@@ -438,6 +501,20 @@ namespace VISOR.ViewModels
             row._lastActiveSegmentCount = activeSegments;
         }
 
+        /// <summary>
+        /// Time since a car was last at <paramref name="targetPct"/>, per its history buffer.
+        /// Returns -1 when the buffer is missing or no usable crossing exists (caller treats as miss).
+        /// </summary>
+        private static float CrossingGap(PositionHistoryBuffer? buffer, float targetPct, double sessionTime)
+        {
+            if (buffer == null)
+                return -1f;
+            double? crossingTime = buffer.FindCrossingTime(targetPct);
+            if (crossingTime.HasValue && sessionTime > crossingTime.Value)
+                return (float)(sessionTime - crossingTime.Value);
+            return -1f;
+        }
+
         private static void ClearSegments(RelativeRowViewModel row)
         {
             row.Segment1Color = Brushes.Transparent;
@@ -450,15 +527,30 @@ namespace VISOR.ViewModels
 
 #if DEBUG
         private void LogDiagnosticRow(SVappsLABSnapshot snapshot, int slotIndex, RelativeRowViewModel row,
-            RelativeRowViewModel playerRow, float distDelta, bool isGeometricallyAhead, string gapSource,
+            RelativeRowViewModel playerRow, float distDelta, bool isAhead, string gapSource,
             float displayGap, string gapText)
         {
+            // Proximity gate: only log while a car is near the player, measured geometrically so the
+            // window stays valid even when the time-gap readout glitches to a full lap.
+            float trackLengthMeters = _historyManager.TrackLengthMeters;
+            bool isClose = (trackLengthMeters > 0f)
+                ? Math.Abs(distDelta) * trackLengthMeters <= LOG_PROXIMITY_METERS
+                : Math.Abs(distDelta) <= LOG_PROXIMITY_FALLBACK_PCT;
+            if (!isClose) return;
+
+            // Position-number path (the sort the relative slot can't show): assigned positions and the
+            // trackPosition that drives PositionCalculator's ordering.
+            int classPos = _positionCalculator.GetClassPosition(row.CarIdx, row.ClassID);
+            int overallPos = _positionCalculator.GetOverallPosition(row.CarIdx);
+            float trackPosition = row.CurrentLap + row.LapDistPct;
+
             float sessionTime = (float)snapshot.SessionTime;
             _gapLogger?.LogRow(
                 sessionTime, slotIndex, row.CarNum,
                 playerRow.LapDistPct, row.LapDistPct,
-                distDelta, isGeometricallyAhead,
-                gapSource, displayGap, gapText);
+                distDelta, isAhead,
+                gapSource, displayGap, gapText,
+                classPos, overallPos, trackPosition);
         }
 #endif
 

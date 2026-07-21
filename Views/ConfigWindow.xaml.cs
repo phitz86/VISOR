@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using VISOR.Diagnostics;
 using VISOR.Telemetry;
 using VISOR.Settings;
+using VISOR.Update;
 
 namespace VISOR.Views
 {
@@ -36,6 +37,8 @@ namespace VISOR.Views
 
             _configModeManager.EnterConfigMode();
 
+            CenterOnPrimaryScreen();
+
             var radarWindow = GetCurrentRadarWindow();
             if (radarWindow != null)
             {
@@ -46,12 +49,34 @@ namespace VISOR.Views
             UpdateDebugModeDisplay();
             _isInitialized = true;
 
+            // Surface an update if one was already found, and listen for one that
+            // arrives while this window is open. Storing the result statically means
+            // a Config window reopened after the check still shows the notification.
+            if (UpdateChecker.AvailableUpdate != null)
+                ShowUpdateAvailable(UpdateChecker.AvailableUpdate);
+            UpdateChecker.UpdateAvailable += OnUpdateAvailable;
+
             Log.Info("ConfigWindow opened - config mode enabled");
         }
 
         private RadarWindow? GetCurrentRadarWindow()
         {
             return ((App)Application.Current).CurrentRadarWindow;
+        }
+
+        /// <summary>
+        /// Anchors the Config window to the center of the primary screen ("Screen 1")
+        /// on startup. WPF's CenterScreen centers on whichever monitor holds the mouse
+        /// cursor, which is unpredictable on multi-monitor sim rigs; this is
+        /// deterministic. The primary screen's work area always sits at the origin of
+        /// the virtual desktop, so this keeps the window on Screen 1 and clear of the
+        /// taskbar.
+        /// </summary>
+        private void CenterOnPrimaryScreen()
+        {
+            var workArea = SystemParameters.WorkArea;
+            Left = workArea.Left + (workArea.Width - Width) / 2;
+            Top = workArea.Top + (workArea.Height - Height) / 2;
         }
 
         private void LoadCurrentSettings()
@@ -71,9 +96,23 @@ namespace VISOR.Views
             Row2CheckBox.IsChecked = settings.ShowRow2;
             Row3CheckBox.IsChecked = settings.ShowRow3;
             Row4CheckBox.IsChecked = settings.ShowRow4;
+            HidePitsCheckBox.IsChecked = settings.HideCarsInPits;
             Row5CheckBox.IsChecked = settings.ShowRow5;
+            TrackLocationCheckBox.IsChecked = settings.ShowTrackLocation;
+            IncidentCheckBox.IsChecked = settings.ShowIncidentCounter;
+            TrackTempCheckBox.IsChecked = settings.ShowTrackTemp;
             RadarCheckBox.IsChecked = settings.ShowRadar;
             DebugModeCheckBox.IsChecked = settings.DebugModeEnabled;
+
+            if (settings.PositionDisplayMode == PositionDisplayMode.Overall)
+                PositionOverallRadio.IsChecked = true;
+            else
+                PositionClassRadio.IsChecked = true;
+
+            if (settings.TemperatureUnit == TemperatureUnit.Celsius)
+                TempCelsiusRadio.IsChecked = true;
+            else
+                TempFahrenheitRadio.IsChecked = true;
 
             Log.Debug("Loaded current settings into UI");
         }
@@ -107,7 +146,7 @@ namespace VISOR.Views
                     _ => WindowSizePreset.Large
                 };
 
-                Log.Info($"Window size changed to {newSize}");
+                Log.Debug($"Window size changed to {newSize}");
                 _settingsManager.UpdateWindowSize(newSize);
             }
         }
@@ -183,6 +222,58 @@ namespace VISOR.Views
                 showRow0, showRow1, showRow2, showRow3, showRow4, showRow5, showRadar);
         }
 
+        private void Row5ElementCheckBox_Changed(object? sender, RoutedEventArgs e)
+        {
+            if (!_isInitialized || _settingsManager == null)
+                return;
+
+            bool showTrackLocation = TrackLocationCheckBox.IsChecked ?? false;
+            bool showIncident = IncidentCheckBox.IsChecked ?? false;
+            bool showTrackTemp = TrackTempCheckBox.IsChecked ?? false;
+
+            Log.Info($"Row 5 elements changed - location:{showTrackLocation} incident:{showIncident} temp:{showTrackTemp}");
+            _settingsManager.UpdateRow5ElementVisibility(showTrackLocation, showIncident, showTrackTemp);
+        }
+
+        private void PositionDisplayRadio_Changed(object? sender, RoutedEventArgs e)
+        {
+            if (!_isInitialized || _settingsManager == null)
+                return;
+
+            var newMode = PositionOverallRadio.IsChecked == true
+                ? PositionDisplayMode.Overall
+                : PositionDisplayMode.Class;
+
+            Log.Info($"Position display mode changed to {newMode}");
+            _settingsManager.UpdatePositionDisplayMode(newMode);
+        }
+
+        private void TempUnitRadio_Changed(object? sender, RoutedEventArgs e)
+        {
+            if (!_isInitialized || _settingsManager == null)
+                return;
+
+            var settings = _settingsManager.Settings;
+            settings.TemperatureUnit = TempCelsiusRadio.IsChecked == true
+                ? TemperatureUnit.Celsius
+                : TemperatureUnit.Fahrenheit;
+            settings.SaveSettings();
+
+            Log.Info($"Temperature unit changed to {settings.TemperatureUnit}");
+        }
+
+        private void HidePitsCheckBox_Changed(object? sender, RoutedEventArgs e)
+        {
+            if (!_isInitialized || _settingsManager == null)
+                return;
+
+            var settings = _settingsManager.Settings;
+            settings.HideCarsInPits = HidePitsCheckBox.IsChecked ?? false;
+            settings.SaveSettings();
+
+            Log.Info($"Hide cars in pits changed to {settings.HideCarsInPits}");
+        }
+
         private void RadarCheckBox_Changed(object? sender, RoutedEventArgs e)
         {
             if (!_isInitialized || _settingsManager == null)
@@ -225,9 +316,33 @@ namespace VISOR.Views
             ExitRequested?.Invoke(this, EventArgs.Empty);
         }
 
+        private void OnUpdateAvailable(Version latestVersion)
+        {
+            // The check may complete on a background continuation; marshal to the UI.
+            Dispatcher.Invoke(() => ShowUpdateAvailable(latestVersion));
+        }
+
+        /// <summary>
+        /// Reveals the green "Version x.y.z available" pill next to the version label.
+        /// </summary>
+        private void ShowUpdateAvailable(Version latestVersion)
+        {
+            UpdateButton.Content = $"Version {latestVersion.Major}.{latestVersion.Minor}.{latestVersion.Build} available";
+            UpdateButton.Visibility = Visibility.Visible;
+        }
+
+        private void UpdateButton_Click(object? sender, RoutedEventArgs e)
+        {
+            Log.Info("Update notification clicked - opening releases page");
+            UpdateChecker.OpenReleasesPage();
+        }
+
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
             Log.Info("ConfigWindow closing - saving window positions and exiting config mode");
+
+            // Static event would otherwise keep this closed window alive.
+            UpdateChecker.UpdateAvailable -= OnUpdateAvailable;
 
             SaveWindowPositions();
             _configModeManager.ExitConfigMode();

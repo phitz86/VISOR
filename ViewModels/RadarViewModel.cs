@@ -112,11 +112,27 @@ namespace VISOR.ViewModels
 
             if (lapDistPct == null || trackSurface == null) return;
 
+            // The live SDK telemetry CarIdx arrays (trackSurface, lapDistPct, onPitRoad) are sized
+            // by the SDK, while the session-derived arrays (carNumbers, carClassIDs) are fixed at 64.
+            // These are not guaranteed to match — as a new session loads the SDK arrays can come back
+            // larger than the still-64-sized session caches. Indexing every parallel array by the same
+            // i past the shortest one throws IndexOutOfRangeException, so bound the loop by the minimum.
+            int carCount = Math.Min(trackSurface.Length, lapDistPct.Length);
+            carCount = Math.Min(carCount, carNumbers.Length);
+            carCount = Math.Min(carCount, carClassIDs.Length);
+            carCount = Math.Min(carCount, onPitRoad.Length);
+
+            if (playerCarIdx < 0 || playerCarIdx >= carCount)
+            {
+                VisibleCarCount = 0;
+                return;
+            }
+
             var playerLapDistPct = lapDistPct[playerCarIdx];
             var playerOnPitRoad = onPitRoad?[playerCarIdx] ?? false;
             var visibleCars = new List<RadarCarData>();
 
-            for (int i = 0; i < trackSurface.Length; i++)
+            for (int i = 0; i < carCount; i++)
             {
                 if (i == playerCarIdx) continue;
                 if (trackSurface[i] == (int)iRacingTrackSurface.NotInWorld) continue;
@@ -181,7 +197,7 @@ namespace VISOR.ViewModels
 
             if (stateChanged)
             {
-                Log.Info($"[Radar] CarLeftRight state changed to {carLeftRightState}, {visibleCars.Count} visible cars");
+                Log.Debug($"[Radar] CarLeftRight state changed to {carLeftRightState}, {visibleCars.Count} visible cars");
             }
 
             foreach (var car in visibleCars)

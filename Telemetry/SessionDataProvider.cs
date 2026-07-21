@@ -19,6 +19,10 @@ namespace VISOR.Telemetry
         int IncidentLimit { get; }
         int CurrentSessionNum { get; }
 
+        // Stable identifier for the current iRacing session (from WeekendInfo.SubSessionID). Changes
+        // whenever the player moves to a genuinely different session, even if SessionNum repeats.
+        string SubSessionId { get; }
+
         // Session definition queries
         int GetSessionLaps(int sessionNum);
         double GetSessionTimeSeconds(int sessionNum);
@@ -28,7 +32,7 @@ namespace VISOR.Telemetry
         // Session-aware helper methods for positioning logic
         bool ShouldUseFastestLapPositioning();
         bool ShouldHideRelativeDisplay();
-        List<(int carIdx, float fastestTime, int position)> GetFastestLapPositioning();
+        List<(int carIdx, float fastestTime, int classPosition, int overallPosition)> GetFastestLapPositioning();
 
         // Qualifying results for reference lap time cascade
         float[] GetQualifyResultsFastestTimes();
