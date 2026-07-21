@@ -50,6 +50,13 @@ namespace VISOR.ViewModels
         public bool ShowRelative => _settingsManager.Settings.ShowRow4;
         public bool ShowWarnings => _settingsManager.Settings.ShowRow5;
 
+        // Individual Row 5 element toggles. The row grid is gated by ShowWarnings; these
+        // gate each element within it (the track-location element additionally hides itself
+        // when the current track isn't in the catalog, via TrackLocationVM.LocationVisible).
+        public bool ShowTrackLocationElement => _settingsManager.Settings.ShowTrackLocation;
+        public bool ShowIncidentElement => _settingsManager.Settings.ShowIncidentCounter;
+        public bool ShowTrackTempElement => _settingsManager.Settings.ShowTrackTemp;
+
         public double ScaleFactor => _settingsManager.Settings.WindowSize switch
         {
             WindowSizePreset.Small => 0.6,
@@ -90,6 +97,9 @@ namespace VISOR.ViewModels
             OnPropertyChanged(nameof(ShowLapTimes));
             OnPropertyChanged(nameof(ShowRelative));
             OnPropertyChanged(nameof(ShowWarnings));
+            OnPropertyChanged(nameof(ShowTrackLocationElement));
+            OnPropertyChanged(nameof(ShowIncidentElement));
+            OnPropertyChanged(nameof(ShowTrackTempElement));
             OnPropertyChanged(nameof(ScaleFactor));
         }
 

@@ -252,20 +252,27 @@
                          The DownOnly Viewbox keeps short names at full size while shrinking
                          long ones ("International Horseshoe") to fit the column — a name can
                          never clip, whatever the catalog grows to contain. -->
-                    <Viewbox Grid.Column="0" MaxWidth="196" MaxHeight="32"
-                             Stretch="Uniform" StretchDirection="DownOnly"
-                             HorizontalAlignment="Center" VerticalAlignment="Center"
-                             Visibility="{Binding TrackLocationVM.LocationVisible, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <TextBlock Text="{Binding TrackLocationVM.SectionName}"
-                                   FontSize="24" Foreground="White" Style="{StaticResource SemiboldText}"/>
-                    </Viewbox>
+                    <!-- Outer container carries the user's per-element toggle; the inner
+                         Viewbox keeps the data-driven hide on uncatalogued tracks. -->
+                    <Grid Grid.Column="0"
+                          Visibility="{Binding ShowTrackLocationElement, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Viewbox MaxWidth="196" MaxHeight="32"
+                                 Stretch="Uniform" StretchDirection="DownOnly"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center"
+                                 Visibility="{Binding TrackLocationVM.LocationVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock Text="{Binding TrackLocationVM.SectionName}"
+                                       FontSize="24" Foreground="White" Style="{StaticResource SemiboldText}"/>
+                        </Viewbox>
+                    </Grid>
 
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center"
+                                Visibility="{Binding ShowIncidentElement, Converter={StaticResource BoolToVisibilityConverter}}">
                         <TextBlock Text="⚠️" FontSize="36" Margin="0,0,10,0" Foreground="{Binding WarningsVM.IncidentColor}" Style="{StaticResource NormalWeightSymbol}"/>
                         <TextBlock Text="{Binding WarningsVM.IncidentDisplay}" FontSize="36" Foreground="{Binding WarningsVM.IncidentColor}" Style="{StaticResource SemiboldText}"/>
                     </StackPanel>
 
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Center">
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Center"
+                                Visibility="{Binding ShowTrackTempElement, Converter={StaticResource BoolToVisibilityConverter}}">
                         <TextBlock Text="🌡" FontSize="36" Margin="0,0,6,0" Foreground="LightGray" Style="{StaticResource NormalWeightSymbol}"/>
                         <TextBlock Text="{Binding TrackTempVM.TempDisplay}" FontSize="36" Style="{StaticResource SemiboldText}"/>
                         <TextBlock Text="{Binding TrackTempVM.TrendArrow}" FontSize="30" Width="26" Margin="4,0,0,0"
