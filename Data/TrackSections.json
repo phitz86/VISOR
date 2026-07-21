@@ -104,22 +104,22 @@
     },
     {
       "track": "Nürburgring Grand-Prix-Strecke",
-      "source": "APPROXIMATE (pending debug calibration): T1 anchored to pit-exit 0.112 (~150m before T1); mid-lap spread estimated",
+      "source": "calibrated to 3 measured apexes (T1 0.126, Dunlop 0.360, T13 0.880); intermediate corners interpolated",
       "match": ["rburgring"],
       "configs": ["grand prix", "grandprix", "gp"],
       "sections": [
         { "pct": 0.000, "name": "Start/Finish Straight" },
-        { "pct": 0.140, "name": "Castrol-S" },
-        { "pct": 0.259, "name": "Mercedes-Arena" },
-        { "pct": 0.310, "name": "Ford-Kurve" },
-        { "pct": 0.423, "name": "Dunlop-Kehre" },
-        { "pct": 0.513, "name": "Michael-Schumacher-S" },
-        { "pct": 0.642, "name": "Michelin-Kurve" },
-        { "pct": 0.688, "name": "Warsteiner-Kurve" },
-        { "pct": 0.783, "name": "Advan-Bogen" },
-        { "pct": 0.885, "name": "NGK-Schikane" },
-        { "pct": 0.935, "name": "Coca-Cola-Kurve" },
-        { "pct": 0.970, "name": "Start/Finish Straight" }
+        { "pct": 0.116, "name": "Castrol-S" },
+        { "pct": 0.214, "name": "Mercedes-Arena" },
+        { "pct": 0.256, "name": "Ford-Kurve" },
+        { "pct": 0.350, "name": "Dunlop-Kehre" },
+        { "pct": 0.439, "name": "Michael-Schumacher-S" },
+        { "pct": 0.566, "name": "Michelin-Kurve" },
+        { "pct": 0.610, "name": "Warsteiner-Kurve" },
+        { "pct": 0.704, "name": "Advan-Bogen" },
+        { "pct": 0.804, "name": "NGK-Schikane" },
+        { "pct": 0.915, "name": "Coca-Cola-Kurve" },
+        { "pct": 0.960, "name": "Start/Finish Straight" }
       ]
     },
     {
