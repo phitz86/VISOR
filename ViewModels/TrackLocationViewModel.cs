@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using VISOR.Diagnostics;
+using VISOR.Settings;
 using VISOR.Telemetry;
 using VISOR.TrackData;
 
@@ -54,13 +55,30 @@ namespace VISOR.ViewModels
             }
 
             ResolveTrackIfChanged(dataProvider);
+
+            float pct = snapshot.CarIdxLapDistPct[playerIdx];
+            bool onPitRoad = snapshot.CarIdxOnPitRoad[playerIdx];
+            bool validPct = pct >= 0f && pct <= 1f;
+
+            // Calibration aid: with Debug Mode on, show the live LapDistPct (and the
+            // resolved section name, if any) on every track — including uncatalogued ones
+            // and pit road — so true corner fractions can be read straight off a replay to
+            // tune the catalog. Bypasses the dwell so the number tracks the car instantly.
+            if (UserSettings.Instance.DebugModeEnabled && validPct)
+            {
+                string? label = ResolveSectionName(pct, onPitRoad);
+                SectionName = label != null ? $"{label} · {pct:F3}" : $"{pct:F3}";
+                LocationVisible = true;
+                return;
+            }
+
             if (_sectionSet == null)
             {
                 Hide();
                 return;
             }
 
-            if (snapshot.CarIdxOnPitRoad[playerIdx])
+            if (onPitRoad)
             {
                 // Force a fresh section fix on pit exit rather than resuming a stale one.
                 _displayedIdx = -1;
@@ -69,8 +87,7 @@ namespace VISOR.ViewModels
                 return;
             }
 
-            float pct = snapshot.CarIdxLapDistPct[playerIdx];
-            if (pct < 0f || pct > 1f)
+            if (!validPct)
             {
                 Hide();
                 return;
@@ -99,6 +116,18 @@ namespace VISOR.ViewModels
 
             if (_displayedIdx >= 0)
                 Show(_sectionSet.Sections[_displayedIdx].Name);
+        }
+
+        /// <summary>
+        /// The label for the current position without the dwell filter: "Pit Lane" on pit
+        /// road, the catalog section name on track, or null when the track is uncatalogued.
+        /// Used only by the Debug-Mode readout.
+        /// </summary>
+        private string? ResolveSectionName(float pct, bool onPitRoad)
+        {
+            if (onPitRoad) return _sectionSet != null ? PitLaneLabel : null;
+            if (_sectionSet == null) return null;
+            return _sectionSet.Sections[SectionIndexAt(pct)].Name;
         }
 
         /// <summary>
