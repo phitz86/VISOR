@@ -98,7 +98,19 @@ namespace VISOR.ViewModels
                 isTimedSession = (sessionLaps == -1);
             }
 
-            bool lapCompleted = currentLap > _lastLap;
+            // The first observation of the lap counter only seeds it: _lastLap starts at -1, and
+            // treating "anything > -1" as a completed lap would let the very first frame consume a
+            // flag that is already flying (starting or reconnecting VISOR mid-race under the white
+            // or checkered would latch Final Lap / FINISHED on the spot).
+            bool lapCompleted = _lastLap >= 0 && currentLap > _lastLap;
+
+            // A flag only counts toward a latch if it was already flying on an EARLIER frame than
+            // the crossing that consumes it. Latching on flags raised in the same telemetry sample
+            // would let a checkered that comes out as the player crosses S/F end their race a lap
+            // early — the routine case in multiclass, where the overall leader is lapping traffic
+            // and finishes alongside a car from a slower class.
+            bool whiteWasAlreadyFlying = _pendingWhiteFlag;
+            bool checkeredWasAlreadyFlying = _pendingCheckeredFlag;
 
             // Lap counter regressed — session restart.
             if (currentLap < _lastLap)
@@ -106,6 +118,8 @@ namespace VISOR.ViewModels
                 _greenFlagSeen = false;
                 _pendingWhiteFlag = false;
                 _pendingCheckeredFlag = false;
+                whiteWasAlreadyFlying = false;
+                checkeredWasAlreadyFlying = false;
             }
 
             if ((sessionFlagsValue & (int)SessionFlags.Green) == (int)SessionFlags.Green)
@@ -142,11 +156,11 @@ namespace VISOR.ViewModels
 
             if (shouldShowTimer)
             {
-                if (_pendingWhiteFlag && lapCompleted)
+                if (whiteWasAlreadyFlying && lapCompleted)
                 {
                     _finalLapLatched = true;
                 }
-                if (_pendingCheckeredFlag && lapCompleted)
+                if (checkeredWasAlreadyFlying && lapCompleted)
                 {
                     _finishedLatched = true;
                 }

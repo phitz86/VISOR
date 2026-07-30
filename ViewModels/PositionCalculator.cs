@@ -28,6 +28,11 @@ namespace VISOR.ViewModels
         private const float MIN_VELOCITY_THRESHOLD = 0.00001f; // Minimum velocity to use prediction
         private const int PACE_CAR_CLASS_ID = 11; // iRacing pace/safety car class - excluded from overall field positions
         private const int SESSION_STATE_RACING = 4; // irsdk SessionState: green flag is out (ParadeLaps=3 -> Racing=4)
+
+        // S/F crossing detection for the lap-number desync correction below.
+        private const float SF_WRAP_HIGH = 0.9f;
+        private const float SF_WRAP_LOW = 0.1f;
+        private const int LAP_DESYNC_MAX_FRAMES = 30; // ~0.5s at 60Hz - the correction is a bridge, not a state
         #endregion
 
         #region Private Fields - Core State
@@ -67,6 +72,15 @@ namespace VISOR.ViewModels
         // Tier 3: cache expiration removes cars after prolonged invalid data.
         private readonly Dictionary<int, int> _framesSinceValidData = new();
         private readonly Dictionary<int, int> _predictionStartFrame = new();
+        #endregion
+
+        #region Private Fields - Lap Number Desync
+        // iRacing does not always tick CarIdxLap and CarIdxLapDistPct over in the same telemetry
+        // frame at S/F. Whichever lags, the derived track position (lap + LapDistPct) is a full lap
+        // out for a frame or two, which drops a leader to the tail of the running order and back.
+        // This holds a per-car +1/-1 lap correction plus the frame it was raised, so a correction
+        // that never resolves expires instead of persisting as a bogus lap.
+        private readonly Dictionary<int, (int Offset, int Frame)> _lapNumberCorrection = new();
         #endregion
 
         #region Private Fields - Logging State
@@ -200,6 +214,7 @@ namespace VISOR.ViewModels
             _lastValidCurrentLap.Clear();
             _framesSinceValidData.Clear();
             _predictionStartFrame.Clear();
+            _lapNumberCorrection.Clear();
             _lastFrameValidCars.Clear();
             _isCurrentlyPredicting.Clear();
             _carsWithInvalidLapDistPctLogged.Clear();
@@ -258,6 +273,7 @@ namespace VISOR.ViewModels
                 _leaderHasFinished = false;
                 _lastLapCompleted.Clear();
                 _carsHavingTakenGreen.Clear();
+                _lapNumberCorrection.Clear();
             }
 
             _lastSessionNum = currentSessionNum;
@@ -406,15 +422,10 @@ namespace VISOR.ViewModels
         /// Sort key for a car that has not yet taken the green flag. Returns a negative value derived
         /// from grid order so the whole pre-green block sorts behind any car already racing (whose key
         /// is currentLap + LapDistPct, i.e. >= ~1), while preserving grid order within the block.
-        /// Grid order is taken from live CarIdxClassPosition (already per-class), falling back to
-        /// qualifying position, then to a deterministic last-place ordering if neither is available.
         /// </summary>
-        private static float GetPreGreenSortKey(int carIdx, int[]? classPositions, int[]? qualPositions)
+        private static float GetPreGreenSortKey(int carIdx, int[]? gridPositions)
         {
-            int grid = (classPositions != null && carIdx < classPositions.Length) ? classPositions[carIdx] : 0;
-
-            if (grid <= 0 && qualPositions != null && carIdx < qualPositions.Length)
-                grid = qualPositions[carIdx];
+            int grid = (gridPositions != null && carIdx < gridPositions.Length) ? gridPositions[carIdx] : 0;
 
             if (grid <= 0)
             {
@@ -425,6 +436,37 @@ namespace VISOR.ViewModels
             // Lower grid position should sort ahead; negate so P1 (-1) outranks P2 (-2) under
             // OrderByDescending, and the whole block stays below any green car's positive key.
             return -grid;
+        }
+
+        /// <summary>
+        /// Pick ONE grid-order source for the whole pre-green block. The live arrays are per-class
+        /// (CarIdxClassPosition) or field-wide (CarIdxPosition) and 1-based with 0 meaning "unknown";
+        /// qualifying order is field-wide and 1-based on the same terms. Both are valid orderings on
+        /// their own, but a per-car fallback would compare a 1..n class number against a 1..N field
+        /// number and scramble the block, so the source covering the most pre-green cars is used for
+        /// all of them and the rest fall to the back of the block.
+        /// </summary>
+        private static int[]? SelectGridSource(int[]? livePositions, int[]? qualPositions, List<int> preGreenCars)
+        {
+            int liveCoverage = CountCoveredCars(livePositions, preGreenCars);
+            if (liveCoverage == preGreenCars.Count)
+                return livePositions;
+
+            return (CountCoveredCars(qualPositions, preGreenCars) > liveCoverage) ? qualPositions : livePositions;
+        }
+
+        private static int CountCoveredCars(int[]? positions, List<int> carIndices)
+        {
+            if (positions == null)
+                return 0;
+
+            int covered = 0;
+            foreach (int carIdx in carIndices)
+            {
+                if (carIdx < positions.Length && positions[carIdx] > 0)
+                    covered++;
+            }
+            return covered;
         }
         #endregion
 
@@ -530,8 +572,23 @@ namespace VISOR.ViewModels
 
             _carsWithInvalidLapDistPctLogged.Remove(carIdx);
 
+            // Only meaningful against the immediately preceding frame. Across a telemetry gap the
+            // car may have crossed S/F unobserved, so the lap counter legitimately jumps without a
+            // LapDistPct wrap to pair it with — reading that as a desync would subtract a real lap.
+            bool followsValidFrame = _framesSinceValidData.GetValueOrDefault(carIdx, int.MaxValue) == 0;
+
             if (_lastValidLapDistPct.TryGetValue(carIdx, out float lastDist))
             {
+                if (followsValidFrame)
+                {
+                    UpdateLapNumberCorrection(carIdx, lastDist, lapDist,
+                        _lastValidCurrentLap.GetValueOrDefault(carIdx, lap), lap);
+                }
+                else
+                {
+                    _lapNumberCorrection.Remove(carIdx);
+                }
+
                 float delta = lapDist - lastDist;
 
                 // Lap boundary wrap-around.
@@ -586,6 +643,47 @@ namespace VISOR.ViewModels
             }
         }
 
+        /// <summary>
+        /// Track whether CarIdxLap and CarIdxLapDistPct currently disagree about which lap a car is
+        /// on. They normally tick over together at S/F, but either can lead the other by a frame or
+        /// two; while they disagree, lap + LapDistPct is a full lap off. The correction is a running
+        /// balance: a forward LapDistPct wrap adds a lap, the lap counter advancing removes one, so
+        /// it settles back at 0 the moment they agree again. Anything beyond +/-1 lap is a tow or a
+        /// reset rather than a desync, so the correction is dropped instead of carried.
+        /// </summary>
+        private void UpdateLapNumberCorrection(int carIdx, float prevDist, float lapDist, int prevLap, int lap)
+        {
+            int offset = GetLapNumberCorrection(carIdx);
+
+            offset -= (lap - prevLap);
+
+            if (prevDist > SF_WRAP_HIGH && lapDist < SF_WRAP_LOW)
+                offset += 1;
+            else if (prevDist < SF_WRAP_LOW && lapDist > SF_WRAP_HIGH)
+                offset -= 1;
+
+            if (offset == 0 || offset > 1 || offset < -1)
+                _lapNumberCorrection.Remove(carIdx);
+            else
+                _lapNumberCorrection[carIdx] = (offset, _globalFrameCounter);
+        }
+
+        /// <summary>
+        /// Lap-number correction for a car, or 0 once it has expired. Expiry matters because the
+        /// correction is only ever meant to bridge the frames between the two telemetry variables
+        /// agreeing; if the lap counter never catches up (an invalidated lap, a car towed to the
+        /// pits), holding it would put the car a whole lap out of position indefinitely.
+        /// </summary>
+        private int GetLapNumberCorrection(int carIdx)
+        {
+            if (_lapNumberCorrection.TryGetValue(carIdx, out var correction) &&
+                _globalFrameCounter - correction.Frame <= LAP_DESYNC_MAX_FRAMES)
+            {
+                return correction.Offset;
+            }
+            return 0;
+        }
+
         private float GetPredictedLapDistPct(int carIdx)
         {
             if (!_lastValidLapDistPct.TryGetValue(carIdx, out float lastDist) ||
@@ -620,12 +718,8 @@ namespace VISOR.ViewModels
             if (carClassIDs == null || currentLap == null || lapDistPct == null)
                 return;
 
-            // Grid-order sources for cars that have not yet taken the green flag.
-            var classPositions = snapshot.CarIdxClassPosition;
-            var overallPositions = snapshot.CarIdxPosition;
-            var qualPositions = sessionDataProvider.GetQualifyResultsPositions();
-
             var carsWithPositions = new List<CarPositionData>();
+            var preGreenCars = new List<int>();
 
             foreach (int carIdx in _validCarIndices)
             {
@@ -655,19 +749,15 @@ namespace VISOR.ViewModels
                 if (effectiveLapDistPct < 0f)
                     continue;
 
+                // CarIdxLap and CarIdxLapDistPct don't always tick over in the same frame at S/F;
+                // realign them so a car crossing the line doesn't read a full lap out for a frame.
+                effectiveCurrentLap += GetLapNumberCorrection(carIdx);
+
                 float trackPosition = effectiveCurrentLap + effectiveLapDistPct;
 
-                // Until a car takes the green flag, its on-grid LapDistPct is ambiguous across the
-                // S/F line, so order it by grid position instead of live track position. Class and
-                // overall use the same track position once green, but fall back to their respective
-                // grid orders (per-class vs field-wide) while pre-green.
                 bool hasTakenGreen = _carsHavingTakenGreen.Contains(carIdx);
-                float sortKey = hasTakenGreen
-                    ? trackPosition
-                    : GetPreGreenSortKey(carIdx, classPositions, qualPositions);
-                float overallSortKey = hasTakenGreen
-                    ? trackPosition
-                    : GetPreGreenSortKey(carIdx, overallPositions, qualPositions);
+                if (!hasTakenGreen)
+                    preGreenCars.Add(carIdx);
 
                 carsWithPositions.Add(new CarPositionData
                 {
@@ -676,9 +766,30 @@ namespace VISOR.ViewModels
                     CurrentLap = effectiveCurrentLap,
                     LapDistPct = effectiveLapDistPct,
                     TrackPosition = trackPosition,
-                    SortKey = sortKey,
-                    OverallSortKey = overallSortKey
+                    HasTakenGreen = hasTakenGreen,
+                    SortKey = trackPosition,
+                    OverallSortKey = trackPosition
                 });
+            }
+
+            // Until a car takes the green flag, its on-grid LapDistPct is ambiguous across the S/F
+            // line, so order it by grid position instead of live track position. Class and overall
+            // use the same track position once green, but fall back to their respective grid orders
+            // (per-class vs field-wide) while pre-green.
+            if (preGreenCars.Count > 0)
+            {
+                var qualPositions = sessionDataProvider.GetQualifyResultsPositions();
+                var classGrid = SelectGridSource(snapshot.CarIdxClassPosition, qualPositions, preGreenCars);
+                var overallGrid = SelectGridSource(snapshot.CarIdxPosition, qualPositions, preGreenCars);
+
+                foreach (var car in carsWithPositions)
+                {
+                    if (car.HasTakenGreen)
+                        continue;
+
+                    car.SortKey = GetPreGreenSortKey(car.CarIdx, classGrid);
+                    car.OverallSortKey = GetPreGreenSortKey(car.CarIdx, overallGrid);
+                }
             }
 
             AssignOverallPositions(carsWithPositions);
@@ -751,6 +862,7 @@ namespace VISOR.ViewModels
             public int CurrentLap { get; set; }
             public float LapDistPct { get; set; }
             public float TrackPosition { get; set; }
+            public bool HasTakenGreen { get; set; }
             public float SortKey { get; set; }
             public float OverallSortKey { get; set; }
         }

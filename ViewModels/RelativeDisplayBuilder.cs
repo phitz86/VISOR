@@ -35,6 +35,11 @@ namespace VISOR.ViewModels
         // (it can only return a gap as deep as the history it stores); beyond this is noise.
         private const float MAX_TIME_GAP_SECONDS = 600f;
 
+        // The gap is a real transponder-style measurement all the way out to half a lap, which on a
+        // long circuit is minutes. Past this it has stopped being proximity information and is just
+        // a wide number crowding the column, so it collapses to a bounded "99+" form.
+        private const float MAX_PRECISE_GAP_SECONDS = 99.9f;
+
         // Ahead/behind hysteresis: a car must separate from the player by this much before its row
         // slot (and gap sign) flips. Expressed in metres (converted via track length) so it stays a
         // fixed physical distance on every track. ~2 m clears the real side-by-side longitudinal
@@ -455,7 +460,9 @@ namespace VISOR.ViewModels
             if (displayGap > 0 && displayGap < MAX_TIME_GAP_SECONDS)
             {
                 string sign = isAhead ? "+" : "-";
-                row.GapText = $"{sign}{displayGap:F1}";
+                row.GapText = (displayGap > MAX_PRECISE_GAP_SECONDS)
+                    ? $"{sign}99+"
+                    : $"{sign}{displayGap:F1}";
             }
             else
             {

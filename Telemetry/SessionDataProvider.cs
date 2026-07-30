@@ -37,8 +37,9 @@ namespace VISOR.Telemetry
         // Qualifying results for reference lap time cascade
         float[] GetQualifyResultsFastestTimes();
 
-        // Qualifying grid positions (field-wide, monotonic within a class).
-        // Used as a fallback grid order for cars that have not yet taken the green flag.
+        // Qualifying grid positions (field-wide, monotonic within a class), 1-based: the
+        // pole-sitter is 1 and 0 means "this car has no qualifying result". Used as a fallback
+        // grid order for cars that have not yet taken the green flag.
         int[] GetQualifyResultsPositions();
     }
 }

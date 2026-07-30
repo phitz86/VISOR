@@ -5,6 +5,34 @@ All notable changes to VISOR are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Pole-sitter shown at the back of the field on the grid** — qualifying results
+  report the pole position as `0`, which the pre-green grid sort read as "this car has
+  no grid slot" and dumped to the back of the block. Everyone else shifted up one spot
+  as a result. Positions snapped back to correct at the green flag, so it only affected
+  the grid, parade laps, and the countdown to the start.
+- **Position flickering by a full lap at the start/finish line** — `CarIdxLap` and
+  `CarIdxLapDistPct` do not always tick over in the same telemetry frame, so for a frame
+  or two a car crossing S/F read as a whole lap down and dropped to the tail of the
+  running order before snapping back. The two variables are now realigned while they
+  disagree.
+- **Pre-green ordering no longer mixes grid sources** — the per-class live position array
+  and the field-wide qualifying order were being used interchangeably per car, which
+  could interleave a 1..n class number with a 1..N field number.
+- **"FINISHED" appearing a lap early** — the checkered flag is now only allowed to end
+  the race readout on a start/finish crossing that happens *after* the flag was seen, not
+  one in the same telemetry sample. In multiclass this matters: the overall leader is
+  usually lapping traffic when it finishes, so its checkered can land in the same frame as
+  a slower-class car crossing the line with a lap still to run. Starting or reconnecting
+  VISOR mid-race under the white or checkered flag no longer latches on the first frame
+  either.
+- **Very large relative gaps no longer crowd the gap column** — gaps beyond 99.9s (real
+  measurements, but no longer proximity information) now read `99+` instead of a widening
+  three-digit number.
+
 ## [1.0.0] - 2026-07-21
 
 VISOR's first stable release, graduating the app out of beta. This release reworks
