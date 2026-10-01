@@ -16,6 +16,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   It stays collapsed — costing no height — in every other session type, including lone
   qualifying and lap-limited races, which have no meaningful clock to show.
 
+### Changed
+
+- **Debug Mode now says what it actually does** — enabling it also appends your raw track
+  position (0–1) to the track-location readout, a calibration aid for tuning section
+  boundaries. The Config window only advertised verbose logging, so the overlay change came
+  as a surprise. The hint text now mentions both.
+- **Finish-phase diagnostics** — the log now records every change in SessionState and in the
+  green/white/checkered session flags, along with the leader's track position and laps
+  completed at that instant, plus a line for the case where a car completes a lap under the
+  checkered but isn't frozen. The timing between the flags changing and a car reaching the
+  line is what the finishing-position logic depends on, and nothing in the log could show it.
+
 ### Fixed
 
 - **Finishing positions not held when cars leave at the checkered** — the lap-completed

@@ -436,7 +436,7 @@
                         <TextBlock Text="Debug Settings (for Beta Testing)" Style="{StaticResource SectionHeader}"/>
                         <CheckBox x:Name="DebugModeCheckBox" Content="Enable Debug Mode (Verbose Logging)"
                                   Checked="DebugModeCheckBox_Checked" Unchecked="DebugModeCheckBox_Unchecked"/>
-                        <TextBlock Text="When enabled, detailed logs will be saved to the Logs folder."
+                        <TextBlock Text="When enabled, detailed logs will be saved to the Logs folder. The track-location readout also shows your raw track position (0-1), which is used to calibrate section boundaries."
                                    Style="{StaticResource HintText}" Margin="0,0,0,12"/>
                         <Button x:Name="OpenLogsFolderButton" Content="Open Logs Folder"
                                 Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left"

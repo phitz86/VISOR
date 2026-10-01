@@ -64,6 +64,10 @@ namespace VISOR.ViewModels
             // resolved section name, if any) on every track — including uncatalogued ones
             // and pit road — so true corner fractions can be read straight off a replay to
             // tune the catalog. Bypasses the dwell so the number tracks the car instantly.
+            //
+            // Note this is the user-facing Debug Mode setting, not a DEBUG build gate: it
+            // ships, and anyone enabling verbose logging sees this too. The Config window's
+            // Debug Settings hint says so, so keep the two in step if this changes.
             if (UserSettings.Instance.DebugModeEnabled && validPct)
             {
                 string? label = ResolveSectionName(pct, onPitRoad);
