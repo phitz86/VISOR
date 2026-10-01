@@ -18,6 +18,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Finishing positions not held when cars leave at the checkered** — the lap-completed
+  baseline used to detect a car crossing the line was seeded on the first checkered frame.
+  iRacing flips the session state to Checkered *because* the leader crossed, so the
+  leader's crossing landed in the same telemetry sample as the state change and was
+  swallowed by that seeding. The leader never latched, the gate that starts freezing never
+  opened, and nothing was frozen at all — so every car that logged out after finishing
+  handed a free position to everyone behind it (P15 drifting up to P2 as the field left).
+  The baseline is now tracked from the start of the session. As a second guarantee, a car
+  that drops out of the session under the checkered now holds the slot it left on, which
+  covers offline and AI races where cars disappear the instant they finish.
+- **Single-frame full-lap position flicker at the line** — right at S/F, iRacing reports
+  LapDistPct marginally outside 0–1 for a frame. The predictive fallback wrapped its
+  estimate back to ~0 while the car's cached lap number was still the previous lap, so the
+  car read a whole lap down and briefly dropped to the tail of the running order. The laps
+  the prediction wraps through are now added back.
 - **Pole-sitter shown at the back of the field on the grid** — qualifying results
   report the pole position as `0`, which the pre-green grid sort read as "this car has
   no grid slot" and dumped to the back of the block. Everyone else shifted up one spot
