@@ -33,6 +33,10 @@ namespace VISOR.ViewModels
         private const float SF_WRAP_HIGH = 0.9f;
         private const float SF_WRAP_LOW = 0.1f;
         private const int LAP_DESYNC_MAX_FRAMES = 30; // ~0.5s at 60Hz - the correction is a bridge, not a state
+
+        // SessionFlags bits that bear on the finish (irsdk: checkered 0x1, white 0x2, green 0x4).
+        // Masked so the finish diagnostics don't log on every caution or start-light change.
+        private const int FINISH_FLAG_MASK = 0x7;
         #endregion
 
         #region Private Fields - Core State
@@ -81,6 +85,11 @@ namespace VISOR.ViewModels
         // This holds a per-car +1/-1 lap correction plus the frame it was raised, so a correction
         // that never resolves expires instead of persisting as a bogus lap.
         private readonly Dictionary<int, (int Offset, int Frame)> _lapNumberCorrection = new();
+        #endregion
+
+        #region Private Fields - Finish Diagnostics
+        private int _lastLoggedFinishFlags = -1;
+        private int _lastLoggedSessionState = -999;
         #endregion
 
         #region Private Fields - Logging State
@@ -227,6 +236,8 @@ namespace VISOR.ViewModels
             _lastSessionNum = -1;
             _lastLapCompleted.Clear();
             _carsHavingTakenGreen.Clear();
+            _lastLoggedFinishFlags = -1;
+            _lastLoggedSessionState = -999;
 
             Log.Info("PositionCalculator reset - all state cleared");
         }
@@ -237,6 +248,7 @@ namespace VISOR.ViewModels
         {
             DetectSessionTransition(snapshot, sessionDataProvider);
             TrackCheckeredFlagState(snapshot);
+            LogFinishPhaseTransitions(snapshot, sessionDataProvider);
             FreezeFinishingPositions(snapshot, sessionDataProvider);
 
             UpdateValidCarTracking(sessionDataProvider);
@@ -295,6 +307,74 @@ namespace VISOR.ViewModels
             {
                 Log.Info($"Checkered flag detected (SessionState: {sessionState}), beginning finishing position tracking");
             }
+        }
+
+        /// <summary>
+        /// Record the frame-accurate ordering between the session flags / SessionState changing and
+        /// cars actually crossing S/F. Everything the finish logic does hangs off that ordering, and
+        /// nothing else in the log can see it: SessionFlags is never logged, and a lap-completed
+        /// increment only surfaces when a freeze succeeds — i.e. it is missing in exactly the case
+        /// where the feature failed.
+        ///
+        /// The leader's LapDistPct is the measurement that matters. If the flags are raised as the
+        /// leader exits the final corner, this logs a pct short of 1.0 (0.95-ish); if they are raised
+        /// at the line, it logs ~0.999 or a value just past the wrap. Positions come from the
+        /// previous frame's sort, which is the same data the freeze reads.
+        /// </summary>
+        private void LogFinishPhaseTransitions(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        {
+            int finishFlags = snapshot.SessionFlags & FINISH_FLAG_MASK;
+            int sessionState = snapshot.SessionState;
+
+            if (finishFlags == _lastLoggedFinishFlags && sessionState == _lastLoggedSessionState)
+            {
+                return;
+            }
+
+            _lastLoggedFinishFlags = finishFlags;
+            _lastLoggedSessionState = sessionState;
+
+            Log.Info($"[Finish] SessionState {sessionState}, flags [{DescribeFinishFlags(finishFlags)}] - " +
+                     DescribeLeader(snapshot, sessionDataProvider));
+        }
+
+        private static string DescribeFinishFlags(int finishFlags)
+        {
+            if (finishFlags == 0)
+                return "none";
+
+            var parts = new List<string>(3);
+            if ((finishFlags & 0x4) != 0) parts.Add("Green");
+            if ((finishFlags & 0x2) != 0) parts.Add("White");
+            if ((finishFlags & 0x1) != 0) parts.Add("Checkered");
+            return string.Join("|", parts);
+        }
+
+        /// <summary>
+        /// The current overall leader with the two variables the freeze depends on. Reads the
+        /// position cache, so it reports whoever the running order currently has at P1 — which is
+        /// itself worth seeing, since a wrong leader is one of the ways the freeze goes astray.
+        /// </summary>
+        private string DescribeLeader(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        {
+            foreach (var entry in _cachedOverallPositions)
+            {
+                if (entry.Value != 1)
+                    continue;
+
+                int carIdx = entry.Key;
+                var carNumbers = sessionDataProvider.CarNumbers;
+                var lapDistPct = snapshot.CarIdxLapDistPct;
+                var lapCompleted = snapshot.CarIdxLapCompleted;
+
+                string number = (carNumbers != null && carIdx < carNumbers.Length) ? carNumbers[carIdx] : "?";
+                float pct = (lapDistPct != null && carIdx < lapDistPct.Length) ? lapDistPct[carIdx] : -1f;
+                int laps = (lapCompleted != null && carIdx < lapCompleted.Length) ? lapCompleted[carIdx] : -1;
+
+                return $"leader #{number} (idx {carIdx}) at LapDistPct {pct:F4}, LapCompleted {laps}";
+            }
+
+            return "no leader in the running order yet";
         }
 
         /// <summary>
@@ -367,6 +447,16 @@ namespace VISOR.ViewModels
                         _carsFinished.Add(carIdx);
 
                         Log.Info($"Car #{carNumbers[carIdx]} (idx {carIdx}) took checkered flag - frozen at P{currentPosition} (overall P{currentOverall}) (LapCompleted: {lastLapCompleted} -> {currentLapCompleted})");
+                    }
+                    else
+                    {
+                        // The crossing was seen but no slot was taken: either the leader gate is
+                        // still shut (nothing has been recognised as finishing P1 yet) or this car
+                        // has no computed position. Without this line a failed freeze is completely
+                        // silent, which is what made the leader-latch failure so hard to place.
+                        Log.Info($"Car #{carNumbers[carIdx]} (idx {carIdx}) completed a lap under the checkered but was NOT frozen - " +
+                                 $"P{currentPosition} (overall P{currentOverall}), leaderHasFinished={_leaderHasFinished} " +
+                                 $"(LapCompleted: {lastLapCompleted} -> {currentLapCompleted})");
                     }
                 }
             }
