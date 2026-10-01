@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a slower-class car crossing the line with a lap still to run. Starting or reconnecting
   VISOR mid-race under the white or checkered flag no longer latches on the first frame
   either.
+- **Missing car-number background in single-class sessions** — online Test sessions and
+  offline custom races report every driver as `CarClassID 0`, which both the relative
+  display and the radar treated as "no class" and left the number swatch transparent
+  (on the radar, an empty black-outlined box). Class 0 is now resolved like any other
+  class, falling back to the existing light grey when iRacing reports no class colour.
 - **Very large relative gaps no longer crowd the gap column** — gaps beyond 99.9s (real
   measurements, but no longer proximity information) now read `99+` instead of a widening
   three-digit number.

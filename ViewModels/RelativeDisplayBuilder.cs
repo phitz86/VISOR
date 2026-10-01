@@ -344,7 +344,9 @@ namespace VISOR.ViewModels
             int[] carClassColors,
             int[] carClassIDs)
         {
-            if (row.ClassID == 0) return;
+            // No ClassID == 0 guard: that is the real class in single-class sessions (online Test,
+            // offline custom races), and skipping it left the swatch at its Transparent default.
+            // ClassColorManager resolves an unknown or uncoloured class to a legible light grey.
             row.ClassBackground = _classColorManager.GetClassColor(row.ClassID, carClassColors, carClassIDs);
         }
 

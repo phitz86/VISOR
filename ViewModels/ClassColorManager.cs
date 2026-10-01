@@ -36,8 +36,11 @@ namespace VISOR.ViewModels
         /// <returns>The brush color for this class</returns>
         public Brush GetClassColor(int classID, int[]? carClassColors = null, int[]? carClassIDs = null)
         {
-            if (classID == 0)
-                return Brushes.Transparent;
+            // Class ID 0 is a real class here, not a missing one: online Test sessions and offline
+            // custom races are single-class and iRacing reports every driver as CarClassID 0. It
+            // used to short-circuit to Transparent, which left the car-number swatch unpainted in
+            // exactly those sessions. Callers only ask about cars that have YAML driver data, so
+            // there is no empty-slot case to guard against.
 
             if (_classColorMap.TryGetValue(classID, out var existingColor))
                 return existingColor;
@@ -46,23 +49,29 @@ namespace VISOR.ViewModels
             {
                 for (int i = 0; i < carClassIDs.Length; i++)
                 {
-                    if (carClassIDs[i] == classID)
-                    {
-                        // 0x000000 means iRacing didn't assign this class a colour; fall through
-                        // to the light-grey default rather than rendering an invisible black swatch.
-                        if (carClassColors[i] == 0)
-                            break;
+                    // 0x000000 means this entry carries no colour for the class (and every unused
+                    // car slot reads as class 0 / colour 0, so for class 0 those entries match
+                    // here). Keep scanning for a real colour rather than giving up on the first
+                    // blank one.
+                    if (carClassIDs[i] != classID || carClassColors[i] == 0)
+                        continue;
 
-                        var brush = ConvertHexColorToBrush(carClassColors[i]);
-                        _classColorMap[classID] = brush;
+                    var brush = ConvertHexColorToBrush(carClassColors[i]);
+                    _classColorMap[classID] = brush;
 
-                        Log.Debug($"[ClassColorManager] Assigned YAML color 0x{carClassColors[i]:X6} to class {classID}");
-                        return brush;
-                    }
+                    Log.Debug($"[ClassColorManager] Assigned YAML color 0x{carClassColors[i]:X6} to class {classID}");
+                    return brush;
                 }
             }
 
-            Log.Warning($"[ClassColorManager] No YAML color found for class {classID}, using default light grey");
+            // Expected for class 0 (single-class sessions have no class colour to report);
+            // genuinely unexpected for a real class ID.
+            string message = $"[ClassColorManager] No YAML color found for class {classID}, using default light grey";
+            if (classID == 0)
+                Log.Info(message);
+            else
+                Log.Warning(message);
+
             _classColorMap[classID] = DefaultClassBrush;
             return DefaultClassBrush;
         }
@@ -78,8 +87,9 @@ namespace VISOR.ViewModels
             byte g = (byte)((hexColor >> 8) & 0xFF);
             byte b = (byte)(hexColor & 0xFF);
 
-            var color = Color.FromArgb(255, r, g, b);
-            return new SolidColorBrush(color);
+            // Frozen to match DefaultClassBrush: these are cached for the session and handed
+            // straight to the renderer, so there is nothing to gain from keeping them mutable.
+            return CreateFrozenBrush(Color.FromArgb(255, r, g, b));
         }
 
         /// <summary>
