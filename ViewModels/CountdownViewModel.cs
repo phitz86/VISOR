@@ -12,8 +12,14 @@ namespace VISOR.ViewModels
         private void OnPropertyChanged([CallerMemberName] string? name = null) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
+        // iRacing fills SessionTime with a 24h+ placeholder for sessions that run to a lap count
+        // with no clock (lone qualifying, lap-limited races). A value below this is a real budget.
+        private const double UNLIMITED_SESSION_TIME_SECONDS = 86400.0;
+
         private string _timeRemainingDisplay = "--:--";
         private string _timeRemainingSymbol = "⏳";
+        private string _secondaryTimerDisplay = string.Empty;
+        private bool _showSecondaryTimer;
 
         public string TimeRemainingDisplay
         {
@@ -24,6 +30,22 @@ namespace VISOR.ViewModels
         {
             get => _timeRemainingSymbol;
             private set { _timeRemainingSymbol = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>
+        /// Session clock shown beneath the primary readout when that readout is counting laps but
+        /// the session also runs to a time limit — standard open qualifying (so many flying laps,
+        /// so many minutes to set them). Empty whenever <see cref="ShowSecondaryTimer"/> is false.
+        /// </summary>
+        public string SecondaryTimerDisplay
+        {
+            get => _secondaryTimerDisplay;
+            private set { if (_secondaryTimerDisplay == value) return; _secondaryTimerDisplay = value; OnPropertyChanged(); }
+        }
+        public bool ShowSecondaryTimer
+        {
+            get => _showSecondaryTimer;
+            private set { if (_showSecondaryTimer == value) return; _showSecondaryTimer = value; OnPropertyChanged(); }
         }
 
         private bool _greenFlagSeen;
@@ -49,6 +71,8 @@ namespace VISOR.ViewModels
         {
             TimeRemainingDisplay = "--:--";
             TimeRemainingSymbol = "⏳";
+            SecondaryTimerDisplay = string.Empty;
+            ShowSecondaryTimer = false;
             _greenFlagSeen = false;
             _lastLap = -1;
             _currentLapDisplay = "-- Laps";
@@ -68,10 +92,16 @@ namespace VISOR.ViewModels
         {
             Reset();
 
+            // Logged for every session so the laps/clock pair that drives the readout (and whether
+            // the secondary clock will appear at all) is visible in the log without a repro.
+            int laps = sessionDataProvider.GetSessionLaps(newSessionNum);
+            double timeBudget = sessionDataProvider.GetSessionTimeSeconds(newSessionNum);
+            Log.Info($"[Countdown] Session {newSessionNum}: laps {(laps == -1 ? "unlimited" : laps.ToString())}, " +
+                     $"SessionTime {timeBudget:F0}s");
+
             if (sessionDataProvider.IsQualifyingSession(newSessionNum))
             {
-                _totalQualifyingLaps = sessionDataProvider.GetSessionLaps(newSessionNum);
-                Log.Info($"[Countdown] Qualifying session detected, total laps: {_totalQualifyingLaps}");
+                _totalQualifyingLaps = laps;
                 if (_totalQualifyingLaps > 0)
                 {
                     _isFirstQualiLap = true;
@@ -91,11 +121,18 @@ namespace VISOR.ViewModels
             int sessionFlagsValue = snapshot.SessionFlags;
 
             bool isTimedSession = false;
+            bool hasTimeLimit = false;
             if (sessionDataProvider != null && sessionDataProvider.IsDataReady)
             {
                 int currentSessionNum = sessionDataProvider.CurrentSessionNum;
                 int sessionLaps = sessionDataProvider.GetSessionLaps(currentSessionNum);
                 isTimedSession = (sessionLaps == -1);
+
+                // A lap-limited session can still be on a clock (open qualifying: 2 flying laps,
+                // 8 minutes to set them). Those are the sessions where the laps-to-go readout
+                // alone hides half the picture, so the secondary clock fills it in.
+                double sessionTimeSeconds = sessionDataProvider.GetSessionTimeSeconds(currentSessionNum);
+                hasTimeLimit = sessionTimeSeconds > 0.0 && sessionTimeSeconds < UNLIMITED_SESSION_TIME_SECONDS;
             }
 
             // The first observation of the lap counter only seeds it: _lastLap starts at -1, and
@@ -153,6 +190,7 @@ namespace VISOR.ViewModels
             }
 
             bool shouldShowTimer = _greenFlagSeen || timeRemain > 0;
+            bool primaryShowsLaps = false;
 
             if (shouldShowTimer)
             {
@@ -191,6 +229,7 @@ namespace VISOR.ViewModels
                     }
 
                     newLapDisplay = lapsToGo == 1 ? "1 Lap" : $"{lapsToGo} Laps";
+                    primaryShowsLaps = true;
                 }
                 else if (!isTimedSession && lapsRemaining >= 0 && lapsRemaining < 10000)
                 {
@@ -202,15 +241,12 @@ namespace VISOR.ViewModels
                         _currentLapDisplay = latestLapDisplay;
                     }
                     newLapDisplay = _currentLapDisplay;
+                    primaryShowsLaps = true;
                 }
                 else if (timeRemain > 0)
                 {
                     newSymbol = "⏳";
-                    TimeSpan remaining = TimeSpan.FromSeconds(timeRemain);
-                    if (remaining.TotalHours >= 1.0)
-                        newLapDisplay = $"{(int)remaining.TotalHours}:{remaining.Minutes:D2}:{remaining.Seconds:D2}";
-                    else
-                        newLapDisplay = $"{(int)remaining.TotalMinutes}:{remaining.Seconds:D2}";
+                    newLapDisplay = FormatSessionClock(timeRemain);
                 }
                 else
                 {
@@ -228,7 +264,28 @@ namespace VISOR.ViewModels
                 }
             }
 
+            // The clock only earns its own line when the primary readout is spending itself on a lap
+            // count and the session is genuinely on a timer as well. The timeRemain bound is a second
+            // guard: SessionTimeRemain reports a placeholder of its own in untimed sessions, and the
+            // secondary must never show a 23-hour countdown.
+            bool showSecondary = primaryShowsLaps && hasTimeLimit
+                && timeRemain > 0 && timeRemain < UNLIMITED_SESSION_TIME_SECONDS;
+
+            SecondaryTimerDisplay = showSecondary ? FormatSessionClock(timeRemain) : string.Empty;
+            ShowSecondaryTimer = showSecondary;
+
             _lastLap = currentLap;
+        }
+
+        /// <summary>
+        /// Session clock as h:mm:ss past the hour, m:ss below it.
+        /// </summary>
+        private static string FormatSessionClock(double secondsRemaining)
+        {
+            TimeSpan remaining = TimeSpan.FromSeconds(secondsRemaining);
+            return remaining.TotalHours >= 1.0
+                ? $"{(int)remaining.TotalHours}:{remaining.Minutes:D2}:{remaining.Seconds:D2}"
+                : $"{(int)remaining.TotalMinutes}:{remaining.Seconds:D2}";
         }
     }
 }
