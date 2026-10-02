@@ -12,8 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Secondary session clock for lap-limited timed sessions** — standard open qualifying
   gives you a lap allowance *and* a deadline (e.g. 2 flying laps in 8 minutes), but the
   Row 1 readout could only show one of them. A smaller countdown now appears beneath the
-  lap count in sessions that are lap-limited and on a clock, so both are visible at once.
-  It stays collapsed — costing no height — in every other session type, including lone
+  lap count, Final Lap, and FINISHED in sessions that are lap-limited and on a clock, so
+  both are visible at once. It stays collapsed — costing no height — in every other session type, including lone
   qualifying and lap-limited races, which have no meaningful clock to show.
 
 ### Changed

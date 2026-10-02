@@ -190,6 +190,10 @@ namespace VISOR.ViewModels
             }
 
             bool shouldShowTimer = _greenFlagSeen || timeRemain > 0;
+            // True when the primary readout is spending itself on something other than the clock in a
+            // lap-limited session: the lap counter, Final Lap, or FINISHED. Those are the states that
+            // hide the deadline, so they are the ones the secondary clock has to cover. A timed
+            // session's primary is the clock itself, so there is nothing to add there.
             bool primaryShowsLaps = false;
 
             if (shouldShowTimer)
@@ -225,11 +229,13 @@ namespace VISOR.ViewModels
                 {
                     newSymbol = "🏁";
                     newLapDisplay = "FINISHED";
+                    primaryShowsLaps = !isTimedSession;
                 }
                 else if (_finalLapLatched)
                 {
                     newSymbol = "🏁";
                     newLapDisplay = "Final Lap";
+                    primaryShowsLaps = !isTimedSession;
                 }
                 else if (_totalQualifyingLaps > 0 && _greenFlagSeen)
                 {
