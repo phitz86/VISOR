@@ -90,6 +90,7 @@ namespace VISOR.ViewModels
         #region Private Fields - Finish Diagnostics
         private int _lastLoggedFinishFlags = -1;
         private int _lastLoggedSessionState = -999;
+        private int _lastLoggedLeaderIdx = -1;
         #endregion
 
         #region Private Fields - Logging State
@@ -238,6 +239,7 @@ namespace VISOR.ViewModels
             _carsHavingTakenGreen.Clear();
             _lastLoggedFinishFlags = -1;
             _lastLoggedSessionState = -999;
+            _lastLoggedLeaderIdx = -1;
 
             Log.Info("PositionCalculator reset - all state cleared");
         }
@@ -352,7 +354,19 @@ namespace VISOR.ViewModels
             if (playerIdx < 0 || playerIdx >= lapDistPct.Length || playerIdx >= lapCompleted.Length)
                 return "player n/a";
 
-            return $"player at LapDistPct {lapDistPct[playerIdx]:F4}, LapCompleted {lapCompleted[playerIdx]}";
+            return $"player at LapDistPct {lapDistPct[playerIdx]:F4}, LapCompleted {lapCompleted[playerIdx]}, " +
+                   $"CarIdxLap {FormatLap(snapshot, playerIdx)}";
+        }
+
+        /// <summary>
+        /// CarIdxLap, which is what the running-order sort adds to LapDistPct. It is the one input
+        /// to the sort that none of the other logging shows, and it is what a leader that is
+        /// impossible by LapDistPct/LapCompleted would have to be disagreeing about.
+        /// </summary>
+        private static string FormatLap(SVappsLABSnapshot snapshot, int carIdx)
+        {
+            var lap = snapshot.CarIdxLap;
+            return (carIdx >= 0 && carIdx < lap.Length) ? lap[carIdx].ToString() : "n/a";
         }
 
         private static string DescribeFinishFlags(int finishFlags)
@@ -388,7 +402,7 @@ namespace VISOR.ViewModels
                 float pct = (lapDistPct != null && carIdx < lapDistPct.Length) ? lapDistPct[carIdx] : -1f;
                 int laps = (lapCompleted != null && carIdx < lapCompleted.Length) ? lapCompleted[carIdx] : -1;
 
-                return $"leader #{number} (idx {carIdx}) at LapDistPct {pct:F4}, LapCompleted {laps}";
+                return $"leader #{number} (idx {carIdx}) at LapDistPct {pct:F4}, LapCompleted {laps}, CarIdxLap {FormatLap(snapshot, carIdx)}";
             }
 
             // Finished cars are excluded from the live sort, so once the leader freezes there is no
@@ -459,7 +473,11 @@ namespace VISOR.ViewModels
                     int currentPosition = GetClassPosition(carIdx, classId);
                     int currentOverall = GetOverallPosition(carIdx);
 
-                    if (!_leaderHasFinished && currentPosition == 1)
+                    // The gate is the OVERALL leader finishing, not any class leader: iRacing ends the
+                    // race for everyone when the overall winner takes the flag, and a slower class's
+                    // P1 crossing in the few seconds between the state flip and the winner's crossing
+                    // would otherwise open the gate early and freeze cars that are still racing.
+                    if (!_leaderHasFinished && currentOverall == 1)
                     {
                         _finishingClassPositions[carIdx] = currentPosition;
                         _finishingOverallPositions[carIdx] = currentOverall;
@@ -477,15 +495,21 @@ namespace VISOR.ViewModels
 
                         Log.Info($"Car #{carNumbers[carIdx]} (idx {carIdx}) took checkered flag - frozen at P{currentPosition} (overall P{currentOverall}) (LapCompleted: {lastLapCompleted} -> {currentLapCompleted})");
                     }
+                    else if (!_leaderHasFinished)
+                    {
+                        // Expected: the car crossed after the state flip but before the overall leader
+                        // did, so it has not been given the flag and races another lap. Routine in a
+                        // multiclass field, so it stays out of the Info log.
+                        Log.Debug($"Car #{carNumbers[carIdx]} (idx {carIdx}) crossed before the overall leader - not frozen, " +
+                                  $"P{currentPosition} (overall P{currentOverall}) (LapCompleted: {lastLapCompleted} -> {currentLapCompleted})");
+                    }
                     else
                     {
-                        // The crossing was seen but no slot was taken: either the leader gate is
-                        // still shut (nothing has been recognised as finishing P1 yet) or this car
-                        // has no computed position. Without this line a failed freeze is completely
-                        // silent, which is what made the leader-latch failure so hard to place.
+                        // Unexpected: the leader has finished but this car has no computed position, so
+                        // no slot could be taken. Without this line a failed freeze is completely
+                        // silent, which is what made the original leader-latch failure so hard to place.
                         Log.Info($"Car #{carNumbers[carIdx]} (idx {carIdx}) completed a lap under the checkered but was NOT frozen - " +
-                                 $"P{currentPosition} (overall P{currentOverall}), leaderHasFinished={_leaderHasFinished} " +
-                                 $"(LapCompleted: {lastLapCompleted} -> {currentLapCompleted})");
+                                 $"P{currentPosition} (overall P{currentOverall}) (LapCompleted: {lastLapCompleted} -> {currentLapCompleted})");
                     }
                 }
             }
@@ -542,9 +566,10 @@ namespace VISOR.ViewModels
                 _finishingOverallPositions[carIdx] = overallPosition;
                 _carsFinished.Add(carIdx);
 
-                // Keep the leader gate coherent: if the car that left was holding P1, the class
-                // leader is home and the crossing-based freeze can start on everyone else.
-                if (classPosition == 1)
+                // Keep the leader gate coherent: if the car that left was holding overall P1, the
+                // winner is home and the crossing-based freeze can start on everyone else. Overall,
+                // not class: a slower class's leader leaving says nothing about the race winner.
+                if (overallPosition == 1)
                 {
                     _leaderHasFinished = true;
                 }
@@ -598,7 +623,8 @@ namespace VISOR.ViewModels
                 if (lapCompleted[carIdx] >= 0 && validDist)
                 {
                     _carsHavingTakenGreen.Add(carIdx);
-                    Log.Debug($"Car #{carNumbers[carIdx]} (idx {carIdx}) took the green flag - switching to live position calc");
+                    Log.Debug($"Car #{carNumbers[carIdx]} (idx {carIdx}) took the green flag - switching to live position calc " +
+                              $"(CarIdxLap {FormatLap(snapshot, carIdx)}, LapCompleted {lapCompleted[carIdx]}, LapDistPct {lapDistPct[carIdx]:F4})");
                 }
             }
         }
@@ -1016,6 +1042,7 @@ namespace VISOR.ViewModels
             }
 
             AssignOverallPositions(carsWithPositions);
+            LogLeaderChange(carsWithPositions, snapshot, sessionDataProvider);
 
             var classGroups = carsWithPositions.GroupBy(c => c.ClassId);
 
@@ -1044,6 +1071,38 @@ namespace VISOR.ViewModels
                     nextPosition++;
                 }
             }
+        }
+
+        /// <summary>
+        /// Log each change of overall leader with the inputs the sort used for it. The overall P1
+        /// is the one car whose sort key can be checked against the real race at a glance, so a
+        /// leader that is physically impossible (a car just off the line leading the field) shows
+        /// up here with the CarIdxLap/LapDistPct that produced it. Leader changes are rare, so
+        /// this stays quiet.
+        /// </summary>
+        private void LogLeaderChange(List<CarPositionData> carsWithPositions, SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        {
+            if (!_cachedOverallPositions.Any(kv => kv.Value == 1))
+                return;
+
+            int leaderIdx = _cachedOverallPositions.First(kv => kv.Value == 1).Key;
+            if (leaderIdx == _lastLoggedLeaderIdx)
+                return;
+
+            _lastLoggedLeaderIdx = leaderIdx;
+
+            var leader = carsWithPositions.FirstOrDefault(c => c.CarIdx == leaderIdx);
+            if (leader == null)
+                return;
+
+            var carNumbers = sessionDataProvider.CarNumbers;
+            var lapCompleted = snapshot.CarIdxLapCompleted;
+            string number = (carNumbers != null && leaderIdx < carNumbers.Length) ? carNumbers[leaderIdx] : "?";
+            int completed = leaderIdx < lapCompleted.Length ? lapCompleted[leaderIdx] : -1;
+
+            Log.Debug($"[Leader] Overall leader is now #{number} (idx {leaderIdx}) - effective lap {leader.CurrentLap} " +
+                      $"(raw CarIdxLap {FormatLap(snapshot, leaderIdx)}), LapCompleted {completed}, LapDistPct {leader.LapDistPct:F4}, " +
+                      $"sort key {leader.OverallSortKey:F4}, green latched {leader.HasTakenGreen}");
         }
 
         /// <summary>

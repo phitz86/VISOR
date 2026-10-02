@@ -27,10 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   completed at that instant, plus a line for the case where a car completes a lap under the
   checkered but isn't frozen. The timing between the flags changing and a car reaching the
   line is what the finishing-position logic depends on, and nothing in the log could show it.
-  The same line now includes the player's own track position (the white and checkered bits are
-  raised per car, about 11 s ahead of that car's own line), the leader is reported correctly
-  once frozen, and Final Lap / FINISHED latches are logged with the flags and lap that caused
-  them, including the case where a flag lands on the very sample of a crossing.
+  The same line now includes the player's own track position and lap (the white and checkered
+  bits are raised per car, when that car passes a fixed point shortly before the line), the
+  leader is reported correctly once frozen, and Final Lap / FINISHED latches are logged with the
+  flags and lap that caused them, including the case where a flag lands on the very sample of a
+  crossing. Each change of overall leader is also logged with the lap and track position that
+  put the car there.
 
 ### Fixed
 
@@ -44,6 +46,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The baseline is now tracked from the start of the session. As a second guarantee, a car
   that drops out of the session under the checkered now holds the slot it left on, which
   covers offline and AI races where cars disappear the instant they finish.
+- **Multiclass finishing positions could start freezing too early** — the point at which
+  cars start being frozen was triggered by the first car with a class position of 1 to
+  cross under the checkered, rather than the overall leader. A slower class's leader
+  crossing in the few seconds between the finish being signalled and the winner reaching
+  the line could therefore freeze cars that were still racing. It now waits for the
+  overall leader.
 - **Single-frame full-lap position flicker at the line** — right at S/F, iRacing reports
   LapDistPct marginally outside 0–1 for a frame. The predictive fallback wrapped its
   estimate back to ~0 while the car's cached lap number was still the previous lap, so the
@@ -62,13 +70,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pre-green ordering no longer mixes grid sources** — the per-class live position array
   and the field-wide qualifying order were being used interchangeably per car, which
   could interleave a 1..n class number with a 1..N field number.
-- **"FINISHED" appearing a lap early** — the checkered flag is now only allowed to end
-  the race readout on a start/finish crossing that happens *after* the flag was seen, not
-  one in the same telemetry sample. In multiclass this matters: the overall leader is
-  usually lapping traffic when it finishes, so its checkered can land in the same frame as
-  a slower-class car crossing the line with a lap still to run. Starting or reconnecting
-  VISOR mid-race under the white or checkered flag no longer latches on the first frame
-  either.
+- **Final Lap / FINISHED latching hardened** — a white or checkered flag now only counts
+  toward the readout on a start/finish crossing that happens *after* the flag was seen, not
+  one in the same telemetry sample, and starting or reconnecting VISOR mid-race under a
+  flag no longer latches on the very first frame. Race logs show iRacing raises these flags
+  per car, well before that car's own line, so a same-sample collision is not expected in
+  practice; this is a guard rather than a fix for an observed fault.
 - **Missing car-number background in single-class sessions** — online Test sessions and
   offline custom races report every driver as `CarClassID 0`, which both the relative
   display and the radar treated as "no class" and left the number swatch transparent
