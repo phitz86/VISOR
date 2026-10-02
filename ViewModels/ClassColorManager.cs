@@ -12,6 +12,15 @@ namespace VISOR.ViewModels
     public class ClassColorManager
     {
         private readonly Dictionary<int, Brush> _classColorMap = new();
+        private readonly Dictionary<int, Brush> _classTextMap = new();
+
+        // Perceived-brightness cut-off (0-255) between black and white car numbers. Chosen so the
+        // light class colours (white, yellow, green, cyan) get black text while the saturated
+        // mid-tones (purple, pink, teal, orange) keep the white-with-shadow look they always had.
+        private const double LIGHT_FILL_THRESHOLD = 150.0;
+
+        private static readonly SolidColorBrush DarkTextBrush = CreateFrozenBrush(Colors.Black);
+        private static readonly SolidColorBrush LightTextBrush = CreateFrozenBrush(Colors.White);
 
         // iRacing reports no class colour in some session types (custom league races, offline
         // events) — either the class is absent from the colour data or it comes back as a literal
@@ -77,6 +86,36 @@ namespace VISOR.ViewModels
         }
 
         /// <summary>
+        /// Black or white, whichever reads better as the car number on this class's fill. Resolved
+        /// from the same brush <see cref="GetClassColor"/> hands out, so the number always matches
+        /// what is actually painted behind it, including the light-grey and white defaults.
+        /// </summary>
+        public Brush GetClassTextBrush(int classID, int[]? carClassColors = null, int[]? carClassIDs = null)
+        {
+            if (_classTextMap.TryGetValue(classID, out var cached))
+                return cached;
+
+            var fill = GetClassColor(classID, carClassColors, carClassIDs);
+            Brush text = (fill is SolidColorBrush solid && IsLightFill(solid.Color))
+                ? DarkTextBrush
+                : LightTextBrush;
+
+            _classTextMap[classID] = text;
+            return text;
+        }
+
+        /// <summary>
+        /// True for fills light enough that dark text reads better. Uses the standard weighted
+        /// perceived-brightness formula, which tracks how bright a colour looks far better than
+        /// averaging the channels (pure green is much brighter to the eye than pure blue).
+        /// </summary>
+        private static bool IsLightFill(Color color)
+        {
+            double brightness = (color.R * 299 + color.G * 587 + color.B * 114) / 1000.0;
+            return brightness >= LIGHT_FILL_THRESHOLD;
+        }
+
+        /// <summary>
         /// Converts iRacing hex color format (0xRRGGBB) to WPF SolidColorBrush.
         /// </summary>
         /// <param name="hexColor">Hex color value from YAML (e.g., 0xff5888)</param>
@@ -119,6 +158,7 @@ namespace VISOR.ViewModels
         public void Reset()
         {
             _classColorMap.Clear();
+            _classTextMap.Clear();
             Log.Info("[ClassColorManager] Reset - all color assignments cleared");
         }
 

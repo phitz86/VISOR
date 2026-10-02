@@ -361,6 +361,17 @@ namespace VISOR.ViewModels
             return new RadarPosition { X = x, Y = y };
         }
 
+        private static System.Windows.Media.Effects.DropShadowEffect CreateNumberShadow(double scaleFactor)
+        {
+            return new System.Windows.Media.Effects.DropShadowEffect
+            {
+                Color = Colors.Black,
+                Direction = 0,
+                ShadowDepth = 2 * scaleFactor,
+                BlurRadius = 4 * scaleFactor
+            };
+        }
+
         private RadarCarElement CreateCarElement(RadarCarData car)
         {
             var scaleFactor = GetScaleFactor();
@@ -383,13 +394,7 @@ namespace VISOR.ViewModels
                 TextAlignment = TextAlignment.Center
             };
 
-            numberText.Effect = new System.Windows.Media.Effects.DropShadowEffect
-            {
-                Color = Colors.Black,
-                Direction = 0,
-                ShadowDepth = 2 * scaleFactor,
-                BlurRadius = 4 * scaleFactor
-            };
+            numberText.Effect = CreateNumberShadow(scaleFactor);
 
             return new RadarCarElement
             {
@@ -411,6 +416,17 @@ namespace VISOR.ViewModels
             Canvas.SetTop(element.NumberText, position.Y - halfHeight + (4 * scaleFactor));
 
             element.Rectangle.Fill = _classColorManager.GetClassColor(car.ClassID, carClassColors, carClassIDs);
+
+            // Black or white number, whichever reads on this class's fill. The shadow only helps
+            // white text on a darker fill, so it goes with it; on black text it would just smudge.
+            // Only touched when the colour actually changes, since this runs for every car every frame.
+            var textBrush = _classColorManager.GetClassTextBrush(car.ClassID, carClassColors, carClassIDs);
+            if (!ReferenceEquals(element.NumberText.Foreground, textBrush))
+            {
+                element.NumberText.Foreground = textBrush;
+                bool whiteText = textBrush is SolidColorBrush solid && solid.Color == Colors.White;
+                element.NumberText.Effect = whiteText ? CreateNumberShadow(scaleFactor) : null;
+            }
 
             if (car.IsOnPitRoad)
             {

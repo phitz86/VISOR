@@ -87,6 +87,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   display and the radar treated as "no class" and left the number swatch transparent
   (on the radar, an empty black-outlined box). Class 0 is now resolved like any other
   class, falling back to the existing light grey when iRacing reports no class colour.
+- **Radar car numbers unreadable on light class colours** — radar numbers were always white with a
+  drop shadow, which disappears on a white, yellow, or light-green class fill (iRacing gives
+  single-class sessions a pure white class colour). The number is now black on light fills and
+  white with the shadow on darker ones. The relative display is unchanged.
 - **Very large relative gaps no longer crowd the gap column** — gaps beyond 99.9s (real
   measurements, but no longer proximity information) now read `99+` instead of a widening
   three-digit number.
