@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Setup verifies the .NET runtime it downloads** — before running the runtime installer it
+  fetched, Setup now checks that the file carries a valid Microsoft Authenticode signature, and
+  refuses to run it otherwise. The download still comes from Microsoft's "latest patch" link, so
+  new installs get the current patched runtime rather than a pinned version.
+
+### Fixed
+
+- **Setup can install the .NET runtime again** — Setup saved the runtime download under one file
+  name and then looked for it under another, so on a PC without the runtime the install step was
+  silently skipped and VISOR could not start until the runtime was installed by hand. Both now use the same name, and a missing
+  download is reported instead of ignored.
+
 ### Added
 
 - **Secondary session clock for lap-limited timed sessions** — standard open qualifying
@@ -17,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   qualifying and lap-limited races, which have no meaningful clock to show.
 
 ### Changed
+
+- **Moved to .NET 10** — VISOR now runs on the .NET 10 Desktop Runtime. .NET 8 reaches end of
+  support on November 10, 2026, after which it no longer receives security fixes; .NET 10 is
+  supported until November 2028. VISOR stays framework-dependent, so the installer is still a
+  few megabytes and the runtime is patched by Microsoft rather than frozen inside VISOR. If
+  .NET 10 isn't installed, Setup offers to download it as before.
 
 - **Debug Mode now says what it actually does** — enabling it also appends your raw track
   position (0–1) to the track-location readout, a calibration aid for tuning section

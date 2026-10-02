@@ -10,7 +10,7 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE.txt)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2B%20(x64)-0078D6)
-![.NET](https://img.shields.io/badge/.NET-8.0-512BD4)
+![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)
 ![Version](https://img.shields.io/badge/version-1.0.0-brightgreen)
 
 </div>
@@ -72,8 +72,9 @@ Download the latest installer from the
    **SmartScreen "Windows protected your PC"** prompt — this is expected for a new
    independent app, not a sign of anything wrong. Click **More info → Run anyway**
    to continue. (See [Code signing](#code-signing) below.)
-3. If the **.NET 8 Desktop Runtime** is not already present, the installer will offer
-   to download and install it for you.
+3. If the **.NET 10 Desktop Runtime** is not already present, the installer will offer
+   to download and install it for you. It fetches the latest patch release from
+   Microsoft and checks the download's Microsoft signature before running it.
 4. Launch VISOR, start iRacing, and the overlay will connect automatically when you
    enter a session.
 
@@ -82,21 +83,21 @@ Download the latest installer from the
 | Requirement | Details |
 |-------------|---------|
 | OS          | Windows 10 version 1809 (build 17763) or later, 64-bit |
-| Runtime     | .NET 8 Desktop Runtime (installer can provide it) |
+| Runtime     | .NET 10 Desktop Runtime (installer can provide it) |
 | Simulator   | iRacing installed and running |
 
 ---
 
 ## Building from source
 
-VISOR is a WPF application targeting **.NET 8** (`net8.0-windows8.0`). It builds on
-Windows with the .NET 8 SDK; the installer is produced with
+VISOR is a WPF application targeting **.NET 10** (`net10.0-windows`). It builds on
+Windows with the .NET 10 SDK; the installer is produced with
 [Inno Setup](https://jrsoftware.org/isinfo.php).
 
 ### Prerequisites
 
 - Windows 10/11 (x64)
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - (Optional, for the installer) [Inno Setup 6](https://jrsoftware.org/isdl.php)
 
 ### Build the application
@@ -107,10 +108,10 @@ dotnet restore VISOR.sln
 dotnet build VISOR.sln --configuration Release
 
 # Output:
-#   bin\Release\net8.0-windows8.0\VISOR.exe
+#   bin\Release\net10.0-windows\VISOR.exe
 ```
 
-You can also open `VISOR.sln` in Visual Studio 2022 (or newer) and build the
+You can also open `VISOR.sln` in Visual Studio 2026 (or newer; .NET 10 is not supported in VS 2022) and build the
 **Release** configuration.
 
 ### Build the installer
@@ -138,7 +139,7 @@ VISOR/
 ├── Diagnostics/           Async file logging and debug exporters
 ├── Settings/              User configuration and persistence
 ├── Resources/             Styles, fonts, and value converters
-├── VISOR.csproj           Project file (.NET 8 / WPF)
+├── VISOR.csproj           Project file (.NET 10 / WPF)
 ├── VISOR-Setup.iss        Inno Setup installer script
 └── LICENSE.txt            GNU GPL v3
 ```
