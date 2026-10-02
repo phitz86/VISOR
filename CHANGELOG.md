@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   position (0–1) to the track-location readout, a calibration aid for tuning section
   boundaries. The Config window only advertised verbose logging, so the overlay change came
   as a surprise. The hint text now mentions both.
+- **Disconnected drivers are documented** — a car whose telemetry is missing for more than a few
+  seconds is removed from VISOR's running order, so cars behind it move up a place, while iRacing's
+  official results keep a disconnected driver classified on the laps they completed. Your overall
+  position can therefore read better than the official result when a driver ahead of you leaves
+  mid-race. This is existing behaviour, now described in the user guide; holding such cars at their
+  last known position is a possible future change.
 - **Finish-phase diagnostics** — the log now records every change in SessionState and in the
   green/white/checkered session flags, along with the leader's track position and laps
   completed at that instant, plus a line for the case where a car completes a lap under the
