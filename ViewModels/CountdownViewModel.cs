@@ -194,13 +194,27 @@ namespace VISOR.ViewModels
 
             if (shouldShowTimer)
             {
-                if (whiteWasAlreadyFlying && lapCompleted)
+                if (whiteWasAlreadyFlying && lapCompleted && !_finalLapLatched)
                 {
                     _finalLapLatched = true;
+                    LogLatch("Final Lap", snapshot, currentLap, lapsRemaining, timeRemain);
                 }
-                if (checkeredWasAlreadyFlying && lapCompleted)
+                if (checkeredWasAlreadyFlying && lapCompleted && !_finishedLatched)
                 {
                     _finishedLatched = true;
+                    LogLatch("FINISHED", snapshot, currentLap, lapsRemaining, timeRemain);
+                }
+
+                // The one case the "flag must already be flying" rule can get wrong: a flag raised on
+                // the very sample of the crossing. Logged so that, if it ever happens, it is visible
+                // rather than showing up as a Final Lap / FINISHED that is simply late or missing.
+                if (lapCompleted && !whiteWasAlreadyFlying && _pendingWhiteFlag && !_finalLapLatched)
+                {
+                    Log.Info($"[Countdown] White flag raised on the same sample as the lap {currentLap} crossing - Final Lap NOT latched");
+                }
+                if (lapCompleted && !checkeredWasAlreadyFlying && _pendingCheckeredFlag && !_finishedLatched)
+                {
+                    Log.Info($"[Countdown] Checkered flag raised on the same sample as the lap {currentLap} crossing - FINISHED NOT latched");
                 }
 
                 string newLapDisplay;
@@ -275,6 +289,17 @@ namespace VISOR.ViewModels
             ShowSecondaryTimer = showSecondary;
 
             _lastLap = currentLap;
+        }
+
+        /// <summary>
+        /// Record the moment Final Lap or FINISHED latches, with the state that caused it. These
+        /// readouts are driven entirely by per-car SessionFlags bits and lap crossings, and nothing
+        /// else in the log shows which crossing consumed which flag.
+        /// </summary>
+        private static void LogLatch(string what, SVappsLABSnapshot snapshot, int lap, int lapsRemaining, double timeRemain)
+        {
+            Log.Info($"[Countdown] {what} latched on lap {lap}: SessionState {snapshot.SessionState}, " +
+                     $"flags 0x{snapshot.SessionFlags & 0x7:X}, lapsRemain {lapsRemaining}, timeRemain {timeRemain:F0}s");
         }
 
         /// <summary>

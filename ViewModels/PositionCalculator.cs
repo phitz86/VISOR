@@ -335,7 +335,24 @@ namespace VISOR.ViewModels
             _lastLoggedSessionState = sessionState;
 
             Log.Info($"[Finish] SessionState {sessionState}, flags [{DescribeFinishFlags(finishFlags)}] - " +
-                     DescribeLeader(snapshot, sessionDataProvider));
+                     $"{DescribeLeader(snapshot, sessionDataProvider)}; {DescribePlayer(snapshot)}");
+        }
+
+        /// <summary>
+        /// The player's own track position. The white and checkered SessionFlags bits are raised per
+        /// car, a fixed lead ahead of that car's own line, so the player's position at the moment a
+        /// bit changes (not the leader's) is what shows whether that lead is a distance or a time.
+        /// </summary>
+        private static string DescribePlayer(SVappsLABSnapshot snapshot)
+        {
+            int playerIdx = snapshot.PlayerCarIdx;
+            var lapDistPct = snapshot.CarIdxLapDistPct;
+            var lapCompleted = snapshot.CarIdxLapCompleted;
+
+            if (playerIdx < 0 || playerIdx >= lapDistPct.Length || playerIdx >= lapCompleted.Length)
+                return "player n/a";
+
+            return $"player at LapDistPct {lapDistPct[playerIdx]:F4}, LapCompleted {lapCompleted[playerIdx]}";
         }
 
         private static string DescribeFinishFlags(int finishFlags)
@@ -372,6 +389,18 @@ namespace VISOR.ViewModels
                 int laps = (lapCompleted != null && carIdx < lapCompleted.Length) ? lapCompleted[carIdx] : -1;
 
                 return $"leader #{number} (idx {carIdx}) at LapDistPct {pct:F4}, LapCompleted {laps}";
+            }
+
+            // Finished cars are excluded from the live sort, so once the leader freezes there is no
+            // live P1 even though the race has a leader. Report the frozen one rather than "none".
+            foreach (var entry in _finishingOverallPositions)
+            {
+                if (entry.Value != 1)
+                    continue;
+
+                var carNumbers = sessionDataProvider.CarNumbers;
+                string number = (carNumbers != null && entry.Key < carNumbers.Length) ? carNumbers[entry.Key] : "?";
+                return $"leader #{number} (idx {entry.Key}) already frozen at P1";
             }
 
             return "no leader in the running order yet";

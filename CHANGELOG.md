@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   completed at that instant, plus a line for the case where a car completes a lap under the
   checkered but isn't frozen. The timing between the flags changing and a car reaching the
   line is what the finishing-position logic depends on, and nothing in the log could show it.
+  The same line now includes the player's own track position (the white and checkered bits are
+  raised per car, about 11 s ahead of that car's own line), the leader is reported correctly
+  once frozen, and Final Lap / FINISHED latches are logged with the flags and lap that caused
+  them, including the case where a flag lands on the very sample of a crossing.
 
 ### Fixed
 
