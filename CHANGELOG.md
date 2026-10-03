@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-03
+
 ### Security
 
 - **Setup verifies the .NET runtime it downloads** — before running the runtime installer it
@@ -32,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Version bumped to 1.1.0.0**; README, Config window and user guide updated to match.
 - **Moved to .NET 10** — VISOR now runs on the .NET 10 Desktop Runtime. .NET 8 reaches end of
   support on November 10, 2026, after which it no longer receives security fixes; .NET 10 is
   supported until November 2028. VISOR stays framework-dependent, so the installer is still a
@@ -191,4 +194,6 @@ display, and adds a substantial layer of app-stability and installer hardening.
 - Nullable-reference warnings (CS8602/CS8604) and an unused-variable warning; updated
   deprecated GitHub Actions.
 
+[Unreleased]: https://github.com/phitz86/VISOR/compare/v1.1.0.0...HEAD
+[1.1.0]: https://github.com/phitz86/VISOR/releases/tag/v1.1.0.0
 [1.0.0]: https://github.com/phitz86/VISOR/releases/tag/v1.0.0
