@@ -6,8 +6,14 @@
 #define MyAppSupportEmail "mailto:info@cephasmedia.com"
 #define MyAppExeName "VISOR.exe"
 
+; Build output folder; must match <TargetFramework> in VISOR.csproj
+#define BuildDir "bin\Release\net10.0-windows"
+
+; .NET Desktop Runtime major version VISOR runs on (framework-dependent build)
+#define DotNetMajor "10"
+
 ; Read version from compiled executable
-#define MyAppVersion GetVersionNumbersString("bin\Release\net8.0-windows8.0\VISOR.exe")
+#define MyAppVersion GetVersionNumbersString(BuildDir + "\VISOR.exe")
 
 [Setup]
 ; Basic app info
@@ -40,10 +46,10 @@ UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma2/max
 SolidCompression=yes
 
-; Windows version requirements (Windows 10 1809 or later for .NET 8)
+; Windows version requirements (Windows 10 1809 or later)
 MinVersion=10.0.17763
 
-; Architecture (use x64 since .NET 8 typically targets x64)
+; Architecture (x64 only; the installer fetches the x64 .NET Desktop Runtime)
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 
@@ -80,22 +86,22 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 ; Main executable
-Source: "bin\Release\net8.0-windows8.0\VISOR.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BuildDir}\VISOR.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 ; All DLL dependencies
-Source: "bin\Release\net8.0-windows8.0\*.dll"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
+Source: "{#BuildDir}\*.dll"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
 ; Configuration files
-Source: "bin\Release\net8.0-windows8.0\*.json"; DestDir: "{app}"; Flags: ignoreversion;
+Source: "{#BuildDir}\*.json"; DestDir: "{app}"; Flags: ignoreversion;
 
 ; Track section catalog (named corners for the Row 5 location readout)
-Source: "bin\Release\net8.0-windows8.0\Data\TrackSections.json"; DestDir: "{app}\Data"; Flags: ignoreversion
+Source: "{#BuildDir}\Data\TrackSections.json"; DestDir: "{app}\Data"; Flags: ignoreversion
 
 ; Runtime config
-Source: "bin\Release\net8.0-windows8.0\*.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BuildDir}\*.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Resources are embedded in the executable, not separate files
-; Source: "bin\Release\net8.0-windows8.0\Resources\*"; DestDir: "{app}\Resources"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: DirExists('bin\Release\net8.0-windows8.0\Resources')
+; Source: "{#BuildDir}\Resources\*"; DestDir: "{app}\Resources"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: DirExists('{#BuildDir}\Resources')
 
 ; Icon file
 Source: "VISOR Logo.ico"; DestDir: "{app}"; Flags: ignoreversion
@@ -124,35 +130,110 @@ begin
   ShellExec('open', 'https://venmo.com/u/Pete-Hitzeman', '', '', SW_SHOWNORMAL, ewNoWait, ErrorCode);
 end;
 
-// Check for .NET 8 Runtime
-function IsDotNet8Installed: Boolean;
+const
+  // Microsoft's "latest patch of this major version" link, so a fresh install
+  // always gets the current, security-patched runtime rather than a pinned one.
+  DotNetRuntimeUrl = 'https://aka.ms/dotnet/{#DotNetMajor}.0/windowsdesktop-runtime-win-x64.exe';
+  // The download is saved under this name and run from it; one constant so the
+  // two can't drift apart.
+  DotNetRuntimeFile = 'windowsdesktop-runtime-{#DotNetMajor}-win-x64.exe';
+  DotNetRuntimeName = '.NET {#DotNetMajor} Desktop Runtime';
+  DotNetRuntimeManualUrl = 'https://dotnet.microsoft.com/download/dotnet/{#DotNetMajor}.0';
+
+// True if a released (non-preview) build of the required major version is in a
+// list of installed versions such as '10.0.3' or '9.0.11'.
+function HasRequiredVersion(const Versions: TArrayOfString): Boolean;
 var
-  Version: String;
+  I: Integer;
 begin
   Result := False;
-  // Check registry for Desktop Runtime 8.0.x
-  if RegQueryStringValue(HKLM, 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\desktop', 'Version', Version) then
+  for I := 0 to GetArrayLength(Versions) - 1 do
   begin
-    if (Length(Version) > 0) and (Copy(Version, 1, 2) = '8.') then
+    // Previews ('10.0.0-rc.2...') don't satisfy a 10.0.0 app, so skip them.
+    if (Pos('{#DotNetMajor}.', Versions[I]) = 1) and (Pos('-', Versions[I]) = 0) then
     begin
       Result := True;
       Exit;
     end;
   end;
-  
-  // Fallback: Check if runtime files exist
-  if FileExists(ExpandConstant('{commonpf}\dotnet\shared\Microsoft.WindowsDesktop.App\8.0.0\Microsoft.WindowsDesktop.App.dll')) or
-     DirExists(ExpandConstant('{commonpf}\dotnet\shared\Microsoft.WindowsDesktop.App\8.0.10')) then
+end;
+
+// Check for the .NET Desktop Runtime VISOR needs. Any patch of the right major
+// version will do: the app rolls forward to the newest patch installed.
+function IsDotNetInstalled: Boolean;
+var
+  Versions: TArrayOfString;
+  FindRec: TFindRec;
+  Count: Integer;
+begin
+  Result := False;
+
+  // Primary: the folder the .NET host itself loads the framework from.
+  if FindFirst(ExpandConstant('{commonpf64}\dotnet\shared\Microsoft.WindowsDesktop.App\{#DotNetMajor}.*'), FindRec) then
+  begin
+    try
+      repeat
+        if (FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0 then
+        begin
+          Count := GetArrayLength(Versions);
+          SetArrayLength(Versions, Count + 1);
+          Versions[Count] := FindRec.Name;
+        end;
+      until not FindNext(FindRec);
+    finally
+      FindClose(FindRec);
+    end;
+  end;
+  if HasRequiredVersion(Versions) then
   begin
     Result := True;
+    Exit;
   end;
+
+  // Fallback: the runtime installer records each installed version as a value
+  // name under this key (in the 32-bit registry view, even for x64 runtimes).
+  if RegGetValueNames(HKLM32, 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App', Versions) and
+     HasRequiredVersion(Versions) then
+    Result := True
+  else if RegGetValueNames(HKLM64, 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App', Versions) and
+     HasRequiredVersion(Versions) then
+    Result := True;
+end;
+
+// Refuse to run the downloaded runtime installer unless Windows reports a valid
+// Authenticode signature from Microsoft. This checks the file's integrity and
+// origin without pinning a hash (and therefore a version), so new installs keep
+// getting the latest patch. Fails closed: if the check can't run, nothing is run.
+function IsSignedByMicrosoft(const FileName: String): Boolean;
+var
+  QuotedPath, Script: String;
+  ResultCode: Integer;
+begin
+  Result := False;
+  // PowerShell single-quoted string: escape any ' in the path by doubling it.
+  QuotedPath := FileName;
+  StringChange(QuotedPath, '''', '''''');
+  Script :=
+    '$s = Get-AuthenticodeSignature -LiteralPath ''' + QuotedPath + '''; ' +
+    'if ($s.Status -ne ''Valid'') { exit 1 }; ' +
+    'if ($s.SignerCertificate.Subject -notlike ''CN=Microsoft Corporation,*'') { exit 2 }; ' +
+    'exit 0';
+  if Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+          '-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "' + Script + '"',
+          '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  begin
+    Log('Runtime installer signature check exit code: ' + IntToStr(ResultCode));
+    Result := (ResultCode = 0);
+  end
+  else
+    Log('Runtime installer signature check could not run: ' + SysErrorMessage(ResultCode));
 end;
 
 procedure InitializeWizard;
 begin
-  if not IsDotNet8Installed then
+  if not IsDotNetInstalled then
   begin
-    DotNetRuntimeDownloadPage := CreateDownloadPage(SetupMessage(msgWizardPreparing), 'Downloading .NET 8 Desktop Runtime', nil);
+    DotNetRuntimeDownloadPage := CreateDownloadPage(SetupMessage(msgWizardPreparing), 'Downloading ' + DotNetRuntimeName, nil);
   end;
 
   // Create the Donation Link on the Finished Page
@@ -172,10 +253,10 @@ end;
 function NextButtonClick(CurPageID: Integer): Boolean;
 begin
   Result := True;
-  if (CurPageID = wpReady) and not IsDotNet8Installed then
+  if (CurPageID = wpReady) and not IsDotNetInstalled then
   begin
     DotNetRuntimeDownloadPage.Clear;
-    DotNetRuntimeDownloadPage.Add('https://aka.ms/dotnet/8.0/windowsdesktop-runtime-win-x64.exe', 'windowsdesktop-runtime-8.0-win-x64.exe', '');
+    DotNetRuntimeDownloadPage.Add(DotNetRuntimeUrl, DotNetRuntimeFile, '');
     DotNetRuntimeDownloadPage.Show;
     try
       try
@@ -200,33 +281,45 @@ var
   RuntimeInstaller: String;
 begin
   Result := '';
-  if not IsDotNet8Installed then
+  if not IsDotNetInstalled then
   begin
-    RuntimeInstaller := ExpandConstant('{tmp}\windowsdesktop-runtime-8.0.10-win-x64.exe');
-    if FileExists(RuntimeInstaller) then
+    RuntimeInstaller := ExpandConstant('{tmp}\' + DotNetRuntimeFile);
+    if not FileExists(RuntimeInstaller) then
     begin
-      if MsgBox('.NET 8 Desktop Runtime will now be installed. This may take a few minutes.' + #13#10 + #13#10 + 'Continue?', mbConfirmation, MB_YESNO) = IDYES then
+      Result := 'The ' + DotNetRuntimeName + ' download could not be found. ' +
+                'Please install it from ' + DotNetRuntimeManualUrl + ' and run Setup again.';
+      Exit;
+    end;
+
+    if not IsSignedByMicrosoft(RuntimeInstaller) then
+    begin
+      Result := 'The downloaded ' + DotNetRuntimeName + ' installer did not pass its Microsoft ' +
+                'signature check, so it was not run. Please install the runtime from ' +
+                DotNetRuntimeManualUrl + ' and run Setup again.';
+      Exit;
+    end;
+
+    if MsgBox(DotNetRuntimeName + ' will now be installed. This may take a few minutes.' + #13#10 + #13#10 + 'Continue?', mbConfirmation, MB_YESNO) = IDYES then
+    begin
+      if Exec(RuntimeInstaller, '/quiet /norestart', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
       begin
-        if Exec(RuntimeInstaller, '/quiet /norestart', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+        if ResultCode = 0 then
         begin
-          if ResultCode = 0 then
-          begin
-            Log('.NET Runtime installed successfully');
-          end
-          else
-          begin
-            Result := '.NET Runtime installation failed with code: ' + IntToStr(ResultCode);
-          end;
+          Log('.NET Runtime installed successfully');
         end
         else
         begin
-          Result := 'Failed to execute .NET Runtime installer';
+          Result := '.NET Runtime installation failed with code: ' + IntToStr(ResultCode);
         end;
       end
       else
       begin
-        Result := '.NET 8 Desktop Runtime is required to run VISOR';
+        Result := 'Failed to execute .NET Runtime installer';
       end;
+    end
+    else
+    begin
+      Result := DotNetRuntimeName + ' is required to run VISOR';
     end;
   end;
 end;

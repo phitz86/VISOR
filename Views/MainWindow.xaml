@@ -85,16 +85,27 @@
                     <TextBlock Text="{Binding ClassPositionNumber}" FontSize="72" VerticalAlignment="Center" Style="{StaticResource DigitalIndicator}"/>
                 </StackPanel>
 
-                <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal"
+                <StackPanel Grid.Row="1" Grid.Column="0"
                             Visibility="{Binding ShowTimeRemaining, Converter={StaticResource BoolToVisibilityConverter}}"
-                            HorizontalAlignment="Center">
-                    <TextBlock Text="{Binding CountdownVM.TimeRemainingSymbol}" FontSize="36" Margin="0,0,8,0" Style="{StaticResource NormalWeightSymbol}" Foreground="White"/>
-                    <TextBlock Text="{Binding CountdownVM.TimeRemainingDisplay}" FontSize="36" Style="{StaticResource SemiboldText}"/>
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <TextBlock Text="{Binding CountdownVM.TimeRemainingSymbol}" FontSize="36" Margin="0,0,8,0" Style="{StaticResource NormalWeightSymbol}" Foreground="White"/>
+                        <TextBlock Text="{Binding CountdownVM.TimeRemainingDisplay}" FontSize="36" Style="{StaticResource SemiboldText}"/>
+                    </StackPanel>
+
+                    <!-- Secondary session clock. Collapsed (and so costing no height) except in
+                         sessions that run to a lap count AND a time limit — standard open
+                         qualifying — where the laps-to-go readout alone hides the deadline. -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,-2,0,0"
+                                Visibility="{Binding CountdownVM.ShowSecondaryTimer, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="⏳" FontSize="20" Margin="0,0,6,0" Foreground="LightGray" Style="{StaticResource NormalWeightSymbol}"/>
+                        <TextBlock Text="{Binding CountdownVM.SecondaryTimerDisplay}" FontSize="20" Foreground="LightGray" Style="{StaticResource SemiboldText}"/>
+                    </StackPanel>
                 </StackPanel>
 
                 <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal"
                             Visibility="{Binding ShowFuelRemaining, Converter={StaticResource BoolToVisibilityConverter}}"
-                            HorizontalAlignment="Center">
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
                     <TextBlock Text="⛽" FontSize="36" Margin="0,0,8,0" Foreground="Red" Style="{StaticResource NormalWeightSymbol}"/>
                     <TextBlock Text="{Binding FuelVM.FuelDisplay}" FontSize="36" Style="{StaticResource SemiboldText}"/>
                 </StackPanel>

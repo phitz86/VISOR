@@ -137,10 +137,22 @@ namespace VISOR.Telemetry
 
             if (info.QualifyResultsInfo?.Results != null)
             {
+                // Rebuilt from scratch so a driver dropping out of the qualifying results doesn't
+                // linger with a stale grid slot.
+                dst.QualifyPositions.Clear();
+                dst.QualifyFastestTimes.Clear();
+
                 foreach (var r in info.QualifyResultsInfo.Results)
                 {
                     if (r.CarIdx < 0) continue;
-                    dst.QualifyPositions[r.CarIdx] = r.Position;
+                    // QualifyResultsInfo.Position is 0-based in the YAML: the pole-sitter is
+                    // Position 0. Consumers use 0 as the "no grid slot for this car" sentinel
+                    // (the backing array defaults to 0), so shift to 1-based on the way in or the
+                    // pole car reads as unknown and gets sorted to the back of the grid. The value
+                    // is only ever used as an ordering key, so the shift is safe even if a future
+                    // build of the sim reports these 1-based already.
+                    if (r.Position >= 0)
+                        dst.QualifyPositions[r.CarIdx] = r.Position + 1;
                     dst.QualifyFastestTimes[r.CarIdx] = r.FastestTime;
                 }
             }

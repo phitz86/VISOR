@@ -28,6 +28,15 @@ namespace VISOR.ViewModels
         private const float MIN_VELOCITY_THRESHOLD = 0.00001f; // Minimum velocity to use prediction
         private const int PACE_CAR_CLASS_ID = 11; // iRacing pace/safety car class - excluded from overall field positions
         private const int SESSION_STATE_RACING = 4; // irsdk SessionState: green flag is out (ParadeLaps=3 -> Racing=4)
+
+        // S/F crossing detection for the lap-number desync correction below.
+        private const float SF_WRAP_HIGH = 0.9f;
+        private const float SF_WRAP_LOW = 0.1f;
+        private const int LAP_DESYNC_MAX_FRAMES = 30; // ~0.5s at 60Hz - the correction is a bridge, not a state
+
+        // SessionFlags bits that bear on the finish (irsdk: checkered 0x1, white 0x2, green 0x4).
+        // Masked so the finish diagnostics don't log on every caution or start-light change.
+        private const int FINISH_FLAG_MASK = 0x7;
         #endregion
 
         #region Private Fields - Core State
@@ -67,6 +76,21 @@ namespace VISOR.ViewModels
         // Tier 3: cache expiration removes cars after prolonged invalid data.
         private readonly Dictionary<int, int> _framesSinceValidData = new();
         private readonly Dictionary<int, int> _predictionStartFrame = new();
+        #endregion
+
+        #region Private Fields - Lap Number Desync
+        // iRacing does not always tick CarIdxLap and CarIdxLapDistPct over in the same telemetry
+        // frame at S/F. Whichever lags, the derived track position (lap + LapDistPct) is a full lap
+        // out for a frame or two, which drops a leader to the tail of the running order and back.
+        // This holds a per-car +1/-1 lap correction plus the frame it was raised, so a correction
+        // that never resolves expires instead of persisting as a bogus lap.
+        private readonly Dictionary<int, (int Offset, int Frame)> _lapNumberCorrection = new();
+        #endregion
+
+        #region Private Fields - Finish Diagnostics
+        private int _lastLoggedFinishFlags = -1;
+        private int _lastLoggedSessionState = -999;
+        private int _lastLoggedLeaderIdx = -1;
         #endregion
 
         #region Private Fields - Logging State
@@ -200,6 +224,7 @@ namespace VISOR.ViewModels
             _lastValidCurrentLap.Clear();
             _framesSinceValidData.Clear();
             _predictionStartFrame.Clear();
+            _lapNumberCorrection.Clear();
             _lastFrameValidCars.Clear();
             _isCurrentlyPredicting.Clear();
             _carsWithInvalidLapDistPctLogged.Clear();
@@ -212,6 +237,9 @@ namespace VISOR.ViewModels
             _lastSessionNum = -1;
             _lastLapCompleted.Clear();
             _carsHavingTakenGreen.Clear();
+            _lastLoggedFinishFlags = -1;
+            _lastLoggedSessionState = -999;
+            _lastLoggedLeaderIdx = -1;
 
             Log.Info("PositionCalculator reset - all state cleared");
         }
@@ -222,9 +250,11 @@ namespace VISOR.ViewModels
         {
             DetectSessionTransition(snapshot, sessionDataProvider);
             TrackCheckeredFlagState(snapshot);
+            LogFinishPhaseTransitions(snapshot, sessionDataProvider);
             FreezeFinishingPositions(snapshot, sessionDataProvider);
 
             UpdateValidCarTracking(sessionDataProvider);
+            FreezeDepartedCars(sessionDataProvider);
             UpdatePredictiveCache(snapshot, sessionDataProvider);
 
             if (!sessionDataProvider.ShouldUseFastestLapPositioning())
@@ -258,6 +288,7 @@ namespace VISOR.ViewModels
                 _leaderHasFinished = false;
                 _lastLapCompleted.Clear();
                 _carsHavingTakenGreen.Clear();
+                _lapNumberCorrection.Clear();
             }
 
             _lastSessionNum = currentSessionNum;
@@ -281,17 +312,128 @@ namespace VISOR.ViewModels
         }
 
         /// <summary>
-        /// Freeze class positions for cars as they take the checkered flag.
-        /// Only begins freezing after the P1 car (class leader) crosses S/F.
-        /// Monitors CarIdxLapCompleted increments during checkered flag state.
+        /// Record the frame-accurate ordering between the session flags / SessionState changing and
+        /// cars actually crossing S/F. Everything the finish logic does hangs off that ordering, and
+        /// nothing else in the log can see it: SessionFlags is never logged, and a lap-completed
+        /// increment only surfaces when a freeze succeeds — i.e. it is missing in exactly the case
+        /// where the feature failed.
+        ///
+        /// The leader's LapDistPct is the measurement that matters. If the flags are raised as the
+        /// leader exits the final corner, this logs a pct short of 1.0 (0.95-ish); if they are raised
+        /// at the line, it logs ~0.999 or a value just past the wrap. Positions come from the
+        /// previous frame's sort, which is the same data the freeze reads.
         /// </summary>
-        private void FreezeFinishingPositions(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        private void LogFinishPhaseTransitions(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
-            if (!_isCheckeredFlag)
+            int finishFlags = snapshot.SessionFlags & FINISH_FLAG_MASK;
+            int sessionState = snapshot.SessionState;
+
+            if (finishFlags == _lastLoggedFinishFlags && sessionState == _lastLoggedSessionState)
             {
                 return;
             }
 
+            _lastLoggedFinishFlags = finishFlags;
+            _lastLoggedSessionState = sessionState;
+
+            Log.Info($"[Finish] SessionState {sessionState}, flags [{DescribeFinishFlags(finishFlags)}] - " +
+                     $"{DescribeLeader(snapshot, sessionDataProvider)}; {DescribePlayer(snapshot)}");
+        }
+
+        /// <summary>
+        /// The player's own track position. The white and checkered SessionFlags bits are raised per
+        /// car, a fixed lead ahead of that car's own line, so the player's position at the moment a
+        /// bit changes (not the leader's) is what shows whether that lead is a distance or a time.
+        /// </summary>
+        private static string DescribePlayer(SVappsLABSnapshot snapshot)
+        {
+            int playerIdx = snapshot.PlayerCarIdx;
+            var lapDistPct = snapshot.CarIdxLapDistPct;
+            var lapCompleted = snapshot.CarIdxLapCompleted;
+
+            if (playerIdx < 0 || playerIdx >= lapDistPct.Length || playerIdx >= lapCompleted.Length)
+                return "player n/a";
+
+            return $"player at LapDistPct {lapDistPct[playerIdx]:F4}, LapCompleted {lapCompleted[playerIdx]}, " +
+                   $"CarIdxLap {FormatLap(snapshot, playerIdx)}";
+        }
+
+        /// <summary>
+        /// CarIdxLap, which is what the running-order sort adds to LapDistPct. It is the one input
+        /// to the sort that none of the other logging shows, and it is what a leader that is
+        /// impossible by LapDistPct/LapCompleted would have to be disagreeing about.
+        /// </summary>
+        private static string FormatLap(SVappsLABSnapshot snapshot, int carIdx)
+        {
+            var lap = snapshot.CarIdxLap;
+            return (carIdx >= 0 && carIdx < lap.Length) ? lap[carIdx].ToString() : "n/a";
+        }
+
+        private static string DescribeFinishFlags(int finishFlags)
+        {
+            if (finishFlags == 0)
+                return "none";
+
+            var parts = new List<string>(3);
+            if ((finishFlags & 0x4) != 0) parts.Add("Green");
+            if ((finishFlags & 0x2) != 0) parts.Add("White");
+            if ((finishFlags & 0x1) != 0) parts.Add("Checkered");
+            return string.Join("|", parts);
+        }
+
+        /// <summary>
+        /// The current overall leader with the two variables the freeze depends on. Reads the
+        /// position cache, so it reports whoever the running order currently has at P1 — which is
+        /// itself worth seeing, since a wrong leader is one of the ways the freeze goes astray.
+        /// </summary>
+        private string DescribeLeader(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        {
+            foreach (var entry in _cachedOverallPositions)
+            {
+                if (entry.Value != 1)
+                    continue;
+
+                int carIdx = entry.Key;
+                var carNumbers = sessionDataProvider.CarNumbers;
+                var lapDistPct = snapshot.CarIdxLapDistPct;
+                var lapCompleted = snapshot.CarIdxLapCompleted;
+
+                string number = (carNumbers != null && carIdx < carNumbers.Length) ? carNumbers[carIdx] : "?";
+                float pct = (lapDistPct != null && carIdx < lapDistPct.Length) ? lapDistPct[carIdx] : -1f;
+                int laps = (lapCompleted != null && carIdx < lapCompleted.Length) ? lapCompleted[carIdx] : -1;
+
+                return $"leader #{number} (idx {carIdx}) at LapDistPct {pct:F4}, LapCompleted {laps}, CarIdxLap {FormatLap(snapshot, carIdx)}";
+            }
+
+            // Finished cars are excluded from the live sort, so once the leader freezes there is no
+            // live P1 even though the race has a leader. Report the frozen one rather than "none".
+            foreach (var entry in _finishingOverallPositions)
+            {
+                if (entry.Value != 1)
+                    continue;
+
+                var carNumbers = sessionDataProvider.CarNumbers;
+                string number = (carNumbers != null && entry.Key < carNumbers.Length) ? carNumbers[entry.Key] : "?";
+                return $"leader #{number} (idx {entry.Key}) already frozen at P1";
+            }
+
+            return "no leader in the running order yet";
+        }
+
+        /// <summary>
+        /// Freeze class positions for cars as they take the checkered flag.
+        /// Only begins freezing after the P1 car (class leader) crosses S/F.
+        /// Monitors CarIdxLapCompleted increments during checkered flag state.
+        ///
+        /// The CarIdxLapCompleted baseline is tracked from the moment the session starts, NOT from
+        /// the first checkered frame. iRacing flips SessionState to Checkered *because* the leader
+        /// crossed S/F, so the leader's lap-completed increment lands in the same telemetry sample
+        /// as the state change. Seeding the baseline on that frame swallowed the increment, the
+        /// leader never latched, and with the leader gate never opening nothing was ever frozen —
+        /// so every car that then logged out handed a free position to everyone behind it.
+        /// </summary>
+        private void FreezeFinishingPositions(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        {
             var carClassIDs = sessionDataProvider.CarClassIDs;
             var carNumbers = sessionDataProvider.CarNumbers;
             var carLapCompleted = snapshot.CarIdxLapCompleted;
@@ -303,11 +445,6 @@ namespace VISOR.ViewModels
 
             for (int carIdx = 0; carIdx < carLapCompleted.Length; carIdx++)
             {
-                if (_carsFinished.Contains(carIdx))
-                {
-                    continue;
-                }
-
                 if (carIdx >= carClassIDs.Length || carIdx >= carNumbers.Length)
                 {
                     continue;
@@ -315,20 +452,32 @@ namespace VISOR.ViewModels
 
                 int currentLapCompleted = carLapCompleted[carIdx];
 
-                if (!_lastLapCompleted.ContainsKey(carIdx))
+                // A car with no telemetry reports -1. Keep the last real baseline rather than
+                // storing the sentinel, or the car's return would read as a lap completion.
+                if (currentLapCompleted < 0)
                 {
-                    _lastLapCompleted[carIdx] = currentLapCompleted;
                     continue;
                 }
 
-                int lastLapCompleted = _lastLapCompleted[carIdx];
+                bool isFirstObservation = !_lastLapCompleted.TryGetValue(carIdx, out int lastLapCompleted);
+                _lastLapCompleted[carIdx] = currentLapCompleted;
+
+                if (!_isCheckeredFlag || isFirstObservation || _carsFinished.Contains(carIdx))
+                {
+                    continue;
+                }
+
                 if (currentLapCompleted > lastLapCompleted)
                 {
                     int classId = carClassIDs[carIdx];
                     int currentPosition = GetClassPosition(carIdx, classId);
                     int currentOverall = GetOverallPosition(carIdx);
 
-                    if (!_leaderHasFinished && currentPosition == 1)
+                    // The gate is the OVERALL leader finishing, not any class leader: iRacing ends the
+                    // race for everyone when the overall winner takes the flag, and a slower class's
+                    // P1 crossing in the few seconds between the state flip and the winner's crossing
+                    // would otherwise open the gate early and freeze cars that are still racing.
+                    if (!_leaderHasFinished && currentOverall == 1)
                     {
                         _finishingClassPositions[carIdx] = currentPosition;
                         _finishingOverallPositions[carIdx] = currentOverall;
@@ -346,9 +495,86 @@ namespace VISOR.ViewModels
 
                         Log.Info($"Car #{carNumbers[carIdx]} (idx {carIdx}) took checkered flag - frozen at P{currentPosition} (overall P{currentOverall}) (LapCompleted: {lastLapCompleted} -> {currentLapCompleted})");
                     }
-
-                    _lastLapCompleted[carIdx] = currentLapCompleted;
+                    else if (!_leaderHasFinished)
+                    {
+                        // Expected: the car crossed after the state flip but before the overall leader
+                        // did, so it has not been given the flag and races another lap. Routine in a
+                        // multiclass field, so it stays out of the Info log.
+                        Log.Debug($"Car #{carNumbers[carIdx]} (idx {carIdx}) crossed before the overall leader - not frozen, " +
+                                  $"P{currentPosition} (overall P{currentOverall}) (LapCompleted: {lastLapCompleted} -> {currentLapCompleted})");
+                    }
+                    else
+                    {
+                        // Unexpected: the leader has finished but this car has no computed position, so
+                        // no slot could be taken. Without this line a failed freeze is completely
+                        // silent, which is what made the original leader-latch failure so hard to place.
+                        Log.Info($"Car #{carNumbers[carIdx]} (idx {carIdx}) completed a lap under the checkered but was NOT frozen - " +
+                                 $"P{currentPosition} (overall P{currentOverall}) (LapCompleted: {lastLapCompleted} -> {currentLapCompleted})");
+                    }
                 }
+            }
+        }
+
+        /// <summary>
+        /// Hold the finishing slot of a car that drops out of the session during the checkered
+        /// instead of letting everyone behind it slide up a place. Cars in an offline or AI race
+        /// leave the moment they finish, and a car whose telemetry simply stops is never seen to
+        /// complete a lap, so the crossing-based freeze above can miss it entirely.
+        ///
+        /// Only runs under the checkered, so a mid-race telemetry dropout still recovers normally.
+        /// A car that leaves and rejoins during the checkered keeps the slot it left on, which is
+        /// the right answer once the race is decided.
+        /// </summary>
+        private void FreezeDepartedCars(ISessionDataProvider sessionDataProvider)
+        {
+            if (!_isCheckeredFlag)
+            {
+                return;
+            }
+
+            var carClassIDs = sessionDataProvider.CarClassIDs;
+            var carNumbers = sessionDataProvider.CarNumbers;
+
+            if (carClassIDs == null || carNumbers == null)
+            {
+                return;
+            }
+
+            // _lastFrameValidCars holds the previous frame's roster (UpdateValidCarTracking copies
+            // it before rebuilding _validCarIndices), so the difference is this frame's departures.
+            foreach (int carIdx in _lastFrameValidCars)
+            {
+                if (_validCarIndices.Contains(carIdx) || _carsFinished.Contains(carIdx))
+                {
+                    continue;
+                }
+
+                if (carIdx >= carClassIDs.Length || carIdx >= carNumbers.Length)
+                {
+                    continue;
+                }
+
+                int classPosition = GetClassPosition(carIdx, carClassIDs[carIdx]);
+                int overallPosition = GetOverallPosition(carIdx);
+
+                if (classPosition <= 0 || overallPosition <= 0)
+                {
+                    continue;
+                }
+
+                _finishingClassPositions[carIdx] = classPosition;
+                _finishingOverallPositions[carIdx] = overallPosition;
+                _carsFinished.Add(carIdx);
+
+                // Keep the leader gate coherent: if the car that left was holding overall P1, the
+                // winner is home and the crossing-based freeze can start on everyone else. Overall,
+                // not class: a slower class's leader leaving says nothing about the race winner.
+                if (overallPosition == 1)
+                {
+                    _leaderHasFinished = true;
+                }
+
+                Log.Info($"Car #{carNumbers[carIdx]} (idx {carIdx}) left during the checkered - holding P{classPosition} (overall P{overallPosition})");
             }
         }
         #endregion
@@ -397,7 +623,8 @@ namespace VISOR.ViewModels
                 if (lapCompleted[carIdx] >= 0 && validDist)
                 {
                     _carsHavingTakenGreen.Add(carIdx);
-                    Log.Debug($"Car #{carNumbers[carIdx]} (idx {carIdx}) took the green flag - switching to live position calc");
+                    Log.Debug($"Car #{carNumbers[carIdx]} (idx {carIdx}) took the green flag - switching to live position calc " +
+                              $"(CarIdxLap {FormatLap(snapshot, carIdx)}, LapCompleted {lapCompleted[carIdx]}, LapDistPct {lapDistPct[carIdx]:F4})");
                 }
             }
         }
@@ -406,15 +633,10 @@ namespace VISOR.ViewModels
         /// Sort key for a car that has not yet taken the green flag. Returns a negative value derived
         /// from grid order so the whole pre-green block sorts behind any car already racing (whose key
         /// is currentLap + LapDistPct, i.e. >= ~1), while preserving grid order within the block.
-        /// Grid order is taken from live CarIdxClassPosition (already per-class), falling back to
-        /// qualifying position, then to a deterministic last-place ordering if neither is available.
         /// </summary>
-        private static float GetPreGreenSortKey(int carIdx, int[]? classPositions, int[]? qualPositions)
+        private static float GetPreGreenSortKey(int carIdx, int[]? gridPositions)
         {
-            int grid = (classPositions != null && carIdx < classPositions.Length) ? classPositions[carIdx] : 0;
-
-            if (grid <= 0 && qualPositions != null && carIdx < qualPositions.Length)
-                grid = qualPositions[carIdx];
+            int grid = (gridPositions != null && carIdx < gridPositions.Length) ? gridPositions[carIdx] : 0;
 
             if (grid <= 0)
             {
@@ -425,6 +647,37 @@ namespace VISOR.ViewModels
             // Lower grid position should sort ahead; negate so P1 (-1) outranks P2 (-2) under
             // OrderByDescending, and the whole block stays below any green car's positive key.
             return -grid;
+        }
+
+        /// <summary>
+        /// Pick ONE grid-order source for the whole pre-green block. The live arrays are per-class
+        /// (CarIdxClassPosition) or field-wide (CarIdxPosition) and 1-based with 0 meaning "unknown";
+        /// qualifying order is field-wide and 1-based on the same terms. Both are valid orderings on
+        /// their own, but a per-car fallback would compare a 1..n class number against a 1..N field
+        /// number and scramble the block, so the source covering the most pre-green cars is used for
+        /// all of them and the rest fall to the back of the block.
+        /// </summary>
+        private static int[]? SelectGridSource(int[]? livePositions, int[]? qualPositions, List<int> preGreenCars)
+        {
+            int liveCoverage = CountCoveredCars(livePositions, preGreenCars);
+            if (liveCoverage == preGreenCars.Count)
+                return livePositions;
+
+            return (CountCoveredCars(qualPositions, preGreenCars) > liveCoverage) ? qualPositions : livePositions;
+        }
+
+        private static int CountCoveredCars(int[]? positions, List<int> carIndices)
+        {
+            if (positions == null)
+                return 0;
+
+            int covered = 0;
+            foreach (int carIdx in carIndices)
+            {
+                if (carIdx < positions.Length && positions[carIdx] > 0)
+                    covered++;
+            }
+            return covered;
         }
         #endregion
 
@@ -530,8 +783,23 @@ namespace VISOR.ViewModels
 
             _carsWithInvalidLapDistPctLogged.Remove(carIdx);
 
+            // Only meaningful against the immediately preceding frame. Across a telemetry gap the
+            // car may have crossed S/F unobserved, so the lap counter legitimately jumps without a
+            // LapDistPct wrap to pair it with — reading that as a desync would subtract a real lap.
+            bool followsValidFrame = _framesSinceValidData.GetValueOrDefault(carIdx, int.MaxValue) == 0;
+
             if (_lastValidLapDistPct.TryGetValue(carIdx, out float lastDist))
             {
+                if (followsValidFrame)
+                {
+                    UpdateLapNumberCorrection(carIdx, lastDist, lapDist,
+                        _lastValidCurrentLap.GetValueOrDefault(carIdx, lap), lap);
+                }
+                else
+                {
+                    _lapNumberCorrection.Remove(carIdx);
+                }
+
                 float delta = lapDist - lastDist;
 
                 // Lap boundary wrap-around.
@@ -586,6 +854,56 @@ namespace VISOR.ViewModels
             }
         }
 
+        /// <summary>
+        /// Track whether CarIdxLap and CarIdxLapDistPct currently disagree about which lap a car is
+        /// on. They normally tick over together at S/F, but either can lead the other by a frame or
+        /// two; while they disagree, lap + LapDistPct is a full lap off. The correction is a running
+        /// balance: a forward LapDistPct wrap adds a lap, the lap counter advancing removes one, so
+        /// it settles back at 0 the moment they agree again, and it is only ever kept while the car
+        /// is actually sitting at the line.
+        /// </summary>
+        private void UpdateLapNumberCorrection(int carIdx, float prevDist, float lapDist, int prevLap, int lap)
+        {
+            int offset = GetLapNumberCorrection(carIdx);
+
+            offset -= (lap - prevLap);
+
+            if (prevDist > SF_WRAP_HIGH && lapDist < SF_WRAP_LOW)
+                offset += 1;
+            else if (prevDist < SF_WRAP_LOW && lapDist > SF_WRAP_HIGH)
+                offset -= 1;
+
+            // A correction only means anything within sight of the line: +1 while LapDistPct has
+            // wrapped and the counter hasn't (the car reads just past S/F), -1 while the counter
+            // has moved and LapDistPct hasn't (it reads just short of S/F). Anywhere else the
+            // pairing is coincidental — a car towed across the line moves its lap counter with no
+            // wrap to match — and the raw lap number is the better bet. This also covers the
+            // settled case, where the two agree again and the offset is back to 0.
+            bool isPlausibleDesync = (offset == 1 && lapDist < SF_WRAP_LOW)
+                                  || (offset == -1 && lapDist > SF_WRAP_HIGH);
+
+            if (isPlausibleDesync)
+                _lapNumberCorrection[carIdx] = (offset, _globalFrameCounter);
+            else
+                _lapNumberCorrection.Remove(carIdx);
+        }
+
+        /// <summary>
+        /// Lap-number correction for a car, or 0 once it has expired. Expiry matters because the
+        /// correction is only ever meant to bridge the frames between the two telemetry variables
+        /// agreeing; if the lap counter never catches up (an invalidated lap, a car towed to the
+        /// pits), holding it would put the car a whole lap out of position indefinitely.
+        /// </summary>
+        private int GetLapNumberCorrection(int carIdx)
+        {
+            if (_lapNumberCorrection.TryGetValue(carIdx, out var correction) &&
+                _globalFrameCounter - correction.Frame <= LAP_DESYNC_MAX_FRAMES)
+            {
+                return correction.Offset;
+            }
+            return 0;
+        }
+
         private float GetPredictedLapDistPct(int carIdx)
         {
             if (!_lastValidLapDistPct.TryGetValue(carIdx, out float lastDist) ||
@@ -608,6 +926,34 @@ namespace VISOR.ViewModels
 
             return predictedDist;
         }
+
+        /// <summary>
+        /// Whole laps the prediction has carried a car past S/F while its telemetry was invalid.
+        /// <see cref="GetEffectiveLapDistPct"/> wraps its result into [0,1) because the relative
+        /// display needs a track position, but the running-order sort pairs that with a cached
+        /// CarIdxLap that stopped updating when the telemetry did. Without adding these laps back,
+        /// a car predicted across the line reads a full lap down and drops to the tail of the
+        /// order — which is the single-frame position flicker seen as cars cross S/F, since
+        /// LapDistPct reads marginally outside [0,1] for a frame right at the line.
+        /// </summary>
+        private int GetPredictedLapOffset(int carIdx)
+        {
+            if (!HasValidCache(carIdx) ||
+                !_lastValidLapDistPct.TryGetValue(carIdx, out float lastDist) ||
+                !_lapDistPctVelocity.TryGetValue(carIdx, out float velocity) ||
+                !_framesSinceValidData.TryGetValue(carIdx, out int framesSinceValid))
+            {
+                return 0;
+            }
+
+            // Mirrors GetPredictedLapDistPct: a stopped car holds its last position, no wrap.
+            if (Math.Abs(velocity) < MIN_VELOCITY_THRESHOLD)
+            {
+                return 0;
+            }
+
+            return (int)Math.Floor(lastDist + (velocity * framesSinceValid));
+        }
         #endregion
 
         #region Private Methods - Race Position Calculation
@@ -620,12 +966,8 @@ namespace VISOR.ViewModels
             if (carClassIDs == null || currentLap == null || lapDistPct == null)
                 return;
 
-            // Grid-order sources for cars that have not yet taken the green flag.
-            var classPositions = snapshot.CarIdxClassPosition;
-            var overallPositions = snapshot.CarIdxPosition;
-            var qualPositions = sessionDataProvider.GetQualifyResultsPositions();
-
             var carsWithPositions = new List<CarPositionData>();
+            var preGreenCars = new List<int>();
 
             foreach (int carIdx in _validCarIndices)
             {
@@ -641,11 +983,16 @@ namespace VISOR.ViewModels
 
                 if (lapDistPct[carIdx] >= 0f && lapDistPct[carIdx] <= 1f)
                 {
-                    effectiveCurrentLap = currentLap[carIdx];
+                    // CarIdxLap and CarIdxLapDistPct don't always tick over in the same frame at
+                    // S/F; realign them so a car crossing the line doesn't read a full lap out.
+                    effectiveCurrentLap = currentLap[carIdx] + GetLapNumberCorrection(carIdx);
                 }
                 else if (_lastValidCurrentLap.TryGetValue(carIdx, out int cachedLap))
                 {
-                    effectiveCurrentLap = cachedLap;
+                    // Predicting: the cached lap number froze with the telemetry, so add the laps
+                    // the prediction has since wrapped through. The correction still applies —
+                    // it fixes the cached baseline, the offset covers motion since.
+                    effectiveCurrentLap = cachedLap + GetLapNumberCorrection(carIdx) + GetPredictedLapOffset(carIdx);
                 }
                 else
                 {
@@ -657,17 +1004,9 @@ namespace VISOR.ViewModels
 
                 float trackPosition = effectiveCurrentLap + effectiveLapDistPct;
 
-                // Until a car takes the green flag, its on-grid LapDistPct is ambiguous across the
-                // S/F line, so order it by grid position instead of live track position. Class and
-                // overall use the same track position once green, but fall back to their respective
-                // grid orders (per-class vs field-wide) while pre-green.
                 bool hasTakenGreen = _carsHavingTakenGreen.Contains(carIdx);
-                float sortKey = hasTakenGreen
-                    ? trackPosition
-                    : GetPreGreenSortKey(carIdx, classPositions, qualPositions);
-                float overallSortKey = hasTakenGreen
-                    ? trackPosition
-                    : GetPreGreenSortKey(carIdx, overallPositions, qualPositions);
+                if (!hasTakenGreen)
+                    preGreenCars.Add(carIdx);
 
                 carsWithPositions.Add(new CarPositionData
                 {
@@ -676,12 +1015,34 @@ namespace VISOR.ViewModels
                     CurrentLap = effectiveCurrentLap,
                     LapDistPct = effectiveLapDistPct,
                     TrackPosition = trackPosition,
-                    SortKey = sortKey,
-                    OverallSortKey = overallSortKey
+                    HasTakenGreen = hasTakenGreen,
+                    SortKey = trackPosition,
+                    OverallSortKey = trackPosition
                 });
             }
 
+            // Until a car takes the green flag, its on-grid LapDistPct is ambiguous across the S/F
+            // line, so order it by grid position instead of live track position. Class and overall
+            // use the same track position once green, but fall back to their respective grid orders
+            // (per-class vs field-wide) while pre-green.
+            if (preGreenCars.Count > 0)
+            {
+                var qualPositions = sessionDataProvider.GetQualifyResultsPositions();
+                var classGrid = SelectGridSource(snapshot.CarIdxClassPosition, qualPositions, preGreenCars);
+                var overallGrid = SelectGridSource(snapshot.CarIdxPosition, qualPositions, preGreenCars);
+
+                foreach (var car in carsWithPositions)
+                {
+                    if (car.HasTakenGreen)
+                        continue;
+
+                    car.SortKey = GetPreGreenSortKey(car.CarIdx, classGrid);
+                    car.OverallSortKey = GetPreGreenSortKey(car.CarIdx, overallGrid);
+                }
+            }
+
             AssignOverallPositions(carsWithPositions);
+            LogLeaderChange(carsWithPositions, snapshot, sessionDataProvider);
 
             var classGroups = carsWithPositions.GroupBy(c => c.ClassId);
 
@@ -710,6 +1071,38 @@ namespace VISOR.ViewModels
                     nextPosition++;
                 }
             }
+        }
+
+        /// <summary>
+        /// Log each change of overall leader with the inputs the sort used for it. The overall P1
+        /// is the one car whose sort key can be checked against the real race at a glance, so a
+        /// leader that is physically impossible (a car just off the line leading the field) shows
+        /// up here with the CarIdxLap/LapDistPct that produced it. Leader changes are rare, so
+        /// this stays quiet.
+        /// </summary>
+        private void LogLeaderChange(List<CarPositionData> carsWithPositions, SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        {
+            if (!_cachedOverallPositions.Any(kv => kv.Value == 1))
+                return;
+
+            int leaderIdx = _cachedOverallPositions.First(kv => kv.Value == 1).Key;
+            if (leaderIdx == _lastLoggedLeaderIdx)
+                return;
+
+            _lastLoggedLeaderIdx = leaderIdx;
+
+            var leader = carsWithPositions.FirstOrDefault(c => c.CarIdx == leaderIdx);
+            if (leader == null)
+                return;
+
+            var carNumbers = sessionDataProvider.CarNumbers;
+            var lapCompleted = snapshot.CarIdxLapCompleted;
+            string number = (carNumbers != null && leaderIdx < carNumbers.Length) ? carNumbers[leaderIdx] : "?";
+            int completed = leaderIdx < lapCompleted.Length ? lapCompleted[leaderIdx] : -1;
+
+            Log.Debug($"[Leader] Overall leader is now #{number} (idx {leaderIdx}) - effective lap {leader.CurrentLap} " +
+                      $"(raw CarIdxLap {FormatLap(snapshot, leaderIdx)}), LapCompleted {completed}, LapDistPct {leader.LapDistPct:F4}, " +
+                      $"sort key {leader.OverallSortKey:F4}, green latched {leader.HasTakenGreen}");
         }
 
         /// <summary>
@@ -751,6 +1144,7 @@ namespace VISOR.ViewModels
             public int CurrentLap { get; set; }
             public float LapDistPct { get; set; }
             public float TrackPosition { get; set; }
+            public bool HasTakenGreen { get; set; }
             public float SortKey { get; set; }
             public float OverallSortKey { get; set; }
         }

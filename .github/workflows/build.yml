@@ -34,7 +34,7 @@ env:
   # Adjust the slugs below to match what you create in the SignPath portal.
   SIGNPATH_PROJECT_SLUG: VISOR
   SIGNPATH_SIGNING_POLICY_SLUG: release-signing
-  DOTNET_VERSION: '8.0.x'
+  DOTNET_VERSION: '10.0.x'
 
 jobs:
   build:
@@ -109,7 +109,7 @@ jobs:
         shell: pwsh
         run: |
           $expected = $env:EXPECTED_VERSION
-          $exe = "bin\Release\net8.0-windows8.0\VISOR.exe"
+          $exe = "bin\Release\net10.0-windows\VISOR.exe"
           if (-not (Test-Path $exe)) { Write-Error "Built exe not found at $exe"; exit 1 }
           $exeVer = (Get-Item $exe).VersionInfo.FileVersion
           Write-Host "Built exe FileVersion=$exeVer (expected $expected)"

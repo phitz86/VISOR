@@ -12,6 +12,15 @@ namespace VISOR.ViewModels
     public class ClassColorManager
     {
         private readonly Dictionary<int, Brush> _classColorMap = new();
+        private readonly Dictionary<int, Brush> _classTextMap = new();
+
+        // Perceived-brightness cut-off (0-255) between black and white car numbers. Chosen so the
+        // light class colours (white, yellow, green, cyan) get black text while the saturated
+        // mid-tones (purple, pink, teal, orange) keep the white-with-shadow look they always had.
+        private const double LIGHT_FILL_THRESHOLD = 150.0;
+
+        private static readonly SolidColorBrush DarkTextBrush = CreateFrozenBrush(Colors.Black);
+        private static readonly SolidColorBrush LightTextBrush = CreateFrozenBrush(Colors.White);
 
         // iRacing reports no class colour in some session types (custom league races, offline
         // events) — either the class is absent from the colour data or it comes back as a literal
@@ -36,8 +45,11 @@ namespace VISOR.ViewModels
         /// <returns>The brush color for this class</returns>
         public Brush GetClassColor(int classID, int[]? carClassColors = null, int[]? carClassIDs = null)
         {
-            if (classID == 0)
-                return Brushes.Transparent;
+            // Class ID 0 is a real class here, not a missing one: online Test sessions and offline
+            // custom races are single-class and iRacing reports every driver as CarClassID 0. It
+            // used to short-circuit to Transparent, which left the car-number swatch unpainted in
+            // exactly those sessions. Callers only ask about cars that have YAML driver data, so
+            // there is no empty-slot case to guard against.
 
             if (_classColorMap.TryGetValue(classID, out var existingColor))
                 return existingColor;
@@ -46,25 +58,61 @@ namespace VISOR.ViewModels
             {
                 for (int i = 0; i < carClassIDs.Length; i++)
                 {
-                    if (carClassIDs[i] == classID)
-                    {
-                        // 0x000000 means iRacing didn't assign this class a colour; fall through
-                        // to the light-grey default rather than rendering an invisible black swatch.
-                        if (carClassColors[i] == 0)
-                            break;
+                    // 0x000000 means this entry carries no colour for the class (and every unused
+                    // car slot reads as class 0 / colour 0, so for class 0 those entries match
+                    // here). Keep scanning for a real colour rather than giving up on the first
+                    // blank one.
+                    if (carClassIDs[i] != classID || carClassColors[i] == 0)
+                        continue;
 
-                        var brush = ConvertHexColorToBrush(carClassColors[i]);
-                        _classColorMap[classID] = brush;
+                    var brush = ConvertHexColorToBrush(carClassColors[i]);
+                    _classColorMap[classID] = brush;
 
-                        Log.Debug($"[ClassColorManager] Assigned YAML color 0x{carClassColors[i]:X6} to class {classID}");
-                        return brush;
-                    }
+                    Log.Debug($"[ClassColorManager] Assigned YAML color 0x{carClassColors[i]:X6} to class {classID}");
+                    return brush;
                 }
             }
 
-            Log.Warning($"[ClassColorManager] No YAML color found for class {classID}, using default light grey");
+            // Expected for class 0 (single-class sessions have no class colour to report);
+            // genuinely unexpected for a real class ID.
+            string message = $"[ClassColorManager] No YAML color found for class {classID}, using default light grey";
+            if (classID == 0)
+                Log.Info(message);
+            else
+                Log.Warning(message);
+
             _classColorMap[classID] = DefaultClassBrush;
             return DefaultClassBrush;
+        }
+
+        /// <summary>
+        /// Black or white, whichever reads better as the car number on this class's fill. Resolved
+        /// from the same brush <see cref="GetClassColor"/> hands out, so the number always matches
+        /// what is actually painted behind it, including the light-grey and white defaults.
+        /// </summary>
+        public Brush GetClassTextBrush(int classID, int[]? carClassColors = null, int[]? carClassIDs = null)
+        {
+            if (_classTextMap.TryGetValue(classID, out var cached))
+                return cached;
+
+            var fill = GetClassColor(classID, carClassColors, carClassIDs);
+            Brush text = (fill is SolidColorBrush solid && IsLightFill(solid.Color))
+                ? DarkTextBrush
+                : LightTextBrush;
+
+            _classTextMap[classID] = text;
+            return text;
+        }
+
+        /// <summary>
+        /// True for fills light enough that dark text reads better. Uses the standard weighted
+        /// perceived-brightness formula, which tracks how bright a colour looks far better than
+        /// averaging the channels (pure green is much brighter to the eye than pure blue).
+        /// </summary>
+        private static bool IsLightFill(Color color)
+        {
+            double brightness = (color.R * 299 + color.G * 587 + color.B * 114) / 1000.0;
+            return brightness >= LIGHT_FILL_THRESHOLD;
         }
 
         /// <summary>
@@ -78,8 +126,9 @@ namespace VISOR.ViewModels
             byte g = (byte)((hexColor >> 8) & 0xFF);
             byte b = (byte)(hexColor & 0xFF);
 
-            var color = Color.FromArgb(255, r, g, b);
-            return new SolidColorBrush(color);
+            // Frozen to match DefaultClassBrush: these are cached for the session and handed
+            // straight to the renderer, so there is nothing to gain from keeping them mutable.
+            return CreateFrozenBrush(Color.FromArgb(255, r, g, b));
         }
 
         /// <summary>
@@ -109,6 +158,7 @@ namespace VISOR.ViewModels
         public void Reset()
         {
             _classColorMap.Clear();
+            _classTextMap.Clear();
             Log.Info("[ClassColorManager] Reset - all color assignments cleared");
         }
 
