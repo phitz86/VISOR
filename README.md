@@ -11,7 +11,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE.txt)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2B%20(x64)-0078D6)
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)
-![Version](https://img.shields.io/badge/version-1.1.0-brightgreen)
+![Version](https://img.shields.io/badge/version-1.2.0-brightgreen)
 
 </div>
 

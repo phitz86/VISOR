@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-03
+
+### Changed
+
+- **Version bumped to 1.2.0.0**; README, Config window and user guide updated to match.
+- **iRacing telemetry SDK upgraded to 2.5** (from 1.2.1) — the SDK now retries a frame that
+  iRacing was still writing while it was being read, instead of passing on a half-updated
+  sample, and reads session info as UTF-8 so accented driver names display correctly. VISOR's
+  telemetry handling was moved to the SDK's new single monitoring call.
+- **Telemetry keeps running if a window throws** — under the new SDK, an error escaping one of
+  VISOR's telemetry handlers would stop telemetry until VISOR was restarted. Those handlers now
+  catch and log such errors, and a disconnect still clears cached session data even if a window
+  fails to handle it.
+- **Dependency tidy-up** — dropped an unused `System.Diagnostics.PerformanceCounter` package
+  reference (VISOR now uses the copy built into .NET, which is patched with the runtime) and
+  updated `System.Management` to 10.0.12.
+
 ## [1.1.0] - 2026-10-03
 
 ### Security
@@ -194,6 +211,7 @@ display, and adds a substantial layer of app-stability and installer hardening.
 - Nullable-reference warnings (CS8602/CS8604) and an unused-variable warning; updated
   deprecated GitHub Actions.
 
-[Unreleased]: https://github.com/phitz86/VISOR/compare/v1.1.0.0...HEAD
+[Unreleased]: https://github.com/phitz86/VISOR/compare/v1.2.0.0...HEAD
+[1.2.0]: https://github.com/phitz86/VISOR/releases/tag/v1.2.0.0
 [1.1.0]: https://github.com/phitz86/VISOR/releases/tag/v1.1.0.0
 [1.0.0]: https://github.com/phitz86/VISOR/releases/tag/v1.0.0

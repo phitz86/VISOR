@@ -46,7 +46,8 @@ namespace VISOR.Telemetry
         private bool _lastPrimedState = false;
         private DateTime? _disconnectedAt = null;
 
-        // Defensive detector state (see Planning/SDK-Migration-Roadmap.md §"Defensive logging strategy")
+        // Defensive detector state: frame-gap detector, handler latency timer, and the
+        // [StreamFault] logging in RunAsync.
         private long _lastTickTs;
         private int _frameGapCount;
         private double _worstGapMs;
@@ -114,44 +115,42 @@ namespace VISOR.Telemetry
             {
                 await using (_client)
                 {
-                    var subscriptionTask = _client.SubscribeToAllStreams(
-                        onTelemetryUpdate: data => { OnTelemetryUpdate(data); return Task.CompletedTask; },
-                        onRawSessionInfoUpdate: yaml => { OnRawSessionInfoUpdate(yaml); return Task.CompletedTask; },
-                        onSessionInfoUpdate: info => { OnSessionInfoUpdate(info); return Task.CompletedTask; },
-                        onConnectStateChanged: state => { OnConnectStateChanged(state); return Task.CompletedTask; },
-                        onError: ex => { Log.Error("[SDK Stream] error from SDK", ex); return Task.CompletedTask; },
-                        cancellationToken: ct);
-                    var monitorTask = _client.Monitor(ct);
+                    // Under SDK 2.x an exception escaping any of these handlers faults Monitor and
+                    // stops all streams for good (Monitor runs once per client). Every handler body
+                    // below must therefore catch its own exceptions. OnError only receives
+                    // SDK-side processing errors, never handler exceptions.
+                    var handlers = new TelemetryHandlers<TelemetryData>
+                    {
+                        OnTelemetryUpdate = data => { OnTelemetryUpdate(data); return Task.CompletedTask; },
+                        OnRawSessionInfoUpdate = yaml => { OnRawSessionInfoUpdate(yaml); return Task.CompletedTask; },
+                        OnSessionInfoUpdate = info => { OnSessionInfoUpdate(info); return Task.CompletedTask; },
+                        OnConnectStateChanged = state => { OnConnectStateChanged(state); return Task.CompletedTask; },
+                        OnError = ex => { Log.Error("[SDK Stream] error from SDK", ex); return Task.CompletedTask; }
+                    };
 
-                    // Defensive detector #3: stream task fault logger.
-                    // Task.WhenAny returns the first task to finish; if it finished unexpectedly
-                    // (faulted, or completed without shutdown being requested), surface it.
-                    var winner = await Task.WhenAny(monitorTask, subscriptionTask);
-                    if (winner.IsFaulted)
+                    // Defensive detector #3: stream fault logger.
+                    // Monitor returns normally on cancellation; returning while shutdown was not
+                    // requested, or throwing, means telemetry has stopped unexpectedly.
+                    int records = await _client.Monitor(handlers, ct);
+                    if (ct.IsCancellationRequested)
                     {
-                        Log.Error("[StreamFault] SDK task ended unexpectedly", winner.Exception);
+                        Log.Info($"SDK monitoring stopped ({records} telemetry records processed)");
                     }
-                    else if (!ct.IsCancellationRequested)
+                    else
                     {
-                        Log.Warning("[StreamFault] SDK task ended without exception (expected only on shutdown)");
-                    }
-
-                    // Observe any pending exception on the other task so it doesn't disappear into the void.
-                    try
-                    {
-                        await Task.WhenAll(monitorTask, subscriptionTask);
-                    }
-                    catch (OperationCanceledException) { /* expected on shutdown */ }
-                    catch (Exception ex)
-                    {
-                        Log.Error("[StreamFault] additional exception while draining SDK tasks", ex);
+                        Log.Warning($"[StreamFault] SDK Monitor ended without shutdown being requested ({records} telemetry records processed)");
                     }
                 }
             }
-            catch (OperationCanceledException) { /* expected on shutdown */ }
+            catch (TimeoutException ex)
+            {
+                // SDK 2.x throws this when a handler has not returned within 5s of monitoring ending.
+                Log.Error("[StreamFault] an SDK handler did not return within 5s of shutdown", ex);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { /* expected on shutdown */ }
             catch (Exception ex)
             {
-                Log.Error("[SDK Stream] RunAsync error", ex);
+                Log.Error("[StreamFault] SDK Monitor faulted", ex);
             }
         }
 
@@ -159,36 +158,51 @@ namespace VISOR.Telemetry
 
         private void OnConnectStateChanged(ConnectState state)
         {
-            bool newConnectionState = state == ConnectState.Connected;
-            if (newConnectionState == _isConnected) return;
-
-            _isConnected = newConnectionState;
-
-            if (_isConnected && _disconnectedAt.HasValue)
+            try
             {
-                var duration = DateTime.UtcNow - _disconnectedAt.Value;
-                Log.Info($"iRacing reconnected after {duration.TotalSeconds:F1}s disconnection");
-                _disconnectedAt = null;
-            }
-            else
-            {
-                Log.Info($"iRacing connection state changed: {(_isConnected ? "Connected" : "Disconnected")}");
+                bool newConnectionState = state == ConnectState.Connected;
+                if (newConnectionState == _isConnected) return;
+
+                _isConnected = newConnectionState;
+
+                if (_isConnected && _disconnectedAt.HasValue)
+                {
+                    var duration = DateTime.UtcNow - _disconnectedAt.Value;
+                    Log.Info($"iRacing reconnected after {duration.TotalSeconds:F1}s disconnection");
+                    _disconnectedAt = null;
+                }
+                else
+                {
+                    Log.Info($"iRacing connection state changed: {(_isConnected ? "Connected" : "Disconnected")}");
+                    if (!_isConnected)
+                        _disconnectedAt = DateTime.UtcNow;
+                }
+
+                // Guarded separately so a throwing subscriber can't skip the cache reset below.
+                try
+                {
+                    ConnectionStateChanged?.Invoke(_isConnected);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("ConnectionStateChanged subscriber error", ex);
+                }
+
                 if (!_isConnected)
-                    _disconnectedAt = DateTime.UtcNow;
+                {
+                    _sessionCoordinator.ClearCache();
+                    _cachedRawYaml = string.Empty;
+                    _lastSessionNumForLog = -1;
+                    // Reset frame-gap baseline so the wall-clock gap across a disconnect
+                    // doesn't get reported as a single huge gap on the first frame after reconnect.
+                    _lastTickTs = 0;
+                }
+                CheckPrimedStateChange();
             }
-
-            ConnectionStateChanged?.Invoke(_isConnected);
-
-            if (!_isConnected)
+            catch (Exception ex)
             {
-                _sessionCoordinator.ClearCache();
-                _cachedRawYaml = string.Empty;
-                _lastSessionNumForLog = -1;
-                // Reset frame-gap baseline so the wall-clock gap across a disconnect
-                // doesn't get reported as a single huge gap on the first frame after reconnect.
-                _lastTickTs = 0;
+                Log.Error("OnConnectStateChanged error", ex);
             }
-            CheckPrimedStateChange();
         }
 
         private void CheckPrimedStateChange()
@@ -201,7 +215,15 @@ namespace VISOR.Telemetry
                     : "HUD no longer primed: waiting for connection or session data");
                 _lastPrimedState = isPrimed;
             }
-            PrimedStateChanged?.Invoke(isPrimed);
+
+            try
+            {
+                PrimedStateChanged?.Invoke(isPrimed);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("PrimedStateChanged subscriber error", ex);
+            }
         }
 
         private void OnRawSessionInfoUpdate(string sessionInfo)
@@ -246,6 +268,19 @@ namespace VISOR.Telemetry
 
         private void OnTelemetryUpdate(TelemetryData telemetryData)
         {
+            // Outer guard: nothing may escape into the SDK (see RunAsync).
+            try
+            {
+                ProcessTelemetryUpdate(telemetryData);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("OnTelemetryUpdate error", ex);
+            }
+        }
+
+        private void ProcessTelemetryUpdate(TelemetryData telemetryData)
+        {
             // Defensive detector #1: frame-gap detector. 60Hz expected, flag gaps >33ms.
             var now = Stopwatch.GetTimestamp();
             if (_lastTickTs != 0)
@@ -279,7 +314,7 @@ namespace VISOR.Telemetry
             }
 
             // Offload the fan-out and DEBUG-only file I/O so the SDK stream thread isn't
-            // blocked on consumer work. In SDK 1.x the channel has a 60-sample ring buffer
+            // blocked on consumer work. The SDK's telemetry channel is a 60-sample ring buffer
             // and oldest samples are silently dropped when consumption is slow; keeping
             // the on-thread cost minimal is the prescribed mitigation.
             if (snapshot != null)
@@ -307,7 +342,7 @@ namespace VISOR.Telemetry
                 if (handlerStart - _lastLatencyLogTs > cooldownTicks)
                 {
                     _lastLatencyLogTs = handlerStart;
-                    Log.Warning($"[HandlerLatency] OnTelemetryUpdate took {elapsedMs:F1}ms (>{HandlerLatencyWarnMs}ms); risk of dropped samples in 1.x ring buffer");
+                    Log.Warning($"[HandlerLatency] OnTelemetryUpdate took {elapsedMs:F1}ms (>{HandlerLatencyWarnMs}ms); risk of dropped samples in SDK ring buffer");
                 }
             }
         }

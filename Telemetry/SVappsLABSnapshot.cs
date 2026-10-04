@@ -57,7 +57,7 @@ namespace VISOR.Telemetry
         public int SessionLapsTotal => Data.SessionLapsTotal ?? 0;
         public int SessionNum => Data.SessionNum ?? 0;
 
-        // SessionState is a nullable enum under SDK 1.2.1; cast to int with a -1 "unknown"
+        // SessionState is a nullable enum in the generated TelemetryData; cast to int with a -1 "unknown"
         // fallback so the accessor is null-safe and never throws.
         public int SessionState => (int?)Data.SessionState ?? -1;
 
