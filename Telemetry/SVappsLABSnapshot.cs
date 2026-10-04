@@ -84,6 +84,21 @@ namespace VISOR.Telemetry
         // TrackWetness enum as int: 0 unknown, 1 dry, 2 mostly dry, 3+ increasingly wet.
         public int TrackWetness => Convert.ToInt32(Data.TrackWetness);
 
+#if DEBUG
+        // --- DEBUG-only wet-grip research inputs (raw, nullable: null = not in the live feed) ---
+        public float? Precipitation => Data.Precipitation;
+        public bool? WeatherDeclaredWet => Data.WeatherDeclaredWet;
+        public int? PlayerTireCompound => Data.PlayerTireCompound;
+        public float? YawRate => Data.YawRate;
+        public float? SteeringWheelAngle => Data.SteeringWheelAngle;
+        public float? LFspeed => Data.LFspeed;
+        public float? RFspeed => Data.RFspeed;
+        public float? LRspeed => Data.LRspeed;
+        public float? RRspeed => Data.RRspeed;
+        public double? Lat => Data.Lat;
+        public double? Lon => Data.Lon;
+#endif
+
         public double SessionTime => Data.SessionTime ?? 0.0;
         public double SessionTimeRemain => Data.SessionTimeRemain ?? 0.0;
         public int SessionLapsRemain => Data.SessionLapsRemain ?? 0;

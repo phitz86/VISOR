@@ -24,7 +24,15 @@ namespace VISOR.Telemetry
         // Shift indicator + shift-point learner (ShiftPointProvider / ShiftPointLearner)
         TelemetryVar.PlayerCarSLFirstRPM, TelemetryVar.PlayerCarSLShiftRPM, TelemetryVar.Throttle,
         TelemetryVar.Brake, TelemetryVar.Clutch, TelemetryVar.LongAccel, TelemetryVar.LatAccel, TelemetryVar.EngineWarnings,
-        TelemetryVar.IsOnTrack, TelemetryVar.IsReplayPlaying, TelemetryVar.TrackWetness
+        TelemetryVar.IsOnTrack, TelemetryVar.IsReplayPlaying, TelemetryVar.TrackWetness,
+#if DEBUG
+        // DEBUG-only wet-grip research (WetResearchLogger). Some may only exist in IBT files,
+        // not the live feed; unavailable vars read as null and log as blank.
+        TelemetryVar.Precipitation, TelemetryVar.WeatherDeclaredWet, TelemetryVar.PlayerTireCompound,
+        TelemetryVar.YawRate, TelemetryVar.SteeringWheelAngle,
+        TelemetryVar.LFspeed, TelemetryVar.RFspeed, TelemetryVar.LRspeed, TelemetryVar.RRspeed,
+        TelemetryVar.Lat, TelemetryVar.Lon,
+#endif
     ])]
     public class SVappsLABSDKWrapper : IDisposable
     {

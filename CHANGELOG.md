@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on a wet track, during wheelspin and while cornering hard (above about 0.3 g sideways, where
   tire side load eats into forward acceleration). On ovals that means learning is slow, but you
   rarely shift there, and the indicator still works from iRacing's shift point.
+- **Wet-track research logging (debug builds only)** — on a wet track, debug builds record
+  60 Hz telemetry (where on track, conditions, inputs, accelerations and wheelspin signals, at
+  every throttle level) to `Diagnostics\WetResearch`, as groundwork for a future grip-aware wet
+  shift model. Release builds don't collect it.
 - **Unit tests** (`Tests/VISOR.Tests`) for the shift-point learner and its storage, using a
   simulated car whose true optimal shift points are known.
 

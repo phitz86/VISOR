@@ -58,6 +58,7 @@ namespace VISOR.ViewModels
 
 #if DEBUG
         private ShiftPointLogger? _debugLogger;
+        private WetResearchLogger? _wetLogger;
 #endif
 
         public ShiftPointProvider()
@@ -151,6 +152,7 @@ namespace VISOR.ViewModels
                 bool added = _learner.AddSample(sample);
 #if DEBUG
                 if (added) _debugLogger?.LogSample(sample, _learner.GetRatio(sample.Gear));
+                if (WetResearchLogger.ShouldLog(s, onPitRoad)) _wetLogger?.Write(s, _learner.GetRatio(s.Gear));
 #endif
             }
 
@@ -195,6 +197,8 @@ namespace VISOR.ViewModels
 #if DEBUG
                 _debugLogger?.Dispose();
                 _debugLogger = new ShiftPointLogger(car.CarPath);
+                _wetLogger?.Dispose();
+                _wetLogger = new WetResearchLogger(car.CarPath);
 #endif
             }
 
@@ -352,6 +356,14 @@ namespace VISOR.ViewModels
         /// </summary>
         public void Flush()
         {
+#if DEBUG
+            // Close the current wet-research file (disconnect/exit); a new one opens on the next wet frame.
+            lock (_lock)
+            {
+                _wetLogger?.Dispose();
+                _wetLogger = _car != null ? new WetResearchLogger(_car.CarPath) : null;
+            }
+#endif
             try
             {
                 string carPath, carVersion;
