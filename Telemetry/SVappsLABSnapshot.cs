@@ -66,6 +66,10 @@ namespace VISOR.Telemetry
         // reads, so a slope shows up as the force the engine is fighting rather than as noise.
         public float LongAccel => Data.LongAccel ?? 0f;
 
+        // Lateral acceleration in m/s^2. The shift-point learner skips samples taken while
+        // cornering hard, where tire side load eats into forward acceleration.
+        public float LatAccel => Data.LatAccel ?? 0f;
+
         // EngineWarnings is a bitfield enum; normalize to its underlying int (same approach as
         // SessionFlags) and test the two bits the shift indicator cares about.
         public int EngineWarnings => Convert.ToInt32(Data.EngineWarnings);

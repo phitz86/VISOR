@@ -137,6 +137,7 @@ namespace VISOR.ViewModels
                 Rpm: s.RPM,
                 Speed: s.Speed,
                 LongAccel: s.LongAccel,
+                LatAccel: s.LatAccel,
                 Throttle: s.Throttle,
                 Brake: s.Brake,
                 Clutch: s.Clutch,

@@ -23,7 +23,7 @@ namespace VISOR.Telemetry
         TelemetryVar.TrackTempCrew,
         // Shift indicator + shift-point learner (ShiftPointProvider / ShiftPointLearner)
         TelemetryVar.PlayerCarSLFirstRPM, TelemetryVar.PlayerCarSLShiftRPM, TelemetryVar.Throttle,
-        TelemetryVar.Brake, TelemetryVar.Clutch, TelemetryVar.LongAccel, TelemetryVar.EngineWarnings,
+        TelemetryVar.Brake, TelemetryVar.Clutch, TelemetryVar.LongAccel, TelemetryVar.LatAccel, TelemetryVar.EngineWarnings,
         TelemetryVar.IsOnTrack, TelemetryVar.IsReplayPlaying, TelemetryVar.TrackWetness
     ])]
     public class SVappsLABSDKWrapper : IDisposable

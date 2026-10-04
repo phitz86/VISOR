@@ -78,9 +78,17 @@ namespace VISOR.Tests
         /// One full-throttle run from low speed through every gear, then braking back down.
         /// <paramref name="shiftAt"/> picks each upshift RPM (the driver's habit).
         /// <paramref name="wheelspinInFirst"/> makes first gear spin the wheels part of the time.
+        /// <paramref name="cornerExits"/> makes about half the low-RPM stretches in gears 1-3 corner
+        /// exits: full throttle with heavy lateral g and forward acceleration cut by cornering drag,
+        /// but with the tires gripping (RPM/speed stays on the gear's ratio, so the wheelspin check
+        /// can't catch it). <paramref name="reportLateralG"/> = false hides the lateral g from the
+        /// learner, to show what it would learn without the gate.
         /// </summary>
-        public IEnumerable<ShiftSample> Run(Func<int, double> shiftAt, bool wheelspinInFirst = false)
+        public IEnumerable<ShiftSample> Run(Func<int, double> shiftAt, bool wheelspinInFirst = false,
+            bool cornerExits = false, bool reportLateralG = true)
         {
+            const double CornerExitMaxRpm = 5500;
+            bool cornering = cornerExits && _rng.NextDouble() < 0.5;
             double v = 10;
             int gear = 1;
             double target = shiftAt(gear);  // the driver picks one shift point per gear
@@ -105,6 +113,7 @@ namespace VISOR.Tests
                     }
                     gear++;
                     target = shiftAt(gear);
+                    cornering = cornerExits && gear <= 3 && _rng.NextDouble() < 0.5;
                     continue;
                 }
 
@@ -119,7 +128,15 @@ namespace VISOR.Tests
                     accel *= 0.6;
                 }
 
-                yield return Frame(gear, reportedRpm, v, accel + _noise * Gaussian(), throttle: 1, clutch: 1);
+                double lat = 0;
+                if (cornering && gear <= 3 && rpm < CornerExitMaxRpm)
+                {
+                    lat = 6 + 6 * _rng.NextDouble();              // 0.6-1.2 g
+                    accel *= 1 - (0.15 + 0.10 * _rng.NextDouble()); // 15-25% lost to cornering drag
+                }
+
+                yield return Frame(gear, reportedRpm, v, accel + _noise * Gaussian(), throttle: 1, clutch: 1,
+                    lat: reportLateralG ? lat : 0);
                 v += accel * Dt;
                 if (accel <= 0.05) break;   // top speed reached
             }
@@ -134,9 +151,9 @@ namespace VISOR.Tests
             }
         }
 
-        private ShiftSample Frame(int gear, double rpm, double v, double accel, float throttle, float clutch, float brake = 0)
+        private ShiftSample Frame(int gear, double rpm, double v, double accel, float throttle, float clutch, float brake = 0, double lat = 0)
         {
-            var s = new ShiftSample(_time, gear, (float)rpm, (float)v, (float)accel, throttle, brake, clutch, Eligible: true);
+            var s = new ShiftSample(_time, gear, (float)rpm, (float)v, (float)accel, (float)lat, throttle, brake, clutch, Eligible: true);
             _time += Dt;
             return s;
         }

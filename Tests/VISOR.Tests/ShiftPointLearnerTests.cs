@@ -12,12 +12,12 @@ namespace VISOR.Tests
         private const int ToleranceRpm = 50;
 
         private static ShiftPointLearner Train(int runs, Func<int, double> shiftAt, int seed = 1, bool wheelspin = false,
-            Func<double, double>? torque = null)
+            Func<double, double>? torque = null, bool cornerExits = false, bool reportLateralG = true)
         {
             var learner = new ShiftPointLearner();
             var sim = new CarSimulator(seed, torque: torque);
             for (int i = 0; i < runs; i++)
-                foreach (var s in sim.Run(shiftAt, wheelspin))
+                foreach (var s in sim.Run(shiftAt, wheelspin, cornerExits, reportLateralG))
                     learner.AddSample(s);
             return learner;
         }
@@ -126,6 +126,43 @@ namespace VISOR.Tests
         }
 
         [Fact]
+        public void CorneringDoesNotSkewResult()
+        {
+            var clean = Train(runs: 30, shiftAt: _ => CarSimulator.RedLine, seed: 11)
+                .Solve(CarSimulator.RedLine, CarSimulator.GearRatios.Length);
+            var cornering = Train(runs: 30, shiftAt: _ => CarSimulator.RedLine, seed: 11, cornerExits: true)
+                .Solve(CarSimulator.RedLine, CarSimulator.GearRatios.Length);
+
+            for (int i = 0; i < clean.Length; i++)
+            {
+                int expected = CarSimulator.OptimalShift(clean[i].Gear);
+                _out.WriteLine($"gear {clean[i].Gear}: clean {clean[i].Rpm}, with corner exits {cornering[i].Rpm}, true optimum {expected}");
+                Assert.True(cornering[i].Confident, cornering[i].Reason);
+                Assert.InRange(cornering[i].Rpm, expected - ToleranceRpm, expected + ToleranceRpm);
+            }
+        }
+
+        [Fact]
+        public void CorneringWouldSkewTorqueCurveWithoutGate()
+        {
+            // Same driving, but the corner-exit frames claim zero lateral g so they slip past the
+            // gate. Proves the scenario really distorts the fit, i.e. the gate is doing real work.
+            var gated = Train(runs: 30, shiftAt: _ => CarSimulator.RedLine, seed: 11, cornerExits: true);
+            var ungated = Train(runs: 30, shiftAt: _ => CarSimulator.RedLine, seed: 11, cornerExits: true, reportLateralG: false);
+
+            // Torque shape compared as a ratio (the fit's absolute scale is arbitrary).
+            const double lo = 4500, hi = 6500;
+            double truth = CarSimulator.Torque(lo) / CarSimulator.Torque(hi);
+            double gatedRatio = gated.RelativeTorqueAt(lo)!.Value / gated.RelativeTorqueAt(hi)!.Value;
+            double ungatedRatio = ungated.RelativeTorqueAt(lo)!.Value / ungated.RelativeTorqueAt(hi)!.Value;
+            _out.WriteLine($"T({lo})/T({hi}): truth {truth:F3}, gated {gatedRatio:F3}, ungated {ungatedRatio:F3}");
+
+            Assert.InRange(gatedRatio, truth * 0.97, truth * 1.03);
+            Assert.True(Math.Abs(ungatedRatio / truth - 1) > 0.05,
+                $"expected cornering to distort the ungated fit by >5%, got {ungatedRatio / truth - 1:P1}");
+        }
+
+        [Fact]
         public void RejectsIneligibleAndTransientFrames()
         {
             var learner = Train(runs: 2, shiftAt: _ => CarSimulator.RedLine);
@@ -135,17 +172,22 @@ namespace VISOR.Tests
 
             // Establish gear 3 well past the post-shift settle time.
             for (int i = 0; i < 120; i++, t += CarSimulator.Dt)
-                learner.AddSample(new ShiftSample(t, 3, (float)(k * 40), 40, 3f, 1, 0, 1, Eligible: true));
+                learner.AddSample(new ShiftSample(t, 3, (float)(k * 40), 40, 3f, 0f, 1, 0, 1, Eligible: true));
             long settled = learner.SampleCount;
             Assert.True(settled > before);
 
-            Assert.False(learner.AddSample(new ShiftSample(t, 3, (float)(k * 40), 40, 3f, 1, 0, 1, Eligible: false)));
-            Assert.False(learner.AddSample(new ShiftSample(t, 3, (float)(k * 40), 40, 3f, 0.5f, 0, 1, true)));     // part throttle
-            Assert.False(learner.AddSample(new ShiftSample(t, 3, (float)(k * 40), 40, 3f, 1, 0.5f, 1, true)));     // braking
-            Assert.False(learner.AddSample(new ShiftSample(t, 3, (float)(k * 40), 40, 3f, 1, 0, 0.5f, true)));     // clutch slipping
-            Assert.False(learner.AddSample(new ShiftSample(t, 3, (float)(k * 40 * 1.1), 40, 3f, 1, 0, 1, true)));  // wheelspin
-            Assert.False(learner.AddSample(new ShiftSample(t, 4, (float)(CarSimulator.K(4) * 40), 40, 3f, 1, 0, 1, true))); // just shifted
-            Assert.False(learner.AddSample(new ShiftSample(t, 0, 3000, 40, 0f, 1, 0, 1, true)));                   // neutral
+            Assert.False(learner.AddSample(new ShiftSample(t, 3, (float)(k * 40), 40, 3f, 0f, 1, 0, 1, Eligible: false)));
+            Assert.False(learner.AddSample(new ShiftSample(t, 3, (float)(k * 40), 40, 3f, 0f, 0.5f, 0, 1, true)));     // part throttle
+            Assert.False(learner.AddSample(new ShiftSample(t, 3, (float)(k * 40), 40, 3f, 0f, 1, 0.5f, 1, true)));     // braking
+            Assert.False(learner.AddSample(new ShiftSample(t, 3, (float)(k * 40), 40, 3f, 0f, 1, 0, 0.5f, true)));     // clutch slipping
+            Assert.False(learner.AddSample(new ShiftSample(t, 3, (float)(k * 40 * 1.1), 40, 3f, 0f, 1, 0, 1, true)));  // wheelspin
+            Assert.False(learner.AddSample(new ShiftSample(t, 4, (float)(CarSimulator.K(4) * 40), 40, 3f, 0f, 1, 0, 1, true))); // just shifted
+            Assert.False(learner.AddSample(new ShiftSample(t, 0, 3000, 40, 0f, 0f, 1, 0, 1, true)));                   // neutral
+            for (int i = 0; i < 60; i++, t += CarSimulator.Dt)                                                        // settle in gear 3
+                learner.AddSample(new ShiftSample(t, 3, (float)(k * 40), 40, 3f, 0f, 1, 0, 1, true));
+            Assert.False(learner.AddSample(new ShiftSample(t, 3, (float)(k * 40), 40, 3f, 8f, 1, 0, 1, true)));       // hard cornering
+            Assert.False(learner.AddSample(new ShiftSample(t, 3, (float)(k * 40), 40, 3f, -8f, 1, 0, 1, true)));      // ...either direction
+            Assert.True(learner.AddSample(new ShiftSample(t, 3, (float)(k * 40), 40, 3f, 1f, 1, 0, 1, true)));        // gentle curve is fine
         }
 
         [Fact]

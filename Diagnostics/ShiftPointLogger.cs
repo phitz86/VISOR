@@ -26,7 +26,7 @@ namespace VISOR.Diagnostics
                 string stem = Regex.Replace(carPath ?? "car", "[^A-Za-z0-9_-]", "_");
                 string path = Path.Combine(dir, $"{stem}_{DateTime.Now:yyyyMMdd-HHmmss}.csv");
                 _writer = new StreamWriter(path) { AutoFlush = false };
-                _writer.WriteLine("type,session_time,gear,rpm,speed_mps,long_accel,ratio,est_rpm,confident,reason");
+                _writer.WriteLine("type,session_time,gear,rpm,speed_mps,long_accel,lat_accel,ratio,est_rpm,confident,reason");
                 Log.Info($"[ShiftPointCSV] Output: {path}");
             }
             catch (Exception ex)
@@ -40,14 +40,14 @@ namespace VISOR.Diagnostics
         {
             if (_writer == null) return;
             _writer.WriteLine(string.Create(CultureInfo.InvariantCulture,
-                $"sample,{s.SessionTime:F3},{s.Gear},{s.Rpm:F0},{s.Speed:F2},{s.LongAccel:F3},{ratio:F2},,,"));
+                $"sample,{s.SessionTime:F3},{s.Gear},{s.Rpm:F0},{s.Speed:F2},{s.LongAccel:F3},{s.LatAccel:F3},{ratio:F2},,,"));
         }
 
         public void LogEstimate(GearShiftEstimate e)
         {
             if (_writer == null) return;
             _writer.WriteLine(string.Create(CultureInfo.InvariantCulture,
-                $"fit,,{e.Gear},,,,,{e.Rpm},{e.Confident},{e.Reason}"));
+                $"fit,,{e.Gear},,,,,,{e.Rpm},{e.Confident},{e.Reason}"));
             _writer.Flush();
         }
 

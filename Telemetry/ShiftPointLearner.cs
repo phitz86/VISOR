@@ -12,6 +12,7 @@ namespace VISOR.Telemetry
         float Rpm,
         float Speed,            // m/s
         float LongAccel,        // m/s^2, including gravity
+        float LatAccel,         // m/s^2; hard cornering is excluded from the torque fit
         float Throttle,         // 0..1
         float Brake,            // 0..1
         float Clutch,           // 0..1, 1 = fully engaged
@@ -67,6 +68,15 @@ namespace VISOR.Telemetry
         private const double PostShiftSettle = 0.5;     // s ignored after any gear change
         private const double RatioSlipTolerance = 0.03; // sample's RPM/speed must be within 3% of the gear's ratio
         private const float MaxAbsAccel = 30f;
+
+        // Cornering: while the tires carry side load, part of their grip goes to turning and
+        // forward acceleration drops, which the model would otherwise blame on the engine.
+        // Corner exits happen at similar RPMs every lap, so that bias would pile up in one part
+        // of the torque curve rather than averaging out. Lateral g is the gate rather than
+        // steering angle (steering ratio and lock differ per car) or yaw rate (the same rate
+        // means very different cornering at different speeds): it measures the side load
+        // directly, in the same units for every car. 3 m/s^2 ≈ 0.3 g.
+        private const float MaxLatAccel = 3f;
 
         // --- Confidence ---
         public const double MinBinWeight = 60;          // ≈ 1 s of full-throttle data per 250-RPM bin
@@ -130,7 +140,7 @@ namespace VISOR.Telemetry
             if (s.SessionTime - _lastGearChangeTime < PostShiftSettle) return false;
             if (s.Speed < MinSpeed || s.Rpm <= 0f) return false;
             if (s.Clutch < ClutchEngaged || s.Brake > MaxBrake) return false;
-            if (!float.IsFinite(s.Rpm) || !float.IsFinite(s.Speed) || !float.IsFinite(s.LongAccel)) return false;
+            if (!float.IsFinite(s.Rpm) || !float.IsFinite(s.Speed) || !float.IsFinite(s.LongAccel) || !float.IsFinite(s.LatAccel)) return false;
 
             double ratioNow = s.Rpm / s.Speed;
             var tracker = _ratios[s.Gear];
@@ -138,6 +148,9 @@ namespace VISOR.Telemetry
 
             if (s.Throttle < FullThrottle) return false;
             if (Math.Abs(s.LongAccel) > MaxAbsAccel) return false;
+            // After the ratio update on purpose: cornering frames still measure the gear ratio
+            // (valid while the tires grip), they're just kept out of the torque fit.
+            if (Math.Abs(s.LatAccel) > MaxLatAccel) return false;
             if (tracker.Count < MinRatioSamples) return false;
 
             // Wheelspin (or locking) shows up as RPM/speed drifting off the gear's true ratio.
@@ -246,6 +259,17 @@ namespace VISOR.Telemetry
             }
 
             return new GearShiftEstimate(g, (int)Math.Round(rpm), true, atRedline ? "holds to redline" : "crossover");
+        }
+
+        /// <summary>
+        /// The fitted torque curve's relative value at <paramref name="rpm"/> (arbitrary scale,
+        /// only ratios between RPMs are meaningful), or null if there isn't enough data to fit.
+        /// For diagnostics and tests; solves the model on each call.
+        /// </summary>
+        public double? RelativeTorqueAt(double rpm)
+        {
+            var theta = SolveTorqueCurve();
+            return theta == null ? null : Torque(theta, rpm);
         }
 
         private bool IsCovered(double rpmLo, double rpmHi)

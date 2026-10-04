@@ -23,7 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `%LOCALAPPDATA%\VISOR\ShiftModels`, builds up across sessions, and starts again when iRacing
   updates the car. Saved files are size-capped and validated on load, and anything malformed is
   discarded and relearned. Learning pauses in the pits, on the pit limiter, off track, in replays,
-  on a wet track and during wheelspin.
+  on a wet track, during wheelspin and while cornering hard (above about 0.3 g sideways, where
+  tire side load eats into forward acceleration). On ovals that means learning is slow, but you
+  rarely shift there, and the indicator still works from iRacing's shift point.
 - **Unit tests** (`Tests/VISOR.Tests`) for the shift-point learner and its storage, using a
   simulated car whose true optimal shift points are known.
 
