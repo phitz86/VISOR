@@ -34,6 +34,49 @@
                 <Setter Property="FontWeight" Value="Normal"/>
             </Style>
 
+            <!-- Row 0 gear symbol, doubling as the shift indicator (MainViewModel.ShiftState).
+                 Symbola v9.17, subset to the single U+2699 glyph (see Resources/Fonts/Symbola-LICENSE.txt):
+                 Segoe UI has no gear, so Windows substituted Segoe UI Symbol's flower-like one. -->
+            <Style x:Key="GearSymbol" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="pack://application:,,,/Resources/Fonts/#Symbola"/>
+                <Setter Property="FontWeight" Value="Normal"/>
+                <Setter Property="Foreground" Value="LightGray"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding ShiftState}" Value="Approach">
+                        <Setter Property="Foreground" Value="#FFB000"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding ShiftState}" Value="Limiter">
+                        <Setter Property="Foreground" Value="#FF2020"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding ShiftState}" Value="ShiftNow">
+                        <Setter Property="Foreground" Value="#FF2020"/>
+                        <DataTrigger.EnterActions>
+                            <!-- Red/white at 3 flashes per second (the WCAG photosensitivity ceiling):
+                                 one 0.333 s cycle = red half, white half. -->
+                            <BeginStoryboard x:Name="ShiftFlash">
+                                <Storyboard RepeatBehavior="Forever" Duration="0:0:0.333">
+                                    <ObjectAnimationUsingKeyFrames Storyboard.TargetProperty="Foreground">
+                                        <DiscreteObjectKeyFrame KeyTime="0:0:0">
+                                            <DiscreteObjectKeyFrame.Value>
+                                                <SolidColorBrush Color="#FF2020"/>
+                                            </DiscreteObjectKeyFrame.Value>
+                                        </DiscreteObjectKeyFrame>
+                                        <DiscreteObjectKeyFrame KeyTime="0:0:0.167">
+                                            <DiscreteObjectKeyFrame.Value>
+                                                <SolidColorBrush Color="White"/>
+                                            </DiscreteObjectKeyFrame.Value>
+                                        </DiscreteObjectKeyFrame>
+                                    </ObjectAnimationUsingKeyFrames>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </DataTrigger.EnterActions>
+                        <DataTrigger.ExitActions>
+                            <StopStoryboard BeginStoryboardName="ShiftFlash"/>
+                        </DataTrigger.ExitActions>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
             <Style x:Key="DigitalIndicator" TargetType="TextBlock">
                 <Setter Property="FontFamily" Value="pack://application:,,,/Resources/Fonts/#Digital-7"/>
                 <Setter Property="FontWeight" Value="Normal"/>
@@ -74,7 +117,7 @@
                             Orientation="Horizontal"
                             Visibility="{Binding ShowGear, Converter={StaticResource BoolToVisibilityConverter}}"
                             HorizontalAlignment="Center">
-                    <TextBlock Text="⚙" FontSize="54" Foreground="LightGray" VerticalAlignment="Bottom" Margin="0,0,8,0" Style="{StaticResource NormalWeightSymbol}"/>
+                    <TextBlock Text="⚙" FontSize="54" VerticalAlignment="Bottom" Margin="0,0,8,0" Style="{StaticResource GearSymbol}"/>
                     <TextBlock Text="{Binding GearDisplay}" FontSize="80" VerticalAlignment="Bottom" Style="{StaticResource DigitalIndicator}"/>
                 </StackPanel>
 

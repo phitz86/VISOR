@@ -36,6 +36,10 @@ namespace VISOR.Telemetry
         public float[] CarClassEstLapTimes => _carClassEstLapTimesCache;
         public int[] CurDriverIncidentCount => _curDriverIncidentCountCache;
 
+        // Published by reference (immutable record) for lock-free reads, like the arrays above.
+        private volatile PlayerCarInfo? _playerCarCache;
+        public PlayerCarInfo? PlayerCar => _playerCarCache;
+
         public StaticEventData GetStaticEventData()
         {
             lock (_parseLock)
@@ -316,6 +320,7 @@ namespace VISOR.Telemetry
                     if (!ready) return false;
 
                     UpdateDriverDataCaches();
+                    _playerCarCache = _staticData.PlayerCar;
                     IsDataReady = true;
 
                     var trackName = !string.IsNullOrEmpty(_staticData.Weekend.TrackDisplayName)
@@ -406,6 +411,8 @@ namespace VISOR.Telemetry
                 _liveData.QualifyPositions.Clear();
                 _liveData.QualifyFastestTimes.Clear();
                 _lastParseSummary = string.Empty;
+                _staticData.PlayerCar = null;
+                _playerCarCache = null;
                 IsDataReady = false;
 
                 UpdateDriverDataCaches();

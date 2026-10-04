@@ -166,6 +166,18 @@ namespace VISOR.Settings
         }
 
         /// <summary>
+        /// Color the Row 0 gear symbol as a shift indicator (amber approaching the shift point,
+        /// flashing red/white at it, solid red at the redline). Gated by ShowRow0.
+        /// </summary>
+        [UserScopedSetting]
+        [DefaultSettingValue("true")]
+        public bool ShowShiftIndicator
+        {
+            get => (bool)this["ShowShiftIndicator"];
+            set => this["ShowShiftIndicator"] = value;
+        }
+
+        /// <summary>
         /// Show Row 1 (Time + Fuel)
         /// </summary>
         [UserScopedSetting]

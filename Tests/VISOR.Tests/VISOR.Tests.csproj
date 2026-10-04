@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Unit tests for VISOR's platform-independent logic. Targets plain net10.0 (no WPF) so it
+       runs anywhere: `dotnet test Tests/VISOR.Tests`. Source files under test are linked in
+       rather than referencing the WPF app project. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\Telemetry\ShiftPointLearner.cs" Link="Linked\ShiftPointLearner.cs" />
+    <Compile Include="..\..\Telemetry\ShiftModelStore.cs" Link="Linked\ShiftModelStore.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+
+</Project>

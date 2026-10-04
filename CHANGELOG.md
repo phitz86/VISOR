@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-10-04
+
+### Added
+
+- **Shift indicator** — the Row 0 gear symbol now tells you when to upshift, the same way in
+  every car: gray normally, amber as the shift point approaches (starting the same RPM before it
+  as the car's own lights), flashing red/white at the shift point, and solid red at the redline
+  or rev limiter. It stays gray in neutral, reverse and the pits, and top gear only shows the
+  limiter. It can be turned off in the Configuration Window.
+- **Learned optimal shift points** — VISOR starts from iRacing's shift-light RPM for the car,
+  then learns the fastest upshift for each gear from your own full-throttle acceleration (where
+  the next gear would pull harder than the current one), and switches a gear over once it has
+  seen enough of it. It needs no outside data: what it learns is kept locally per car in
+  `%LOCALAPPDATA%\VISOR\ShiftModels`, builds up across sessions, and starts again when iRacing
+  updates the car. Saved files are size-capped and validated on load, and anything malformed is
+  discarded and relearned. Learning pauses in the pits, on the pit limiter, off track, in replays,
+  on a wet track and during wheelspin.
+- **Unit tests** (`Tests/VISOR.Tests`) for the shift-point learner and its storage, using a
+  simulated car whose true optimal shift points are known.
+
+### Changed
+
+- **Version bumped to 1.2.1.0**; README, Config window and user guide updated to match.
+- **New gear symbol** — the ⚙ is now drawn from a bundled copy of the Symbola font (v9.17, from
+  before its 2018 license change, cut down to the single gear glyph). VISOR's text font has no
+  gear, so Windows had been substituting Segoe UI Symbol's flower-like one.
+
 ## [1.2.0] - 2026-10-03
 
 ### Changed
@@ -211,7 +238,8 @@ display, and adds a substantial layer of app-stability and installer hardening.
 - Nullable-reference warnings (CS8602/CS8604) and an unused-variable warning; updated
   deprecated GitHub Actions.
 
-[Unreleased]: https://github.com/phitz86/VISOR/compare/v1.2.0.0...HEAD
+[Unreleased]: https://github.com/phitz86/VISOR/compare/v1.2.1.0...HEAD
+[1.2.1]: https://github.com/phitz86/VISOR/releases/tag/v1.2.1.0
 [1.2.0]: https://github.com/phitz86/VISOR/releases/tag/v1.2.0.0
 [1.1.0]: https://github.com/phitz86/VISOR/releases/tag/v1.1.0.0
 [1.0.0]: https://github.com/phitz86/VISOR/releases/tag/v1.0.0

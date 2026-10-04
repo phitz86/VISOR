@@ -9,14 +9,16 @@
     <LangVersion>14.0</LangVersion>
     <RootNamespace>VISOR</RootNamespace>
     <ApplicationIcon>VISOR Logo.ico</ApplicationIcon>
-    <AssemblyVersion>1.2.0.0</AssemblyVersion>
-    <FileVersion>1.2.0.0</FileVersion>
-    <Version>1.2.0.0</Version>
+    <AssemblyVersion>1.2.1.0</AssemblyVersion>
+    <FileVersion>1.2.1.0</FileVersion>
+    <Version>1.2.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Remove="Archive\**" />
     <Compile Remove="Raw outputs\**" />
+    <Compile Remove="Tests\**" />
+    <None Remove="Tests\**" />
     <EmbeddedResource Remove="Archive\**" />
     <EmbeddedResource Remove="Raw outputs\**" />
     <None Remove="Archive\**" />
@@ -32,6 +34,7 @@
 
   <ItemGroup>
     <Resource Include="Resources\Fonts\digital-7.ttf" />
+    <Resource Include="Resources\Fonts\symbola-gear.ttf" />
     <Resource Include="VISOR Logo.ico" />
   </ItemGroup>
 

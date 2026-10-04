@@ -28,6 +28,7 @@ namespace VISOR.ViewModels
         private readonly ClassColorManager _classColorManager;
         private readonly SettingsManager _settingsManager;
         private readonly PositionCalculator _positionCalculator;
+        private readonly ShiftPointProvider _shiftPoints = new();
 
         private int _lastSessionNum = -1;
         private int _lastSessionState = -999;
@@ -38,6 +39,12 @@ namespace VISOR.ViewModels
 
         public string ClassPositionNumber { get; private set; } = "--";
         public string GearDisplay { get; private set; } = "N";
+        public ShiftState ShiftState { get; private set; } = ShiftState.Normal;
+
+        // Hysteresis: once a state is reached it holds until RPM falls this far below its
+        // threshold (or the gear changes), so RPM hovering at a threshold can't flicker it.
+        private const int ShiftStateHysteresisRpm = 150;
+        private int _shiftStateGear = int.MinValue;
         public string LastLapTime { get; private set; } = LapTimePlaceholder;
         public string BestLapTime { get; private set; } = LapTimePlaceholder;
 
@@ -152,6 +159,7 @@ namespace VISOR.ViewModels
             UpdateLapTimeDisplays(lastLap, snapshot.LapBestLapTime);
 
             UpdateGearDisplay(snapshot);
+            UpdateShiftIndicator(snapshot, sessionDataProvider);
         }
 
         #region --- Player Position Calculation ---
@@ -225,6 +233,61 @@ namespace VISOR.ViewModels
             }
         }
 
+        private void UpdateShiftIndicator(SVappsLABSnapshot snapshot, ISessionDataProvider? sessionDataProvider)
+        {
+            var car = sessionDataProvider != null && sessionDataProvider.IsDataReady ? sessionDataProvider.PlayerCar : null;
+
+            int playerIdx = snapshot.PlayerCarIdx;
+            var pitRoadArr = snapshot.CarIdxOnPitRoad;
+            bool onPitRoad = playerIdx >= 0 && playerIdx < pitRoadArr.Length && pitRoadArr[playerIdx];
+
+            // Learning runs whether or not the indicator is shown, so the shift points are ready
+            // if the driver turns it on later.
+            _shiftPoints.Update(snapshot, car, onPitRoad);
+
+            var newState = ShiftState.Normal;
+            int gear = snapshot.Gear;
+            if (car != null && _settingsManager.Settings.ShowShiftIndicator
+                && snapshot.IsOnTrack && !onPitRoad && !snapshot.PitLimiterOn && gear >= 1)
+            {
+                newState = ComputeShiftState(snapshot, car, gear);
+            }
+            _shiftStateGear = gear;
+
+            if (newState != ShiftState)
+            {
+                ShiftState = newState;
+                OnPropertyChanged(nameof(ShiftState));
+            }
+        }
+
+        private ShiftState ComputeShiftState(SVappsLABSnapshot snapshot, PlayerCarInfo car, int gear)
+        {
+            float rpm = snapshot.RPM;
+            bool sameGear = gear == _shiftStateGear;
+            // A state already showing in this gear stays until RPM drops past the hysteresis band.
+            float Hold(ShiftState state) => sameGear && ShiftState >= state ? ShiftStateHysteresisRpm : 0;
+
+            if (snapshot.RevLimiterActive || (car.RedLine > 0 && rpm >= car.RedLine - Hold(ShiftState.Limiter)))
+                return ShiftState.Limiter;
+
+            // Top gear (shift RPM 0) only ever shows the limiter state.
+            int shiftRpm = _shiftPoints.GetShiftRpm(gear, snapshot, car);
+            if (shiftRpm <= 0) return ShiftState.Normal;
+
+            if (rpm >= shiftRpm - Hold(ShiftState.ShiftNow))
+                return ShiftState.ShiftNow;
+
+            int approachRpm = ShiftPointProvider.GetApproachRpm(shiftRpm, snapshot, car);
+            if (rpm >= approachRpm - Hold(ShiftState.Approach))
+                return ShiftState.Approach;
+
+            return ShiftState.Normal;
+        }
+
+        /// <summary>Saves any unsaved shift-point learning. Called on disconnect and app exit.</summary>
+        public void FlushShiftPoints() => _shiftPoints.Flush();
+
         private static string GetStateName(int state) => state switch
         {
             0 => "Invalid",
@@ -261,6 +324,8 @@ namespace VISOR.ViewModels
             RelativeVM.Reset();
             CountdownVM.Reset();
             GearDisplay = "N";
+            ShiftState = ShiftState.Normal;
+            _shiftStateGear = int.MinValue;
             ClassPositionNumber = "--";
             _playerWasOnPitRoad = null;
 
@@ -329,6 +394,7 @@ namespace VISOR.ViewModels
 
         public void Reset()
         {
+            _shiftPoints.Flush();
             _lastSessionNum = -1;
             _lastSessionState = -999;
             _lastSubSessionId = string.Empty;

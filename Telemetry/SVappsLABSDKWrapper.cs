@@ -20,7 +20,11 @@ namespace VISOR.Telemetry
         TelemetryVar.SessionState, TelemetryVar.SessionTime, TelemetryVar.SessionTimeRemain, TelemetryVar.SessionLapsRemain,
         TelemetryVar.SessionLapsTotal, TelemetryVar.SessionNum, TelemetryVar.PlayerCarIdx, TelemetryVar.SessionFlags,
         TelemetryVar.CarLeftRight, TelemetryVar.CarIdxF2Time, TelemetryVar.CarIdxEstTime, TelemetryVar.CarIdxLapCompleted,
-        TelemetryVar.TrackTempCrew
+        TelemetryVar.TrackTempCrew,
+        // Shift indicator + shift-point learner (ShiftPointProvider / ShiftPointLearner)
+        TelemetryVar.PlayerCarSLFirstRPM, TelemetryVar.PlayerCarSLShiftRPM, TelemetryVar.Throttle,
+        TelemetryVar.Brake, TelemetryVar.Clutch, TelemetryVar.LongAccel, TelemetryVar.EngineWarnings,
+        TelemetryVar.IsOnTrack, TelemetryVar.IsReplayPlaying, TelemetryVar.TrackWetness
     ])]
     public class SVappsLABSDKWrapper : IDisposable
     {

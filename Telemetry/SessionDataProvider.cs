@@ -23,6 +23,9 @@ namespace VISOR.Telemetry
         // whenever the player moves to a genuinely different session, even if SessionNum repeats.
         string SubSessionId { get; }
 
+        // The player's car (shift-light RPMs, redline, CarPath, version). Null until parsed.
+        PlayerCarInfo? PlayerCar { get; }
+
         // Session definition queries
         int GetSessionLaps(int sessionNum);
         double GetSessionTimeSeconds(int sessionNum);
