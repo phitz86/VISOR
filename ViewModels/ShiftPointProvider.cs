@@ -413,7 +413,11 @@ namespace VISOR.ViewModels
                 {
                     sb.Append(" | g").Append(e.Gear).Append(' ');
                     if (e.Gear < learned.Length && learned[e.Gear] > 0) sb.Append("learned ").Append(learned[e.Gear]);
-                    else if (e.BandsNeeded > 0) sb.Append($"waiting: {e.BandsSeen}/{e.BandsNeeded} RPM bands seen");
+                    else if (e.BandsNeeded > 0)
+                    {
+                        sb.Append($"waiting: {e.BandsSeen}/{e.BandsNeeded} RPM bands seen");
+                        if (e.MissingBands.Length > 0) sb.Append($" (missing {e.MissingBands})");
+                    }
                     else sb.Append("waiting: ").Append(e.Reason);
                 }
                 if (_lastEstimates.Length == 0) sb.Append(" | no fit yet");

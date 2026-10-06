@@ -12,10 +12,10 @@ namespace VISOR.Tests
         private const int ToleranceRpm = 50;
 
         private static ShiftPointLearner Train(int runs, Func<int, double> shiftAt, int seed = 1, bool wheelspin = false,
-            Func<double, double>? torque = null, bool cornerExits = false, bool reportLateralG = true)
+            Func<double, double>? torque = null, bool cornerExits = false, bool reportLateralG = true, bool revLimiter = false)
         {
             var learner = new ShiftPointLearner();
-            var sim = new CarSimulator(seed, torque: torque);
+            var sim = new CarSimulator(seed, torque: torque, revLimiter: revLimiter);
             for (int i = 0; i < runs; i++)
                 foreach (var s in sim.Run(shiftAt, wheelspin, cornerExits, reportLateralG))
                     learner.AddSample(s);
@@ -226,6 +226,30 @@ namespace VISOR.Tests
 
             var many = Train(runs: 25, shiftAt: _ => CarSimulator.RedLine).Solve(CarSimulator.RedLine, 6);
             Assert.All(many, e => { Assert.True(e.Confident); Assert.Equal(e.BandsNeeded, e.BandsSeen); });
+        }
+
+        [Theory]
+        [InlineData(7350)]
+        [InlineData(7500)]
+        public void LearnsShiftAtRedline_WithRevLimiter_WhenDriverShiftsBeforeIt(double driverShiftRpm)
+        {
+            // Regression: the GR86 at Indy sat at "7/8 RPM bands seen" in every gear for 30 min.
+            // When the best shift is at the redline, the coverage check demanded the band centered
+            // above the redline (7625), which only limiter-adjacent frames could ever fill.
+            var learner = Train(runs: 25, shiftAt: _ => driverShiftRpm, revLimiter: true);
+            var results = learner.Solve(CarSimulator.RedLine, CarSimulator.GearRatios.Length);
+
+            foreach (var r in results)
+            {
+                int expected = CarSimulator.OptimalShift(r.Gear);
+                _out.WriteLine($"limiter, shift@{driverShiftRpm} gear {r.Gear}: {r.Rpm} ({r.Reason}, confident={r.Confident}, " +
+                               $"bands {r.BandsSeen}/{r.BandsNeeded}, missing [{r.MissingBands}]), true optimum {expected}");
+            }
+
+            var gear1 = results[0];
+            Assert.Equal((int)CarSimulator.RedLine, CarSimulator.OptimalShift(1));   // the case under test
+            Assert.True(gear1.Confident, $"gear 1 stuck: {gear1.Reason} ({gear1.BandsSeen}/{gear1.BandsNeeded}, missing {gear1.MissingBands})");
+            Assert.InRange(gear1.Rpm, CarSimulator.RedLine - ToleranceRpm, CarSimulator.RedLine);
         }
 
         [Fact]

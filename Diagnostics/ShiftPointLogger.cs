@@ -47,7 +47,7 @@ namespace VISOR.Diagnostics
         {
             if (_writer == null) return;
             _writer.WriteLine(string.Create(CultureInfo.InvariantCulture,
-                $"fit,,{e.Gear},,,,,,{e.Rpm},{e.Confident},{e.Reason}"));
+                $"fit,,{e.Gear},,,,,,{e.Rpm},{e.Confident},{e.Reason}{(e.MissingBands.Length > 0 ? $" (missing {e.MissingBands})" : "")}"));
             _writer.Flush();
         }
 

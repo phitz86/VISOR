@@ -22,12 +22,18 @@ namespace VISOR.Tests
         public int GearCount => GearRatios.Length;
 
         private readonly Func<double, double> _torque;
+
+        // When on, frames at or above the redline are marked ineligible, as VISOR does when
+        // iRacing reports the rev limiter active. Real drivers rarely reach it, so the top RPM
+        // band near the redline gets little or no data.
+        private readonly bool _revLimiter;
         private readonly Random _rng;
         private readonly double _noise;
         private double _time;
 
-        public CarSimulator(int seed = 1, double accelNoise = 0.15, Func<double, double>? torque = null)
+        public CarSimulator(int seed = 1, double accelNoise = 0.15, Func<double, double>? torque = null, bool revLimiter = false)
         {
+            _revLimiter = revLimiter;
             _torque = torque ?? Torque;
             _rng = new Random(seed);
             _noise = accelNoise;
@@ -153,7 +159,8 @@ namespace VISOR.Tests
 
         private ShiftSample Frame(int gear, double rpm, double v, double accel, float throttle, float clutch, float brake = 0, double lat = 0)
         {
-            var s = new ShiftSample(_time, gear, (float)rpm, (float)v, (float)accel, (float)lat, throttle, brake, clutch, Eligible: true);
+            var s = new ShiftSample(_time, gear, (float)rpm, (float)v, (float)accel, (float)lat, throttle, brake, clutch,
+                Eligible: !(_revLimiter && rpm >= RedLine));
             _time += Dt;
             return s;
         }

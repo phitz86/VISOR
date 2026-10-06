@@ -30,7 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rarely shift there, and the indicator still works from iRacing's shift point.
 - **Shift-point learning progress in the log** — VISOR logs the car as soon as it's detected,
   then once a minute while driving: how many frames were used or skipped (and why: cornering,
-  part throttle, wheelspin…) and what each gear is still waiting on (e.g. "6/10 RPM bands seen").
+  part throttle, wheelspin…) and what each gear is still waiting on (e.g. "6/10 RPM bands seen
+  (missing 7375)").
 - **Wet-track research logging (debug builds only)** — on a wet track, debug builds record
   60 Hz telemetry (where on track, conditions, inputs, accelerations and wheelspin signals, at
   every throttle level) to `Diagnostics\WetResearch`, as groundwork for a future grip-aware wet

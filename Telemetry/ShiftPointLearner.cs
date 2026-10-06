@@ -26,7 +26,7 @@ namespace VISOR.Telemetry
     /// around the shift point (in this gear and where the next gear lands) have enough data yet.
     /// </remarks>
     public readonly record struct GearShiftEstimate(int Gear, int Rpm, bool Confident, string Reason,
-        int BandsSeen = 0, int BandsNeeded = 0);
+        int BandsSeen = 0, int BandsNeeded = 0, string MissingBands = "");
 
     /// <summary>Why a frame was left out of the torque model (for progress logging).</summary>
     public enum SkipReason
@@ -294,13 +294,15 @@ namespace VISOR.Telemetry
 
             // Only trust the answer when the torque curve is well observed where it matters: around
             // the shift point in this gear and around where the engine lands in the next gear.
-            var (seenHi, neededHi) = CountCoverage(rpm - CoverageMarginRpm, Math.Min(rpm + CoverageMarginRpm, redLine));
-            var (seenLo, neededLo) = CountCoverage(rho * rpm - CoverageMarginRpm, rho * rpm + CoverageMarginRpm);
+            var missing = new System.Collections.Generic.List<int>();
+            var (seenHi, neededHi) = CountCoverage(rpm - CoverageMarginRpm, Math.Min(rpm + CoverageMarginRpm, redLine), missing);
+            var (seenLo, neededLo) = CountCoverage(rho * rpm - CoverageMarginRpm, rho * rpm + CoverageMarginRpm, missing);
             int seen = seenHi + seenLo, needed = neededHi + neededLo;
             if (seen < needed)
             {
+                missing.Sort();
                 return new GearShiftEstimate(g, (int)Math.Round(rpm), false, "torque curve not yet observed around shift point",
-                    seen, needed);
+                    seen, needed, string.Join(" ", missing));
             }
 
             return new GearShiftEstimate(g, (int)Math.Round(rpm), true, atRedline ? "holds to redline" : "crossover",
@@ -319,15 +321,26 @@ namespace VISOR.Telemetry
         }
 
         // How many of the RPM bands spanning [rpmLo, rpmHi] have enough data (MinBinWeight).
-        private (int Seen, int Needed) CountCoverage(double rpmLo, double rpmHi)
+        // Bands are hat functions centered at (i + 0.5) * BinWidth, so the bands that describe the
+        // curve over [rpmLo, rpmHi] are the ones whose centers fall inside it. (Selecting by
+        // floor(rpm / BinWidth) instead pulled in the band centered *above* the top of the range;
+        // with the range capped at the redline, that band - centered 125 RPM over the redline -
+        // could only be filled by frames right at the rev limiter, so gears near the redline
+        // never became confident.)
+        private (int Seen, int Needed) CountCoverage(double rpmLo, double rpmHi, System.Collections.Generic.List<int> missing)
         {
-            int lo = Math.Clamp((int)Math.Floor(rpmLo / BinWidthRpm), 0, BinCount - 1);
-            int hi = Math.Clamp((int)Math.Floor(rpmHi / BinWidthRpm), 0, BinCount - 1);
+            int lo = Math.Max((int)Math.Ceiling(rpmLo / BinWidthRpm - 0.5), 0);
+            int hi = Math.Min((int)Math.Floor(rpmHi / BinWidthRpm - 0.5), BinCount - 1);
             int seen = 0;
             for (int i = lo; i <= hi; i++)
+            {
                 if (_binWeight[i] >= MinBinWeight) seen++;
-            return (seen, hi - lo + 1);
+                else missing.Add(BinCenterRpm(i));
+            }
+            return (seen, Math.Max(hi - lo + 1, 0));
         }
+
+        private static int BinCenterRpm(int bin) => (int)((bin + 0.5) * BinWidthRpm);
 
         private static double Torque(double[] theta, double rpm)
         {
