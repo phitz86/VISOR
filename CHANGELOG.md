@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pulls harder than the next at the highest RPM seen, the cue now moves later in 250-RPM steps,
   each confirmed by driving up to it, until the real best shift point is learned. It never moves
   the cue earlier than the car's light on that evidence alone.
-- **Calibration dot** — a small dot by the gear symbol shows whether the current gear's shift
+- **Calibration dot** — a small dot at the gear symbol's lower left shows whether the current gear's shift
   point has settled: red while calibrating, green once learned, hidden in neutral, reverse and
   top gear.
 - **Shift-point learning progress in the log** — VISOR logs the car as soon as it's detected,
@@ -50,6 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Version bumped to 1.2.1.0**; README, Config window and user guide updated to match.
+- **Larger gear symbol** — the ⚙ grows from 54 to 68 pt, closer to the gear number, since it
+  now doubles as the shift light.
 - **New gear symbol** — the ⚙ is now drawn from a bundled copy of the Symbola font (v9.17, from
   before its 2018 license change, cut down to the single gear glyph). VISOR's text font has no
   gear, so Windows had been substituting Segoe UI Symbol's flower-like one.

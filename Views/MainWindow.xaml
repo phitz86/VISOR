@@ -120,12 +120,13 @@
                             Visibility="{Binding ShowGear, Converter={StaticResource BoolToVisibilityConverter}}"
                             HorizontalAlignment="Center">
                     <Grid VerticalAlignment="Bottom" Margin="0,0,8,0">
-                        <TextBlock Text="⚙" FontSize="54" Style="{StaticResource GearSymbol}"/>
-                        <!-- Calibration dot: red while this gear's shift point is still being learned
-                             (car's light or stepping up), green once settled, hidden when no shift
-                             point applies. Fixed size and position so the layout never moves. -->
-                        <Ellipse Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Top"
-                                 Margin="0,8,-6,0">
+                        <TextBlock Text="⚙" FontSize="68" Style="{StaticResource GearSymbol}"/>
+                        <!-- Calibration dot, at the gear symbol's lower left: red while this gear's shift
+                             point is still being learned (car's light or stepping up), green once settled,
+                             hidden when no shift point applies. Fixed size and position so the layout
+                             never moves. -->
+                        <Ellipse Width="8" Height="8" HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                                 Margin="-4,0,0,8">
                             <Ellipse.Style>
                                 <Style TargetType="Ellipse">
                                     <Setter Property="Visibility" Value="Hidden"/>
