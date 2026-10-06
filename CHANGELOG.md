@@ -13,8 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Shift indicator** — the Row 0 gear symbol now tells you when to upshift, the same way in
   every car: gray normally, amber as the shift point approaches (starting the same RPM before it
-  as the car's own lights), flashing red/white at the shift point, and solid red at the redline
-  or rev limiter. It stays gray in neutral, reverse and the pits, and top gear only shows the
+  as the car's own lights), flashing white/red (5 times a second) at the shift point, and solid
+  red at the redline or rev limiter. The cue allows about 0.15 s of reaction time: it comes early
+  by however far RPM will climb in that time, so it's noticeably earlier in the low gears, where
+  RPM rises fastest, and barely changes in top gear. It stays gray in neutral, reverse and the pits, and top gear only shows the
   limiter. It can be turned off in the Configuration Window.
 - **Learned optimal shift points** — VISOR starts from iRacing's shift-light RPM for the car,
   then learns the fastest upshift for each gear from your own full-throttle acceleration (where
@@ -26,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on a wet track, during wheelspin and while cornering hard (above about 0.3 g sideways, where
   tire side load eats into forward acceleration). On ovals that means learning is slow, but you
   rarely shift there, and the indicator still works from iRacing's shift point.
+- **Shift-point learning progress in the log** — VISOR logs the car as soon as it's detected,
+  then once a minute while driving: how many frames were used or skipped (and why: cornering,
+  part throttle, wheelspin…) and what each gear is still waiting on (e.g. "6/10 RPM bands seen").
 - **Wet-track research logging (debug builds only)** — on a wet track, debug builds record
   60 Hz telemetry (where on track, conditions, inputs, accelerations and wheelspin signals, at
   every throttle level) to `Diagnostics\WetResearch`, as groundwork for a future grip-aware wet

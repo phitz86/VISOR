@@ -21,7 +21,27 @@ namespace VISOR.Telemetry
     /// <summary>
     /// Result of solving for one gear's optimal upshift.
     /// </summary>
-    public readonly record struct GearShiftEstimate(int Gear, int Rpm, bool Confident, string Reason);
+    /// <remarks>
+    /// <see cref="BandsSeen"/> / <see cref="BandsNeeded"/>: how many of the 250-RPM torque bands
+    /// around the shift point (in this gear and where the next gear lands) have enough data yet.
+    /// </remarks>
+    public readonly record struct GearShiftEstimate(int Gear, int Rpm, bool Confident, string Reason,
+        int BandsSeen = 0, int BandsNeeded = 0);
+
+    /// <summary>Why a frame was left out of the torque model (for progress logging).</summary>
+    public enum SkipReason
+    {
+        Ineligible,     // caller's gate: pits, off track, replay, limiter, wet
+        NotInGear,
+        PostShift,
+        LowSpeed,
+        ClutchOrBrake,
+        PartThrottle,
+        Cornering,
+        RatioWarmup,    // gear ratio not measured yet this session
+        Wheelspin,
+        OutOfRange
+    }
 
     /// <summary>
     /// Learns a car's optimal upshift RPM per gear from the driver's own full-throttle telemetry.
@@ -119,6 +139,27 @@ namespace VISOR.Telemetry
         /// and adds a torque-model sample when the frame is a clean full-throttle frame.
         /// Returns true when the frame was added to the torque model.
         /// </summary>
+        private readonly long[] _skipCounts = new long[Enum.GetValues<SkipReason>().Length];
+        private long _keptCount;
+
+        /// <summary>
+        /// Kept-sample count and per-reason skip counts since the last call, then resets them.
+        /// </summary>
+        public (long Kept, long[] Skipped) TakeCounters()
+        {
+            var skipped = (long[])_skipCounts.Clone();
+            long kept = _keptCount;
+            Array.Clear(_skipCounts);
+            _keptCount = 0;
+            return (kept, skipped);
+        }
+
+        private bool Skip(SkipReason reason)
+        {
+            _skipCounts[(int)reason]++;
+            return false;
+        }
+
         public bool AddSample(in ShiftSample s)
         {
             // Session clock went backwards (reset to pits, new session): restart shift tracking.
@@ -135,29 +176,29 @@ namespace VISOR.Telemetry
                 _lastGearChangeTime = s.SessionTime;
             }
 
-            if (!s.Eligible) return false;
-            if (s.Gear < 1 || s.Gear > MaxGears) return false;
-            if (s.SessionTime - _lastGearChangeTime < PostShiftSettle) return false;
-            if (s.Speed < MinSpeed || s.Rpm <= 0f) return false;
-            if (s.Clutch < ClutchEngaged || s.Brake > MaxBrake) return false;
-            if (!float.IsFinite(s.Rpm) || !float.IsFinite(s.Speed) || !float.IsFinite(s.LongAccel) || !float.IsFinite(s.LatAccel)) return false;
+            if (!s.Eligible) return Skip(SkipReason.Ineligible);
+            if (s.Gear < 1 || s.Gear > MaxGears) return Skip(SkipReason.NotInGear);
+            if (s.SessionTime - _lastGearChangeTime < PostShiftSettle) return Skip(SkipReason.PostShift);
+            if (s.Speed < MinSpeed || s.Rpm <= 0f) return Skip(SkipReason.LowSpeed);
+            if (s.Clutch < ClutchEngaged || s.Brake > MaxBrake) return Skip(SkipReason.ClutchOrBrake);
+            if (!float.IsFinite(s.Rpm) || !float.IsFinite(s.Speed) || !float.IsFinite(s.LongAccel) || !float.IsFinite(s.LatAccel)) return Skip(SkipReason.OutOfRange);
 
             double ratioNow = s.Rpm / s.Speed;
             var tracker = _ratios[s.Gear];
             tracker.Add(ratioNow);
 
-            if (s.Throttle < FullThrottle) return false;
-            if (Math.Abs(s.LongAccel) > MaxAbsAccel) return false;
+            if (s.Throttle < FullThrottle) return Skip(SkipReason.PartThrottle);
+            if (Math.Abs(s.LongAccel) > MaxAbsAccel) return Skip(SkipReason.OutOfRange);
             // After the ratio update on purpose: cornering frames still measure the gear ratio
             // (valid while the tires grip), they're just kept out of the torque fit.
-            if (Math.Abs(s.LatAccel) > MaxLatAccel) return false;
-            if (tracker.Count < MinRatioSamples) return false;
+            if (Math.Abs(s.LatAccel) > MaxLatAccel) return Skip(SkipReason.Cornering);
+            if (tracker.Count < MinRatioSamples) return Skip(SkipReason.RatioWarmup);
 
             // Wheelspin (or locking) shows up as RPM/speed drifting off the gear's true ratio.
             double k = tracker.Median;
-            if (Math.Abs(ratioNow - k) > k * RatioSlipTolerance) return false;
+            if (Math.Abs(ratioNow - k) > k * RatioSlipTolerance) return Skip(SkipReason.Wheelspin);
 
-            if (!TryGetBinWeights(s.Rpm, out int j, out double w)) return false;
+            if (!TryGetBinWeights(s.Rpm, out int j, out double w)) return Skip(SkipReason.OutOfRange);
 
             // Feature row (4 non-zeros): hat-function weights on two adjacent torque bins,
             // then the drag and constant terms.
@@ -176,6 +217,7 @@ namespace VISOR.Telemetry
             _binWeight[j + 1] += w;
             _sampleCount++;
             _dirtySamples++;
+            _keptCount++;
             return true;
         }
 
@@ -252,13 +294,17 @@ namespace VISOR.Telemetry
 
             // Only trust the answer when the torque curve is well observed where it matters: around
             // the shift point in this gear and around where the engine lands in the next gear.
-            if (!IsCovered(rpm - CoverageMarginRpm, Math.Min(rpm + CoverageMarginRpm, redLine)) ||
-                !IsCovered(rho * rpm - CoverageMarginRpm, rho * rpm + CoverageMarginRpm))
+            var (seenHi, neededHi) = CountCoverage(rpm - CoverageMarginRpm, Math.Min(rpm + CoverageMarginRpm, redLine));
+            var (seenLo, neededLo) = CountCoverage(rho * rpm - CoverageMarginRpm, rho * rpm + CoverageMarginRpm);
+            int seen = seenHi + seenLo, needed = neededHi + neededLo;
+            if (seen < needed)
             {
-                return new GearShiftEstimate(g, (int)Math.Round(rpm), false, "torque curve not yet observed around shift point");
+                return new GearShiftEstimate(g, (int)Math.Round(rpm), false, "torque curve not yet observed around shift point",
+                    seen, needed);
             }
 
-            return new GearShiftEstimate(g, (int)Math.Round(rpm), true, atRedline ? "holds to redline" : "crossover");
+            return new GearShiftEstimate(g, (int)Math.Round(rpm), true, atRedline ? "holds to redline" : "crossover",
+                seen, needed);
         }
 
         /// <summary>
@@ -272,13 +318,15 @@ namespace VISOR.Telemetry
             return theta == null ? null : Torque(theta, rpm);
         }
 
-        private bool IsCovered(double rpmLo, double rpmHi)
+        // How many of the RPM bands spanning [rpmLo, rpmHi] have enough data (MinBinWeight).
+        private (int Seen, int Needed) CountCoverage(double rpmLo, double rpmHi)
         {
             int lo = Math.Clamp((int)Math.Floor(rpmLo / BinWidthRpm), 0, BinCount - 1);
             int hi = Math.Clamp((int)Math.Floor(rpmHi / BinWidthRpm), 0, BinCount - 1);
+            int seen = 0;
             for (int i = lo; i <= hi; i++)
-                if (_binWeight[i] < MinBinWeight) return false;
-            return true;
+                if (_binWeight[i] >= MinBinWeight) seen++;
+            return (seen, hi - lo + 1);
         }
 
         private static double Torque(double[] theta, double rpm)

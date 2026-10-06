@@ -13,6 +13,7 @@
   <ItemGroup>
     <Compile Include="..\..\Telemetry\ShiftPointLearner.cs" Link="Linked\ShiftPointLearner.cs" />
     <Compile Include="..\..\Telemetry\ShiftModelStore.cs" Link="Linked\ShiftModelStore.cs" />
+    <Compile Include="..\..\ViewModels\ShiftCue.cs" Link="Linked\ShiftCue.cs" />
   </ItemGroup>
 
   <ItemGroup>

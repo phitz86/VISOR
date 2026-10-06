@@ -51,19 +51,21 @@
                     <DataTrigger Binding="{Binding ShiftState}" Value="ShiftNow">
                         <Setter Property="Foreground" Value="#FF2020"/>
                         <DataTrigger.EnterActions>
-                            <!-- Red/white at 3 flashes per second (the WCAG photosensitivity ceiling):
-                                 one 0.333 s cycle = red half, white half. -->
+                            <!-- White/red at 5 flashes per second: one 0.2 s cycle, white half first so
+                                 the change from amber is instant and the change to the solid-red limiter
+                                 is visible. WCAG's 3-per-second guidance is for large flashing areas; a
+                                 glyph this size is well inside its small-area exemption. -->
                             <BeginStoryboard x:Name="ShiftFlash">
-                                <Storyboard RepeatBehavior="Forever" Duration="0:0:0.333">
+                                <Storyboard RepeatBehavior="Forever" Duration="0:0:0.2">
                                     <ObjectAnimationUsingKeyFrames Storyboard.TargetProperty="Foreground">
                                         <DiscreteObjectKeyFrame KeyTime="0:0:0">
                                             <DiscreteObjectKeyFrame.Value>
-                                                <SolidColorBrush Color="#FF2020"/>
+                                                <SolidColorBrush Color="White"/>
                                             </DiscreteObjectKeyFrame.Value>
                                         </DiscreteObjectKeyFrame>
-                                        <DiscreteObjectKeyFrame KeyTime="0:0:0.167">
+                                        <DiscreteObjectKeyFrame KeyTime="0:0:0.1">
                                             <DiscreteObjectKeyFrame.Value>
-                                                <SolidColorBrush Color="White"/>
+                                                <SolidColorBrush Color="#FF2020"/>
                                             </DiscreteObjectKeyFrame.Value>
                                         </DiscreteObjectKeyFrame>
                                     </ObjectAnimationUsingKeyFrames>

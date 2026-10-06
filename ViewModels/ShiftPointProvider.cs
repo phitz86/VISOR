@@ -9,17 +9,6 @@ using VISOR.Telemetry;
 namespace VISOR.ViewModels
 {
     /// <summary>
-    /// What the ⚙ gear symbol shows.
-    /// </summary>
-    public enum ShiftState
-    {
-        Normal,     // light gray
-        Approach,   // solid amber: shift point coming up
-        ShiftNow,   // flashing red/white: shift now
-        Limiter     // solid red: at redline / on the rev limiter
-    }
-
-    /// <summary>
     /// Decides the shift point for the current gear and runs the shift-point learner.
     ///
     /// Shift RPM comes from, in order: the learned optimum for this gear (once the learner is
@@ -54,6 +43,9 @@ namespace VISOR.ViewModels
         private readonly Stopwatch _clock = Stopwatch.StartNew();
         private TimeSpan _lastFit;
         private TimeSpan _lastSave;
+        private TimeSpan _lastProgress;
+        private static readonly TimeSpan ProgressInterval = TimeSpan.FromSeconds(60);
+        private GearShiftEstimate[] _lastEstimates = Array.Empty<GearShiftEstimate>();
         private long _lastFitSampleCount = -1;
 
 #if DEBUG
@@ -162,6 +154,11 @@ namespace VISOR.ViewModels
                 _lastFit = now;
                 ScheduleFit();
             }
+            if (now - _lastProgress >= ProgressInterval)
+            {
+                _lastProgress = now;
+                LogProgress();
+            }
             if (now - _lastSave >= SaveInterval)
             {
                 _lastSave = now;
@@ -183,6 +180,8 @@ namespace VISOR.ViewModels
 
             // Car changed (or first car): save the old model, start fresh, load the new one.
             Flush();
+            Log.Info($"[ShiftPoint] Car detected: {Describe(car)} ({car.CarPath}, build {car.CarVersion}), " +
+                     $"iRacing shift {car.SLShiftRPM:F0}, redline {car.RedLine:F0}, {car.GearNumForward} gears");
 
             int gen;
             lock (_lock)
@@ -193,6 +192,7 @@ namespace VISOR.ViewModels
                 gen = ++_generation;
                 _lastFitSampleCount = -1;
                 _learnedRpm = new int[ShiftPointLearner.MaxGears + 1];
+                _lastEstimates = Array.Empty<GearShiftEstimate>();
                 for (int i = 0; i < _recentFits.Length; i++) _recentFits[i] = Array.Empty<int>();
 #if DEBUG
                 _debugLogger?.Dispose();
@@ -328,6 +328,7 @@ namespace VISOR.ViewModels
             }
 
             _learnedRpm = next;
+            _lastEstimates = estimates;
         }
 
         private void ScheduleSave()
@@ -381,6 +382,44 @@ namespace VISOR.ViewModels
             {
                 Log.Error("[ShiftPoint] flush failed", ex);
             }
+        }
+
+        /// <summary>
+        /// Once a minute: how many frames the learner kept vs skipped (and why), and what each
+        /// gear is waiting on. Silent while nothing but ineligible frames (garage, pits) arrive.
+        /// </summary>
+        private void LogProgress()
+        {
+            string line;
+            lock (_lock)
+            {
+                if (_learner == null || _car == null) return;
+                var (kept, skipped) = _learner.TakeCounters();
+                long active = kept;
+                for (int i = 0; i < skipped.Length; i++)
+                    if (i != (int)SkipReason.Ineligible) active += skipped[i];
+                if (active == 0) return;
+
+                var sb = new System.Text.StringBuilder();
+                sb.Append($"[ShiftPoint] progress ({Describe(_car)}): {kept} frames kept, skipped:");
+                for (int i = 0; i < skipped.Length; i++)
+                    if (skipped[i] > 0) sb.Append($" {(SkipReason)i} {skipped[i]},");
+                if (sb[^1] == ',') sb.Length--;
+                else sb.Append(" none");
+                sb.Append(" | total model samples ").Append(_learner.SampleCount);
+
+                var learned = _learnedRpm;
+                foreach (var e in _lastEstimates)
+                {
+                    sb.Append(" | g").Append(e.Gear).Append(' ');
+                    if (e.Gear < learned.Length && learned[e.Gear] > 0) sb.Append("learned ").Append(learned[e.Gear]);
+                    else if (e.BandsNeeded > 0) sb.Append($"waiting: {e.BandsSeen}/{e.BandsNeeded} RPM bands seen");
+                    else sb.Append("waiting: ").Append(e.Reason);
+                }
+                if (_lastEstimates.Length == 0) sb.Append(" | no fit yet");
+                line = sb.ToString();
+            }
+            Log.Info(line);
         }
 
         private static string Describe(PlayerCarInfo car) =>

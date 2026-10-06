@@ -40,11 +40,7 @@ namespace VISOR.ViewModels
         public string ClassPositionNumber { get; private set; } = "--";
         public string GearDisplay { get; private set; } = "N";
         public ShiftState ShiftState { get; private set; } = ShiftState.Normal;
-
-        // Hysteresis: once a state is reached it holds until RPM falls this far below its
-        // threshold (or the gear changes), so RPM hovering at a threshold can't flicker it.
-        private const int ShiftStateHysteresisRpm = 150;
-        private int _shiftStateGear = int.MinValue;
+        private readonly ShiftCue _shiftCue = new();
         public string LastLapTime { get; private set; } = LapTimePlaceholder;
         public string BestLapTime { get; private set; } = LapTimePlaceholder;
 
@@ -245,44 +241,25 @@ namespace VISOR.ViewModels
             // if the driver turns it on later.
             _shiftPoints.Update(snapshot, car, onPitRoad);
 
-            var newState = ShiftState.Normal;
             int gear = snapshot.Gear;
-            if (car != null && _settingsManager.Settings.ShowShiftIndicator
-                && snapshot.IsOnTrack && !onPitRoad && !snapshot.PitLimiterOn && gear >= 1)
+            bool active = car != null && _settingsManager.Settings.ShowShiftIndicator
+                && snapshot.IsOnTrack && !onPitRoad && !snapshot.PitLimiterOn && gear >= 1;
+
+            int shiftRpm = 0, approachRpm = 0;
+            if (active)
             {
-                newState = ComputeShiftState(snapshot, car, gear);
+                shiftRpm = _shiftPoints.GetShiftRpm(gear, snapshot, car);
+                approachRpm = ShiftPointProvider.GetApproachRpm(shiftRpm, snapshot, car!);
             }
-            _shiftStateGear = gear;
+
+            var newState = _shiftCue.Update(snapshot.SessionTime, gear, snapshot.RPM, active,
+                snapshot.RevLimiterActive, car?.RedLine ?? 0f, shiftRpm, approachRpm);
 
             if (newState != ShiftState)
             {
                 ShiftState = newState;
                 OnPropertyChanged(nameof(ShiftState));
             }
-        }
-
-        private ShiftState ComputeShiftState(SVappsLABSnapshot snapshot, PlayerCarInfo car, int gear)
-        {
-            float rpm = snapshot.RPM;
-            bool sameGear = gear == _shiftStateGear;
-            // A state already showing in this gear stays until RPM drops past the hysteresis band.
-            float Hold(ShiftState state) => sameGear && ShiftState >= state ? ShiftStateHysteresisRpm : 0;
-
-            if (snapshot.RevLimiterActive || (car.RedLine > 0 && rpm >= car.RedLine - Hold(ShiftState.Limiter)))
-                return ShiftState.Limiter;
-
-            // Top gear (shift RPM 0) only ever shows the limiter state.
-            int shiftRpm = _shiftPoints.GetShiftRpm(gear, snapshot, car);
-            if (shiftRpm <= 0) return ShiftState.Normal;
-
-            if (rpm >= shiftRpm - Hold(ShiftState.ShiftNow))
-                return ShiftState.ShiftNow;
-
-            int approachRpm = ShiftPointProvider.GetApproachRpm(shiftRpm, snapshot, car);
-            if (rpm >= approachRpm - Hold(ShiftState.Approach))
-                return ShiftState.Approach;
-
-            return ShiftState.Normal;
         }
 
         /// <summary>Saves any unsaved shift-point learning. Called on disconnect and app exit.</summary>
@@ -325,7 +302,7 @@ namespace VISOR.ViewModels
             CountdownVM.Reset();
             GearDisplay = "N";
             ShiftState = ShiftState.Normal;
-            _shiftStateGear = int.MinValue;
+            _shiftCue.Reset();
             ClassPositionNumber = "--";
             _playerWasOnPitRoad = null;
 

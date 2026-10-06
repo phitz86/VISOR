@@ -191,6 +191,44 @@ namespace VISOR.Tests
         }
 
         [Fact]
+        public void SkipCounters_AttributeRejections()
+        {
+            var learner = Train(runs: 2, shiftAt: _ => CarSimulator.RedLine);
+            learner.TakeCounters();   // discard training counts
+            double t = 20_000, k = CarSimulator.K(3);
+            for (int i = 0; i < 120; i++, t += CarSimulator.Dt)
+                learner.AddSample(new ShiftSample(t, 3, (float)(k * 40), 40, 3f, 0f, 1, 0, 1, true));
+            learner.TakeCounters();
+
+            learner.AddSample(new ShiftSample(t, 3, (float)(k * 40), 40, 3f, 8f, 1, 0, 1, true));       // cornering
+            learner.AddSample(new ShiftSample(t, 3, (float)(k * 40), 40, 3f, 0f, 0.5f, 0, 1, true));    // part throttle
+            learner.AddSample(new ShiftSample(t, 3, (float)(k * 40 * 1.1), 40, 3f, 0f, 1, 0, 1, true)); // wheelspin
+            learner.AddSample(new ShiftSample(t, 3, (float)(k * 40), 40, 3f, 0f, 1, 0, 1, false));      // ineligible
+            learner.AddSample(new ShiftSample(t, 3, (float)(k * 40), 40, 3f, 0f, 1, 0, 1, true));       // kept
+
+            var (kept, skipped) = learner.TakeCounters();
+            Assert.Equal(1, kept);
+            Assert.Equal(1, skipped[(int)SkipReason.Cornering]);
+            Assert.Equal(1, skipped[(int)SkipReason.PartThrottle]);
+            Assert.Equal(1, skipped[(int)SkipReason.Wheelspin]);
+            Assert.Equal(1, skipped[(int)SkipReason.Ineligible]);
+
+            var (kept2, skipped2) = learner.TakeCounters();
+            Assert.Equal(0, kept2);
+            Assert.All(skipped2, c => Assert.Equal(0, c));
+        }
+
+        [Fact]
+        public void ReportsBandCoverage_WhileWaiting_AndWhenConfident()
+        {
+            var few = Train(runs: 2, shiftAt: _ => CarSimulator.RedLine).Solve(CarSimulator.RedLine, 6);
+            Assert.Contains(few, e => !e.Confident && e.BandsNeeded > 0 && e.BandsSeen < e.BandsNeeded);
+
+            var many = Train(runs: 25, shiftAt: _ => CarSimulator.RedLine).Solve(CarSimulator.RedLine, 6);
+            Assert.All(many, e => { Assert.True(e.Confident); Assert.Equal(e.BandsNeeded, e.BandsSeen); });
+        }
+
+        [Fact]
         public void NoUpshiftForTopGear()
         {
             var learner = Train(runs: 3, shiftAt: _ => CarSimulator.RedLine);
