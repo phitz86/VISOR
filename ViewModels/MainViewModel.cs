@@ -40,6 +40,7 @@ namespace VISOR.ViewModels
         public string ClassPositionNumber { get; private set; } = "--";
         public string GearDisplay { get; private set; } = "N";
         public ShiftState ShiftState { get; private set; } = ShiftState.Normal;
+        public ShiftCalibration ShiftCalibration { get; private set; } = ShiftCalibration.None;
         private readonly ShiftCue _shiftCue = new();
         public string LastLapTime { get; private set; } = LapTimePlaceholder;
         public string BestLapTime { get; private set; } = LapTimePlaceholder;
@@ -260,6 +261,17 @@ namespace VISOR.ViewModels
                 ShiftState = newState;
                 OnPropertyChanged(nameof(ShiftState));
             }
+
+            // Calibration dot: status of the current gear's shift point; hidden when the
+            // indicator is off or no shift point applies.
+            var newCalibration = _settingsManager.Settings.ShowShiftIndicator
+                ? _shiftPoints.GetCalibration(gear, car)
+                : ShiftCalibration.None;
+            if (newCalibration != ShiftCalibration)
+            {
+                ShiftCalibration = newCalibration;
+                OnPropertyChanged(nameof(ShiftCalibration));
+            }
         }
 
         /// <summary>Saves any unsaved shift-point learning. Called on disconnect and app exit.</summary>
@@ -302,6 +314,7 @@ namespace VISOR.ViewModels
             CountdownVM.Reset();
             GearDisplay = "N";
             ShiftState = ShiftState.Normal;
+            ShiftCalibration = ShiftCalibration.None;
             _shiftCue.Reset();
             ClassPositionNumber = "--";
             _playerWasOnPitRoad = null;

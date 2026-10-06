@@ -300,6 +300,69 @@ namespace VISOR.Tests
             }
         }
 
+        // The cue VISOR would show for a gear: learned value, else a provisional step if it's later
+        // than the car's light, else the light.
+        private static int Cue(GearShiftEstimate e, int baseline) =>
+            e.Confident ? e.Rpm : e.Provisional && e.Rpm > baseline ? e.Rpm : baseline;
+
+        [Fact]
+        public void ClosedLoop_CueStepsUpFromEarlyLight_AndConverges()
+        {
+            // The car's light says 6700, but every gear's true optimum is 7100-7500. The driver
+            // shifts wherever VISOR cues (top gear lifts at the light too, so no free data from
+            // long straights), and the rev limiter hides the redline. Before provisional steps,
+            // this loop could never leave 6700.
+            const int Baseline = 6700;
+            int gears = CarSimulator.GearRatios.Length;
+            var cues = Enumerable.Repeat(Baseline, gears + 1).ToArray();
+            var learner = new ShiftPointLearner();
+            var sim = new CarSimulator(seed: 21, revLimiter: true);
+
+            for (int session = 1; session <= 40; session++)
+            {
+                for (int run = 0; run < 3; run++)
+                    foreach (var smp in sim.Run(g => cues[g]))
+                        learner.AddSample(smp);
+
+                var results = learner.Solve(CarSimulator.RedLine, gears);
+                foreach (var e in results)
+                {
+                    cues[e.Gear] = Cue(e, Baseline);
+                    // Never cue meaningfully past the true optimum: at most one step + fit noise.
+                    Assert.True(cues[e.Gear] <= CarSimulator.OptimalShift(e.Gear) + ShiftPointLearner.ProvisionalStepRpm + 60,
+                        $"session {session} gear {e.Gear}: cue {cues[e.Gear]} overshoots optimum {CarSimulator.OptimalShift(e.Gear)}");
+                }
+                if (session % 5 == 0 || session == 1)
+                    _out.WriteLine($"session {session}: " + string.Join("  ", results.Select(e =>
+                        $"g{e.Gear} {cues[e.Gear]}{(e.Confident ? "*" : e.Provisional ? $"(p{e.ProvenRpm})" : "")}")));
+            }
+
+            for (int g = 1; g < gears; g++)
+            {
+                int expected = CarSimulator.OptimalShift(g);
+                // Holds-to-redline gears cue just under it (VISOR caps the cue below the redline anyway).
+                Assert.InRange(cues[g], expected - 75, expected + ToleranceRpm);
+            }
+        }
+
+        [Fact]
+        public void Provisional_NeverWhenConfident_AndNeverBelowEvidence()
+        {
+            var learner = Train(runs: 6, shiftAt: _ => 6900, revLimiter: true);
+            foreach (var e in learner.Solve(CarSimulator.RedLine, CarSimulator.GearRatios.Length))
+            {
+                Assert.False(e.Confident && e.Provisional);
+                if (e.Provisional)
+                {
+                    Assert.True(e.ProvenRpm > 0 && e.Rpm > e.ProvenRpm);
+                    Assert.True(e.Rpm - e.ProvenRpm <= ShiftPointLearner.ProvisionalStepRpm);
+                    // Sound: the true optimum really is at least the proven point.
+                    Assert.True(CarSimulator.OptimalShift(e.Gear) >= e.ProvenRpm - 30,
+                        $"gear {e.Gear}: proven {e.ProvenRpm} but true optimum {CarSimulator.OptimalShift(e.Gear)}");
+                }
+            }
+        }
+
         [Fact]
         public void NoUpshiftForTopGear()
         {

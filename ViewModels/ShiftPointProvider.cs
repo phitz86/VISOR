@@ -8,6 +8,14 @@ using VISOR.Telemetry;
 
 namespace VISOR.ViewModels
 {
+    /// <summary>Calibration status of the current gear's shift point (the dot by the ⚙).</summary>
+    public enum ShiftCalibration
+    {
+        None,           // no shift point applies: hidden
+        Calibrating,    // red: still on the car's light, or stepping up
+        Settled         // green: learned and stable
+    }
+
     /// <summary>
     /// Decides the shift point for the current gear and runs the shift-point learner.
     ///
@@ -38,6 +46,11 @@ namespace VISOR.ViewModels
         // Learned RPM per gear (index = gear), 0 = not confident. Replaced wholesale, read lock-free.
         private volatile int[] _learnedRpm = new int[ShiftPointLearner.MaxGears + 1];
         private readonly int[][] _recentFits = NewRecentFits();
+
+        // Provisional ("stepping up") cue per gear, 0 = none. Used only when it's later than the
+        // car's own shift light; see ShiftPointLearner's GearShiftEstimate.Provisional.
+        private volatile int[] _provisionalRpm = new int[ShiftPointLearner.MaxGears + 1];
+        private readonly int[][] _recentProvisional = NewRecentFits();
         private int _fitRunning;
 
         private readonly Stopwatch _clock = Stopwatch.StartNew();
@@ -82,11 +95,18 @@ namespace VISOR.ViewModels
             if (car == null || gear < 1) return 0;
             if (car.GearNumForward > 0 && gear >= car.GearNumForward) return 0;
 
+            int baseline = snapshot.PlayerCarSLShiftRPM > 0f ? (int)snapshot.PlayerCarSLShiftRPM
+                         : car.SLShiftRPM > 0f ? (int)car.SLShiftRPM : 0;
+
+            // Learned value first. Otherwise a provisional step, but only to move the cue later
+            // than the car's light (earlier shifts need a confident learned crossover).
+            // Otherwise the light.
             int rpm;
             var learned = _learnedRpm;
+            var provisional = _provisionalRpm;
             if (gear < learned.Length && learned[gear] > 0) rpm = learned[gear];
-            else if (snapshot.PlayerCarSLShiftRPM > 0f) rpm = (int)snapshot.PlayerCarSLShiftRPM;
-            else rpm = car.SLShiftRPM > 0f ? (int)car.SLShiftRPM : 0;
+            else if (gear < provisional.Length && provisional[gear] > baseline) rpm = provisional[gear];
+            else rpm = baseline;
 
             // Keep the shift point a little under the redline. When a gear is best held to the
             // redline, this lets the flash show (and leaves time to react) before the solid-red
@@ -94,6 +114,19 @@ namespace VISOR.ViewModels
             if (rpm > 0 && car.RedLine > 0)
                 rpm = Math.Min(rpm, (int)(car.RedLine - Math.Max(RedLineMarginMinRpm, RedLineMarginFraction * car.RedLine)));
             return rpm;
+        }
+
+        /// <summary>
+        /// Calibration status of the shift point for <paramref name="gear"/>, for the HUD dot:
+        /// Settled once learned; Calibrating while on the car's light or stepping up; None when no
+        /// shift point applies (neutral, reverse, top gear, no car).
+        /// </summary>
+        public ShiftCalibration GetCalibration(int gear, PlayerCarInfo? car)
+        {
+            if (car == null || gear < 1) return ShiftCalibration.None;
+            if (car.GearNumForward > 0 && gear >= car.GearNumForward) return ShiftCalibration.None;
+            var learned = _learnedRpm;
+            return gear < learned.Length && learned[gear] > 0 ? ShiftCalibration.Settled : ShiftCalibration.Calibrating;
         }
 
         /// <summary>
@@ -193,6 +226,8 @@ namespace VISOR.ViewModels
                 gen = ++_generation;
                 _lastFitSampleCount = -1;
                 _learnedRpm = new int[ShiftPointLearner.MaxGears + 1];
+                _provisionalRpm = new int[ShiftPointLearner.MaxGears + 1];
+                for (int i = 0; i < _recentProvisional.Length; i++) _recentProvisional[i] = Array.Empty<int>();
                 _lastEstimates = Array.Empty<GearShiftEstimate>();
                 for (int i = 0; i < _recentFits.Length; i++) _recentFits[i] = Array.Empty<int>();
 #if DEBUG
@@ -289,6 +324,7 @@ namespace VISOR.ViewModels
         private void ApplyEstimates(GearShiftEstimate[] estimates, PlayerCarInfo car, ShiftPointLearner learner)
         {
             var next = (int[])_learnedRpm.Clone();
+            var nextProv = (int[])_provisionalRpm.Clone();
 #if DEBUG
             bool changed = false;   // a learned value was promoted or moved: dump the curve to the CSV
 #endif
@@ -296,37 +332,40 @@ namespace VISOR.ViewModels
             {
                 if (e.Gear < 1 || e.Gear >= next.Length) continue;
 
-                var recent = _recentFits[e.Gear];
-                if (!e.Confident)
+                if (e.Confident)
                 {
-                    // Keep an already-learned value; a not-yet-confident fit just doesn't add to it.
+                    _recentProvisional[e.Gear] = Array.Empty<int>();
+                    nextProv[e.Gear] = 0;   // learned supersedes any provisional step
+                    if (TryStabilize(_recentFits, e.Gear, e.Rpm, out int value))
+                    {
+                        int old = next[e.Gear];
+                        next[e.Gear] = value;
+                        if (old == 0 || Math.Abs(old - value) > LogChangeRpm)
+                        {
+                            Log.Info($"[ShiftPoint] {Describe(car)} gear {e.Gear}: iRacing {car.SLShiftRPM:F0} -> learned {value} RPM ({Explain(e, car)})");
+#if DEBUG
+                            changed = true;
+#endif
+                        }
+                    }
+                }
+                else if (e.Provisional)
+                {
+                    // Keep an already-learned value; a provisional fit just doesn't add to it.
                     _recentFits[e.Gear] = Array.Empty<int>();
+                    if (TryStabilize(_recentProvisional, e.Gear, e.Rpm, out int value))
+                    {
+                        int old = nextProv[e.Gear];
+                        nextProv[e.Gear] = value;
+                        if (next[e.Gear] == 0 && value > car.SLShiftRPM && (old == 0 || Math.Abs(old - value) > LogChangeRpm))
+                            Log.Info($"[ShiftPoint] {Describe(car)} gear {e.Gear}: stepping up {(old > 0 ? old : (int)car.SLShiftRPM)} -> {value} RPM (proven to {e.ProvenRpm})");
+                    }
                 }
                 else
                 {
-                    var updated = new int[Math.Min(recent.Length + 1, StableFits)];
-                    Array.Copy(recent, Math.Max(0, recent.Length - (updated.Length - 1)), updated, 0, updated.Length - 1);
-                    updated[^1] = e.Rpm;
-                    _recentFits[e.Gear] = updated;
-
-                    if (updated.Length == StableFits)
-                    {
-                        int min = int.MaxValue, max = int.MinValue; long sum = 0;
-                        foreach (var r in updated) { min = Math.Min(min, r); max = Math.Max(max, r); sum += r; }
-                        if (max - min <= StableSpreadRpm)
-                        {
-                            int value = (int)(Math.Round(sum / (double)updated.Length / 10.0) * 10);
-                            int old = next[e.Gear];
-                            next[e.Gear] = value;
-                            if (old == 0 || Math.Abs(old - value) > LogChangeRpm)
-                            {
-                                Log.Info($"[ShiftPoint] {Describe(car)} gear {e.Gear}: iRacing {car.SLShiftRPM:F0} -> learned {value} RPM ({Explain(e, car)})");
-#if DEBUG
-                                changed = true;
-#endif
-                            }
-                        }
-                    }
+                    // Not confident: an already-learned or provisional value stays; fits restart.
+                    _recentFits[e.Gear] = Array.Empty<int>();
+                    _recentProvisional[e.Gear] = Array.Empty<int>();
                 }
 
 #if DEBUG
@@ -334,6 +373,7 @@ namespace VISOR.ViewModels
 #endif
             }
 
+            _provisionalRpm = nextProv;
             _learnedRpm = next;
             _lastEstimates = estimates;
 
@@ -344,6 +384,25 @@ namespace VISOR.ViewModels
                 if (curve != null) _debugLogger?.LogCurve(curve);
             }
 #endif
+        }
+
+        // Appends a fit to the gear's recent list; true (with the averaged value, rounded to 10 RPM)
+        // once StableFits consecutive fits agree within StableSpreadRpm.
+        private static bool TryStabilize(int[][] recentFits, int gear, int rpm, out int value)
+        {
+            var recent = recentFits[gear];
+            var updated = new int[Math.Min(recent.Length + 1, StableFits)];
+            Array.Copy(recent, Math.Max(0, recent.Length - (updated.Length - 1)), updated, 0, updated.Length - 1);
+            updated[^1] = rpm;
+            recentFits[gear] = updated;
+
+            value = 0;
+            if (updated.Length < StableFits) return false;
+            int min = int.MaxValue, max = int.MinValue; long sum = 0;
+            foreach (var r in updated) { min = Math.Min(min, r); max = Math.Max(max, r); sum += r; }
+            if (max - min > StableSpreadRpm) return false;
+            value = (int)(Math.Round(sum / (double)updated.Length / 10.0) * 10);
+            return true;
         }
 
         // "holds to redline; at 7500, 5th would pull 4% less" / "crossover; 3rd pulls equal at 7210"
@@ -450,9 +509,14 @@ namespace VISOR.ViewModels
                         if (e.Reason == "holds to redline" && !double.IsNaN(e.NextGearThrustAtRedlinePct))
                             sb.Append($" (next gear {e.NextGearThrustAtRedlinePct - 100:+0;-0}% at redline)");
                     }
+                    else if (e.Gear < _provisionalRpm.Length && _provisionalRpm[e.Gear] > 0)
+                    {
+                        sb.Append($"stepping up {_provisionalRpm[e.Gear]}");
+                        if (e.Provisional) sb.Append($" (proven to {e.ProvenRpm})");
+                    }
                     else if (e.BandsNeeded > 0)
                     {
-                        sb.Append($"waiting: {e.BandsSeen}/{e.BandsNeeded} RPM bands seen");
+                        sb.Append($"waiting (est {e.Rpm}): {e.BandsSeen}/{e.BandsNeeded} RPM bands seen");
                         if (e.MissingBands.Length > 0) sb.Append($" (missing {e.MissingBands})");
                     }
                     else sb.Append("waiting: ").Append(e.Reason);

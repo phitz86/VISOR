@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on a wet track, during wheelspin and while cornering hard (above about 0.3 g sideways, where
   tire side load eats into forward acceleration). On ovals that means learning is slow, but you
   rarely shift there, and the indicator still works from iRacing's shift point.
+- **Shift cue steps past an early light** — VISOR won't recommend revs it hasn't seen, so a car
+  whose light comes on early could stay stuck on that light. When the data proves a gear still
+  pulls harder than the next at the highest RPM seen, the cue now moves later in 250-RPM steps,
+  each confirmed by driving up to it, until the real best shift point is learned. It never moves
+  the cue earlier than the car's light on that evidence alone.
+- **Calibration dot** — a small dot by the gear symbol shows whether the current gear's shift
+  point has settled: red while calibrating, green once learned, hidden in neutral, reverse and
+  top gear.
 - **Shift-point learning progress in the log** — VISOR logs the car as soon as it's detected,
   then once a minute while driving: how many frames were used or skipped (and why: cornering,
   part throttle, wheelspin…) and what each gear is still waiting on (e.g. "6/10 RPM bands seen

@@ -29,9 +29,14 @@ namespace VISOR.Telemetry
     /// shifting there; the further below, the more clear-cut. Only meaningful near 100 (for gears
     /// that hold to the redline); far above it for a peaky engine it's noisy and irrelevant, since
     /// the shift then happens well before the redline. NaN when not computed.
+    /// <see cref="Provisional"/> / <see cref="ProvenRpm"/>: not confident yet, but the data proves
+    /// this gear still out-pulls the next up to <see cref="ProvenRpm"/>, so the best shift is at
+    /// least that high. <see cref="Rpm"/> is then one step (250 RPM) past it, capped at the
+    /// model's estimate: where to cue next so the driver revs high enough to confirm the step.
     /// </remarks>
     public readonly record struct GearShiftEstimate(int Gear, int Rpm, bool Confident, string Reason,
-        int BandsSeen = 0, int BandsNeeded = 0, string MissingBands = "", double NextGearThrustAtRedlinePct = double.NaN);
+        int BandsSeen = 0, int BandsNeeded = 0, string MissingBands = "", double NextGearThrustAtRedlinePct = double.NaN,
+        bool Provisional = false, int ProvenRpm = 0);
 
     /// <summary>Why a frame was left out of the torque model (for progress logging).</summary>
     public enum SkipReason
@@ -109,6 +114,9 @@ namespace VISOR.Telemetry
         private const double CoverageMarginRpm = 500;
 
         public const int MaxGears = 10;
+
+        // How far a provisional cue may step past the proven point (one band).
+        public const int ProvisionalStepRpm = BinWidthRpm;
 
         private readonly double[] _ata = new double[ParamCount * ParamCount];
         private readonly double[] _atb = new double[ParamCount];
@@ -276,6 +284,7 @@ namespace VISOR.Telemetry
             double step = 10;
             double prevDiff = double.NaN, prevR = double.NaN;
             double crossover = double.NaN;
+            double proven = double.NaN;   // highest RPM where "this gear still pulls harder" rests on observed data
 
             for (double r = minRpm; r <= redLine; r += step)
             {
@@ -286,6 +295,7 @@ namespace VISOR.Telemetry
                     crossover = double.IsNaN(prevDiff) ? r : prevR + step * prevDiff / (prevDiff - diff);
                     break;
                 }
+                if (IsObserved(r) && IsObserved(rho * r)) proven = r;
                 prevDiff = diff;
                 prevR = r;
             }
@@ -310,8 +320,20 @@ namespace VISOR.Telemetry
             if (seen < needed)
             {
                 missing.Sort();
+                string missingText = string.Join(" ", missing);
+
+                // Not confident, but if the data proves this gear still out-pulls the next up to
+                // some RPM, the best shift is at least that high: cue one step past it (capped at
+                // the estimate) so the driver revs high enough to confirm the next step.
+                if (!double.IsNaN(proven) && proven < rpm)
+                {
+                    int cue = (int)Math.Round(Math.Min(proven + ProvisionalStepRpm, rpm));
+                    return new GearShiftEstimate(g, cue, false, $"stepping up: proven to {proven:F0}",
+                        seen, needed, missingText, marginPct, Provisional: true, ProvenRpm: (int)Math.Round(proven));
+                }
+
                 return new GearShiftEstimate(g, (int)Math.Round(rpm), false, "torque curve not yet observed around shift point",
-                    seen, needed, string.Join(" ", missing), marginPct);
+                    seen, needed, missingText, marginPct);
             }
 
             return new GearShiftEstimate(g, (int)Math.Round(rpm), true, atRedline ? "holds to redline" : "crossover",
@@ -381,6 +403,15 @@ namespace VISOR.Telemetry
         }
 
         private static int BinCenterRpm(int bin) => (int)((bin + 0.5) * BinWidthRpm);
+
+        // The fitted torque at this RPM rests on observed data: both bands it interpolates
+        // between have enough samples.
+        private bool IsObserved(double rpm)
+        {
+            TryGetBinWeights(rpm, out int j, out double w);
+            if (j + 1 >= BinCount) return false;
+            return _binWeight[j] >= MinBinWeight && (w == 0 || _binWeight[j + 1] >= MinBinWeight);
+        }
 
         private static double Torque(double[] theta, double rpm)
         {
