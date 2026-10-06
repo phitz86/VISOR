@@ -51,6 +51,20 @@ namespace VISOR.Diagnostics
             _writer.Flush();
         }
 
+        /// <summary>
+        /// The fitted curve, one row per 250-RPM band: rpm, relative torque and power (peak = 100)
+        /// and the band's sample weight. Columns reuse the header: rpm, long_accel = rel torque,
+        /// lat_accel = rel power, ratio = band weight.
+        /// </summary>
+        public void LogCurve((int Rpm, double RelTorque, double RelPower, double Weight)[] curve)
+        {
+            if (_writer == null) return;
+            foreach (var c in curve)
+                _writer.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                    $"curve,,,{c.Rpm},,{c.RelTorque:F2},{c.RelPower:F2},{c.Weight:F0},,,"));
+            _writer.Flush();
+        }
+
         public void Dispose()
         {
             try { _writer?.Flush(); _writer?.Dispose(); } catch { /* best effort */ }

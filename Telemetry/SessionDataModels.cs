@@ -90,7 +90,9 @@ namespace VISOR.Telemetry
         float RedLine,
         float SLFirstRPM,
         float SLShiftRPM,
-        int GearNumForward)
+        int GearNumForward,
+        float SLLastRPM = 0f,
+        float SLBlinkRPM = 0f)
     {
         public bool HasShiftLights => SLShiftRPM > 0f;
     }

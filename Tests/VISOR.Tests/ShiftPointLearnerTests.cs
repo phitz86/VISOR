@@ -252,6 +252,54 @@ namespace VISOR.Tests
             Assert.InRange(gear1.Rpm, CarSimulator.RedLine - ToleranceRpm, CarSimulator.RedLine);
         }
 
+        private static double AnalyticMarginPct(int gear, Func<double, double> torque)
+        {
+            double kg = CarSimulator.K(gear), kn = CarSimulator.K(gear + 1), r = CarSimulator.RedLine;
+            return 100 * kn * torque(kn / kg * r) / (kg * torque(r));
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void MarginAtRedline_MatchesPhysics(bool peaky)
+        {
+            Func<double, double> torque = peaky ? CarSimulator.PeakyTorque : CarSimulator.Torque;
+            var results = Train(runs: 25, shiftAt: _ => CarSimulator.RedLine, torque: peaky ? torque : null)
+                .Solve(CarSimulator.RedLine, CarSimulator.GearRatios.Length);
+
+            foreach (var r in results)
+            {
+                double expected = AnalyticMarginPct(r.Gear, torque);
+                _out.WriteLine($"{(peaky ? "peaky" : "smooth")} gear {r.Gear}: {r.Reason}, next gear at redline " +
+                               $"{r.NextGearThrustAtRedlinePct:F1}% (true {expected:F1}%)");
+                // The margin is only meaningful near 100% (a close call). Far from it - e.g. a peaky
+                // engine whose power has collapsed by the redline - the ratio of two small numbers
+                // is noisy, but it can't matter: the shift happens well before the redline.
+                if (expected > 80 && expected < 120)
+                    Assert.InRange(r.NextGearThrustAtRedlinePct, expected - 2.5, expected + 2.5);
+                // Consistent with the decision: below 100% <=> holding to the redline.
+                Assert.Equal(r.Reason == "holds to redline", r.NextGearThrustAtRedlinePct < 100);
+            }
+        }
+
+        [Fact]
+        public void Curve_IsScaledToPeak_AndTracksTrueShape()
+        {
+            var learner = Train(runs: 25, shiftAt: _ => CarSimulator.RedLine);
+            var curve = learner.GetCurve(CarSimulator.RedLine);
+            Assert.NotNull(curve);
+            Assert.Equal(100, curve!.Max(c => c.RelPower), 3);
+            Assert.True(curve.Last().Rpm <= CarSimulator.RedLine);
+
+            // Within the well-observed range, relative power tracks the true curve's shape.
+            double truePeak = curve.Max(c => CarSimulator.Torque(c.Rpm) * c.Rpm);
+            foreach (var c in curve.Where(c => c.Weight >= ShiftPointLearner.MinBinWeight))
+            {
+                double truth = 100 * CarSimulator.Torque(c.Rpm) * c.Rpm / truePeak;
+                Assert.InRange(c.RelPower, truth - 4, truth + 4);
+            }
+        }
+
         [Fact]
         public void NoUpshiftForTopGear()
         {

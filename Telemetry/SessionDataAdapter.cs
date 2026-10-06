@@ -81,7 +81,9 @@ namespace VISOR.Telemetry
                 RedLine: System.Convert.ToSingle(src.DriverCarRedLine, ci),
                 SLFirstRPM: System.Convert.ToSingle(src.DriverCarSLFirstRPM, ci),
                 SLShiftRPM: System.Convert.ToSingle(src.DriverCarSLShiftRPM, ci),
-                GearNumForward: System.Convert.ToInt32(src.DriverCarGearNumForward, ci));
+                GearNumForward: System.Convert.ToInt32(src.DriverCarGearNumForward, ci),
+                SLLastRPM: System.Convert.ToSingle(src.DriverCarSLLastRPM, ci),
+                SLBlinkRPM: System.Convert.ToSingle(src.DriverCarSLBlinkRPM, ci));
         }
 
         private static void ApplySchedule(SessionInfo src, StaticEventData dst)

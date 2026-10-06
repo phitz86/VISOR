@@ -24,9 +24,14 @@ namespace VISOR.Telemetry
     /// <remarks>
     /// <see cref="BandsSeen"/> / <see cref="BandsNeeded"/>: how many of the 250-RPM torque bands
     /// around the shift point (in this gear and where the next gear lands) have enough data yet.
+    /// <see cref="NextGearThrustAtRedlinePct"/>: the next gear's thrust as a % of this gear's when
+    /// shifting at the redline (same road speed). Below 100 means holding to the redline beats
+    /// shifting there; the further below, the more clear-cut. Only meaningful near 100 (for gears
+    /// that hold to the redline); far above it for a peaky engine it's noisy and irrelevant, since
+    /// the shift then happens well before the redline. NaN when not computed.
     /// </remarks>
     public readonly record struct GearShiftEstimate(int Gear, int Rpm, bool Confident, string Reason,
-        int BandsSeen = 0, int BandsNeeded = 0, string MissingBands = "");
+        int BandsSeen = 0, int BandsNeeded = 0, string MissingBands = "", double NextGearThrustAtRedlinePct = double.NaN);
 
     /// <summary>Why a frame was left out of the torque model (for progress logging).</summary>
     public enum SkipReason
@@ -288,6 +293,10 @@ namespace VISOR.Telemetry
             if (double.IsNaN(prevDiff) && !double.IsNaN(crossover))
                 return new GearShiftEstimate(g, (int)Math.Round(crossover), false, "crossover below half redline");
 
+            // How decisive the answer is: next gear's thrust vs this gear's, if shifting at the redline.
+            double tRed = kg * Torque(theta, redLine);
+            double marginPct = tRed > 0 ? 100.0 * kn * Torque(theta, rho * redLine) / tRed : double.NaN;
+
             // Curves never crossed below the redline: hold the gear to the redline.
             bool atRedline = double.IsNaN(crossover);
             double rpm = atRedline ? redLine : crossover;
@@ -302,11 +311,11 @@ namespace VISOR.Telemetry
             {
                 missing.Sort();
                 return new GearShiftEstimate(g, (int)Math.Round(rpm), false, "torque curve not yet observed around shift point",
-                    seen, needed, string.Join(" ", missing));
+                    seen, needed, string.Join(" ", missing), marginPct);
             }
 
             return new GearShiftEstimate(g, (int)Math.Round(rpm), true, atRedline ? "holds to redline" : "crossover",
-                seen, needed);
+                seen, needed, "", marginPct);
         }
 
         /// <summary>
@@ -318,6 +327,37 @@ namespace VISOR.Telemetry
         {
             var theta = SolveTorqueCurve();
             return theta == null ? null : Torque(theta, rpm);
+        }
+
+        /// <summary>
+        /// The fitted curve per 250-RPM band center up to <paramref name="redLine"/>: relative
+        /// torque and power (scaled so peak power in range = 100) and the band's sample weight.
+        /// Null if there isn't enough data to fit. For the debug CSV; solves the model.
+        /// </summary>
+        public (int Rpm, double RelTorque, double RelPower, double Weight)[]? GetCurve(float redLine)
+        {
+            var theta = SolveTorqueCurve();
+            if (theta == null || redLine <= 0) return null;
+
+            var rows = new System.Collections.Generic.List<(int, double, double, double)>();
+            double peakPower = 0;
+            for (int i = 0; i < BinCount && BinCenterRpm(i) <= redLine; i++)
+            {
+                int rpm = BinCenterRpm(i);
+                double t = Torque(theta, rpm);
+                peakPower = Math.Max(peakPower, t * rpm);
+                rows.Add((rpm, t, t * rpm, _binWeight[i]));
+            }
+            if (peakPower <= 0) return null;
+            double peakTorque = 0;
+            foreach (var r in rows) peakTorque = Math.Max(peakTorque, r.Item2);
+            var result = new (int, double, double, double)[rows.Count];
+            for (int i = 0; i < rows.Count; i++)
+            {
+                var (rpm, t, p, w) = rows[i];
+                result[i] = (rpm, 100.0 * t / peakTorque, 100.0 * p / peakPower, w);
+            }
+            return result;
         }
 
         // How many of the RPM bands spanning [rpmLo, rpmHi] have enough data (MinBinWeight).

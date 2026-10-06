@@ -181,7 +181,8 @@ namespace VISOR.ViewModels
             // Car changed (or first car): save the old model, start fresh, load the new one.
             Flush();
             Log.Info($"[ShiftPoint] Car detected: {Describe(car)} ({car.CarPath}, build {car.CarVersion}), " +
-                     $"iRacing shift {car.SLShiftRPM:F0}, redline {car.RedLine:F0}, {car.GearNumForward} gears");
+                     $"iRacing lights first/shift/last/blink {car.SLFirstRPM:F0}/{car.SLShiftRPM:F0}/{car.SLLastRPM:F0}/{car.SLBlinkRPM:F0}, " +
+                     $"redline {car.RedLine:F0}, {car.GearNumForward} gears");
 
             int gen;
             lock (_lock)
@@ -268,7 +269,7 @@ namespace VISOR.ViewModels
                     lock (_lock)
                     {
                         if (gen != _generation) return;
-                        ApplyEstimates(learner.Solve(car.RedLine, car.GearNumForward), car);
+                        ApplyEstimates(learner.Solve(car.RedLine, car.GearNumForward), car, learner);
                     }
                 }
                 catch (Exception ex)
@@ -285,9 +286,12 @@ namespace VISOR.ViewModels
         // Promotes a gear's estimate to "learned" only after StableFits consecutive confident fits
         // that agree within StableSpreadRpm, so one noisy fit can't move the shift point.
         // Caller holds _lock.
-        private void ApplyEstimates(GearShiftEstimate[] estimates, PlayerCarInfo car)
+        private void ApplyEstimates(GearShiftEstimate[] estimates, PlayerCarInfo car, ShiftPointLearner learner)
         {
             var next = (int[])_learnedRpm.Clone();
+#if DEBUG
+            bool changed = false;   // a learned value was promoted or moved: dump the curve to the CSV
+#endif
             foreach (var e in estimates)
             {
                 if (e.Gear < 1 || e.Gear >= next.Length) continue;
@@ -316,7 +320,10 @@ namespace VISOR.ViewModels
                             next[e.Gear] = value;
                             if (old == 0 || Math.Abs(old - value) > LogChangeRpm)
                             {
-                                Log.Info($"[ShiftPoint] {Describe(car)} gear {e.Gear}: iRacing {car.SLShiftRPM:F0} -> learned {value} RPM ({e.Reason})");
+                                Log.Info($"[ShiftPoint] {Describe(car)} gear {e.Gear}: iRacing {car.SLShiftRPM:F0} -> learned {value} RPM ({Explain(e, car)})");
+#if DEBUG
+                                changed = true;
+#endif
                             }
                         }
                     }
@@ -329,7 +336,31 @@ namespace VISOR.ViewModels
 
             _learnedRpm = next;
             _lastEstimates = estimates;
+
+#if DEBUG
+            if (changed)
+            {
+                var curve = learner.GetCurve(car.RedLine);
+                if (curve != null) _debugLogger?.LogCurve(curve);
+            }
+#endif
         }
+
+        // "holds to redline; at 7500, 5th would pull 4% less" / "crossover; 3rd pulls equal at 7210"
+        private static string Explain(GearShiftEstimate e, PlayerCarInfo car)
+        {
+            string next = Ordinal(e.Gear + 1);
+            if (e.Reason == "holds to redline" && !double.IsNaN(e.NextGearThrustAtRedlinePct))
+                return $"holds to redline; at {car.RedLine:F0}, {next} would pull {100 - e.NextGearThrustAtRedlinePct:F0}% less";
+            if (e.Reason == "crossover")
+                return $"crossover; {next} pulls equal at {e.Rpm}";
+            return e.Reason;
+        }
+
+        private static string Ordinal(int n) => n switch
+        {
+            1 => "1st", 2 => "2nd", 3 => "3rd", _ => $"{n}th"
+        };
 
         private void ScheduleSave()
         {
@@ -412,7 +443,13 @@ namespace VISOR.ViewModels
                 foreach (var e in _lastEstimates)
                 {
                     sb.Append(" | g").Append(e.Gear).Append(' ');
-                    if (e.Gear < learned.Length && learned[e.Gear] > 0) sb.Append("learned ").Append(learned[e.Gear]);
+                    if (e.Gear < learned.Length && learned[e.Gear] > 0)
+                    {
+                        sb.Append("learned ").Append(learned[e.Gear]);
+                        // Only for holds-to-redline gears, where it says how close the call was.
+                        if (e.Reason == "holds to redline" && !double.IsNaN(e.NextGearThrustAtRedlinePct))
+                            sb.Append($" (next gear {e.NextGearThrustAtRedlinePct - 100:+0;-0}% at redline)");
+                    }
                     else if (e.BandsNeeded > 0)
                     {
                         sb.Append($"waiting: {e.BandsSeen}/{e.BandsNeeded} RPM bands seen");
