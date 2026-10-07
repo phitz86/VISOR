@@ -95,7 +95,7 @@ namespace VISOR.Telemetry
         private const float FullThrottle = 0.98f;
         private const float MaxBrake = 0.02f;
         private const float ClutchEngaged = 0.99f;
-        private const double PostShiftSettle = 0.5;     // s ignored after any gear change
+        private const double PostShiftSettle = 0.25;    // s ignored after any gear change (clutch and wheelspin checks catch the rest)
         private const double RatioSlipTolerance = 0.03; // sample's RPM/speed must be within 3% of the gear's ratio
         private const float MaxAbsAccel = 30f;
 
@@ -310,28 +310,38 @@ namespace VISOR.Telemetry
             double rho = kn / kg;   // RPM drop factor on the upshift
             if (rho < 0.4 || rho > 0.98) return new GearShiftEstimate(g, 0, false, $"implausible ratio step {rho:F2}");
 
+            // The best upshift is the RPM after which the next gear pulls harder all the way to the
+            // redline. Scan DOWN from the redline for the highest RPM where this gear is still the
+            // stronger one: the answer then rests on the top of the rev range, which normal driving
+            // covers every lap, and a wiggle in the fitted curve down in rarely-driven low RPM can't
+            // stop the search early (an upward "first crossing" search could, and would also shift
+            // too early on an engine whose power dips and recovers).
             double minRpm = 0.5 * redLine;
-            double step = 10;
-            double prevDiff = double.NaN, prevR = double.NaN;
-            double crossover = double.NaN;
-            double proven = double.NaN;   // highest RPM where "this gear still pulls harder" rests on observed data
+            const double step = 10;
+            double Diff(double r) => kg * Torque(theta, r) - kn * Torque(theta, rho * r);
 
-            for (double r = minRpm; r <= redLine; r += step)
+            double crossover = double.NaN;   // NaN = this gear is still stronger at the redline
+            bool crossesBelowHalf = false;
+            double dTop = Diff(redLine);
+            if (dTop <= 0)
             {
-                // Thrust in the current gear vs in the next gear at the same road speed.
-                double diff = kg * Torque(theta, r) - kn * Torque(theta, rho * r);
-                if (diff <= 0)
+                double prevR = redLine, prevD = dTop;
+                for (double r = redLine - step; r >= minRpm; r -= step)
                 {
-                    crossover = double.IsNaN(prevDiff) ? r : prevR + step * prevDiff / (prevDiff - diff);
-                    break;
+                    double d = Diff(r);
+                    if (d > 0)
+                    {
+                        crossover = r + step * d / (d - prevD);   // interpolate between r and prevR
+                        break;
+                    }
+                    prevR = r;
+                    prevD = d;
                 }
-                if (IsObserved(r) && IsObserved(rho * r)) proven = r;
-                prevDiff = diff;
-                prevR = r;
+                if (double.IsNaN(crossover)) crossesBelowHalf = true;   // next gear stronger everywhere we look
             }
 
-            if (double.IsNaN(prevDiff) && !double.IsNaN(crossover))
-                return new GearShiftEstimate(g, (int)Math.Round(crossover), false, "crossover below half redline");
+            if (crossesBelowHalf)
+                return new GearShiftEstimate(g, (int)Math.Round(minRpm), false, "crossover below half redline");
 
             // How decisive the answer is: next gear's thrust vs this gear's, if shifting at the redline.
             double tRed = kg * Torque(theta, redLine);
@@ -341,11 +351,26 @@ namespace VISOR.Telemetry
             bool atRedline = double.IsNaN(crossover);
             double rpm = atRedline ? redLine : crossover;
 
+            // Proven point: the highest RPM at or below the answer where "this gear still pulls
+            // harder" rests on observed data in both gears. The best shift is at least that high
+            // (the answer is the LAST point where this gear is stronger), whatever the curve does
+            // lower down.
+            double proven = double.NaN;
+            for (double r = Math.Floor(rpm / step) * step; r >= minRpm; r -= step)
+            {
+                if (Diff(r) <= 0) continue;
+                if (IsObserved(r) && IsObserved(rho * r)) { proven = r; break; }
+            }
+
             // Only trust the answer when the torque curve is well observed where it matters: around
             // the shift point in this gear and around where the engine lands in the next gear.
             var missing = new System.Collections.Generic.List<int>();
             var (seenHi, neededHi) = CountCoverage(rpm - CoverageMarginRpm, Math.Min(rpm + CoverageMarginRpm, redLine), missing);
-            var (seenLo, neededLo) = CountCoverage(rho * rpm - CoverageMarginRpm, rho * rpm + CoverageMarginRpm, missing);
+            // Next gear: from where the engine lands after the upshift, upward. After shifting at
+            // rpm the engine is never below rho*rpm in normal driving, so data lower than that
+            // can't affect the answer, and real drivers rarely provide it. (Half a band below the
+            // landing point keeps the band the landing RPM interpolates from.)
+            var (seenLo, neededLo) = CountCoverage(rho * rpm - BinWidthRpm / 2.0, rho * rpm + CoverageMarginRpm, missing);
             int seen = seenHi + seenLo, needed = neededHi + neededLo;
             if (seen < needed)
             {

@@ -399,6 +399,97 @@ namespace VISOR.Tests
             Assert.Equal(0, learner.GetRatio(6));
         }
 
+        // A "realistic" driver: no low-RPM pulls. Mostly corner exits that start in gears 2-5 just
+        // below where the engine lands after an upshift, then wind it out to the shift point;
+        // an occasional standing start in 1st. Top gear lifts at the shift point too (no free
+        // data from long straights), and the rev limiter is on.
+        private static ShiftPointLearner TrainRealistic(int runs, double shiftRpm, Func<double, double>? torque = null,
+            int seed = 31, double exitSpreadRpm = 300)
+        {
+            var learner = new ShiftPointLearner();
+            var sim = new CarSimulator(seed, torque: torque, revLimiter: true);
+            var rng = new Random(seed);
+            for (int i = 0; i < runs; i++)
+            {
+                int startGear = i % 10 == 0 ? 1 : 2 + rng.Next(4);
+                double startRpm = startGear == 1 ? 0
+                    : shiftRpm * CarSimulator.K(startGear) / CarSimulator.K(startGear - 1) - rng.NextDouble() * exitSpreadRpm;
+                foreach (var s in sim.Run(_ => shiftRpm, startGear: startGear, startRpm: startRpm))
+                    learner.AddSample(s);
+            }
+            return learner;
+        }
+
+        [Fact]
+        public void RealisticDriving_LearnsAllGears_WithoutLowRpmPulls()
+        {
+            var results = TrainRealistic(runs: 60, shiftRpm: 7400).Solve(CarSimulator.RedLine, CarSimulator.GearRatios.Length);
+            foreach (var r in results)
+            {
+                int expected = CarSimulator.OptimalShift(r.Gear);
+                _out.WriteLine($"realistic gear {r.Gear}: {r.Rpm} ({r.Reason}, confident={r.Confident}, missing [{r.MissingBands}]), true {expected}");
+                Assert.True(r.Confident, $"gear {r.Gear}: {r.Reason} (missing {r.MissingBands})");
+                Assert.InRange(r.Rpm, expected - ToleranceRpm, expected + ToleranceRpm);
+            }
+        }
+
+        [Fact]
+        public void RealisticDriving_PeakyEngine_NeverConfidentlyWrong_WhenLandingRpmUnseen()
+        {
+            // The driver winds it out to 7400 (a late light); the true best shifts are ~6750-6950,
+            // which land lower in the next gear than this driver ever runs it. For those gears the
+            // learner can't know the next gear's pull, so it must hold off (cue stays on the car's
+            // light) rather than guess. Gears whose landing RPM is seen are learned.
+            var results = TrainRealistic(runs: 60, shiftRpm: 7400, torque: CarSimulator.PeakyTorque)
+                .Solve(CarSimulator.RedLine, CarSimulator.GearRatios.Length);
+            foreach (var r in results)
+            {
+                int expected = CarSimulator.OptimalShift(r.Gear, CarSimulator.PeakyTorque);
+                _out.WriteLine($"realistic peaky gear {r.Gear}: {r.Rpm} ({r.Reason}, confident={r.Confident}, missing [{r.MissingBands}]), true {expected}");
+                if (r.Confident)
+                    Assert.InRange(r.Rpm, expected - ToleranceRpm, expected + ToleranceRpm);
+                else
+                    Assert.NotEqual("", r.MissingBands);
+            }
+            Assert.True(results.Count(r => r.Confident) >= 3, "upper gears should learn from corner exits alone");
+        }
+
+        [Fact]
+        public void RealisticDriving_FindsEarlyShifts_ForPeakyEngine_WithVariedCornerExits()
+        {
+            // Same driver, but corner exits vary as they do on a real track (a hairpin drops
+            // 2nd gear lower than a fast sweeper): still no low-RPM pulls, and every gear learns.
+            var results = TrainRealistic(runs: 60, shiftRpm: 7400, torque: CarSimulator.PeakyTorque, exitSpreadRpm: 1000)
+                .Solve(CarSimulator.RedLine, CarSimulator.GearRatios.Length);
+            foreach (var r in results)
+            {
+                int expected = CarSimulator.OptimalShift(r.Gear, CarSimulator.PeakyTorque);
+                _out.WriteLine($"varied peaky gear {r.Gear}: {r.Rpm} ({r.Reason}, confident={r.Confident}, missing [{r.MissingBands}]), true {expected}");
+                Assert.True(r.Confident, $"gear {r.Gear}: {r.Reason} (missing {r.MissingBands})");
+                Assert.InRange(r.Rpm, expected - ToleranceRpm, expected + ToleranceRpm);
+            }
+        }
+
+        [Fact]
+        public void TorqueDip_DoesNotTriggerEarlyShift()
+        {
+            // Sanity: the dip really does create an early crossing that a first-crossing search
+            // would stop at, for at least one gear.
+            int g = 5;
+            Assert.True(CarSimulator.FirstCrossing(g, CarSimulator.DipTorque) < 5500,
+                "test curve should have an early (false) crossing");
+
+            var results = Train(runs: 25, shiftAt: _ => CarSimulator.RedLine, torque: CarSimulator.DipTorque)
+                .Solve(CarSimulator.RedLine, CarSimulator.GearRatios.Length);
+            foreach (var r in results)
+            {
+                int expected = CarSimulator.OptimalShift(r.Gear, CarSimulator.DipTorque);
+                _out.WriteLine($"dip gear {r.Gear}: {r.Rpm} ({r.Reason}), true {expected}, first crossing {CarSimulator.FirstCrossing(r.Gear, CarSimulator.DipTorque)}");
+                Assert.True(r.Confident, r.Reason);
+                Assert.InRange(r.Rpm, expected - ToleranceRpm, expected + ToleranceRpm);
+            }
+        }
+
         [Fact]
         public void NoUpshiftForTopGear()
         {

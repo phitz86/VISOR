@@ -40,6 +40,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Gear ratios remembered per car** — saved with the learned model and reused for gears you
   haven't driven yet this session, but only once a gear you have driven confirms the gearing is
   unchanged (within 1%). Rarely used top gears no longer hold up learning of the gear below.
+- **Learns from normal driving** — no full-range pulls needed. VISOR now finds the shift point
+  by working down from the redline to the last RPM where the current gear still pulls harder, so
+  a torque dip low in the rev range can't cause an early shift. It only needs to have seen the
+  next gear from where an upshift lands, which corner exits provide. It also starts using data
+  0.25 s after a shift instead of 0.5 s. If you never run a gear as low as the best shift would
+  land you, that gear keeps the car's own light rather than guessing.
 - **Quieter learning log** — the progress line drops from once a minute to once every 10 minutes
   after every gear has settled.
 - **Shift-point learning progress in the log** — VISOR logs the car as soon as it's detected,

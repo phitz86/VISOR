@@ -68,10 +68,33 @@ namespace VISOR.Tests
 
         public static int OptimalShift(int gear, Func<double, double> torque)
         {
+            // The last RPM where this gear still pulls harder: after it, the next gear is stronger
+            // all the way to the redline.
+            double kg = K(gear), kn = K(gear + 1), rho = kn / kg;
+            if (kg * torque(RedLine) > kn * torque(rho * RedLine)) return (int)RedLine;
+            for (double r = RedLine; r >= RedLine / 2; r -= 1)
+                if (kg * torque(r) > kn * torque(rho * r)) return (int)Math.Round(r);
+            return (int)(RedLine / 2);
+        }
+
+        /// <summary>The FIRST RPM (from half redline up) where the next gear pulls harder.</summary>
+        public static int FirstCrossing(int gear, Func<double, double> torque)
+        {
             double kg = K(gear), kn = K(gear + 1), rho = kn / kg;
             for (double r = RedLine / 2; r <= RedLine; r += 1)
                 if (kg * torque(r) <= kn * torque(rho * r)) return (int)Math.Round(r);
             return (int)RedLine;
+        }
+
+        /// <summary>
+        /// The standard curve with a deep, narrow torque dip around 5000 RPM that recovers above
+        /// it (e.g. a resonance or cam-transition hole). The next gear briefly out-pulls this one
+        /// inside the dip, but the true best upshift is still up near the top.
+        /// </summary>
+        public static double DipTorque(double rpm)
+        {
+            double dip = 0.30 * Math.Exp(-Math.Pow((rpm - 5000) / 250, 2));
+            return Torque(rpm) * (1 - dip);
         }
 
         private double Gaussian()
@@ -91,12 +114,12 @@ namespace VISOR.Tests
         /// learner, to show what it would learn without the gate.
         /// </summary>
         public IEnumerable<ShiftSample> Run(Func<int, double> shiftAt, bool wheelspinInFirst = false,
-            bool cornerExits = false, bool reportLateralG = true)
+            bool cornerExits = false, bool reportLateralG = true, int startGear = 1, double startRpm = 0)
         {
             const double CornerExitMaxRpm = 5500;
             bool cornering = cornerExits && _rng.NextDouble() < 0.5;
-            double v = 10;
-            int gear = 1;
+            int gear = startGear;
+            double v = startRpm > 0 ? startRpm / K(startGear) : 10;
             double target = shiftAt(gear);  // the driver picks one shift point per gear
 
             while (true)
