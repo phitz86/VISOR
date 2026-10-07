@@ -20,6 +20,10 @@ namespace VISOR.Telemetry
         private const long MaxFileBytes = 2 * 1024 * 1024;
         private const double MaxAbsValue = 1e15;
 
+        // Plausible overall gear ratio, in RPM per m/s of road speed (0 = not known).
+        private const double MinRatio = 20;
+        private const double MaxRatio = 2000;
+
         private static readonly Regex UnsafeChars = new("[^A-Za-z0-9_-]", RegexOptions.Compiled);
         private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = false };
 
@@ -98,7 +102,18 @@ namespace VISOR.Telemetry
                 foreach (var w in dto.BinWeights)
                     if (w < 0) { reason = "negative bin weight"; return null; }
 
-                return new ShiftModelState(dto.AtaUpper, dto.Atb, dto.BinWeights, dto.SampleCount);
+                if (dto.GearRatios != null)
+                {
+                    if (dto.GearRatios.Length > ShiftPointLearner.MaxGears + 1) { reason = "malformed gear ratios"; return null; }
+                    foreach (var r in dto.GearRatios)
+                        if (!double.IsFinite(r) || (r != 0 && (r < MinRatio || r > MaxRatio)))
+                        {
+                            reason = "malformed gear ratios";
+                            return null;
+                        }
+                }
+
+                return new ShiftModelState(dto.AtaUpper, dto.Atb, dto.BinWeights, dto.SampleCount, dto.GearRatios);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or NotSupportedException)
             {
@@ -130,7 +145,8 @@ namespace VISOR.Telemetry
                     SampleCount = state.SampleCount,
                     AtaUpper = state.AtaUpper,
                     Atb = state.Atb,
-                    BinWeights = state.BinWeights
+                    BinWeights = state.BinWeights,
+                    GearRatios = state.GearRatios
                 };
                 string tmp = path + ".tmp";
                 File.WriteAllBytes(tmp, JsonSerializer.SerializeToUtf8Bytes(dto, JsonOptions));
@@ -163,6 +179,7 @@ namespace VISOR.Telemetry
             public double[]? AtaUpper { get; set; }
             public double[]? Atb { get; set; }
             public double[]? BinWeights { get; set; }
+            public double[]? GearRatios { get; set; }   // optional; absent in older files
         }
     }
 }

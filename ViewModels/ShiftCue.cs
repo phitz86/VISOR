@@ -113,3 +113,54 @@ namespace VISOR.ViewModels
         }
     }
 }
+
+namespace VISOR.ViewModels
+{
+    /// <summary>
+    /// Tracks whether one gear's shift cue has stopped moving, for the calibration dot.
+    ///
+    /// The dot answers "is this gear's shift point still moving?", not "has the learner passed
+    /// its full confidence check?". A gear can settle while the learner keeps refining it in the
+    /// background (e.g. 1st gear stepping up on a track with little hard acceleration low in
+    /// 2nd): what matters to the driver is that the cue has stopped changing.
+    ///
+    /// Settled once the cue has stayed within <see cref="StableBandRpm"/> of where it settled
+    /// for <see cref="SettleSeconds"/> of actual driving. A cue that's just the car's own light
+    /// (nothing learned yet) never counts as settled, so "nothing is happening" can't show green.
+    /// </summary>
+    public sealed class CueStability
+    {
+        public const int StableBandRpm = 100;
+        public const double SettleSeconds = 180;
+
+        private int _anchor;
+        private double _stableFor;
+
+        public bool Settled => _anchor > 0 && _stableFor >= SettleSeconds;
+
+        /// <param name="cueRpm">The cue currently in effect for this gear.</param>
+        /// <param name="fromLearning">True if the cue comes from learning (learned or stepping up), false if it's the car's light.</param>
+        /// <param name="drivingSeconds">Time spent actually driving (on track, eligible) since the last call.</param>
+        public void Observe(int cueRpm, bool fromLearning, double drivingSeconds)
+        {
+            if (!fromLearning || cueRpm <= 0)
+            {
+                Reset();
+                return;
+            }
+            if (_anchor == 0 || Math.Abs(cueRpm - _anchor) > StableBandRpm)
+            {
+                _anchor = cueRpm;      // moved: start timing again from here
+                _stableFor = 0;
+                return;
+            }
+            _stableFor += Math.Max(drivingSeconds, 0);
+        }
+
+        public void Reset()
+        {
+            _anchor = 0;
+            _stableFor = 0;
+        }
+    }
+}

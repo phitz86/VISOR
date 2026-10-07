@@ -33,9 +33,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pulls harder than the next at the highest RPM seen, the cue now moves later in 250-RPM steps,
   each confirmed by driving up to it, until the real best shift point is learned. It never moves
   the cue earlier than the car's light on that evidence alone.
-- **Calibration dot** — a small dot at the gear symbol's lower left shows whether the current gear's shift
-  point has settled: red while calibrating, green once learned, hidden in neutral, reverse and
-  top gear.
+- **Calibration dot** — a small dot at the gear symbol's lower left shows whether the current
+  gear's shift point has stopped moving: red while it's still being worked out, green once it has
+  held steady (within 100 RPM) for three minutes of driving, hidden in neutral, reverse and top
+  gear.
+- **Gear ratios remembered per car** — saved with the learned model and reused for gears you
+  haven't driven yet this session, but only once a gear you have driven confirms the gearing is
+  unchanged (within 1%). Rarely used top gears no longer hold up learning of the gear below.
+- **Quieter learning log** — the progress line drops from once a minute to once every 10 minutes
+  after every gear has settled.
 - **Shift-point learning progress in the log** — VISOR logs the car as soon as it's detected,
   then once a minute while driving: how many frames were used or skipped (and why: cornering,
   part throttle, wheelspin…) and what each gear is still waiting on (e.g. "6/10 RPM bands seen

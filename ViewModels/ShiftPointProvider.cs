@@ -57,6 +57,20 @@ namespace VISOR.ViewModels
         private TimeSpan _lastFit;
         private TimeSpan _lastSave;
         private TimeSpan _lastProgress;
+        private static readonly TimeSpan SettledProgressInterval = TimeSpan.FromMinutes(10);
+
+        // Calibration dot: per-gear cue stability (UI thread only: Update and GetCalibration).
+        private readonly CueStability[] _stability = NewStability();
+        private double _drivingSecondsSinceCheck;
+        private TimeSpan _lastStabilityCheck;
+        private static readonly TimeSpan StabilityCheckInterval = TimeSpan.FromSeconds(5);
+
+        private static CueStability[] NewStability()
+        {
+            var a = new CueStability[ShiftPointLearner.MaxGears + 1];
+            for (int i = 0; i < a.Length; i++) a[i] = new CueStability();
+            return a;
+        }
         private static readonly TimeSpan ProgressInterval = TimeSpan.FromSeconds(60);
         private GearShiftEstimate[] _lastEstimates = Array.Empty<GearShiftEstimate>();
         private long _lastFitSampleCount = -1;
@@ -95,18 +109,7 @@ namespace VISOR.ViewModels
             if (car == null || gear < 1) return 0;
             if (car.GearNumForward > 0 && gear >= car.GearNumForward) return 0;
 
-            int baseline = snapshot.PlayerCarSLShiftRPM > 0f ? (int)snapshot.PlayerCarSLShiftRPM
-                         : car.SLShiftRPM > 0f ? (int)car.SLShiftRPM : 0;
-
-            // Learned value first. Otherwise a provisional step, but only to move the cue later
-            // than the car's light (earlier shifts need a confident learned crossover).
-            // Otherwise the light.
-            int rpm;
-            var learned = _learnedRpm;
-            var provisional = _provisionalRpm;
-            if (gear < learned.Length && learned[gear] > 0) rpm = learned[gear];
-            else if (gear < provisional.Length && provisional[gear] > baseline) rpm = provisional[gear];
-            else rpm = baseline;
+            int rpm = CueFor(gear, Baseline(snapshot, car), out _);
 
             // Keep the shift point a little under the redline. When a gear is best held to the
             // redline, this lets the flash show (and leaves time to react) before the solid-red
@@ -116,17 +119,57 @@ namespace VISOR.ViewModels
             return rpm;
         }
 
+        private static int Baseline(SVappsLABSnapshot snapshot, PlayerCarInfo car) =>
+            snapshot.PlayerCarSLShiftRPM > 0f ? (int)snapshot.PlayerCarSLShiftRPM
+            : car.SLShiftRPM > 0f ? (int)car.SLShiftRPM : 0;
+
+        // The cue for a gear before the redline cap: learned value first; otherwise a provisional
+        // step, but only to move the cue later than the car's light (earlier shifts need a
+        // confident learned crossover); otherwise the light.
+        private int CueFor(int gear, int baseline, out bool fromLearning)
+        {
+            var learned = _learnedRpm;
+            var provisional = _provisionalRpm;
+            fromLearning = true;
+            if (gear < learned.Length && learned[gear] > 0) return learned[gear];
+            if (gear < provisional.Length && provisional[gear] > baseline) return provisional[gear];
+            fromLearning = false;
+            return baseline;
+        }
+
         /// <summary>
         /// Calibration status of the shift point for <paramref name="gear"/>, for the HUD dot:
-        /// Settled once learned; Calibrating while on the car's light or stepping up; None when no
-        /// shift point applies (neutral, reverse, top gear, no car).
+        /// Settled once that gear's cue has stopped moving (see <see cref="CueStability"/>);
+        /// Calibrating otherwise; None when no shift point applies (neutral, reverse, top gear, no
+        /// car). UI thread.
         /// </summary>
         public ShiftCalibration GetCalibration(int gear, PlayerCarInfo? car)
         {
-            if (car == null || gear < 1) return ShiftCalibration.None;
+            if (car == null || gear < 1 || gear >= _stability.Length) return ShiftCalibration.None;
             if (car.GearNumForward > 0 && gear >= car.GearNumForward) return ShiftCalibration.None;
-            var learned = _learnedRpm;
-            return gear < learned.Length && learned[gear] > 0 ? ShiftCalibration.Settled : ShiftCalibration.Calibrating;
+            return _stability[gear].Settled ? ShiftCalibration.Settled : ShiftCalibration.Calibrating;
+        }
+
+        private bool AllGearsSettled(PlayerCarInfo car)
+        {
+            int top = Math.Min(car.GearNumForward, _stability.Length);
+            if (top < 2) return false;
+            for (int g = 1; g < top; g++)
+                if (!_stability[g].Settled) return false;
+            return true;
+        }
+
+        // UI thread, every few seconds: feed each gear's current cue to its stability tracker.
+        private void CheckStability(SVappsLABSnapshot snapshot, PlayerCarInfo car)
+        {
+            int baseline = Baseline(snapshot, car);
+            int top = car.GearNumForward > 0 ? Math.Min(car.GearNumForward, _stability.Length) : _stability.Length;
+            for (int g = 1; g < top; g++)
+            {
+                int cue = CueFor(g, baseline, out bool fromLearning);
+                _stability[g].Observe(cue, fromLearning, _drivingSecondsSinceCheck);
+            }
+            _drivingSecondsSinceCheck = 0;
         }
 
         /// <summary>
@@ -181,13 +224,22 @@ namespace VISOR.ViewModels
 #endif
             }
 
+            // Only time spent actually driving counts toward a cue settling (not the pits/garage).
+            if (sample.Eligible) _drivingSecondsSinceCheck += 1.0 / 60.0;
+
             var now = _clock.Elapsed;
+            if (now - _lastStabilityCheck >= StabilityCheckInterval)
+            {
+                _lastStabilityCheck = now;
+                CheckStability(s, car);
+            }
             if (now - _lastFit >= FitInterval)
             {
                 _lastFit = now;
                 ScheduleFit();
             }
-            if (now - _lastProgress >= ProgressInterval)
+            // Progress log: every minute while anything is still calibrating, every 10 once settled.
+            if (now - _lastProgress >= (AllGearsSettled(car) ? SettledProgressInterval : ProgressInterval))
             {
                 _lastProgress = now;
                 LogProgress();
@@ -227,6 +279,8 @@ namespace VISOR.ViewModels
                 _lastFitSampleCount = -1;
                 _learnedRpm = new int[ShiftPointLearner.MaxGears + 1];
                 _provisionalRpm = new int[ShiftPointLearner.MaxGears + 1];
+                foreach (var st in _stability) st.Reset();
+                _drivingSecondsSinceCheck = 0;
                 for (int i = 0; i < _recentProvisional.Length; i++) _recentProvisional[i] = Array.Empty<int>();
                 _lastEstimates = Array.Empty<GearShiftEstimate>();
                 for (int i = 0; i < _recentFits.Length; i++) _recentFits[i] = Array.Empty<int>();

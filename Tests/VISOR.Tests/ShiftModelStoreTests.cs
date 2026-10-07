@@ -56,6 +56,33 @@ namespace VISOR.Tests
         }
 
         [Fact]
+        public void RoundTrip_KeepsGearRatios_AndOldFilesWithoutThemStillLoad()
+        {
+            var state = TrainedLearner().ExportState();
+            Assert.NotNull(state.GearRatios);
+            Assert.True(state.GearRatios![6] > 0);
+            _store.Save(Car, Version, state, out _);
+            var loaded = _store.Load(Car, Version, out _);
+            Assert.Equal(state.GearRatios, loaded!.GearRatios);
+
+            _store.Save(Car, Version, state with { GearRatios = null }, out _);
+            Assert.NotNull(_store.Load(Car, Version, out var reason));
+        }
+
+        [Theory]
+        [InlineData(5000.0)]    // implausible ratio
+        [InlineData(-3.0)]
+        public void Load_RejectsMalformedGearRatios(double bad)
+        {
+            var state = TrainedLearner().ExportState();
+            var ratios = (double[])state.GearRatios!.Clone();
+            ratios[2] = bad;
+            _store.Save(Car, Version, state with { GearRatios = ratios }, out _);
+            Assert.Null(_store.Load(Car, Version, out var reason));
+            Assert.Equal("malformed gear ratios", reason);
+        }
+
+        [Fact]
         public void Load_ReturnsNull_WhenNothingSaved()
         {
             Assert.Null(_store.Load(Car, Version, out var reason));

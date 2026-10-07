@@ -363,6 +363,42 @@ namespace VISOR.Tests
             }
         }
 
+        // A learner restored from a saved model, then driven only in 3rd gear this session at the
+        // given ratio scale (1.0 = same gearing as when saved).
+        private static ShiftPointLearner RestoredThenDriveThird(double ratioScale)
+        {
+            var saved = Train(runs: 3, shiftAt: _ => CarSimulator.RedLine).ExportState();
+            var learner = new ShiftPointLearner();
+            learner.ImportState(saved);
+            double k = CarSimulator.K(3) * ratioScale;
+            double t = 50_000;
+            for (int i = 0; i < 200; i++, t += CarSimulator.Dt)
+                learner.AddSample(new ShiftSample(t, 3, (float)(k * 40), 40, 2f, 0f, 1, 0, 1, true));
+            return learner;
+        }
+
+        [Fact]
+        public void SavedRatio_UsedForUndrivenGear_WhenGearingMatches()
+        {
+            var learner = RestoredThenDriveThird(1.0);
+            Assert.InRange(learner.GetRatio(6), CarSimulator.K(6) * 0.99, CarSimulator.K(6) * 1.01);
+        }
+
+        [Fact]
+        public void SavedRatio_Rejected_WhenGearingChanged()
+        {
+            var learner = RestoredThenDriveThird(1.05);   // new setup: 5% shorter 3rd
+            Assert.Equal(0, learner.GetRatio(6));
+        }
+
+        [Fact]
+        public void SavedRatio_NotUsed_BeforeAnyGearIsMeasured()
+        {
+            var learner = new ShiftPointLearner();
+            learner.ImportState(Train(runs: 3, shiftAt: _ => CarSimulator.RedLine).ExportState());
+            Assert.Equal(0, learner.GetRatio(6));
+        }
+
         [Fact]
         public void NoUpshiftForTopGear()
         {

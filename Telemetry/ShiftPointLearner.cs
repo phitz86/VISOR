@@ -142,8 +142,38 @@ namespace VISOR.Telemetry
         public bool TakeDirty() { bool d = _dirtySamples > 0; _dirtySamples = 0; return d; }
 
         /// <summary>The gear's measured overall ratio this session (RPM per m/s), or 0 if not yet known.</summary>
-        public double GetRatio(int gear) =>
-            gear >= 1 && gear <= MaxGears && _ratios[gear].Count >= MinRatioSamples ? _ratios[gear].Median : 0;
+        public double GetRatio(int gear)
+        {
+            if (gear < 1 || gear > MaxGears) return 0;
+            double live = MeasuredRatio(gear);
+            if (live > 0) return live;
+            // Not driven enough in this gear yet this session: use the ratio saved last time,
+            // but only once the gears measured so far prove the gearing hasn't changed.
+            return _savedRatios[gear] > 0 && SavedRatiosStillValid() ? _savedRatios[gear] : 0;
+        }
+
+        private double MeasuredRatio(int gear) =>
+            _ratios[gear].Count >= MinRatioSamples ? _ratios[gear].Median : 0;
+
+        // Saved ratios (from the persisted model) are trusted only when at least one gear measured
+        // this session has a saved ratio, and every such gear matches it within 1%: evidence the
+        // setup's gearing is the same as last time. A setup with different gearing fails this,
+        // and every ratio is re-measured live.
+        public const double SavedRatioTolerance = 0.01;
+        private readonly double[] _savedRatios = new double[MaxGears + 1];
+
+        private bool SavedRatiosStillValid()
+        {
+            bool anyMatch = false;
+            for (int g = 1; g <= MaxGears; g++)
+            {
+                double live = MeasuredRatio(g), saved = _savedRatios[g];
+                if (live <= 0 || saved <= 0) continue;
+                if (Math.Abs(live - saved) > saved * SavedRatioTolerance) return false;
+                anyMatch = true;
+            }
+            return anyMatch;
+        }
 
         public double GetBinWeight(int bin) => bin >= 0 && bin < BinCount ? _binWeight[bin] : 0;
 
@@ -503,7 +533,16 @@ namespace VISOR.Telemetry
             for (int i = 0; i < n; i++)
                 for (int j = i; j < n; j++)
                     upper[p++] = _ata[i * n + j];
-            return new ShiftModelState(upper, (double[])_atb.Clone(), (double[])_binWeight.Clone(), _sampleCount);
+            // Ratios to remember: measured this session where available; otherwise keep the saved
+            // value, but only if this session's gearing matched it (else it may be stale).
+            bool savedValid = SavedRatiosStillValid();
+            var ratios = new double[MaxGears + 1];
+            for (int g = 1; g <= MaxGears; g++)
+            {
+                double live = MeasuredRatio(g);
+                ratios[g] = live > 0 ? live : savedValid ? _savedRatios[g] : 0;
+            }
+            return new ShiftModelState(upper, (double[])_atb.Clone(), (double[])_binWeight.Clone(), _sampleCount, ratios);
         }
 
         /// <summary>Replaces the torque statistics with previously persisted ones. Caller validates shape.</summary>
@@ -522,6 +561,11 @@ namespace VISOR.Telemetry
             Array.Copy(state.BinWeights, _binWeight, BinCount);
             _sampleCount = state.SampleCount;
             _dirtySamples = 0;
+
+            Array.Clear(_savedRatios);
+            if (state.GearRatios != null)
+                for (int g = 1; g < state.GearRatios.Length && g <= MaxGears; g++)
+                    _savedRatios[g] = state.GearRatios[g];
         }
 
         #endregion
@@ -569,5 +613,10 @@ namespace VISOR.Telemetry
     }
 
     /// <summary>The persisted torque statistics of a <see cref="ShiftPointLearner"/>.</summary>
-    public sealed record ShiftModelState(double[] AtaUpper, double[] Atb, double[] BinWeights, long SampleCount);
+    /// <remarks>
+    /// <see cref="GearRatios"/> (index = gear, 0 = unknown) are optional: older saved models don't
+    /// have them. They're only ever used as a fallback; see <see cref="ShiftPointLearner.GetRatio"/>.
+    /// </remarks>
+    public sealed record ShiftModelState(double[] AtaUpper, double[] Atb, double[] BinWeights, long SampleCount,
+        double[]? GearRatios = null);
 }
