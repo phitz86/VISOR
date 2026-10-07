@@ -36,7 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Calibration dot** — a small dot at the gear symbol's lower left shows whether the current
   gear's shift point has stopped moving: red while it's still being worked out, green once it has
   held steady (within 100 RPM) for three minutes of driving, hidden in neutral, reverse and top
-  gear.
+  gear, and in any gear whose next gear up you haven't driven (e.g. 5th at a track where you
+  never use 6th), since there's nothing to calibrate it against.
 - **Gear ratios remembered per car** — saved with the learned model and reused for gears you
   haven't driven yet this session, but only once a gear you have driven confirms the gearing is
   unchanged (within 1%). Rarely used top gears no longer hold up learning of the gear below.

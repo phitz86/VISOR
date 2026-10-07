@@ -61,6 +61,10 @@ namespace VISOR.ViewModels
 
         // Calibration dot: per-gear cue stability (UI thread only: Update and GetCalibration).
         private readonly CueStability[] _stability = NewStability();
+        // True for a gear whose next gear hasn't been driven (no ratio, live or saved): it's
+        // effectively this driver's top gear here, so there's nothing to calibrate against.
+        private readonly bool[] _nextGearUnused = NewFlags();
+        private static bool[] NewFlags() { var a = new bool[ShiftPointLearner.MaxGears + 1]; Array.Fill(a, true); return a; }
         private double _drivingSecondsSinceCheck;
         private TimeSpan _lastStabilityCheck;
         private static readonly TimeSpan StabilityCheckInterval = TimeSpan.FromSeconds(5);
@@ -147,6 +151,7 @@ namespace VISOR.ViewModels
         {
             if (car == null || gear < 1 || gear >= _stability.Length) return ShiftCalibration.None;
             if (car.GearNumForward > 0 && gear >= car.GearNumForward) return ShiftCalibration.None;
+            if (_nextGearUnused[gear]) return ShiftCalibration.None;
             return _stability[gear].Settled ? ShiftCalibration.Settled : ShiftCalibration.Calibrating;
         }
 
@@ -154,9 +159,14 @@ namespace VISOR.ViewModels
         {
             int top = Math.Min(car.GearNumForward, _stability.Length);
             if (top < 2) return false;
+            bool any = false;
             for (int g = 1; g < top; g++)
+            {
+                if (_nextGearUnused[g]) continue;    // e.g. 5th when 6th is never used here
                 if (!_stability[g].Settled) return false;
-            return true;
+                any = true;
+            }
+            return any;
         }
 
         // UI thread, every few seconds: feed each gear's current cue to its stability tracker.
@@ -164,6 +174,11 @@ namespace VISOR.ViewModels
         {
             int baseline = Baseline(snapshot, car);
             int top = car.GearNumForward > 0 ? Math.Min(car.GearNumForward, _stability.Length) : _stability.Length;
+            lock (_lock)
+            {
+                for (int g = 1; g < _nextGearUnused.Length; g++)
+                    _nextGearUnused[g] = _learner == null || g + 1 > ShiftPointLearner.MaxGears || _learner.GetRatio(g + 1) <= 0;
+            }
             for (int g = 1; g < top; g++)
             {
                 int cue = CueFor(g, baseline, out bool fromLearning);
@@ -288,6 +303,7 @@ namespace VISOR.ViewModels
                 _learnedRpm = new int[ShiftPointLearner.MaxGears + 1];
                 _provisionalRpm = new int[ShiftPointLearner.MaxGears + 1];
                 foreach (var st in _stability) st.Reset();
+                Array.Fill(_nextGearUnused, true);
                 _drivingSecondsSinceCheck = 0;
                 for (int i = 0; i < _recentProvisional.Length; i++) _recentProvisional[i] = Array.Empty<int>();
                 _lastEstimates = Array.Empty<GearShiftEstimate>();

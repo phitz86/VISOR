@@ -305,7 +305,8 @@ namespace VISOR.Telemetry
         private GearShiftEstimate SolveGear(double[] theta, int g, float redLine)
         {
             double kg = GetRatio(g), kn = GetRatio(g + 1);
-            if (kg <= 0 || kn <= 0) return new GearShiftEstimate(g, 0, false, "gear ratio not measured yet");
+            if (kg <= 0) return new GearShiftEstimate(g, 0, false, "gear ratio not measured yet");
+            if (kn <= 0) return new GearShiftEstimate(g, 0, false, $"gear {g + 1} not driven yet");
 
             double rho = kn / kg;   // RPM drop factor on the upshift
             if (rho < 0.4 || rho > 0.98) return new GearShiftEstimate(g, 0, false, $"implausible ratio step {rho:F2}");
