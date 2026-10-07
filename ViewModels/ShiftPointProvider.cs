@@ -259,7 +259,15 @@ namespace VISOR.ViewModels
             string key = car.CarPath + "|" + car.CarVersion;
             if (key == _carKey)
             {
-                _car = car;     // refresh redline / shift-light values from the latest parse
+                // Same car, new session-info parse: refresh redline / shift-light values. iRacing
+                // can change these mid-session (e.g. LMP2 redline 8500 at detection, 8000 later),
+                // so log it to keep the log's numbers consistent.
+                if (_car != null)
+                {
+                    string changes = DescribeCarChanges(_car, car);
+                    if (changes.Length > 0) Log.Info($"[ShiftPoint] {Describe(car)}: car data updated - {changes}");
+                }
+                _car = car;
                 return;
             }
 
@@ -579,6 +587,19 @@ namespace VISOR.ViewModels
                 line = sb.ToString();
             }
             Log.Info(line);
+        }
+
+        private static string DescribeCarChanges(PlayerCarInfo a, PlayerCarInfo b)
+        {
+            var parts = new System.Collections.Generic.List<string>();
+            void Cmp(string name, float x, float y) { if (x != y) parts.Add($"{name} {x:F0} -> {y:F0}"); }
+            Cmp("redline", a.RedLine, b.RedLine);
+            Cmp("light first", a.SLFirstRPM, b.SLFirstRPM);
+            Cmp("light shift", a.SLShiftRPM, b.SLShiftRPM);
+            Cmp("light last", a.SLLastRPM, b.SLLastRPM);
+            Cmp("light blink", a.SLBlinkRPM, b.SLBlinkRPM);
+            Cmp("gears", a.GearNumForward, b.GearNumForward);
+            return string.Join(", ", parts);
         }
 
         private static string Describe(PlayerCarInfo car) =>
