@@ -338,6 +338,7 @@ namespace VISOR
             try
             {
                 Log.Info("Application exit initiated");
+                _mainWindow?.ViewModel.FlushShiftPoints();
                 _sdkWrapper?.Shutdown();
 
                 // Tear down the single-instance guard (primary instance only): wake

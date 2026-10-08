@@ -51,6 +51,54 @@ namespace VISOR.Telemetry
         // updates through the session under dynamic weather; the older TrackTemp var is static.
         public float TrackTempCrew => Data.TrackTempCrew ?? 0f;
 
+        // --- Shift indicator / shift-point learner inputs ---
+        // Live shift-light RPMs for the player's car. iRacing can vary these per gear on some
+        // cars, unlike the single DriverCarSL*RPM values in the session YAML. 0 = not reported.
+        public float PlayerCarSLFirstRPM => Data.PlayerCarSLFirstRPM ?? 0f;
+        public float PlayerCarSLShiftRPM => Data.PlayerCarSLShiftRPM ?? 0f;
+
+        // Pedals, 0..1. Clutch is 1 = fully engaged (pedal up), 0 = disengaged.
+        public float Throttle => Data.Throttle ?? 0f;
+        public float Brake => Data.Brake ?? 0f;
+        public float Clutch => Data.Clutch ?? 0f;
+
+        // Longitudinal acceleration in m/s^2, including gravity — i.e. what an accelerometer
+        // reads, so a slope shows up as the force the engine is fighting rather than as noise.
+        public float LongAccel => Data.LongAccel ?? 0f;
+
+        // Lateral acceleration in m/s^2. The shift-point learner skips samples taken while
+        // cornering hard, where tire side load eats into forward acceleration.
+        public float LatAccel => Data.LatAccel ?? 0f;
+
+        // EngineWarnings is a bitfield enum; normalize to its underlying int (same approach as
+        // SessionFlags) and test the two bits the shift indicator cares about.
+        public int EngineWarnings => Convert.ToInt32(Data.EngineWarnings);
+        public const int EngineWarningPitSpeedLimiter = 0x10;
+        public const int EngineWarningRevLimiterActive = 0x20;
+        public bool PitLimiterOn => (EngineWarnings & EngineWarningPitSpeedLimiter) != 0;
+        public bool RevLimiterActive => (EngineWarnings & EngineWarningRevLimiterActive) != 0;
+
+        public bool IsOnTrack => Data.IsOnTrack ?? false;
+        public bool IsReplayPlaying => Data.IsReplayPlaying ?? false;
+
+        // TrackWetness enum as int: 0 unknown, 1 dry, 2 mostly dry, 3+ increasingly wet.
+        public int TrackWetness => Convert.ToInt32(Data.TrackWetness);
+
+#if DEBUG
+        // --- DEBUG-only wet-grip research inputs (raw, nullable: null = not in the live feed) ---
+        public float? Precipitation => Data.Precipitation;
+        public bool? WeatherDeclaredWet => Data.WeatherDeclaredWet;
+        public int? PlayerTireCompound => Data.PlayerTireCompound;
+        public float? YawRate => Data.YawRate;
+        public float? SteeringWheelAngle => Data.SteeringWheelAngle;
+        public float? LFspeed => Data.LFspeed;
+        public float? RFspeed => Data.RFspeed;
+        public float? LRspeed => Data.LRspeed;
+        public float? RRspeed => Data.RRspeed;
+        public double? Lat => Data.Lat;
+        public double? Lon => Data.Lon;
+#endif
+
         public double SessionTime => Data.SessionTime ?? 0.0;
         public double SessionTimeRemain => Data.SessionTimeRemain ?? 0.0;
         public int SessionLapsRemain => Data.SessionLapsRemain ?? 0;

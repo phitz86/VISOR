@@ -1,0 +1,24 @@
+Symbola (subset: symbola-gear.ttf)
+==================================
+
+Font:      Symbola, Version 9.17 (2017), by George Douros
+Upstream:  http://users.teilar.gr/~g1951d/  ("Unicode Fonts for Ancient Scripts")
+Obtained:  Debian/Ubuntu package fonts-symbola 2.60-1.1
+           (file usr/share/fonts/truetype/ancient-scripts/Symbola_hint.ttf)
+
+License, as embedded in the font's own name table (license field):
+
+    Fonts in this site are free for any use.
+
+License, as recorded in the package's copyright file:
+
+    Fonts are free for any use; they may be opened, edited,
+    modified, regenerated, packaged and redistributed.
+
+Note: from March 2018 (versions after 10.23) the author changed Symbola's license
+to "free for personal, non-commercial use" only. VISOR deliberately bundles only
+this earlier 9.17 release, which was published under the terms above.
+
+Modification: subset with fontTools (pyftsubset) to the single glyph
+U+2699 GEAR, used for VISOR's Row 0 gear / shift indicator. Name table kept
+intact.

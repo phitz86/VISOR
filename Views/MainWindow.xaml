@@ -34,6 +34,51 @@
                 <Setter Property="FontWeight" Value="Normal"/>
             </Style>
 
+            <!-- Row 0 gear symbol, doubling as the shift indicator (MainViewModel.ShiftState).
+                 Symbola v9.17, subset to the single U+2699 glyph (see Resources/Fonts/Symbola-LICENSE.txt):
+                 Segoe UI has no gear, so Windows substituted Segoe UI Symbol's flower-like one. -->
+            <Style x:Key="GearSymbol" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="pack://application:,,,/Resources/Fonts/#Symbola"/>
+                <Setter Property="FontWeight" Value="Normal"/>
+                <Setter Property="Foreground" Value="LightGray"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding ShiftState}" Value="Approach">
+                        <Setter Property="Foreground" Value="#FFB000"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding ShiftState}" Value="Limiter">
+                        <Setter Property="Foreground" Value="#FF2020"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding ShiftState}" Value="ShiftNow">
+                        <Setter Property="Foreground" Value="#FF2020"/>
+                        <DataTrigger.EnterActions>
+                            <!-- White/red at 5 flashes per second: one 0.2 s cycle, white half first so
+                                 the change from amber is instant and the change to the solid-red limiter
+                                 is visible. WCAG's 3-per-second guidance is for large flashing areas; a
+                                 glyph this size is well inside its small-area exemption. -->
+                            <BeginStoryboard x:Name="ShiftFlash">
+                                <Storyboard RepeatBehavior="Forever" Duration="0:0:0.2">
+                                    <ObjectAnimationUsingKeyFrames Storyboard.TargetProperty="Foreground">
+                                        <DiscreteObjectKeyFrame KeyTime="0:0:0">
+                                            <DiscreteObjectKeyFrame.Value>
+                                                <SolidColorBrush Color="White"/>
+                                            </DiscreteObjectKeyFrame.Value>
+                                        </DiscreteObjectKeyFrame>
+                                        <DiscreteObjectKeyFrame KeyTime="0:0:0.1">
+                                            <DiscreteObjectKeyFrame.Value>
+                                                <SolidColorBrush Color="#FF2020"/>
+                                            </DiscreteObjectKeyFrame.Value>
+                                        </DiscreteObjectKeyFrame>
+                                    </ObjectAnimationUsingKeyFrames>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </DataTrigger.EnterActions>
+                        <DataTrigger.ExitActions>
+                            <StopStoryboard BeginStoryboardName="ShiftFlash"/>
+                        </DataTrigger.ExitActions>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
             <Style x:Key="DigitalIndicator" TargetType="TextBlock">
                 <Setter Property="FontFamily" Value="pack://application:,,,/Resources/Fonts/#Digital-7"/>
                 <Setter Property="FontWeight" Value="Normal"/>
@@ -74,7 +119,31 @@
                             Orientation="Horizontal"
                             Visibility="{Binding ShowGear, Converter={StaticResource BoolToVisibilityConverter}}"
                             HorizontalAlignment="Center">
-                    <TextBlock Text="⚙" FontSize="54" Foreground="LightGray" VerticalAlignment="Bottom" Margin="0,0,8,0" Style="{StaticResource NormalWeightSymbol}"/>
+                    <Grid VerticalAlignment="Bottom" Margin="0,0,8,0">
+                        <TextBlock Text="⚙" FontSize="68" Style="{StaticResource GearSymbol}"/>
+                        <!-- Calibration dot, at the gear symbol's lower left: red while this gear's shift
+                             point is still being learned (car's light or stepping up), green once settled,
+                             hidden when no shift point applies. Fixed size and position so the layout
+                             never moves. -->
+                        <Ellipse Width="8" Height="8" HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                                 Margin="-4,0,0,8">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Setter Property="Visibility" Value="Hidden"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ShiftCalibration}" Value="Calibrating">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                            <Setter Property="Fill" Value="#C84040"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding ShiftCalibration}" Value="Settled">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                            <Setter Property="Fill" Value="#3FBF5F"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
+                    </Grid>
                     <TextBlock Text="{Binding GearDisplay}" FontSize="80" VerticalAlignment="Bottom" Style="{StaticResource DigitalIndicator}"/>
                 </StackPanel>
 

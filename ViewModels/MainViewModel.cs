@@ -28,6 +28,7 @@ namespace VISOR.ViewModels
         private readonly ClassColorManager _classColorManager;
         private readonly SettingsManager _settingsManager;
         private readonly PositionCalculator _positionCalculator;
+        private readonly ShiftPointProvider _shiftPoints = new();
 
         private int _lastSessionNum = -1;
         private int _lastSessionState = -999;
@@ -38,6 +39,9 @@ namespace VISOR.ViewModels
 
         public string ClassPositionNumber { get; private set; } = "--";
         public string GearDisplay { get; private set; } = "N";
+        public ShiftState ShiftState { get; private set; } = ShiftState.Normal;
+        public ShiftCalibration ShiftCalibration { get; private set; } = ShiftCalibration.None;
+        private readonly ShiftCue _shiftCue = new();
         public string LastLapTime { get; private set; } = LapTimePlaceholder;
         public string BestLapTime { get; private set; } = LapTimePlaceholder;
 
@@ -152,6 +156,7 @@ namespace VISOR.ViewModels
             UpdateLapTimeDisplays(lastLap, snapshot.LapBestLapTime);
 
             UpdateGearDisplay(snapshot);
+            UpdateShiftIndicator(snapshot, sessionDataProvider);
         }
 
         #region --- Player Position Calculation ---
@@ -225,6 +230,53 @@ namespace VISOR.ViewModels
             }
         }
 
+        private void UpdateShiftIndicator(SVappsLABSnapshot snapshot, ISessionDataProvider? sessionDataProvider)
+        {
+            var car = sessionDataProvider != null && sessionDataProvider.IsDataReady ? sessionDataProvider.PlayerCar : null;
+
+            int playerIdx = snapshot.PlayerCarIdx;
+            var pitRoadArr = snapshot.CarIdxOnPitRoad;
+            bool onPitRoad = playerIdx >= 0 && playerIdx < pitRoadArr.Length && pitRoadArr[playerIdx];
+
+            // Learning runs whether or not the indicator is shown, so the shift points are ready
+            // if the driver turns it on later.
+            _shiftPoints.Update(snapshot, car, onPitRoad);
+
+            int gear = snapshot.Gear;
+            bool active = car != null && _settingsManager.Settings.ShowShiftIndicator
+                && snapshot.IsOnTrack && !onPitRoad && !snapshot.PitLimiterOn && gear >= 1;
+
+            int shiftRpm = 0, approachRpm = 0;
+            if (active)
+            {
+                shiftRpm = _shiftPoints.GetShiftRpm(gear, snapshot, car);
+                approachRpm = ShiftPointProvider.GetApproachRpm(shiftRpm, snapshot, car!);
+            }
+
+            var newState = _shiftCue.Update(snapshot.SessionTime, gear, snapshot.RPM, active,
+                snapshot.RevLimiterActive, car?.RedLine ?? 0f, shiftRpm, approachRpm);
+
+            if (newState != ShiftState)
+            {
+                ShiftState = newState;
+                OnPropertyChanged(nameof(ShiftState));
+            }
+
+            // Calibration dot: status of the current gear's shift point; hidden when the
+            // indicator is off or no shift point applies.
+            var newCalibration = _settingsManager.Settings.ShowShiftIndicator
+                ? _shiftPoints.GetCalibration(gear, car)
+                : ShiftCalibration.None;
+            if (newCalibration != ShiftCalibration)
+            {
+                ShiftCalibration = newCalibration;
+                OnPropertyChanged(nameof(ShiftCalibration));
+            }
+        }
+
+        /// <summary>Saves any unsaved shift-point learning. Called on disconnect and app exit.</summary>
+        public void FlushShiftPoints() => _shiftPoints.Flush();
+
         private static string GetStateName(int state) => state switch
         {
             0 => "Invalid",
@@ -261,6 +313,9 @@ namespace VISOR.ViewModels
             RelativeVM.Reset();
             CountdownVM.Reset();
             GearDisplay = "N";
+            ShiftState = ShiftState.Normal;
+            ShiftCalibration = ShiftCalibration.None;
+            _shiftCue.Reset();
             ClassPositionNumber = "--";
             _playerWasOnPitRoad = null;
 
@@ -329,6 +384,7 @@ namespace VISOR.ViewModels
 
         public void Reset()
         {
+            _shiftPoints.Flush();
             _lastSessionNum = -1;
             _lastSessionState = -999;
             _lastSubSessionId = string.Empty;

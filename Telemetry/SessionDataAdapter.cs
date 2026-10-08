@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using SVappsLAB.iRacingTelemetrySDK;
 
 namespace VISOR.Telemetry
@@ -20,6 +21,7 @@ namespace VISOR.Telemetry
 
             ApplyWeekend(info.WeekendInfo, staticData);
             ApplyDrivers(info.DriverInfo, staticData, transitionData);
+            ApplyPlayerCar(info.DriverInfo, staticData);
             ApplySchedule(info.SessionInfo, staticData);
             ApplyTransition(info.SessionInfo, staticData, transitionData);
             ApplyLive(info, transitionData.CurrentSessionNum, liveData);
@@ -61,6 +63,27 @@ namespace VISOR.Telemetry
                 };
                 transition.DriverIncidentCounts[d.CarIdx] = d.CurDriverIncidentCount;
             }
+        }
+
+        private static void ApplyPlayerCar(DriverInfo src, StaticEventData dst)
+        {
+            if (src?.Drivers == null) { dst.PlayerCar = null; return; }
+
+            var player = src.Drivers.FirstOrDefault(d => d.CarIdx == src.DriverCarIdx);
+            if (player == null) { dst.PlayerCar = null; return; }
+
+            // Convert.* keeps this resilient to the SDK's exact numeric types for these fields.
+            var ci = CultureInfo.InvariantCulture;
+            dst.PlayerCar = new PlayerCarInfo(
+                CarPath: System.Convert.ToString(player.CarPath, ci) ?? string.Empty,
+                CarScreenName: System.Convert.ToString(player.CarScreenName, ci) ?? string.Empty,
+                CarVersion: System.Convert.ToString(src.DriverCarVersion, ci) ?? string.Empty,
+                RedLine: System.Convert.ToSingle(src.DriverCarRedLine, ci),
+                SLFirstRPM: System.Convert.ToSingle(src.DriverCarSLFirstRPM, ci),
+                SLShiftRPM: System.Convert.ToSingle(src.DriverCarSLShiftRPM, ci),
+                GearNumForward: System.Convert.ToInt32(src.DriverCarGearNumForward, ci),
+                SLLastRPM: System.Convert.ToSingle(src.DriverCarSLLastRPM, ci),
+                SLBlinkRPM: System.Convert.ToSingle(src.DriverCarSLBlinkRPM, ci));
         }
 
         private static void ApplySchedule(SessionInfo src, StaticEventData dst)

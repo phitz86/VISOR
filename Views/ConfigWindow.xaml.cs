@@ -92,6 +92,7 @@ namespace VISOR.Views
             };
 
             Row0CheckBox.IsChecked = settings.ShowRow0;
+            ShiftIndicatorCheckBox.IsChecked = settings.ShowShiftIndicator;
             Row1CheckBox.IsChecked = settings.ShowRow1;
             Row2CheckBox.IsChecked = settings.ShowRow2;
             Row3CheckBox.IsChecked = settings.ShowRow3;
@@ -260,6 +261,18 @@ namespace VISOR.Views
             settings.SaveSettings();
 
             Log.Info($"Temperature unit changed to {settings.TemperatureUnit}");
+        }
+
+        private void ShiftIndicatorCheckBox_Changed(object? sender, RoutedEventArgs e)
+        {
+            if (!_isInitialized || _settingsManager == null)
+                return;
+
+            var settings = _settingsManager.Settings;
+            settings.ShowShiftIndicator = ShiftIndicatorCheckBox.IsChecked ?? false;
+            settings.SaveSettings();
+
+            Log.Info($"Shift indicator changed to {settings.ShowShiftIndicator}");
         }
 
         private void HidePitsCheckBox_Changed(object? sender, RoutedEventArgs e)

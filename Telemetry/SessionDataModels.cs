@@ -34,6 +34,7 @@ namespace VISOR.Telemetry
         public readonly SessionSchedule Schedule = new();
         public readonly WeekendInfo Weekend = new();
         public int IncidentLimit { get; set; }
+        public PlayerCarInfo? PlayerCar { get; set; }
 
         public class DriverInfo
         {
@@ -75,6 +76,25 @@ namespace VISOR.Telemetry
             public string EventType { get; set; } = string.Empty;
             public string SubSessionId { get; set; } = string.Empty;
         }
+    }
+
+    /// <summary>
+    /// The player's car as described by the session YAML (DriverInfo + the player's Drivers
+    /// entry). Immutable: a new instance is published on every session-info parse, so the 60Hz
+    /// path can read it without a lock.
+    /// </summary>
+    public sealed record PlayerCarInfo(
+        string CarPath,
+        string CarScreenName,
+        string CarVersion,
+        float RedLine,
+        float SLFirstRPM,
+        float SLShiftRPM,
+        int GearNumForward,
+        float SLLastRPM = 0f,
+        float SLBlinkRPM = 0f)
+    {
+        public bool HasShiftLights => SLShiftRPM > 0f;
     }
 
     public class SessionTransitionData

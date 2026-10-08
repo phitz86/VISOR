@@ -18,6 +18,10 @@ VISOR is not affiliated with, endorsed by, or sponsored by iRacing.com
 Motorsport Simulations, LLC. "iRacing" is a trademark of its respective
 owner and is used here for descriptive purposes only.
 
+Third-party font: the gear symbol uses a one-glyph subset of Symbola 9.17 by
+George Douros, released as "free for any use". See
+Resources/Fonts/Symbola-LICENSE.txt.
+
 ================================================================================
                     Full text of the GNU General Public License
 ================================================================================

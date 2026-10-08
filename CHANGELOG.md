@@ -7,6 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-10-04
+
+### Added
+
+- **Shift indicator** — the Row 0 gear symbol now tells you when to upshift, the same way in
+  every car: gray normally, amber as the shift point approaches (starting the same RPM before it
+  as the car's own lights), flashing white/red (5 times a second) at the shift point, and solid
+  red at the redline or rev limiter. The cue allows about 0.15 s of reaction time: it comes early
+  by however far RPM will climb in that time, so it's noticeably earlier in the low gears, where
+  RPM rises fastest, and barely changes in top gear. It stays gray in neutral, reverse and the pits, and top gear only shows the
+  limiter. It can be turned off in the Configuration Window.
+- **Learned optimal shift points** — VISOR starts from iRacing's shift-light RPM for the car,
+  then learns the fastest upshift for each gear from your own full-throttle acceleration (where
+  the next gear would pull harder than the current one), and switches a gear over once it has
+  seen enough of it. It needs no outside data: what it learns is kept locally per car in
+  `%LOCALAPPDATA%\VISOR\ShiftModels`, builds up across sessions, and starts again when iRacing
+  updates the car. Saved files are size-capped and validated on load, and anything malformed is
+  discarded and relearned. Learning pauses in the pits, on the pit limiter, off track, in replays,
+  on a wet track, during wheelspin and while cornering hard (above about 0.3 g sideways, where
+  tire side load eats into forward acceleration). On ovals that means learning is slow, but you
+  rarely shift there, and the indicator still works from iRacing's shift point.
+- **Shift cue steps past an early light** — VISOR won't recommend revs it hasn't seen, so a car
+  whose light comes on early could stay stuck on that light. When the data proves a gear still
+  pulls harder than the next at the highest RPM seen, the cue now moves later in 250-RPM steps,
+  each confirmed by driving up to it, until the real best shift point is learned. It never moves
+  the cue earlier than the car's light on that evidence alone.
+- **Calibration dot** — a small dot at the gear symbol's lower left shows whether the current
+  gear's shift point has stopped moving: red while it's still being worked out, green once it has
+  held steady (within 100 RPM) for three minutes of driving, hidden in neutral, reverse and top
+  gear, and in any gear whose next gear up you haven't driven (e.g. 5th at a track where you
+  never use 6th), since there's nothing to calibrate it against.
+- **Gear ratios remembered per car** — saved with the learned model and reused for gears you
+  haven't driven yet this session, but only once a gear you have driven confirms the gearing is
+  unchanged (within 1%). Rarely used top gears no longer hold up learning of the gear below.
+- **Learns from normal driving** — no full-range pulls needed. VISOR now finds the shift point
+  by working down from the redline to the last RPM where the current gear still pulls harder, so
+  a torque dip low in the rev range can't cause an early shift. It only needs to have seen the
+  next gear from where an upshift lands, which corner exits provide. It also starts using data
+  0.25 s after a shift instead of 0.5 s. If you never run a gear as low as the best shift would
+  land you, that gear keeps the car's own light rather than guessing.
+- **Quieter learning log** — the progress line drops from once a minute to once every 10 minutes
+  after every gear has settled.
+- **Shift-point learning progress in the log** — VISOR logs the car as soon as it's detected,
+  then once a minute while driving: how many frames were used or skipped (and why: cornering,
+  part throttle, wheelspin…) and what each gear is still waiting on (e.g. "6/10 RPM bands seen
+  (missing 7375)").
+- **Wet-track research logging (debug builds only)** — on a wet track, debug builds record
+  60 Hz telemetry (where on track, conditions, inputs, accelerations and wheelspin signals, at
+  every throttle level) to `Diagnostics\WetResearch`, as groundwork for a future grip-aware wet
+  shift model. Release builds don't collect it.
+- **Unit tests** (`Tests/VISOR.Tests`) for the shift-point learner and its storage, using a
+  simulated car whose true optimal shift points are known.
+
+### Changed
+
+- **Version bumped to 1.2.1.0**; README, Config window and user guide updated to match.
+- **Larger gear symbol** — the ⚙ grows from 54 to 68 pt, closer to the gear number, since it
+  now doubles as the shift light.
+- **New gear symbol** — the ⚙ is now drawn from a bundled copy of the Symbola font (v9.17, from
+  before its 2018 license change, cut down to the single gear glyph). VISOR's text font has no
+  gear, so Windows had been substituting Segoe UI Symbol's flower-like one.
+
 ## [1.2.0] - 2026-10-03
 
 ### Changed
@@ -211,7 +273,8 @@ display, and adds a substantial layer of app-stability and installer hardening.
 - Nullable-reference warnings (CS8602/CS8604) and an unused-variable warning; updated
   deprecated GitHub Actions.
 
-[Unreleased]: https://github.com/phitz86/VISOR/compare/v1.2.0.0...HEAD
+[Unreleased]: https://github.com/phitz86/VISOR/compare/v1.2.1.0...HEAD
+[1.2.1]: https://github.com/phitz86/VISOR/releases/tag/v1.2.1.0
 [1.2.0]: https://github.com/phitz86/VISOR/releases/tag/v1.2.0.0
 [1.1.0]: https://github.com/phitz86/VISOR/releases/tag/v1.1.0.0
 [1.0.0]: https://github.com/phitz86/VISOR/releases/tag/v1.0.0

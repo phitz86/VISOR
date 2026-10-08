@@ -163,7 +163,7 @@
         <div class="title-block">
             <h1>VISOR User Guide</h1>
             <div class="subtitle">Virtual Intelligence Simulator Overlay & Radar</div>
-            <div class="meta">Version 1.2.0.0 | CephasMedia LLC | info@cephasmedia.com</div>
+            <div class="meta">Version 1.2.1.0 | CephasMedia LLC | info@cephasmedia.com</div>
         </div>
     </header>
 
@@ -211,6 +211,7 @@
         <li><strong>Position display:</strong> Show <strong>Class</strong> (within your car class, the default) or <strong>Overall</strong> (field-wide) position. Applies to both Row 0 and the Row 4 relative table.</li>
         <li><strong>Temperature unit:</strong> Show the Row 5 track temperature in <strong>Fahrenheit</strong> (default) or <strong>Celsius</strong>.</li>
         <li><strong>Row 5 elements:</strong> Track location, incident counter, and track temperature can each be shown or hidden independently.</li>
+        <li><strong>Shift indicator:</strong> Turn the Row 0 gear symbol's shift colors on or off (on by default; see Row 0 below).</li>
         <li><strong>Hide cars in the pits:</strong> Remove pit-road cars from the Row 4 relative table (see Row 4 below for the exceptions).</li>
     </ul>
 
@@ -221,6 +222,21 @@
 
     <h3>Row 0: Gear Indicator & Position</h3>
     <p><strong>Gear Indicator:</strong> Displays current gear ("R" for reverse, "N" for neutral, numbers for forward gears) using a digital-style font for quick readability.</p>
+    <p><strong>Shift Indicator:</strong> The gear symbol next to the number tells you when to upshift, the same way in every car, however that car's own dash lights work:</p>
+    <ul>
+        <li><strong>Gray:</strong> keep going.</li>
+        <li><strong>Amber:</strong> the shift point is coming up. Amber starts the same distance before the shift point as the car's own shift lights do.</li>
+        <li><strong>Flashing white/red:</strong> shift now. The flash allows for your reaction time, so in the low gears, where the revs climb fastest, it starts a little before the shift point itself.</li>
+        <li><strong>Solid red:</strong> you're at the redline or on the rev limiter.</li>
+    </ul>
+    <p>To start with, VISOR uses the shift point iRacing gives for the car (the one its shift lights are built around). As you drive, VISOR also works out the fastest shift point for each gear from your own full-throttle acceleration: the RPM where the next gear would pull harder than the one you're in. Once it has seen enough of a gear (usually a few laps of flat-out running), it switches that gear to the learned shift point. That may be earlier or later than the car's lights, and it can differ from gear to gear. What VISOR learns is saved on your PC for each car and builds up across sessions. When iRacing updates a car, VISOR starts learning it again. Learning pauses in the pits, on the pit limiter, off track, in replays, on a wet track and while cornering hard, since tires that are turning can't put all their grip into acceleration. The indicator stays gray in neutral, reverse and the pits, and in top gear it only turns red at the limiter.</p>
+    <p>VISOR only trusts a shift point once it has seen you drive at those revs. So if the car's light comes on early (it's telling you to shift before the engine has finished pulling), VISOR first proves the engine is still pulling harder at the light, then moves the cue a little later, about 250 RPM at a time. Each step waits until you've driven up to it and VISOR has confirmed it, so the cue works its way up to the real best shift point over a few laps or sessions. It never moves the cue earlier than the car's light until it has the full answer.</p>
+    <p><strong>Calibration Dot:</strong> A small dot at the bottom left of the gear symbol shows whether the shift point for the gear you're in has stopped moving:</p>
+    <ul>
+        <li><strong>Red:</strong> still being worked out. VISOR is using the car's own light, or the shift point is still moving as it learns.</li>
+        <li><strong>Green:</strong> settled. This gear's shift point has stayed put for a few minutes of driving. VISOR may keep refining it in the background (1st gear often learns slowly, because hard acceleration low in 2nd is rare on many tracks), but it isn't changing in any way you'd notice.</li>
+        <li><strong>No dot:</strong> there's no shift point to show (neutral, reverse or top gear), you haven't driven the next gear up yet (for example 5th, at a track where you never use 6th), or the shift indicator is turned off.</li>
+    </ul>
     <p><strong>Position:</strong> Shows your race position. By default this is your position within your car class; you can switch it to <strong>overall</strong> (field-wide) position in the Configuration Window. In practice/qualifying: based on fastest lap times. In races: real-time track position. The pace/safety car is excluded from overall counts.</p>
 
     <h3>Row 1: Time & Fuel Remaining</h3>
@@ -274,6 +290,7 @@
         <li><strong>Testing:</strong> Changes apply in real-time, no restart needed</li>
         <li><strong>Window Positions:</strong> Saved automatically on "Done"</li>
         <li><strong>Fuel:</strong> Most accurate after 3+ consistent laps</li>
+        <li><strong>Shift points:</strong> VISOR learns each car's best shift points over the first few laps of flat-out running</li>
     </ul>
 
     <div class="contact-box">
