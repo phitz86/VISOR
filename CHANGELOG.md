@@ -40,6 +40,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **No waiting on the display during shutdown** — connection and session-state changes no longer
   block on the display, which could delay exit by up to two seconds.
 
+### Changed
+
+- **Less work per frame** — the relative display reuses ten pre-built colour brushes instead of
+  creating up to 1,800 a second, and looks up practice/qualifying positions once per frame
+  instead of once per row. The delta bar only signals a redraw when it actually changes.
+- **Log file stays open for the session** — VISOR now keeps the log open instead of opening and
+  closing it for every line. It stays readable in an editor while VISOR runs, and lines reach
+  the disk as soon as each burst of logging finishes.
+
 ### Removed
 
 - **Unused code and settings plumbing** — about 50 unused members, events and helpers, and the

@@ -53,8 +53,18 @@ namespace VISOR.ViewModels
         private static readonly Color AheadAlertColor = (Color)ColorConverter.ConvertFromString("#FF00FFFF");
         private static readonly Color BehindAlertColor = (Color)ColorConverter.ConvertFromString("#FFFF9900");
         private static readonly Color PitGrayColor = (Color)ColorConverter.ConvertFromString("#60808080");
-        private static readonly SolidColorBrush PitGrayBrush = new SolidColorBrush(PitGrayColor);
-        private static readonly SolidColorBrush StationaryYellowBrush = new SolidColorBrush(Colors.Yellow);
+
+        // Every brush the rows use, built once and frozen, so no frame allocates any. Segment 1 is
+        // the neutral colour, each segment after it a quarter closer to the alert colour, and
+        // segment 5 the alert colour itself.
+        private static readonly SolidColorBrush PitGrayBrush = Frozen(PitGrayColor);
+        private static readonly SolidColorBrush StationaryYellowBrush = Frozen(Colors.Yellow);
+        private static readonly SolidColorBrush[] AheadSegmentBrushes = BuildSegmentBrushes(AheadAlertColor);
+        private static readonly SolidColorBrush[] BehindSegmentBrushes = BuildSegmentBrushes(BehindAlertColor);
+
+        // Segment n lights once the gap is at or under its threshold (segment 1 = widest gap).
+        private static readonly float[] SegmentThresholds =
+            { TIME_SEG1_INFO, TIME_SEG2_AWARE, TIME_SEG3_WARNING, TIME_SEG4_DANGER, TIME_SEG5_CRITICAL };
         #endregion
 
         #region Private Fields
@@ -64,6 +74,10 @@ namespace VISOR.ViewModels
         private readonly PositionHistoryManager _historyManager;
 
         private int _debugFrameCounter = 0;
+
+        // Practice/qualifying positions for this frame, by car. Rebuilt once per frame rather
+        // than fetched (a copied list) and searched again for every row.
+        private readonly Dictionary<int, (float FastestTime, int ClassPosition, int OverallPosition)> _fastestLapByCar = new();
         #endregion
 
         #region Constructor
@@ -111,7 +125,13 @@ namespace VISOR.ViewModels
             List<RelativeRowViewModel> finalRows = BuildProximityBasedRows(allValidCars);
 
             bool useFastestLap = dataProvider.ShouldUseFastestLapPositioning();
-            ApplyDisplayLogic(finalRows, useFastestLap, dataProvider, carClassColors, carClassIDs, snapshot);
+            if (useFastestLap)
+            {
+                _fastestLapByCar.Clear();
+                foreach (var entry in dataProvider.GetFastestLapPositioning())
+                    _fastestLapByCar.TryAdd(entry.carIdx, (entry.fastestTime, entry.classPosition, entry.overallPosition));
+            }
+            ApplyDisplayLogic(finalRows, useFastestLap, carClassColors, carClassIDs, snapshot);
 
             return finalRows;
         }
@@ -268,7 +288,6 @@ namespace VISOR.ViewModels
         private void ApplyDisplayLogic(
             List<RelativeRowViewModel> displayRows,
             bool isFastestLapMode,
-            ISessionDataProvider dataProvider,
             int[] carClassColors,
             int[] carClassIDs,
             SVappsLABSnapshot snapshot)
@@ -276,9 +295,11 @@ namespace VISOR.ViewModels
             var playerRow = displayRows.FirstOrDefault(r => r.IsPlayer);
             if (playerRow == null) return;
 
+            bool useOverall = SettingsManager.Instance.Settings.PositionDisplayMode == PositionDisplayMode.Overall;
+
             foreach (var row in displayRows)
             {
-                AssignClassPositionDisplay(row, isFastestLapMode, dataProvider);
+                AssignClassPositionDisplay(row, isFastestLapMode, useOverall);
                 AssignNameColor(row, playerRow);
                 AssignClassBackgroundColor(row, carClassColors, carClassIDs);
                 AssignFontStyle(row);
@@ -286,19 +307,14 @@ namespace VISOR.ViewModels
             }
         }
 
-        private void AssignClassPositionDisplay(
-            RelativeRowViewModel row,
-            bool isFastestLapMode,
-            ISessionDataProvider dataProvider)
+        private void AssignClassPositionDisplay(RelativeRowViewModel row, bool isFastestLapMode, bool useOverall)
         {
-            bool useOverall = SettingsManager.Instance.Settings.PositionDisplayMode == PositionDisplayMode.Overall;
-
             if (isFastestLapMode)
             {
-                var fastestLapData = dataProvider.GetFastestLapPositioning();
-                var carData = fastestLapData.FirstOrDefault(d => d.carIdx == row.CarIdx);
-                int position = useOverall ? carData.overallPosition : carData.classPosition;
-                row.ClassPos = (carData.fastestTime > 0) ? $"{position}" : "--";
+                if (_fastestLapByCar.TryGetValue(row.CarIdx, out var carData) && carData.FastestTime > 0)
+                    row.ClassPos = $"{(useOverall ? carData.OverallPosition : carData.ClassPosition)}";
+                else
+                    row.ClassPos = "--";
             }
             else
             {
@@ -358,7 +374,7 @@ namespace VISOR.ViewModels
             if (row.IsOnPitRoad)
             {
                 row.GapText = "PIT";
-                row.GapColor = new SolidColorBrush(PitGrayColor);
+                row.GapColor = PitGrayBrush;
                 row.Segment1Color = PitGrayBrush;
                 row.Segment2Color = PitGrayBrush;
                 row.Segment3Color = PitGrayBrush;
@@ -448,28 +464,26 @@ namespace VISOR.ViewModels
                 Log.Debug($"[Buffer] #{row.CarNum} ({relation}): Gap={displayGap:F2}s");
             }
 
-            Color alertColor = isAhead ? AheadAlertColor : BehindAlertColor;
-
             // Count active segments. Hysteresis: once lit, a segment stays on until
             // the gap exceeds its threshold + margin, preventing flicker at boundaries.
             int prevSegments = row._lastActiveSegmentCount;
             int activeSegments = 0;
 
-            float[] thresholds = { TIME_SEG1_INFO, TIME_SEG2_AWARE, TIME_SEG3_WARNING, TIME_SEG4_DANGER, TIME_SEG5_CRITICAL };
-            for (int s = 0; s < thresholds.Length; s++)
+            for (int s = 0; s < SegmentThresholds.Length; s++)
             {
-                float deactivateAt = (s < prevSegments) ? thresholds[s] + SEGMENT_HYSTERESIS : thresholds[s];
+                float deactivateAt = (s < prevSegments) ? SegmentThresholds[s] + SEGMENT_HYSTERESIS : SegmentThresholds[s];
                 if (displayGap <= deactivateAt)
                     activeSegments = s + 1;
             }
 
             // Explicitly set every segment — either colored or Transparent — so segments
             // that are no longer active get cleared without needing a blanket reset at the top.
-            row.Segment1Color = (activeSegments >= 1) ? new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.0)) : Brushes.Transparent;
-            row.Segment2Color = (activeSegments >= 2) ? new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.25)) : Brushes.Transparent;
-            row.Segment3Color = (activeSegments >= 3) ? new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.50)) : Brushes.Transparent;
-            row.Segment4Color = (activeSegments >= 4) ? new SolidColorBrush(BlendColors(NeutralColor, alertColor, 0.75)) : Brushes.Transparent;
-            row.Segment5Color = (activeSegments >= 5) ? new SolidColorBrush(alertColor) : Brushes.Transparent;
+            var segmentBrushes = isAhead ? AheadSegmentBrushes : BehindSegmentBrushes;
+            row.Segment1Color = (activeSegments >= 1) ? segmentBrushes[0] : Brushes.Transparent;
+            row.Segment2Color = (activeSegments >= 2) ? segmentBrushes[1] : Brushes.Transparent;
+            row.Segment3Color = (activeSegments >= 3) ? segmentBrushes[2] : Brushes.Transparent;
+            row.Segment4Color = (activeSegments >= 4) ? segmentBrushes[3] : Brushes.Transparent;
+            row.Segment5Color = (activeSegments >= 5) ? segmentBrushes[4] : Brushes.Transparent;
 
             row._lastActiveSegmentCount = activeSegments;
         }
@@ -498,7 +512,23 @@ namespace VISOR.ViewModels
             row._lastActiveSegmentCount = 0;
         }
 
-        private Color BlendColors(Color color1, Color color2, double ratio)
+        private static SolidColorBrush[] BuildSegmentBrushes(Color alertColor) => new[]
+        {
+            Frozen(BlendColors(NeutralColor, alertColor, 0.0)),
+            Frozen(BlendColors(NeutralColor, alertColor, 0.25)),
+            Frozen(BlendColors(NeutralColor, alertColor, 0.50)),
+            Frozen(BlendColors(NeutralColor, alertColor, 0.75)),
+            Frozen(alertColor)
+        };
+
+        private static SolidColorBrush Frozen(Color color)
+        {
+            var brush = new SolidColorBrush(color);
+            brush.Freeze();
+            return brush;
+        }
+
+        private static Color BlendColors(Color color1, Color color2, double ratio)
         {
             byte r = (byte)(color1.R + (color2.R - color1.R) * ratio);
             byte g = (byte)(color1.G + (color2.G - color1.G) * ratio);

@@ -24,25 +24,25 @@ namespace VISOR.ViewModels
         public double LeftBarWidth
         {
             get => _leftBarWidth;
-            private set { _leftBarWidth = value; OnPropertyChanged(); }
+            private set { if (_leftBarWidth == value) return; _leftBarWidth = value; OnPropertyChanged(); }
         }
 
         public double RightBarWidth
         {
             get => _rightBarWidth;
-            private set { _rightBarWidth = value; OnPropertyChanged(); }
+            private set { if (_rightBarWidth == value) return; _rightBarWidth = value; OnPropertyChanged(); }
         }
 
         public Brush LeftBarColor
         {
             get => _leftBarColor;
-            private set { _leftBarColor = value; OnPropertyChanged(); }
+            private set { if (ReferenceEquals(_leftBarColor, value)) return; _leftBarColor = value; OnPropertyChanged(); }
         }
 
         public Brush RightBarColor
         {
             get => _rightBarColor;
-            private set { _rightBarColor = value; OnPropertyChanged(); }
+            private set { if (ReferenceEquals(_rightBarColor, value)) return; _rightBarColor = value; OnPropertyChanged(); }
         }
 
         /// <summary>

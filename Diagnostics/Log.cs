@@ -27,6 +27,12 @@ namespace VISOR.Diagnostics
         private static readonly object _fileLock = new object();
         private static bool _isInitialized = false;
 
+        // The current log file, held open for the session rather than reopened for every line.
+        // Guarded by _fileLock; null when closed (between sessions, during truncation, after a
+        // write error - the next line reopens it).
+        private static StreamWriter? _writer;
+        private static long _bytesWritten;
+
         /// <summary>
         /// Minimum log level to record. Messages below this level are ignored.
         /// </summary>
@@ -83,6 +89,8 @@ namespace VISOR.Diagnostics
             {
                 lock (_fileLock)
                 {
+                    CloseWriter();
+
                     string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
                     string fileName = $"{LOG_FILE_PREFIX}{timestamp}{LOG_FILE_EXTENSION}";
                     _currentLogFilePath = Path.Combine(GetLogsDirectory(), fileName);
@@ -108,11 +116,36 @@ namespace VISOR.Diagnostics
             // Write directly instead of queueing so the header always lands first.
             lock (_fileLock)
             {
-                if (!string.IsNullOrEmpty(_currentLogFilePath))
-                {
-                    File.AppendAllText(_currentLogFilePath, header.ToString());
-                }
+                OpenWriter();
+                _writer!.Write(header.ToString());
+                _writer.Flush();
+                _bytesWritten += header.Length;
             }
+        }
+
+        // Caller holds _fileLock. Shared read/write/delete so the log can be opened in an editor,
+        // or the folder cleaned up, while VISOR is running.
+        private static void OpenWriter()
+        {
+            var stream = new FileStream(_currentLogFilePath, FileMode.Append, FileAccess.Write,
+                FileShare.ReadWrite | FileShare.Delete);
+            _writer = new StreamWriter(stream);
+            _bytesWritten = stream.Length;
+        }
+
+        // Caller holds _fileLock.
+        private static void CloseWriter()
+        {
+            try
+            {
+                _writer?.Flush();
+                _writer?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Log] Close failed: {ex.GetType().Name}: {ex.Message}");
+            }
+            _writer = null;
         }
 
         /// <summary>
@@ -205,11 +238,21 @@ namespace VISOR.Diagnostics
                         {
                             if (!string.IsNullOrEmpty(_currentLogFilePath))
                             {
-                                File.AppendAllText(_currentLogFilePath, logEntry + Environment.NewLine);
+                                if (_writer == null)
+                                    OpenWriter();
 
-                                var fileInfo = new FileInfo(_currentLogFilePath);
-                                if (fileInfo.Exists && fileInfo.Length > MAX_LOG_SIZE_BYTES)
+                                _writer!.WriteLine(logEntry);
+                                // Characters, not bytes: close enough for a size cap.
+                                _bytesWritten += logEntry.Length + Environment.NewLine.Length;
+
+                                // Flush once the queue is drained, so the file on disk stays
+                                // current without a flush per line during a burst.
+                                if (_logQueue.Count == 0)
+                                    _writer.Flush();
+
+                                if (_bytesWritten > MAX_LOG_SIZE_BYTES)
                                 {
+                                    CloseWriter();
                                     TruncateLogFile();
                                 }
                             }
@@ -218,6 +261,10 @@ namespace VISOR.Diagnostics
                     catch (Exception ex)
                     {
                         System.Diagnostics.Debug.WriteLine($"[Log] Write failed: {ex.GetType().Name}: {ex.Message}");
+                        lock (_fileLock)
+                        {
+                            CloseWriter();
+                        }
                     }
                 }
             }
@@ -228,7 +275,7 @@ namespace VISOR.Diagnostics
 
         private static void TruncateLogFile()
         {
-            // Runs inside _fileLock. Two passes:
+            // Runs inside _fileLock, with the writer closed (the next line reopens it). Two passes:
             //   1. Stream through the file counting lines.
             //   2. Stream again, writing the last TRUNCATE_KEEP_PERCENTAGE portion to a temp file.
             // Finally swap the temp file over the original with File.Replace.
@@ -342,6 +389,10 @@ namespace VISOR.Diagnostics
                 _logQueue.CompleteAdding();
                 _writerTask?.Wait(TimeSpan.FromSeconds(5));
                 _cancellationTokenSource.Cancel();
+                lock (_fileLock)
+                {
+                    CloseWriter();
+                }
             }
             catch
             {
