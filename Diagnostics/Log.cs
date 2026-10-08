@@ -33,6 +33,10 @@ namespace VISOR.Diagnostics
         private static StreamWriter? _writer;
         private static long _bytesWritten;
 
+        // Logs get shared (GitHub issues, Discord), and a path under the user's profile carries
+        // their Windows user name, so such paths are logged as %USERPROFILE%\... instead.
+        private static readonly string _userProfilePrefix = GetUserProfilePrefix();
+
         /// <summary>
         /// Minimum log level to record. Messages below this level are ignored.
         /// </summary>
@@ -109,7 +113,6 @@ namespace VISOR.Diagnostics
             var header = new StringBuilder();
             header.AppendLine("=== VISOR Logging Session Started ===");
             header.AppendLine($"Timestamp Format: YYYYMMDD HH:mm:ss.milliseconds");
-            header.AppendLine($"Machine: {Environment.MachineName}");
             header.AppendLine($"OS: {Environment.OSVersion}");
             header.AppendLine("=======================================");
 
@@ -204,6 +207,9 @@ namespace VISOR.Diagnostics
             {
                 if (level < MinimumLevel)
                     return;
+
+                if (_userProfilePrefix.Length > 0)
+                    message = message.Replace(_userProfilePrefix, @"%USERPROFILE%\", StringComparison.OrdinalIgnoreCase);
 
                 string timestamp = DateTime.Now.ToString("yyyyMMdd HH:mm:ss.fff");
                 string levelStr = level.ToString().ToUpper().PadRight(7);
@@ -317,6 +323,16 @@ namespace VISOR.Diagnostics
                 System.Diagnostics.Debug.WriteLine($"[Log] TruncateLogFile failed: {ex.GetType().Name}: {ex.Message}");
                 try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
             }
+        }
+
+        // The profile folder with a trailing separator, so only paths inside it match (not a
+        // sibling such as C:\Users\Pete2). Empty if it can't be determined.
+        private static string GetUserProfilePrefix()
+        {
+            string profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            return string.IsNullOrEmpty(profile)
+                ? string.Empty
+                : profile.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
         }
 
         /// <summary>

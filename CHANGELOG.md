@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Build pipeline hardened** — the CI build job now runs with a read-only token, and only the
+  signing job (which never runs repository code) can write to the repository. Every GitHub
+  Action is pinned to an exact commit, with Dependabot proposing updates. Inno Setup is
+  installed at a pinned version, and the build no longer leaves its token in the checkout.
+- **Logs no longer identify the PC or Windows user** — the session header drops the machine name,
+  and paths under your user profile are written as `%USERPROFILE%\...`, so a log can be shared
+  as-is.
+
 ### Fixed
 
 - **Radar no longer leaves "ghost" cars behind** — after a disconnect, a session change or lone
@@ -48,6 +58,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Log file stays open for the session** — VISOR now keeps the log open instead of opening and
   closing it for every line. It stays readable in an editor while VISOR runs, and lines reach
   the disk as soon as each burst of logging finishes.
+
+- **Third-party track data credited in `LICENSE.txt`** — the lovely-track-data turn positions and
+  names (CC BY-NC-SA 4.0) are now listed alongside the Symbola font. The README notes that
+  Setup replaces `Data\TrackSections.json` on upgrade, so local edits need a backup.
 
 ### Removed
 

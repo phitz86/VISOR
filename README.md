@@ -53,7 +53,8 @@ relative gaps, and surrounding traffic — without a cluttered screen.
   ("Eau Rouge", "Kemmel Straight"), like a sign hanging over the track surface.
   Driven by an editable catalog (`Data/TrackSections.json`) covering 66 layouts
   out of the box — the Nordschleife, Le Mans, and most iRacing road courses —
-  tune boundaries or add tracks with a text editor. Measured turn positions and
+  tune boundaries or add tracks with a text editor. Setup replaces the file when
+  you upgrade, so keep a copy of any edits. Measured turn positions and
   many names imported from [lovely-track-data](https://github.com/Lovely-Sim-Racing/lovely-track-data)
   by [Lovely Sim Racing](https://lsr.gg) (CC BY-NC-SA 4.0).
 - **AI driver detection** and per-driver incident counts pulled from session data.
