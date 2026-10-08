@@ -354,6 +354,11 @@ Each pass:
 
 - **Frame delivery:** snapshots are raised on the SDK's single telemetry thread and posted to the UI with a non-blocking `BeginInvoke` at the same priority as today. That keeps frames in order, and a capped backlog drops frames rather than queueing them when the UI stalls; drops are logged as `[FrameBacklog]`.
 - **Exit hang (B9):** the connection-state and primed-state handlers stop blocking too.
+- **Rig results:**
+  - A full practice → qualifying → race at Road Atlanta (multiclass) showed no issues.
+  - Radar ghosts didn't show up. That case is hard to reproduce on purpose, so keep an eye out.
+  - `[FrameBacklog]` and `[FrameGap]` appeared together twice, at session loads. That is expected: iRacing sends a burst of frames after a load stall.
+  - One `Session time went backwards` in practice and none in the race. Since frames now arrive in order, this means iRacing's own session clock went backwards (for example during a replay or a session restart).
 - **Rig checklist:**
   - A full practice → qualifying → race through the checkered: Final Lap and FINISHED latch, finishing positions hold, and the qualifying lap countdown is correct.
   - Carried over from Pass 1: leave a session and join another; no ghost cars on the radar.
@@ -373,6 +378,7 @@ Each pass:
 - **Installer:** B4. The recursive `DelTree` goes, replaced by targeted `[InstallDelete]` entries for VISOR's own DLLs, `deps.json`/`runtimeconfig.json` and `runtimes\`.
 - **Rig checklist:**
   - Carried over from Pass 1: with the config window closed, launch VISOR a second time; the running instance comes to the front.
+  - Clean the build output first (Build → Clean Solution, or delete `bin\` and `obj\`). Otherwise a stale `bin\Release\...\runtimes\` folder from older builds still holds `System.Management.dll`, and the installer packs every DLL under `bin\Release`.
   - Compile the installer.
   - Do a fresh install and an upgrade over 1.2.1. Settings, logs and shift models survive; there are no stale DLLs and no `System.Management.dll`.
   - The overlay and radar behave as before.

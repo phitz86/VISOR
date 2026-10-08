@@ -47,6 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   track-temperature trend, or glitch a gap or position for a frame. Frames are now queued for
   the display in the order iRacing sends them. If the display ever falls more than four frames
   behind, newer frames are skipped and noted in the log as `[FrameBacklog]`.
+- **Upgrading no longer wipes the whole install folder** — Setup used to delete everything in the
+  install folder, recursively, before installing the new version. That was harmless in
+  `Program Files\VISOR`, but would have emptied any shared folder VISOR had been installed into.
+  It now removes only VISOR's own program files (its DLLs, `.deps.json`, `.runtimeconfig.json`
+  and `runtimes\` folder), which still clears out DLLs that older versions shipped and this one
+  doesn't.
 - **No waiting on the display during shutdown** — connection and session-state changes no longer
   block on the display, which could delay exit by up to two seconds.
 
