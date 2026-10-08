@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using VISOR.Diagnostics;
 using VISOR.Settings;
 using VISOR.Telemetry;
@@ -19,6 +20,7 @@ namespace VISOR.Views
         private readonly SVappsLABSDKWrapper _sdk;
         private readonly SettingsManager _settingsManager;
         private readonly ConfigModeManager _configModeManager;
+        private readonly FramePoster _framePoster;
 
         private int _lastVisibleCarCount = 0;
         private bool _isFadedOut = false;
@@ -33,6 +35,7 @@ namespace VISOR.Views
             _configModeManager = ConfigModeManager.Instance;
             _viewModel = new RadarViewModel(classColorManager, CarsContainer);
             DataContext = _viewModel;
+            _framePoster = new FramePoster(Dispatcher, "RadarWindow", ProcessSnapshot);
 
             AllowsTransparency = true;
             WindowStyle = WindowStyle.None;
@@ -234,9 +237,11 @@ namespace VISOR.Views
             }
         }
 
+        // Connection and primed-state changes are raised on SDK threads. Queued rather than
+        // invoked, so the SDK never waits on the UI thread (see MainWindow).
         private void OnConnectionStateChanged(bool isConnected)
         {
-            Dispatcher.Invoke(() =>
+            Dispatcher.BeginInvoke(DispatcherPriority.Send, new Action(() =>
             {
                 if (!isConnected)
                 {
@@ -252,12 +257,12 @@ namespace VISOR.Views
                     DebugText.Text = "Radar: Connected";
                     CarLeftRightIndicator.Text = "Connecting";
                 }
-            });
+            }));
         }
 
         private void OnPrimedStateChanged(bool isPrimed)
         {
-            Dispatcher.Invoke(() =>
+            Dispatcher.BeginInvoke(DispatcherPriority.Send, new Action(() =>
             {
                 if (isPrimed)
                 {
@@ -273,44 +278,45 @@ namespace VISOR.Views
                     UpdatePlayerCarDisplay();
                     FadeOut();
                 }
-            });
+            }));
         }
 
-        private void OnSnapshotAvailable(SVappsLABSnapshot snapshot)
+        // SDK telemetry thread: queue the frame for the UI thread, in order (see FramePoster).
+        private void OnSnapshotAvailable(SVappsLABSnapshot snapshot) => _framePoster.Post(snapshot);
+
+        // UI thread.
+        private void ProcessSnapshot(SVappsLABSnapshot snapshot)
         {
-            Dispatcher.Invoke(() =>
+            if (_sdk.IsSessionDataReady)
             {
-                if (_sdk.IsSessionDataReady)
-                {
-                    if (ShouldHideRadar())
-                    {
-                        _viewModel.Reset();
-                        ResetZoneHighlights();
-                        FadeOut();
-                        DebugText.Text = "Radar: Hidden (Lone Qualifying)";
-                        CarLeftRightIndicator.Text = "Hidden";
-                        return;
-                    }
-
-                    UpdatePlayerCarDisplay(snapshot);
-
-                    _viewModel.UpdateFromTelemetry(snapshot, _sdk.Coordinator);
-
-                    UpdateZoneHighlights(snapshot);
-
-                    UpdateFadeState(_viewModel.VisibleCarCount);
-
-                    DebugText.Text = $"Cars: {_viewModel.VisibleCarCount}";
-                }
-                else
+                if (ShouldHideRadar())
                 {
                     _viewModel.Reset();
                     ResetZoneHighlights();
                     FadeOut();
-                    DebugText.Text = "Radar: No session data";
-                    CarLeftRightIndicator.Text = "No Data";
+                    DebugText.Text = "Radar: Hidden (Lone Qualifying)";
+                    CarLeftRightIndicator.Text = "Hidden";
+                    return;
                 }
-            });
+
+                UpdatePlayerCarDisplay(snapshot);
+
+                _viewModel.UpdateFromTelemetry(snapshot, _sdk.Coordinator);
+
+                UpdateZoneHighlights(snapshot);
+
+                UpdateFadeState(_viewModel.VisibleCarCount);
+
+                DebugText.Text = $"Cars: {_viewModel.VisibleCarCount}";
+            }
+            else
+            {
+                _viewModel.Reset();
+                ResetZoneHighlights();
+                FadeOut();
+                DebugText.Text = "Radar: No session data";
+                CarLeftRightIndicator.Text = "No Data";
+            }
         }
 
         private void UpdatePlayerCarDisplay(SVappsLABSnapshot? snapshot = null)

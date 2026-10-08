@@ -31,6 +31,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   could land after a newer one. Saves now take turns, and an older one is skipped.
 - **"HUD ready" state is only announced when it changes** — it was re-announced on every
   session-info update.
+- **Telemetry frames are handled strictly in order** — each frame used to reach the overlay and
+  radar on its own background task, and a later frame could occasionally overtake an earlier
+  one. That could cost a Final Lap or FINISHED latch, count a qualifying lap twice, reset the
+  track-temperature trend, or glitch a gap or position for a frame. Frames are now queued for
+  the display in the order iRacing sends them. If the display ever falls more than four frames
+  behind, newer frames are skipped and noted in the log as `[FrameBacklog]`.
+- **No waiting on the display during shutdown** — connection and session-state changes no longer
+  block on the display, which could delay exit by up to two seconds.
 
 ### Removed
 

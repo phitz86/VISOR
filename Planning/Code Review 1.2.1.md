@@ -336,6 +336,11 @@ Each pass:
     - `RelativeViewModel`'s `INotifyPropertyChanged`, which avoids WPF's binding memory leak and a CS0067 warning.
 - **Loggers removed:** RelativeGap, TelemetryCSV and SessionData, including the raw session-YAML stash that only SessionData used.
 - **Bug fixes:** B1, B2 (including the same lifetime fix for a radar window closed with Alt+F4), B5, B6, B7, B8.
+- **Rig results:**
+  - Verified: Exit from the ⚙ window, the radar toggle, track location (66 entries loaded), shift points, and the debug-build folders.
+  - Track location: Oulton Park Fosters shows no readout because that layout isn't in the catalog, as expected.
+  - WetResearch wasn't exercised (dry race), and its code is unchanged.
+  - Radar ghosts moves to the Pass 2 checklist, and the second-launch check to Pass 3.
 - **Rig checklist:**
   - **Radar ghosts:** leave a session and join another; no stuck car blocks on the radar.
   - **Exit from the ⚙ window:** close the config window with Done, click ⚙ on the overlay, then **Exit VISOR**; VISOR closes.
@@ -351,6 +356,7 @@ Each pass:
 - **Exit hang (B9):** the connection-state and primed-state handlers stop blocking too.
 - **Rig checklist:**
   - A full practice → qualifying → race through the checkered: Final Lap and FINISHED latch, finishing positions hold, and the qualifying lap countdown is correct.
+  - Carried over from Pass 1: leave a session and join another; no ghost cars on the radar.
   - Relative gaps and positions are steady.
   - Exit is prompt.
   - Logs show none of `Session time went backwards`, `raised on the same sample` or `did not shut down gracefully` mid-session; `[FrameBacklog]` is rare or absent.
@@ -366,6 +372,7 @@ Each pass:
   - S4: the lovely-track-data license notice in `LICENSE.txt`, and a README note that catalog edits are replaced on upgrade.
 - **Installer:** B4. The recursive `DelTree` goes, replaced by targeted `[InstallDelete]` entries for VISOR's own DLLs, `deps.json`/`runtimeconfig.json` and `runtimes\`.
 - **Rig checklist:**
+  - Carried over from Pass 1: with the config window closed, launch VISOR a second time; the running instance comes to the front.
   - Compile the installer.
   - Do a fresh install and an upgrade over 1.2.1. Settings, logs and shift models survive; there are no stale DLLs and no `System.Management.dll`.
   - The overlay and radar behave as before.

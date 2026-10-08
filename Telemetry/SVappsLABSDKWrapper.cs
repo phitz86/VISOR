@@ -44,6 +44,10 @@ namespace VISOR.Telemetry
         private Task _monitoringTask = null!;
         private bool _isConnected = false;
 
+        // Set when Shutdown starts. The UI thread then waits for the SDK to stop, so frames
+        // raised meanwhile could only pile up behind it; they are no longer raised.
+        private volatile bool _isShuttingDown;
+
         private int _lastSessionNumForLog = -1;
         private bool _lastPrimedState = false;
         private DateTime? _disconnectedAt = null;
@@ -261,6 +265,8 @@ namespace VISOR.Telemetry
 
         private void ProcessTelemetryUpdate(TelemetryData telemetryData)
         {
+            if (_isShuttingDown) return;
+
             // Defensive detector #1: frame-gap detector. 60Hz expected, flag gaps >33ms.
             var now = Stopwatch.GetTimestamp();
             if (_lastTickTs != 0)
@@ -277,9 +283,9 @@ namespace VISOR.Telemetry
             }
             _lastTickTs = now;
 
-            // Defensive detector #2: handler latency timer. Times the inline body below.
-            // Post-offload the inline cost is just snapshot construction (a thin typed wrapper);
-            // a warning here means something heavy crept back onto the SDK stream thread.
+            // Defensive detector #2: handler latency timer. Times the inline body below: snapshot
+            // construction (a thin typed wrapper) and the subscribers queuing the frame for the UI.
+            // A warning here means something heavy crept back onto the SDK stream thread.
             var handlerStart = Stopwatch.GetTimestamp();
 
             SVappsLABSnapshot? snapshot = null;
@@ -292,23 +298,26 @@ namespace VISOR.Telemetry
                 Log.Error("Telemetry update error", ex);
             }
 
-            // Offload the fan-out so the SDK stream thread isn't blocked on consumer work.
-            // The SDK's telemetry channel is a 60-sample ring buffer and oldest samples are
-            // silently dropped when consumption is slow; keeping the on-thread cost minimal
-            // is the prescribed mitigation.
-            if (snapshot != null)
+            // Raised right here, one frame at a time, so subscribers receive frames in the order the
+            // SDK delivers them. (Each frame used to go out on its own Task.Run, and a later frame's
+            // task could reach the UI first.) Subscribers must only queue work - the windows post
+            // the frame to their UI thread - because the SDK's telemetry channel is a 60-sample ring
+            // buffer that silently drops the oldest samples when consumption is slow. Each
+            // subscriber is guarded on its own so one failing window can't starve the other.
+            var subscribers = SnapshotAvailable;
+            if (snapshot != null && subscribers != null)
             {
-                _ = Task.Run(() =>
+                foreach (Action<SVappsLABSnapshot> subscriber in subscribers.GetInvocationList())
                 {
                     try
                     {
-                        SnapshotAvailable?.Invoke(snapshot);
+                        subscriber(snapshot);
                     }
                     catch (Exception ex)
                     {
-                        Log.Error("[SnapshotFanout] error in offloaded snapshot fan-out", ex);
+                        Log.Error("[SnapshotFanout] snapshot subscriber error", ex);
                     }
-                });
+                }
             }
 
             var elapsedMs = (Stopwatch.GetTimestamp() - handlerStart) * 1000.0 / Stopwatch.Frequency;
@@ -343,6 +352,7 @@ namespace VISOR.Telemetry
             try
             {
                 Log.Info("SVappsLAB SDK shutdown initiated");
+                _isShuttingDown = true;
                 _frameGapFlushTimer?.Stop();
                 _frameGapFlushTimer?.Dispose();
 
