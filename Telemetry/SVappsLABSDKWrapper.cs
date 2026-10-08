@@ -40,19 +40,9 @@ namespace VISOR.Telemetry
         private ITelemetryClient<TelemetryData> _client = null!;
         private readonly ILogger _logger;
         private readonly SessionDataCoordinator _sessionCoordinator;
-#if DEBUG
-        private readonly SessionDataLogger _sessionLogger;
-        private readonly TelemetryCSVLogger _telemetryLogger;
-#endif
-        private SVappsLABSnapshot _latestSnapshot = null!;
         private CancellationTokenSource _cancellationTokenSource = null!;
         private Task _monitoringTask = null!;
         private bool _isConnected = false;
-
-        // Cached raw YAML from onRawSessionInfoUpdate; consumed only by the
-        // DEBUG SessionDataLogger. Reference assignment is atomic in C#, so
-        // the lock-free read pattern matches the volatile driver-cache arrays.
-        private volatile string _cachedRawYaml = string.Empty;
 
         private int _lastSessionNumForLog = -1;
         private bool _lastPrimedState = false;
@@ -72,7 +62,6 @@ namespace VISOR.Telemetry
         #endregion
 
         #region Public Properties
-        public string Name => "SVappsLAB iRacingTelemetrySDK";
         public bool IsSessionDataReady => _sessionCoordinator.IsDataReady;
         public bool IsConnected => _isConnected;
         public bool IsPrimed => _isConnected && _sessionCoordinator.IsDataReady;
@@ -90,16 +79,11 @@ namespace VISOR.Telemetry
             _logger = new VisorSdkLogger<SVappsLABSDKWrapper>();
             _sessionCoordinator = new SessionDataCoordinator();
 
-#if DEBUG
-            _sessionLogger = new SessionDataLogger(() => _cachedRawYaml);
-            _telemetryLogger = new TelemetryCSVLogger();
-#endif
-
             _frameGapFlushTimer = new System.Timers.Timer(5000) { AutoReset = true };
             _frameGapFlushTimer.Elapsed += OnFrameGapFlushTimer;
         }
 
-        public async Task<bool> Initialize()
+        public bool Initialize()
         {
             try
             {
@@ -110,7 +94,6 @@ namespace VISOR.Telemetry
                 _frameGapFlushTimer.Start();
                 _monitoringTask = Task.Run(() => RunAsync(_cancellationTokenSource.Token));
 
-                await Task.Delay(200);
                 Log.Info("SVappsLAB SDK initialized successfully");
                 return true;
             }
@@ -134,7 +117,6 @@ namespace VISOR.Telemetry
                     var handlers = new TelemetryHandlers<TelemetryData>
                     {
                         OnTelemetryUpdate = data => { OnTelemetryUpdate(data); return Task.CompletedTask; },
-                        OnRawSessionInfoUpdate = yaml => { OnRawSessionInfoUpdate(yaml); return Task.CompletedTask; },
                         OnSessionInfoUpdate = info => { OnSessionInfoUpdate(info); return Task.CompletedTask; },
                         OnConnectStateChanged = state => { OnConnectStateChanged(state); return Task.CompletedTask; },
                         OnError = ex => { Log.Error("[SDK Stream] error from SDK", ex); return Task.CompletedTask; }
@@ -165,8 +147,6 @@ namespace VISOR.Telemetry
                 Log.Error("[StreamFault] SDK Monitor faulted", ex);
             }
         }
-
-        public SVappsLABSnapshot GetSnapshot() => _latestSnapshot;
 
         private void OnConnectStateChanged(ConnectState state)
         {
@@ -203,7 +183,6 @@ namespace VISOR.Telemetry
                 if (!_isConnected)
                 {
                     _sessionCoordinator.ClearCache();
-                    _cachedRawYaml = string.Empty;
                     _lastSessionNumForLog = -1;
                     // Reset frame-gap baseline so the wall-clock gap across a disconnect
                     // doesn't get reported as a single huge gap on the first frame after reconnect.
@@ -220,13 +199,12 @@ namespace VISOR.Telemetry
         private void CheckPrimedStateChange()
         {
             bool isPrimed = _isConnected && _sessionCoordinator.IsDataReady;
-            if (isPrimed != _lastPrimedState)
-            {
-                Log.Info(isPrimed
-                    ? "HUD ready: iRacing connected and session data parsed"
-                    : "HUD no longer primed: waiting for connection or session data");
-                _lastPrimedState = isPrimed;
-            }
+            if (isPrimed == _lastPrimedState) return;
+
+            Log.Info(isPrimed
+                ? "HUD ready: iRacing connected and session data parsed"
+                : "HUD no longer primed: waiting for connection or session data");
+            _lastPrimedState = isPrimed;
 
             try
             {
@@ -236,12 +214,6 @@ namespace VISOR.Telemetry
             {
                 Log.Error("PrimedStateChanged subscriber error", ex);
             }
-        }
-
-        private void OnRawSessionInfoUpdate(string sessionInfo)
-        {
-            // Stash for the DEBUG-only SessionDataLogger; parsing happens in OnSessionInfoUpdate.
-            _cachedRawYaml = sessionInfo ?? string.Empty;
         }
 
         private void OnSessionInfoUpdate(TelemetrySessionInfo info)
@@ -270,10 +242,6 @@ namespace VISOR.Telemetry
                 double sessionTimeSeconds = _sessionCoordinator.GetSessionTimeSeconds(currentSessionNum);
 
                 Log.Info($"Session transition: {sessionName} (Type: {sessionType}, Duration: {sessionTimeSeconds}s)");
-
-#if DEBUG
-                _sessionLogger?.ScheduleSessionAwareLogs(currentSessionNum, sessionName, sessionTimeSeconds);
-#endif
                 _lastSessionNumForLog = currentSessionNum;
             }
         }
@@ -317,27 +285,23 @@ namespace VISOR.Telemetry
             SVappsLABSnapshot? snapshot = null;
             try
             {
-                snapshot = new SVappsLABSnapshot(telemetryData, DateTime.UtcNow);
-                _latestSnapshot = snapshot;
+                snapshot = new SVappsLABSnapshot(telemetryData);
             }
             catch (Exception ex)
             {
                 Log.Error("Telemetry update error", ex);
             }
 
-            // Offload the fan-out and DEBUG-only file I/O so the SDK stream thread isn't
-            // blocked on consumer work. The SDK's telemetry channel is a 60-sample ring buffer
-            // and oldest samples are silently dropped when consumption is slow; keeping
-            // the on-thread cost minimal is the prescribed mitigation.
+            // Offload the fan-out so the SDK stream thread isn't blocked on consumer work.
+            // The SDK's telemetry channel is a 60-sample ring buffer and oldest samples are
+            // silently dropped when consumption is slow; keeping the on-thread cost minimal
+            // is the prescribed mitigation.
             if (snapshot != null)
             {
                 _ = Task.Run(() =>
                 {
                     try
                     {
-#if DEBUG
-                        _telemetryLogger?.LogSnapshot(snapshot, _sessionCoordinator);
-#endif
                         SnapshotAvailable?.Invoke(snapshot);
                     }
                     catch (Exception ex)
@@ -381,11 +345,6 @@ namespace VISOR.Telemetry
                 Log.Info("SVappsLAB SDK shutdown initiated");
                 _frameGapFlushTimer?.Stop();
                 _frameGapFlushTimer?.Dispose();
-
-#if DEBUG
-                _sessionLogger?.Dispose();
-                _telemetryLogger?.Dispose();
-#endif
 
                 _cancellationTokenSource?.Cancel();
 

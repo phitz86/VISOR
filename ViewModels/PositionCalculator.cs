@@ -9,7 +9,7 @@ namespace VISOR.ViewModels
     /// <summary>
     /// Calculates race positions with predictive position tracking for data resilience.
     /// Three-tier approach:
-    /// 1. HasEverHadValidData - gates entry to display
+    /// 1. Valid-data history - gates entry to display
     /// 2. Predictive LapDistPct - smooth extrapolation during brief gaps
     /// 3. Cache expiration - removes truly disconnected cars after timeout
     /// 
@@ -95,7 +95,6 @@ namespace VISOR.ViewModels
 
         #region Private Fields - Logging State
         private readonly HashSet<int> _lastFrameValidCars = new();
-        private readonly Dictionary<int, bool> _isCurrentlyPredicting = new();
         private readonly HashSet<int> _carsWithInvalidLapDistPctLogged = new();
         #endregion
 
@@ -182,15 +181,6 @@ namespace VISOR.ViewModels
         }
 
         /// <summary>
-        /// Check if a car has ever had valid telemetry data.
-        /// Used as gate keeper - once true, always true for the session.
-        /// </summary>
-        public bool HasEverHadValidData(int carIdx)
-        {
-            return _carsWithValidDataHistory.Contains(carIdx);
-        }
-
-        /// <summary>
         /// Check if cached data is still valid for a car (within expiration window).
         /// </summary>
         public bool HasValidCache(int carIdx)
@@ -226,7 +216,6 @@ namespace VISOR.ViewModels
             _predictionStartFrame.Clear();
             _lapNumberCorrection.Clear();
             _lastFrameValidCars.Clear();
-            _isCurrentlyPredicting.Clear();
             _carsWithInvalidLapDistPctLogged.Clear();
 
             _finishingClassPositions.Clear();
@@ -248,7 +237,7 @@ namespace VISOR.ViewModels
         #region Private Methods - Update Processing
         private void ProcessUpdate(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
-            DetectSessionTransition(snapshot, sessionDataProvider);
+            DetectSessionTransition(snapshot);
             TrackCheckeredFlagState(snapshot);
             LogFinishPhaseTransitions(snapshot, sessionDataProvider);
             FreezeFinishingPositions(snapshot, sessionDataProvider);
@@ -274,7 +263,7 @@ namespace VISOR.ViewModels
         /// <summary>
         /// Detect session transitions and clear finishing positions when session changes.
         /// </summary>
-        private void DetectSessionTransition(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        private void DetectSessionTransition(SVappsLABSnapshot snapshot)
         {
             int currentSessionNum = snapshot.SessionNum;
 
@@ -831,7 +820,6 @@ namespace VISOR.ViewModels
                 {
                     Log.Debug($"Car #{carNumbers[carIdx]} prediction ended after {predictionDuration} frames");
                 }
-                _isCurrentlyPredicting.Remove(carIdx);
             }
         }
 
@@ -844,7 +832,6 @@ namespace VISOR.ViewModels
                 _lastValidLapDistPct.ContainsKey(carIdx))
             {
                 _predictionStartFrame[carIdx] = _globalFrameCounter;
-                _isCurrentlyPredicting[carIdx] = true;
             }
 
             if (framesSinceValid == MAX_CACHE_AGE_FRAMES &&
@@ -1014,7 +1001,6 @@ namespace VISOR.ViewModels
                     ClassId = carClassIDs[carIdx],
                     CurrentLap = effectiveCurrentLap,
                     LapDistPct = effectiveLapDistPct,
-                    TrackPosition = trackPosition,
                     HasTakenGreen = hasTakenGreen,
                     SortKey = trackPosition,
                     OverallSortKey = trackPosition
@@ -1143,7 +1129,6 @@ namespace VISOR.ViewModels
             public int ClassId { get; set; }
             public int CurrentLap { get; set; }
             public float LapDistPct { get; set; }
-            public float TrackPosition { get; set; }
             public bool HasTakenGreen { get; set; }
             public float SortKey { get; set; }
             public float OverallSortKey { get; set; }

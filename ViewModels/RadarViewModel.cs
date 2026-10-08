@@ -29,9 +29,7 @@ namespace VISOR.ViewModels
 
         private const float AVERAGE_CAR_LENGTH = 4.5f; // meters
         private const float DETECTION_RANGE = 5.0f; // car lengths
-        private const float RADAR_HEIGHT = 396f;
         private const float RADAR_CENTER_Y = 198f;
-        private const float CANVAS_CAR_POSITIONS = 11.0f; // 5 ahead + 1 player + 5 behind
         private const float CANVAS_HALF_RANGE = 5.5f; // car lengths from center to edge
 
         private const double BASE_CAR_WIDTH = 24.0;
@@ -54,6 +52,10 @@ namespace VISOR.ViewModels
 
         private readonly Dictionary<int, RadarCarElement> _carElements = new();
 
+        // The window's car layer. Held here so Reset can take the car shapes off it as well as
+        // forgetting them; clearing only the dictionary left stale shapes frozen on the radar.
+        private readonly Canvas _carsContainer;
+
         private readonly ClassColorManager _classColorManager;
         private readonly SettingsManager _settingsManager;
 
@@ -69,9 +71,10 @@ namespace VISOR.ViewModels
             private set { _visibleCarCount = value; OnPropertyChanged(); }
         }
 
-        public RadarViewModel(ClassColorManager classColorManager)
+        public RadarViewModel(ClassColorManager classColorManager, Canvas carsContainer)
         {
             _classColorManager = classColorManager;
+            _carsContainer = carsContainer;
             _settingsManager = SettingsManager.Instance;
         }
 
@@ -88,7 +91,7 @@ namespace VISOR.ViewModels
             };
         }
 
-        public void UpdateFromTelemetry(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider, Canvas carsContainer)
+        public void UpdateFromTelemetry(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
             if (snapshot == null || sessionDataProvider == null || !sessionDataProvider.IsDataReady)
             {
@@ -105,7 +108,6 @@ namespace VISOR.ViewModels
             var lapDistPct = snapshot.CarIdxLapDistPct;
             var trackSurface = snapshot.CarIdxTrackSurface;
             var carNumbers = sessionDataProvider.CarNumbers;
-            var userNames = sessionDataProvider.UserNames;
             var carClassIDs = sessionDataProvider.CarClassIDs;
             var carClassColors = sessionDataProvider.CarClassColors;
             var onPitRoad = snapshot.CarIdxOnPitRoad;
@@ -154,7 +156,6 @@ namespace VISOR.ViewModels
                         PlayerLapDistPct = playerLapDistPct,
                         TrackDistance = proximityData.TrackDistance,
                         Proximity = proximityData.Proximity,
-                        IsAhead = proximityData.IsAhead,
                         CarNumber = carNumbers[i],
                         ClassID = carClassIDs[i],
                         IsOnPitRoad = onPitRoad?[i] ?? false
@@ -167,11 +168,11 @@ namespace VISOR.ViewModels
             var carLeftRightState = snapshot.CarLeftRightState;
             UpdateZoneAssignments(visibleCars, carLeftRightState);
 
-            UpdateRadarDisplay(carsContainer, visibleCars, carClassColors, carClassIDs);
+            UpdateRadarDisplay(visibleCars, carClassColors, carClassIDs);
             VisibleCarCount = visibleCars.Count;
         }
 
-        private (float TrackDistance, float Proximity, bool IsAhead) CalculateCarProximity(float playerDistPct, float carDistPct, float trackLength)
+        private (float TrackDistance, float Proximity) CalculateCarProximity(float playerDistPct, float carDistPct, float trackLength)
         {
             float directDistance = Math.Abs(carDistPct - playerDistPct) * trackLength;
             float wrapAroundDistance = trackLength - directDistance;
@@ -179,9 +180,8 @@ namespace VISOR.ViewModels
 
             float distancePct = Math.Abs(carDistPct - playerDistPct);
             float proximity = Math.Min(distancePct, 1.0f - distancePct);
-            bool isAhead = (carDistPct - playerDistPct + 1.5f) % 1.0f > 0.5f;
 
-            return (trackDistance, proximity, isAhead);
+            return (trackDistance, proximity);
         }
 
         private void UpdateZoneAssignments(List<RadarCarData> visibleCars, string carLeftRightState)
@@ -296,7 +296,7 @@ namespace VISOR.ViewModels
             return 5000f;
         }
 
-        private void UpdateRadarDisplay(Canvas carsContainer, List<RadarCarData> visibleCars, int[] carClassColors, int[] carClassIDs)
+        private void UpdateRadarDisplay(List<RadarCarData> visibleCars, int[] carClassColors, int[] carClassIDs)
         {
             var carsToRemove = new List<int>();
             foreach (var kvp in _carElements)
@@ -312,8 +312,7 @@ namespace VISOR.ViewModels
             {
                 if (_carElements.TryGetValue(carIdx, out var element))
                 {
-                    carsContainer.Children.Remove(element.Rectangle);
-                    carsContainer.Children.Remove(element.NumberText);
+                    RemoveFromCanvas(element);
                     _carElements.Remove(carIdx);
                 }
             }
@@ -326,8 +325,8 @@ namespace VISOR.ViewModels
                 {
                     var element = CreateCarElement(car);
                     _carElements[car.CarIdx] = element;
-                    carsContainer.Children.Add(element.Rectangle);
-                    carsContainer.Children.Add(element.NumberText);
+                    _carsContainer.Children.Add(element.Rectangle);
+                    _carsContainer.Children.Add(element.NumberText);
                 }
 
                 var carElement = _carElements[car.CarIdx];
@@ -442,8 +441,18 @@ namespace VISOR.ViewModels
             element.NumberText.Text = car.CarNumber;
         }
 
+        private void RemoveFromCanvas(RadarCarElement element)
+        {
+            _carsContainer.Children.Remove(element.Rectangle);
+            _carsContainer.Children.Remove(element.NumberText);
+        }
+
         public void Reset()
         {
+            foreach (var element in _carElements.Values)
+            {
+                RemoveFromCanvas(element);
+            }
             _carElements.Clear();
             _carZoneAssignments.Clear();
             _lastCarLeftRightState = "Off";
@@ -457,7 +466,6 @@ namespace VISOR.ViewModels
             public float PlayerLapDistPct { get; set; }
             public float TrackDistance { get; set; }
             public float Proximity { get; set; }
-            public bool IsAhead { get; set; }
             public string CarNumber { get; set; } = string.Empty;
             public int ClassID { get; set; }
             public bool IsOnPitRoad { get; set; }

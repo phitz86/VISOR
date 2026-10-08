@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Radar no longer leaves "ghost" cars behind** — after a disconnect, a session change or lone
+  qualifying, the radar cleared its list of cars but left their shapes on screen. Those stale
+  blocks reappeared at their old positions when the radar faded back in, and more piled up with
+  every reset.
+- **"Exit VISOR" works from a Config window opened with the overlay's ⚙ button** — that window
+  wasn't connected to the app, so its Exit button did nothing. All Config windows are now opened
+  the same way.
+- **A second launch brings VISOR forward again after the Config window is closed** — VISOR kept
+  trying to surface the closed Config window instead of the overlay, so pressing a Stream Deck
+  launch button a second time did nothing. A radar window closed with Alt+F4 can likewise be
+  reopened from the Config window.
+- **Error pop-ups can't stack up over the sim** — an unexpected error still gets logged every
+  time, but its dialog now appears at most once a minute and never while one is already open.
+- **One bad entry in `Data\TrackSections.json` no longer disables the whole catalog** — malformed
+  entries, blank match or config keys, and sections without a name or outside the lap are now
+  skipped with a warning in the log. A blank config key could previously throw when that track
+  loaded.
+- **Shift-point model saves can't collide** — the periodic background save and the save on car
+  change, disconnect or exit could write the same temporary file at once, and an older save
+  could land after a newer one. Saves now take turns, and an older one is skipped.
+- **"HUD ready" state is only announced when it changes** — it was re-announced on every
+  session-info update.
+
+### Removed
+
+- **Unused code and settings plumbing** — about 50 unused members, events and helpers, and the
+  unused `System.Management` package (one less DLL in the install folder).
+- **Three debug-build loggers whose investigations are finished** — the relative-gap CSV, the 1 Hz
+  telemetry CSV and the session-YAML dumps (iRacing's own `.ibt` recordings capture the same
+  data). Release builds never ran them. The wet-research and shift-point loggers stay.
+- **Stale planning files** — the old file plan, prompt and a raw session dump. The track-identity
+  list used by `tools/validate_track_catalog.py` moved to `tools/`.
+
 ## [1.2.1] - 2026-10-04
 
 ### Added

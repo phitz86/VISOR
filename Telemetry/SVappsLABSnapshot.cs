@@ -5,19 +5,12 @@ namespace VISOR.Telemetry
 {
     public class SVappsLABSnapshot
     {
-        public DateTime Timestamp { get; init; }
-        public bool IsValid { get; init; }
-
         // Strongly-typed live telemetry from the SDK's source generator. All reads go through the
         // typed accessors below, which normalize nulls/defaults centrally.
         public TelemetryData Data { get; init; }
 
-        public SVappsLABSnapshot(TelemetryData data, DateTime timestamp)
+        public SVappsLABSnapshot(TelemetryData data)
         {
-            Timestamp = timestamp;
-            // The wrapper only constructs a snapshot from a delivered telemetry frame, so it is
-            // always usable. (The former dict was likewise always non-null, i.e. IsValid==true.)
-            IsValid = true;
             Data = data;
         }
 

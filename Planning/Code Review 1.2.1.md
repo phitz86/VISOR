@@ -32,31 +32,36 @@ Risk class:
 
 ## Findings at a glance
 
-| ID | Sev | Finding | Risk | Bucket |
+Status reflects the revision plan agreed after the review (see "Agreed revision plan" at the end).
+
+| ID | Sev | Finding | Risk | Status |
 |---|---|---|---|---|
-| B1 | Med | Radar leaves "ghost" car shapes on screen after any reset | Small | 1.2.1 |
-| B2 | Med | Config window opened from the overlay's ⚙: "Exit VISOR" does nothing, and a second launch can't bring VISOR forward | Small | 1.2.1 |
-| B3 | Med | Telemetry frames can be processed out of order | Retest | 1.2.1 (your call) |
-| B4 | Med | Installer upgrade wipes the whole install folder recursively | Small | 1.2.1 |
-| B5 | Low–Med | Crash safety net shows a modal dialog for *every* error | Small | 1.2.1 |
-| B6 | Low | One bad entry in TrackSections.json disables or misroutes the whole catalog | Small | 1.2.1 |
-| B7 | Low | Two shift-model saves can collide on the same temp file | Small | 1.2.1 |
-| B8 | Low | `PrimedStateChanged` fires on every session update, not only on change | Small | 1.2.1 |
-| B9 | Low | Possible 2 s hang on exit (thread-blocking pattern) | — | fixed by B3 |
-| D1 | Low | `System.Management` package unused but shipped | Mech | 1.2.1 |
-| D2–D4 | Low | About 50 unused members / events / parsed fields | Mech | 1.2.1 |
-| D5 | Low | Stale files in `Planning/` and the repo root; dead csproj entries | Mech | 1.2.1 |
-| C1–C3, C5, C7 | Low | Duplicated helpers, scale factors, magic numbers | Mech | 1.2.1 |
-| C4, C6, C8 | Low | Larger consolidations | — | 1.3 |
-| F1–F4 | — | Files over 500 lines: split plans | Mech | 1.2.1 |
-| A1–A5 | — | Separation-of-concerns items | — | 1.3 |
-| P1–P4 | Low | Small per-frame waste (brushes, list copies, log I/O, notifications) | Small | 1.2.1 |
-| P5 | — | Measure the transparent-window rendering cost on your rig | — | measure |
-| S1 | Med | CI token has write access during the build job | Small | 1.2.1 |
-| S2 | Med | CI actions and Inno Setup not pinned to fixed versions | Small | 1.2.1 |
-| S3–S6 | Low | Log privacy, license notice, named-object squatting (accept) | Small | 1.2.1 / accept |
-| T1 | Med | CI never builds or runs the tests | Small | 1.2.1 |
-| T2 | Med | No tests for PositionCalculator (needed before splitting it) | Mech | 1.2.1 |
+| B1 | Med | Radar leaves "ghost" car shapes on screen after any reset | Small | **Pass 1** |
+| B2 | Med | Config window opened from the overlay's ⚙: "Exit VISOR" does nothing, and a second launch can't bring VISOR forward | Small | **Pass 1** |
+| B3 | Med | Telemetry frames can be processed out of order | Retest | **Pass 2** (own commit) |
+| B4 | Med | Installer upgrade wipes the whole install folder recursively | Small | **Pass 3** |
+| B5 | Low–Med | Crash safety net shows a modal dialog for *every* error | Small | **Pass 1** |
+| B6 | Low | One bad entry in TrackSections.json disables or misroutes the whole catalog | Small | **Pass 1** |
+| B7 | Low | Two shift-model saves can collide on the same temp file | Small | **Pass 1** |
+| B8 | Low | `PrimedStateChanged` fires on every session update, not only on change | Small | **Pass 1** |
+| B9 | Low | Possible 2 s hang on exit (thread-blocking pattern) | — | **Pass 2** (with B3) |
+| D1 | Low | `System.Management` package unused but shipped | Mech | **Pass 1** |
+| D2, D4 | Low | Unused members and events | Mech | **Pass 1** |
+| D3 | Low | Session data parsed but never read | Mech | **Skipped** (cheap; unused reads have come in handy) |
+| D5 | Low | Stale files in `Planning/` and the repo root; dead csproj entries | Mech | **Pass 1**, except the stale PDF, which you regenerate before release |
+| C1–C3, C5, C7 | Low | Duplicated helpers, scale factors, magic numbers | Mech | Deferred to the post-pass plan update |
+| C4, C6, C8 | Low | Larger consolidations | — | Deferred (architecture work) |
+| F1–F4 | — | Files over 500 lines: split plans | Mech | Deferred to the post-pass plan update (F1 needs T2) |
+| A1–A5 | — | Separation-of-concerns items | — | Deferred until after the CI pipeline work |
+| P1–P4 | Low | Small per-frame waste (brushes, list copies, log I/O, notifications) | Small | **Pass 3** |
+| P5 | — | Measure the transparent-window rendering cost on your rig | — | **Skipped** |
+| S1 | Med | CI token has write access during the build job | Small | **Pass 3** |
+| S2 | Med | CI actions and Inno Setup not pinned to fixed versions | Small | **Pass 3** |
+| S3, S4 | Low | Log privacy, license notice | Small | **Pass 3** |
+| S5 | Low | Named-object squatting | — | **Accepted** |
+| S6 | Low | Installer `DelTree` scope | — | Covered by B4 |
+| T1 | Med | CI never builds or runs the tests | Small | Deferred to the CI pipeline discussion |
+| T2 | Med | No tests for PositionCalculator (needed before splitting it) | Mech | Deferred to the CI pipeline discussion |
 
 ---
 
@@ -299,45 +304,77 @@ Attack surface: local files (settings, shift models, track catalog, logs), one H
 
 ---
 
-## Debug-only tooling: verdicts (your decision)
+## Debug-only tooling: verdicts and decisions
 
 | Tool | Build | What it's for | Status | Recommendation |
 |---|---|---|---|---|
 | `WetResearchLogger` | Debug | 60 Hz wet-track data for a future wet shift model | Open research | **Keep** |
 | `ShiftPointLogger` | Debug | Learner samples, fits and curves, for comparing cars | Feature just shipped, still tuning | **Keep** for now |
-| `RelativeGapLogger` + `LogDiagnosticRow` | Debug | Relative-gap flicker investigation | Fixed in 1.1 (reject-and-hold) | **Remove.** Saves about 50 lines in `RelativeDisplayBuilder`. |
-| `TelemetryCSVLogger` | Debug | 1 Hz per-car telemetry CSV | iRacing's own `.ibt` recordings capture the same data at 60 Hz; also not thread-safe (called from pool threads) | **Remove** |
-| `SessionDataLogger` | Release-compiled, Debug-used | Raw session YAML dumps | iRacing `.ibt` files include the session YAML too | **Remove**, or gate with `#if DEBUG` if you use it for fixtures |
-| Finish diagnostics (`[Finish]`, `[Leader]`, latch and freeze lines) | **Release**, Info | Finishing-position investigation (1.1) | Cheap, but about 100 lines of `PositionCalculator` | **Keep for one more release**, then demote to Debug once a few real race finishes look right |
+| `RelativeGapLogger` + `LogDiagnosticRow` | Debug | Relative-gap flicker investigation | Fixed in 1.1 (reject-and-hold) | **Remove.** Saves about 50 lines in `RelativeDisplayBuilder`. *Decided: remove (Pass 1).* |
+| `TelemetryCSVLogger` | Debug | 1 Hz per-car telemetry CSV | iRacing's own `.ibt` recordings capture the same data at 60 Hz; also not thread-safe (called from pool threads) | **Remove.** *Decided: remove (Pass 1).* |
+| `SessionDataLogger` | Release-compiled, Debug-used | Raw session YAML dumps | iRacing `.ibt` files include the session YAML too | **Remove**, or gate with `#if DEBUG` if you use it for fixtures. *Decided: remove (Pass 1).* |
+| Finish diagnostics (`[Finish]`, `[Leader]`, latch and freeze lines) | **Release**, Info | Finishing-position investigation (1.1) | Cheap, but about 100 lines of `PositionCalculator` | **Keep for one more release**, then demote to Debug once a few real race finishes look right. *Decided: keep.* |
 | Frame-gap / handler-latency detectors | Release | Telemetry health | Cheap, useful | **Keep** |
 | Debug Mode LapDistPct readout | Release (user-visible) | Catalog calibration | Useful | **Keep** |
 | `[ShiftPoint] progress` log | Release, Info | Learner progress | Already throttled to 10 min once settled | **Keep** |
 
 ---
 
-## Proposed 1.2.1 revision set (for us to shape)
+## Agreed revision plan: three gated passes
 
-In commit order. Each commit is validated with a clean Debug+Release build before it's pushed.
-1. **Dead code and hygiene:** D1–D5, plus removing the debug loggers you approve. *Mech.*
-2. **Bug fixes, one commit each:** B1, B2, B5, B6, B7, B8. *Small.*
-3. **Installer:** B4. *Small; needs a Windows upgrade-install test.*
-4. **Ordered frame delivery:** B3. *Retest on track.* This is the one behaviour-touching change I'd still take before release, because it is the root cause of several latent issues.
-5. **Consolidation and tidy-ups:** C1–C3, C5, C7, P1–P4. *Mech/Small.*
-6. **PositionCalculator:** characterization tests (T2), then the split (F1). Then the other splits (F2–F4). *Mech.*
-7. **CI:** T1, S1, S2. **Docs and logs:** S3, S4, plus a README note on catalog edits.
+Each pass:
+- builds Debug and Release with 0 warnings and 0 errors before it is pushed to `claude/zen-carson-2vx0dk`
+- adds `[Unreleased]` entries to `CHANGELOG.md` (the version bump is left until release)
+- **stops** for compile-and-test on your rig before the next pass starts
 
-**1.3 backlog:** A1–A5, C4, C6, C8, and P5 follow-ups if the measurement warrants them.
+### Pass 1: dead code, three debug loggers, small bug fixes (one commit)
 
-## On-rig checklist (after the revisions)
+- **Dead code:** D1, D2, D4 and D5 (not the PDF).
+  - `RelativeRowViewModel.IncidentCount` stays: it is the same kind of unused read as D3.
+  - Also kept on purpose:
+    - `ShiftPointLearner.RelativeTorqueAt` and `ShiftCue.RpmRate`, which the tests use.
+    - `RelativeViewModel`'s `INotifyPropertyChanged`, which avoids WPF's binding memory leak and a CS0067 warning.
+- **Loggers removed:** RelativeGap, TelemetryCSV and SessionData, including the raw session-YAML stash that only SessionData used.
+- **Bug fixes:** B1, B2 (including the same lifetime fix for a radar window closed with Alt+F4), B5, B6, B7, B8.
+- **Rig checklist:**
+  - **Radar ghosts:** leave a session and join another; no stuck car blocks on the radar.
+  - **Exit from the ⚙ window:** close the config window with Done, click ⚙ on the overlay, then **Exit VISOR**; VISOR closes.
+  - **Second launch:** with the config window closed, launch VISOR again (or press the Stream Deck button); the running instance comes to the front.
+  - **Radar toggle:** turn the radar off and on.
+  - **Track location:** the readout still resolves, and the log shows `[TrackSections] Loaded 66 track entries`.
+  - **Shift points:** shift models still save, and the indicator and calibration dot behave as before.
+  - **Debug build only:** no `Telemetry`, `RelativeGap` or `SessionData` folders under `%LOCALAPPDATA%\VISOR\Diagnostics`; `ShiftPoints` and `WetResearch` are still written.
 
-- Practice → qualifying → race, through the checkered:
-  - Final Lap and FINISHED latch.
-  - Finishing positions hold.
-  - The qualifying lap count is right.
-- Leave and join sessions, and disconnect/reconnect iRacing: no ghost cars on the radar.
-- ⚙ on the overlay → config window → **Exit VISOR** closes the app.
-- Close the config window with Done, then launch VISOR again: it comes to the front.
-- Shift indicator, calibration dot and track-location readout behave as in 1.2.1.
-- Upgrade-install over 1.2.1: settings, logs and shift models survive.
-- Task Manager CPU, GPU and memory for about 30 minutes, compared with 1.2.1.
-- Logs contain none of `Session time went backwards`, `raised on the same sample` or `did not shut down gracefully` outside genuine session resets.
+### Pass 2: ordered frame delivery (B3, with B9; one commit)
+
+- **Frame delivery:** snapshots are raised on the SDK's single telemetry thread and posted to the UI with a non-blocking `BeginInvoke` at the same priority as today. That keeps frames in order, and a capped backlog drops frames rather than queueing them when the UI stalls; drops are logged as `[FrameBacklog]`.
+- **Exit hang (B9):** the connection-state and primed-state handlers stop blocking too.
+- **Rig checklist:**
+  - A full practice → qualifying → race through the checkered: Final Lap and FINISHED latch, finishing positions hold, and the qualifying lap countdown is correct.
+  - Relative gaps and positions are steady.
+  - Exit is prompt.
+  - Logs show none of `Session time went backwards`, `raised on the same sample` or `did not shut down gracefully` mid-session; `[FrameBacklog]` is rare or absent.
+  - CPU is comparable to Pass 1.
+
+### Pass 3: performance, security and docs, installer (one commit per theme)
+
+- **Performance:** P1 (cached frozen brushes), P2 (fastest-lap lookup once per frame), P3 (persistent log writer), P4 (delta bar change checks).
+- **Security and docs:**
+  - S1: the CI build job gets read-only access; only the sign job can write.
+  - S2: actions pinned to commit SHAs, a pinned Inno Setup version, and Dependabot for GitHub Actions.
+  - S3: no machine name in the log header, and `%USERPROFILE%` in place of the profile path.
+  - S4: the lovely-track-data license notice in `LICENSE.txt`, and a README note that catalog edits are replaced on upgrade.
+- **Installer:** B4. The recursive `DelTree` goes, replaced by targeted `[InstallDelete]` entries for VISOR's own DLLs, `deps.json`/`runtimeconfig.json` and `runtimes\`.
+- **Rig checklist:**
+  - Compile the installer.
+  - Do a fresh install and an upgrade over 1.2.1. Settings, logs and shift models survive; there are no stale DLLs and no `System.Management.dll`.
+  - The overlay and radar behave as before.
+  - The log has no machine name, and it can be opened while VISOR runs.
+  - CPU and memory over about 30 minutes, compared with Pass 2.
+  - CI is green with the pinned actions.
+
+### Next (after Pass 3)
+
+1. Update this plan with what's left: D3 (skipped), the C items, the F splits, T1/T2, A1–A5 and P5.
+2. A broader discussion about a full CI test pipeline, then build it (T1, T2 and beyond).
+3. The architecture work (A1–A5, C4, C6, C8), with that test pipeline in place.

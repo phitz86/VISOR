@@ -92,10 +92,7 @@ namespace VISOR.Telemetry
         float SLShiftRPM,
         int GearNumForward,
         float SLLastRPM = 0f,
-        float SLBlinkRPM = 0f)
-    {
-        public bool HasShiftLights => SLShiftRPM > 0f;
-    }
+        float SLBlinkRPM = 0f);
 
     public class SessionTransitionData
     {

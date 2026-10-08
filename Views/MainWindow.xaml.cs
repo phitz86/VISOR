@@ -66,7 +66,7 @@ namespace VISOR.Views
             Top = windowPosition.Y;
         }
 
-        private void OnElementVisibilityChanged(object? sender, ElementVisibilityChangedEventArgs e)
+        private void OnElementVisibilityChanged(object? sender, EventArgs e)
         {
             Dispatcher.Invoke(() =>
             {
@@ -232,17 +232,7 @@ namespace VISOR.Views
 
         private void ConfigButton_Click(object? sender, RoutedEventArgs e)
         {
-            foreach (Window window in Application.Current.Windows)
-            {
-                if (window is ConfigWindow)
-                {
-                    window.Activate();
-                    return;
-                }
-            }
-
-            ConfigWindow configWindow = new ConfigWindow(_sdk, this);
-            configWindow.Show();
+            ((App)Application.Current).ShowConfigWindow();
         }
 
         protected override void OnClosed(EventArgs e)

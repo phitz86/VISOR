@@ -175,8 +175,6 @@ namespace VISOR.Telemetry
             return anyMatch;
         }
 
-        public double GetBinWeight(int bin) => bin >= 0 && bin < BinCount ? _binWeight[bin] : 0;
-
         /// <summary>
         /// Feeds one frame. Updates the gear-ratio estimate whenever the drivetrain is locked up,
         /// and adds a torque-model sample when the frame is a clean full-throttle frame.
@@ -326,16 +324,15 @@ namespace VISOR.Telemetry
             double dTop = Diff(redLine);
             if (dTop <= 0)
             {
-                double prevR = redLine, prevD = dTop;
+                double prevD = dTop;
                 for (double r = redLine - step; r >= minRpm; r -= step)
                 {
                     double d = Diff(r);
                     if (d > 0)
                     {
-                        crossover = r + step * d / (d - prevD);   // interpolate between r and prevR
+                        crossover = r + step * d / (d - prevD);   // interpolate between r and r + step
                         break;
                     }
-                    prevR = r;
                     prevD = d;
                 }
                 if (double.IsNaN(crossover)) crossesBelowHalf = true;   // next gear stronger everywhere we look

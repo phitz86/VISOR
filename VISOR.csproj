@@ -15,21 +15,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Archive\**" />
-    <Compile Remove="Raw outputs\**" />
     <Compile Remove="Tests\**" />
     <None Remove="Tests\**" />
-    <EmbeddedResource Remove="Archive\**" />
-    <EmbeddedResource Remove="Raw outputs\**" />
-    <None Remove="Archive\**" />
-    <None Remove="Raw outputs\**" />
-    <Page Remove="Archive\**" />
-    <Page Remove="Raw outputs\**" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="SVappsLAB.iRacingTelemetrySDK" Version="2.5.0" />
-    <PackageReference Include="System.Management" Version="10.0.12" />
   </ItemGroup>
 
   <ItemGroup>

@@ -31,7 +31,7 @@ namespace VISOR.Views
             _sdk = sdkWrapper;
             _settingsManager = SettingsManager.Instance;
             _configModeManager = ConfigModeManager.Instance;
-            _viewModel = new RadarViewModel(classColorManager);
+            _viewModel = new RadarViewModel(classColorManager, CarsContainer);
             DataContext = _viewModel;
 
             AllowsTransparency = true;
@@ -92,15 +92,14 @@ namespace VISOR.Views
             RadarCanvas.Height = height;
 
             double zoneWidth = width / 5;
-            double centerY = height / 2;
 
-            UpdateRadarLines(width, height, scaleFactor);
-            UpdateZoneHighlights(width, height, zoneWidth);
-            UpdatePlayerCar(width, height, scaleFactor, zoneWidth);
-            UpdateZoneLabelsGrid(width, height);
+            UpdateRadarLines(width, height);
+            UpdateZoneHighlights(height, zoneWidth);
+            UpdatePlayerCar(height, scaleFactor, zoneWidth);
+            UpdateZoneLabelsGrid(width);
         }
 
-        private void UpdateRadarLines(double width, double height, double scaleFactor)
+        private void UpdateRadarLines(double width, double height)
         {
             var lines = RadarCanvas.Children.OfType<Line>().ToList();
 
@@ -138,7 +137,7 @@ namespace VISOR.Views
             }
         }
 
-        private void UpdateZoneHighlights(double width, double height, double zoneWidth)
+        private void UpdateZoneHighlights(double height, double zoneWidth)
         {
             var highlights = new[] { LeftZone1Highlight, LeftZone2Highlight, CenterZoneHighlight, RightZone2Highlight, RightZone1Highlight };
 
@@ -152,7 +151,7 @@ namespace VISOR.Views
             }
         }
 
-        private void UpdatePlayerCar(double width, double height, double scaleFactor, double zoneWidth)
+        private void UpdatePlayerCar(double height, double scaleFactor, double zoneWidth)
         {
             double baseCarWidth = 24;
             double baseCarHeight = 36;
@@ -176,7 +175,7 @@ namespace VISOR.Views
             PlayerCarNumber.FontSize = Math.Max(8, 12 * scaleFactor);
         }
 
-        private void UpdateZoneLabelsGrid(double width, double height)
+        private void UpdateZoneLabelsGrid(double width)
         {
             var grid = RadarCanvas.Children.OfType<Grid>().FirstOrDefault();
             if (grid != null)
@@ -295,7 +294,7 @@ namespace VISOR.Views
 
                     UpdatePlayerCarDisplay(snapshot);
 
-                    _viewModel.UpdateFromTelemetry(snapshot, _sdk.Coordinator, CarsContainer);
+                    _viewModel.UpdateFromTelemetry(snapshot, _sdk.Coordinator);
 
                     UpdateZoneHighlights(snapshot);
 

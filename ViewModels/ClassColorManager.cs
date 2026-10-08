@@ -132,26 +132,6 @@ namespace VISOR.ViewModels
         }
 
         /// <summary>
-        /// Checks if a class has been assigned a color yet.
-        /// </summary>
-        /// <param name="classID">The car class ID</param>
-        /// <returns>True if the class has a color assignment</returns>
-        public bool HasColorAssignment(int classID)
-        {
-            return _classColorMap.ContainsKey(classID);
-        }
-
-        /// <summary>
-        /// Gets all current class color assignments.
-        /// Useful for debugging or displaying class legends.
-        /// </summary>
-        /// <returns>Dictionary of class ID to color mappings</returns>
-        public Dictionary<int, Brush> GetAllAssignments()
-        {
-            return new Dictionary<int, Brush>(_classColorMap);
-        }
-
-        /// <summary>
         /// Resets all color assignments.
         /// Call this when starting a new session or changing tracks.
         /// </summary>
@@ -161,10 +141,5 @@ namespace VISOR.ViewModels
             _classTextMap.Clear();
             Log.Info("[ClassColorManager] Reset - all color assignments cleared");
         }
-
-        /// <summary>
-        /// Gets the number of classes that have been assigned colors.
-        /// </summary>
-        public int AssignedClassCount => _classColorMap.Count;
     }
 }

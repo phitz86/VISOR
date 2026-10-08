@@ -10,7 +10,7 @@
     "'gp' from hitting 'gpshort'. An entry with an empty 'configs' list applies",
     "to every layout of the venue; a config-specific entry wins over a",
     "config-agnostic one. Real slugs for most layouts are listed in",
-    "Planning/iracing-track-identities.json; tools/validate_track_catalog.py",
+    "tools/iracing-track-identities.json; tools/validate_track_catalog.py",
     "checks this file against them.",
     "Sections: ordered by 'pct', the fraction of lap distance (iRacing LapDistPct,",
     "0 = start/finish line) where the section begins. Each section runs until the",

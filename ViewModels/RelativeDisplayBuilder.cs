@@ -47,13 +47,6 @@ namespace VISOR.ViewModels
         private const float AHEAD_BEHIND_HYSTERESIS_METERS = 2.0f;
         private const float AHEAD_BEHIND_HYSTERESIS_DEFAULT_PCT = 0.0004f; // ~2 m on a ~5 km track
 
-        // DEBUG diagnostic gate: the relative-gap CSV logs a row only while a car is within this
-        // geometric distance of the player (~3 car lengths, ~0.2-0.3s at racing speed). Gating on
-        // distance (not the time-gap readout) keeps the flicker frames — where the gap glitches to a
-        // full lap — inside the window instead of filtering them out. Tighten/loosen to taste.
-        private const float LOG_PROXIMITY_METERS = 15f;
-        private const float LOG_PROXIMITY_FALLBACK_PCT = 0.003f; // ~15 m on a ~5 km track when length unknown
-
         private const int DEBUG_LOG_INTERVAL = 60; // ~1s at 60Hz
 
         private static readonly Color NeutralColor = (Color)ColorConverter.ConvertFromString("#80404040");
@@ -70,10 +63,6 @@ namespace VISOR.ViewModels
         private readonly PositionCalculator _positionCalculator;
         private readonly PositionHistoryManager _historyManager;
 
-#if DEBUG
-        private readonly RelativeGapLogger _gapLogger;
-#endif
-
         private int _debugFrameCounter = 0;
         #endregion
 
@@ -88,9 +77,6 @@ namespace VISOR.ViewModels
             _classColorManager = classColorManager;
             _positionCalculator = positionCalculator;
             _historyManager = historyManager;
-#if DEBUG
-            _gapLogger = new RelativeGapLogger();
-#endif
         }
         #endregion
 
@@ -98,9 +84,6 @@ namespace VISOR.ViewModels
         public List<RelativeRowViewModel> Calculate(SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider)
         {
             _debugFrameCounter++;
-#if DEBUG
-            _gapLogger?.BeginFrame();
-#endif
 
             _historyManager.Update(snapshot, dataProvider);
 
@@ -293,14 +276,13 @@ namespace VISOR.ViewModels
             var playerRow = displayRows.FirstOrDefault(r => r.IsPlayer);
             if (playerRow == null) return;
 
-            for (int i = 0; i < displayRows.Count; i++)
+            foreach (var row in displayRows)
             {
-                var row = displayRows[i];
                 AssignClassPositionDisplay(row, isFastestLapMode, dataProvider);
                 AssignNameColor(row, playerRow);
                 AssignClassBackgroundColor(row, carClassColors, carClassIDs);
                 AssignFontStyle(row);
-                AssignProximitySegments(row, playerRow, snapshot, i);
+                AssignProximitySegments(row, playerRow, snapshot);
             }
         }
 
@@ -355,7 +337,7 @@ namespace VISOR.ViewModels
             row.FontStyle = row.IsOnPitRoad ? FontStyles.Italic : FontStyles.Normal;
         }
 
-        private void AssignProximitySegments(RelativeRowViewModel row, RelativeRowViewModel playerRow, SVappsLABSnapshot snapshot, int slotIndex)
+        private void AssignProximitySegments(RelativeRowViewModel row, RelativeRowViewModel playerRow, SVappsLABSnapshot snapshot)
         {
             if (row.IsPlayer)
             {
@@ -382,10 +364,6 @@ namespace VISOR.ViewModels
                 row.Segment3Color = PitGrayBrush;
                 row.Segment4Color = PitGrayBrush;
                 row.Segment5Color = PitGrayBrush;
-
-#if DEBUG
-                LogDiagnosticRow(snapshot, slotIndex, row, playerRow, distDelta, isAhead, "pit", 0f, row.GapText);
-#endif
                 return;
             }
 
@@ -408,10 +386,6 @@ namespace VISOR.ViewModels
                     row.GapText = string.Empty;
                 }
                 ClearSegments(row);
-
-#if DEBUG
-                LogDiagnosticRow(snapshot, slotIndex, row, playerRow, distDelta, isAhead, "stationary", 0f, row.GapText);
-#endif
                 return;
             }
 
@@ -424,9 +398,6 @@ namespace VISOR.ViewModels
             // continuous through dead-even, killing the 0.0 <-> full-lap flicker.
             double sessionTime = snapshot.SessionTime;
             var playerBuffer = _historyManager.GetBuffer(playerRow.CarIdx);
-#if DEBUG
-            string gapSource = "buffer";
-#endif
 
             float aheadGap = CrossingGap(oppBuffer, playerRow.LapDistPct, sessionTime);
             float behindGap = CrossingGap(playerBuffer, row.LapDistPct, sessionTime);
@@ -441,9 +412,6 @@ namespace VISOR.ViewModels
             else
             {
                 // Both buffers missed — hold previous display state instead of blanking the row.
-#if DEBUG
-                LogDiagnosticRow(snapshot, slotIndex, row, playerRow, distDelta, isAhead, "none", 0f, row.GapText);
-#endif
                 return;
             }
 
@@ -473,10 +441,6 @@ namespace VISOR.ViewModels
 
             row.GapColor = Brushes.White;
             row.GapFontWeight = FontWeights.SemiBold;
-
-#if DEBUG
-            LogDiagnosticRow(snapshot, slotIndex, row, playerRow, distDelta, isAhead, gapSource, displayGap, row.GapText);
-#endif
 
             if (_debugFrameCounter % DEBUG_LOG_INTERVAL == 0 && displayGap <= TIME_SEG2_AWARE)
             {
@@ -533,35 +497,6 @@ namespace VISOR.ViewModels
             row.Segment5Color = Brushes.Transparent;
             row._lastActiveSegmentCount = 0;
         }
-
-#if DEBUG
-        private void LogDiagnosticRow(SVappsLABSnapshot snapshot, int slotIndex, RelativeRowViewModel row,
-            RelativeRowViewModel playerRow, float distDelta, bool isAhead, string gapSource,
-            float displayGap, string gapText)
-        {
-            // Proximity gate: only log while a car is near the player, measured geometrically so the
-            // window stays valid even when the time-gap readout glitches to a full lap.
-            float trackLengthMeters = _historyManager.TrackLengthMeters;
-            bool isClose = (trackLengthMeters > 0f)
-                ? Math.Abs(distDelta) * trackLengthMeters <= LOG_PROXIMITY_METERS
-                : Math.Abs(distDelta) <= LOG_PROXIMITY_FALLBACK_PCT;
-            if (!isClose) return;
-
-            // Position-number path (the sort the relative slot can't show): assigned positions and the
-            // trackPosition that drives PositionCalculator's ordering.
-            int classPos = _positionCalculator.GetClassPosition(row.CarIdx, row.ClassID);
-            int overallPos = _positionCalculator.GetOverallPosition(row.CarIdx);
-            float trackPosition = row.CurrentLap + row.LapDistPct;
-
-            float sessionTime = (float)snapshot.SessionTime;
-            _gapLogger?.LogRow(
-                sessionTime, slotIndex, row.CarNum,
-                playerRow.LapDistPct, row.LapDistPct,
-                distDelta, isAhead,
-                gapSource, displayGap, gapText,
-                classPos, overallPos, trackPosition);
-        }
-#endif
 
         private Color BlendColors(Color color1, Color color2, double ratio)
         {

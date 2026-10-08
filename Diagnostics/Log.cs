@@ -33,16 +33,6 @@ namespace VISOR.Diagnostics
         public static Level MinimumLevel { get; set; } = Level.Info;
 
         /// <summary>
-        /// Enable or disable writing logs to file.
-        /// </summary>
-        public static bool EnableFileLogging { get; set; } = true;
-
-        /// <summary>
-        /// Enable or disable Debug.WriteLine output for all log messages.
-        /// </summary>
-        public static bool EnableDebugOutput { get; set; } = true;
-
-        /// <summary>
         /// Convenience property that sets MinimumLevel to Debug when true, Info when false.
         /// </summary>
         public static bool DebugModeEnabled
@@ -118,7 +108,7 @@ namespace VISOR.Diagnostics
             // Write directly instead of queueing so the header always lands first.
             lock (_fileLock)
             {
-                if (EnableFileLogging && !string.IsNullOrEmpty(_currentLogFilePath))
+                if (!string.IsNullOrEmpty(_currentLogFilePath))
                 {
                     File.AppendAllText(_currentLogFilePath, header.ToString());
                 }
@@ -186,12 +176,9 @@ namespace VISOR.Diagnostics
                 string levelStr = level.ToString().ToUpper().PadRight(7);
                 string logEntry = $"[{timestamp}] [{levelStr}] {message}";
 
-                if (EnableDebugOutput)
-                {
-                    System.Diagnostics.Debug.WriteLine(logEntry);
-                }
+                System.Diagnostics.Debug.WriteLine(logEntry);
 
-                if (EnableFileLogging && !string.IsNullOrEmpty(_currentLogFilePath))
+                if (!string.IsNullOrEmpty(_currentLogFilePath))
                 {
                     _logQueue.Add(logEntry);
                 }
