@@ -36,48 +36,56 @@ namespace VISOR.Diagnostics
                 var parser = new Parser(new StringReader(yaml));
                 while (parser.MoveNext()) { }
             }
-            catch (YamlException ex)
+            catch (Exception ex)
             {
-                string key = $"{ex.Start.Line}:{ex.Start.Column}:{ex.Message}";
+                // Usually a YamlException carrying the error's position, but some malformed input
+                // (e.g. a value starting with '{' or '[') makes YamlDotNet throw
+                // InvalidOperationException instead, with no position.
+                Mark? position = ex is YamlException yamlEx ? yamlEx.Start : null;
+                string key = $"{position?.Line}:{position?.Column}:{ex.GetType().Name}:{ex.Message}";
                 if (key == _lastFailureKey)
                     return;
                 _lastFailureKey = key;
-                Save(yaml, ex);
-            }
-            catch (Exception ex)
-            {
-                Log.Error("[SessionYaml] check failed", ex);
+                Save(yaml, ex, position);
             }
         }
 
-        private void Save(string yaml, YamlException ex)
+        private void Save(string yaml, Exception ex, Mark? position)
         {
             try
             {
                 string dir = Path.Combine(Log.GetDiagnosticsDirectory(), "SessionYaml");
                 Directory.CreateDirectory(dir);
                 string path = Path.Combine(dir, $"parse-failure_{DateTime.Now:yyyyMMdd-HHmmss}_{_filesWritten + 1}.yaml");
-
-                // The offending line with a few either side, so the log alone usually shows it.
-                string[] lines = yaml.Replace("\r\n", "\n").Split('\n');
-                int errorLine = (int)Math.Clamp(ex.Start.Line, 1, Math.Max(lines.Length, 1));
-                int from = Math.Max(errorLine - 4, 1), to = Math.Min(errorLine + 2, lines.Length);
-                var excerpt = new System.Text.StringBuilder();
-                for (int n = from; n <= to; n++)
-                    excerpt.Append(n == errorLine ? ">> " : "   ").Append(n).Append(": ").AppendLine(lines[n - 1]);
+                string where = position is { } p ? $"line {p.Line}, column {p.Column}" : "an unknown position";
+                string error = $"{ex.GetType().Name}: {ex.Message}";
 
                 File.WriteAllText(path,
-                    $"# YAML parse error at line {ex.Start.Line}, column {ex.Start.Column}: {ex.Message}\n" +
+                    $"# YAML parse error at {where}: {error}\n" +
                     "# Contains every driver's name and iRacing ID - check before sharing.\n" + yaml);
                 _filesWritten++;
 
-                Log.Warning($"[SessionYaml] session info failed to parse at line {ex.Start.Line}, column {ex.Start.Column} " +
-                            $"({ex.Message}); saved to {path}\n{excerpt}");
+                Log.Warning($"[SessionYaml] session info failed to parse at {where} ({error}); saved to {path}" +
+                            (position is { } at ? "\n" + Excerpt(yaml, at.Line) : string.Empty));
             }
             catch (Exception saveEx)
             {
                 Log.Error("[SessionYaml] could not save the failing session info", saveEx);
             }
+        }
+
+        // The offending line with a few either side, so the log alone usually shows it. A value
+        // broken across lines is reported on the line after the break, so the lines before the
+        // error matter most.
+        private static string Excerpt(string yaml, long errorLine)
+        {
+            string[] lines = yaml.Replace("\r\n", "\n").Split('\n');
+            int target = (int)Math.Clamp(errorLine, 1, Math.Max(lines.Length, 1));
+            int from = Math.Max(target - 4, 1), to = Math.Min(target + 2, lines.Length);
+            var excerpt = new System.Text.StringBuilder();
+            for (int n = from; n <= to; n++)
+                excerpt.Append(n == target ? ">> " : "   ").Append(n).Append(": ").AppendLine(lines[n - 1]);
+            return excerpt.ToString();
         }
     }
 #endif
