@@ -12,6 +12,9 @@
 
   <ItemGroup>
     <Compile Include="..\..\Telemetry\ShiftPointLearner.cs" Link="Linked\ShiftPointLearner.cs" />
+    <Compile Include="..\..\Telemetry\ShiftModelTypes.cs" Link="Linked\ShiftModelTypes.cs" />
+    <Compile Include="..\..\Telemetry\RatioTracker.cs" Link="Linked\RatioTracker.cs" />
+    <Compile Include="..\..\Telemetry\LinearSolver.cs" Link="Linked\LinearSolver.cs" />
     <Compile Include="..\..\Telemetry\ShiftModelStore.cs" Link="Linked\ShiftModelStore.cs" />
     <Compile Include="..\..\ViewModels\ShiftCue.cs" Link="Linked\ShiftCue.cs" />
     <Compile Include="..\..\ViewModels\FuelViewModel.cs" Link="Linked\FuelViewModel.cs" />

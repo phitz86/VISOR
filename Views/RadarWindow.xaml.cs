@@ -355,37 +355,19 @@ namespace VISOR.Views
 
             const double highlightOpacity = 0.15;
 
-            switch (carLeftRight)
-            {
-                case "CarLeft":
-                    LeftZone2Highlight.Opacity = highlightOpacity;
-                    break;
-
-                case "CarRight":
-                    RightZone2Highlight.Opacity = highlightOpacity;
-                    break;
-
-                case "CarLeftRight":
-                    LeftZone2Highlight.Opacity = highlightOpacity;
-                    RightZone2Highlight.Opacity = highlightOpacity;
-                    break;
-
-                case "TwoCarsLeft":
-                    LeftZone1Highlight.Opacity = highlightOpacity;
-                    LeftZone2Highlight.Opacity = highlightOpacity;
-                    break;
-
-                case "TwoCarsRight":
-                    RightZone1Highlight.Opacity = highlightOpacity;
-                    RightZone2Highlight.Opacity = highlightOpacity;
-                    break;
-
-                case "Clear":
-                case "Off":
-                default:
-                    break;
-            }
+            foreach (var zone in RadarViewModel.SideZonesFor(carLeftRight))
+                HighlightFor(zone).Opacity = highlightOpacity;
         }
+
+        // Zone 1 is the outer ("far") lane on each side, zone 2 the inner ("near") one.
+        private UIElement HighlightFor(RadarZone zone) => zone switch
+        {
+            RadarZone.LeftFar => LeftZone1Highlight,
+            RadarZone.LeftNear => LeftZone2Highlight,
+            RadarZone.RightNear => RightZone2Highlight,
+            RadarZone.RightFar => RightZone1Highlight,
+            _ => CenterZoneHighlight,
+        };
 
         private void ResetZoneHighlights()
         {

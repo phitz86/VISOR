@@ -83,6 +83,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Internal tidy-ups, no change in behaviour** — named constants replace the session-state,
+  flag and pace-car magic numbers; the size-preset scale factors, car-name-to-file-name rules and
+  debug-log file naming each live in one place; one table drives the radar's side-zone
+  assignment and highlights; and the shift-point learner, the shift-point provider and the
+  relative display builder are split into smaller files (none now much over 500 lines except the
+  position calculator, whose split waits for its tests). Debug builds only: the radar's zone log
+  lines are worded consistently, and captured session info is saved as
+  `parse-failure_<time>.yaml`.
 - **Tests and checks run on every build** — CI now runs the unit tests (100, up from 59: the new
   ones cover the fuel estimate, the position history behind the gap figures, the track catalog and
   the update check) and checks the track catalog, code whitespace and packages with known

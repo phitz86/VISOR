@@ -443,6 +443,27 @@ namespace VISOR.Settings
     }
 
     /// <summary>
+    /// How much each size preset scales the windows. The overlay and the radar scale differently,
+    /// so the radar stays readable at Small.
+    /// </summary>
+    public static class WindowScale
+    {
+        public static double ForMainWindow(WindowSizePreset preset) => preset switch
+        {
+            WindowSizePreset.Small => 0.6,
+            WindowSizePreset.Medium => 0.8,
+            _ => 1.0
+        };
+
+        public static double ForRadar(WindowSizePreset preset) => preset switch
+        {
+            WindowSizePreset.Small => 0.8,
+            WindowSizePreset.Medium => 0.9,
+            _ => 1.0
+        };
+    }
+
+    /// <summary>
     /// How race positions are displayed throughout the overlay.
     /// Class = position within the car's own class (default).
     /// Overall = position across the entire field, regardless of class.

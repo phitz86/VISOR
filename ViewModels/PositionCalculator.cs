@@ -26,17 +26,11 @@ namespace VISOR.ViewModels
         private const int MAX_CACHE_AGE_FRAMES = 180; // 3 seconds at 60Hz
         private const int LOG_PREDICTION_THRESHOLD = 30; // Log predictions lasting >30 frames
         private const float MIN_VELOCITY_THRESHOLD = 0.00001f; // Minimum velocity to use prediction
-        private const int PACE_CAR_CLASS_ID = 11; // iRacing pace/safety car class - excluded from overall field positions
-        private const int SESSION_STATE_RACING = 4; // irsdk SessionState: green flag is out (ParadeLaps=3 -> Racing=4)
 
         // S/F crossing detection for the lap-number desync correction below.
         private const float SF_WRAP_HIGH = 0.9f;
         private const float SF_WRAP_LOW = 0.1f;
         private const int LAP_DESYNC_MAX_FRAMES = 30; // ~0.5s at 60Hz - the correction is a bridge, not a state
-
-        // SessionFlags bits that bear on the finish (irsdk: checkered 0x1, white 0x2, green 0x4).
-        // Masked so the finish diagnostics don't log on every caution or start-light change.
-        private const int FINISH_FLAG_MASK = 0x7;
         #endregion
 
         #region Private Fields - Core State
@@ -292,7 +286,7 @@ namespace VISOR.ViewModels
             int sessionState = snapshot.SessionState;
             bool wasCheckeredFlag = _isCheckeredFlag;
 
-            _isCheckeredFlag = (sessionState == 5 || sessionState == 6);
+            _isCheckeredFlag = SessionStates.IsCheckered(sessionState);
 
             if (!wasCheckeredFlag && _isCheckeredFlag)
             {
@@ -314,7 +308,8 @@ namespace VISOR.ViewModels
         /// </summary>
         private void LogFinishPhaseTransitions(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
-            int finishFlags = snapshot.SessionFlags & FINISH_FLAG_MASK;
+            // Masked so the finish diagnostics don't log on every caution or start-light change.
+            int finishFlags = snapshot.SessionFlags & IRacingIds.FinishFlagsMask;
             int sessionState = snapshot.SessionState;
 
             if (finishFlags == _lastLoggedFinishFlags && sessionState == _lastLoggedSessionState)
@@ -364,9 +359,9 @@ namespace VISOR.ViewModels
                 return "none";
 
             var parts = new List<string>(3);
-            if ((finishFlags & 0x4) != 0) parts.Add("Green");
-            if ((finishFlags & 0x2) != 0) parts.Add("White");
-            if ((finishFlags & 0x1) != 0) parts.Add("Checkered");
+            if ((finishFlags & (int)SessionFlags.Green) != 0) parts.Add("Green");
+            if ((finishFlags & (int)SessionFlags.White) != 0) parts.Add("White");
+            if ((finishFlags & (int)SessionFlags.Checkered) != 0) parts.Add("Checkered");
             return string.Join("|", parts);
         }
 
@@ -587,7 +582,7 @@ namespace VISOR.ViewModels
         {
             // No car can take the green before the green flag is out. Until then everyone stays on
             // grid order (handled by GetPreGreenSortKey), which is steady through the parade lap.
-            if (snapshot.SessionState < SESSION_STATE_RACING)
+            if (snapshot.SessionState < SessionStates.Racing)
                 return;
 
             var lapCompleted = snapshot.CarIdxLapCompleted;
@@ -1106,7 +1101,7 @@ namespace VISOR.ViewModels
             // Exclude the pace car so it never consumes a field slot and shifts the real cars down.
             // (The per-class path isolates it in its own class group, which the global sort can't.)
             var sortedCars = carsWithPositions
-                .Where(c => c.ClassId != PACE_CAR_CLASS_ID)
+                .Where(c => c.ClassId != IRacingIds.PaceCarClassId)
                 .OrderByDescending(c => c.OverallSortKey)
                 .ToList();
             int nextPosition = 1;

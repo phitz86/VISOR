@@ -55,12 +55,12 @@ Status reflects the revision plan agreed after the review (see "Agreed revision 
 | D2, D4 | Low | Unused members and events | Mech | **Done** (Pass 1) |
 | D3 | Low | Session data parsed but never read | Mech | **Skipped** (cheap; unused reads have come in handy) |
 | D5 | Low | Stale files in `Planning/` and the repo root; dead csproj entries | Mech | **Done** (Pass 1), except the stale PDF, which you regenerate before release |
-| C1–C3, C7 | Low | Duplicated helpers, scale factors, magic numbers, radar zone switches | Mech | **Proposed:** Pass 7 |
+| C1–C3, C7 | Low | Duplicated helpers, scale factors, magic numbers, radar zone switches | Mech | **Done** (Pass 7) |
 | C5 | Low | Fastest-lap positioning rebuilt per row | Mech | **Done** (as P2) |
 | C4 | Low | Session type re-derived under a lock many times per frame | — | **Proposed:** Pass 10 |
 | C6 | Low | Overlay and radar code-behind duplicate their plumbing | — | **Proposed:** Pass 12 |
-| C8 | Low | Debug loggers each re-implement folder, file name and flush | Mech | **Proposed:** Pass 7 |
-| F2–F4 | — | Files over 500 lines: split plans | Mech | **Proposed:** Pass 7 |
+| C8 | Low | Debug loggers each re-implement folder, file name and flush | Mech | **Done** (Pass 7; file naming shared, flushing left to each logger) |
+| F2–F4 | — | Files over 500 lines: split plans | Mech | **Done** (Pass 7) |
 | F1 | — | `PositionCalculator.cs` (1,137 lines): split plan | Mech | **Proposed:** Pass 9, after T2 |
 | A1 | — | Radar view model builds WPF elements | — | **Proposed:** Pass 11 |
 | A2 | — | Leaky session interface; Settings depends on Telemetry | — | **Proposed:** Pass 10 |
@@ -264,7 +264,7 @@ Test-only members to **keep**: `ShiftPointLearner.RelativeTorqueAt` and `ShiftCu
 
 ## File size (target: about 500 lines of C#)
 
-Line counts as of 2026-10-09.
+Line counts as of 2026-10-09, before Pass 7. After it: `PositionCalculator.cs` 1,132, `ShiftPointProvider.cs` 511, `ShiftPointLearner.cs` 510, `RelativeDisplayBuilder.cs` 395.
 
 | File | Lines | Split (code moves only; public API unchanged) |
 |---|---|---|

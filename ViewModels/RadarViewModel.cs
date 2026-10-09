@@ -78,18 +78,7 @@ namespace VISOR.ViewModels
             _settingsManager = SettingsManager.Instance;
         }
 
-        /// <summary>
-        /// Calculate current scale factor based on window size preset
-        /// </summary>
-        private double GetScaleFactor()
-        {
-            return _settingsManager.Settings.WindowSize switch
-            {
-                WindowSizePreset.Small => 0.8,
-                WindowSizePreset.Medium => 0.9,
-                _ => 1.0
-            };
-        }
+        private double GetScaleFactor() => WindowScale.ForRadar(_settingsManager.Settings.WindowSize);
 
         public void UpdateFromTelemetry(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
         {
@@ -184,6 +173,26 @@ namespace VISOR.ViewModels
             return (trackDistance, proximity);
         }
 
+        // The side zones each CarLeftRight state fills, closest car first. "Clear", "Off" and
+        // anything else leave every car in the centre.
+        private static readonly Dictionary<string, RadarZone[]> SideZonesByState = new()
+        {
+            ["CarLeft"] = new[] { RadarZone.LeftNear },
+            ["CarRight"] = new[] { RadarZone.RightNear },
+            ["CarLeftRight"] = new[] { RadarZone.LeftNear, RadarZone.RightNear },
+            ["TwoCarsLeft"] = new[] { RadarZone.LeftNear, RadarZone.LeftFar },
+            ["TwoCarsRight"] = new[] { RadarZone.RightNear, RadarZone.RightFar },
+        };
+
+        /// <summary>
+        /// The side zones a CarLeftRight state fills, closest car first. Drives both the zone
+        /// assignment here and the zone highlights in RadarWindow.
+        /// </summary>
+        public static IReadOnlyList<RadarZone> SideZonesFor(string carLeftRightState) =>
+            carLeftRightState != null && SideZonesByState.TryGetValue(carLeftRightState, out var zones)
+                ? zones
+                : Array.Empty<RadarZone>();
+
         private void UpdateZoneAssignments(List<RadarCarData> visibleCars, string carLeftRightState)
         {
             // Reassign on every tick while CarLeftRight is active, so the closest car always wins the side zone.
@@ -208,78 +217,15 @@ namespace VISOR.ViewModels
             // Closest cars get first pick of the side zones.
             visibleCars.Sort((a, b) => a.Proximity.CompareTo(b.Proximity));
 
-            switch (carLeftRightState)
+            var sideZones = SideZonesFor(carLeftRightState);
+            for (int i = 0; i < sideZones.Count && i < visibleCars.Count; i++)
             {
-                case "CarLeft":
-                    if (visibleCars.Count > 0)
-                    {
-                        _carZoneAssignments[visibleCars[0].CarIdx] = RadarZone.LeftNear;
-                        if (stateChanged)
-                            Log.Debug($"[Radar] Assigned car {visibleCars[0].CarNumber} to LeftNear zone");
-                    }
-                    break;
-
-                case "CarRight":
-                    if (visibleCars.Count > 0)
-                    {
-                        _carZoneAssignments[visibleCars[0].CarIdx] = RadarZone.RightNear;
-                        if (stateChanged)
-                            Log.Debug($"[Radar] Assigned car {visibleCars[0].CarNumber} to RightNear zone");
-                    }
-                    break;
-
-                case "CarLeftRight":
-                    if (visibleCars.Count > 0)
-                    {
-                        _carZoneAssignments[visibleCars[0].CarIdx] = RadarZone.LeftNear;
-                        if (stateChanged)
-                            Log.Debug($"[Radar] Assigned car {visibleCars[0].CarNumber} to LeftNear zone (CarLeftRight)");
-                    }
-                    if (visibleCars.Count > 1)
-                    {
-                        _carZoneAssignments[visibleCars[1].CarIdx] = RadarZone.RightNear;
-                        if (stateChanged)
-                            Log.Debug($"[Radar] Assigned car {visibleCars[1].CarNumber} to RightNear zone (CarLeftRight)");
-                    }
-                    break;
-
-                case "TwoCarsLeft":
-                    if (visibleCars.Count > 0)
-                    {
-                        _carZoneAssignments[visibleCars[0].CarIdx] = RadarZone.LeftNear;
-                        if (stateChanged)
-                            Log.Debug($"[Radar] Assigned car {visibleCars[0].CarNumber} to LeftNear zone (TwoCarsLeft)");
-                    }
-                    if (visibleCars.Count > 1)
-                    {
-                        _carZoneAssignments[visibleCars[1].CarIdx] = RadarZone.LeftFar;
-                        if (stateChanged)
-                            Log.Debug($"[Radar] Assigned car {visibleCars[1].CarNumber} to LeftFar zone (TwoCarsLeft)");
-                    }
-                    break;
-
-                case "TwoCarsRight":
-                    if (visibleCars.Count > 0)
-                    {
-                        _carZoneAssignments[visibleCars[0].CarIdx] = RadarZone.RightNear;
-                        if (stateChanged)
-                            Log.Debug($"[Radar] Assigned car {visibleCars[0].CarNumber} to RightNear zone (TwoCarsRight)");
-                    }
-                    if (visibleCars.Count > 1)
-                    {
-                        _carZoneAssignments[visibleCars[1].CarIdx] = RadarZone.RightFar;
-                        if (stateChanged)
-                            Log.Debug($"[Radar] Assigned car {visibleCars[1].CarNumber} to RightFar zone (TwoCarsRight)");
-                    }
-                    break;
-
-                case "Clear":
-                case "Off":
-                default:
-                    if (stateChanged)
-                        Log.Debug($"[Radar] All cars assigned to Center zone (state: {carLeftRightState})");
-                    break;
+                _carZoneAssignments[visibleCars[i].CarIdx] = sideZones[i];
+                if (stateChanged)
+                    Log.Debug($"[Radar] Assigned car {visibleCars[i].CarNumber} to {sideZones[i]} zone ({carLeftRightState})");
             }
+            if (sideZones.Count == 0 && stateChanged)
+                Log.Debug($"[Radar] All cars assigned to Center zone (state: {carLeftRightState})");
         }
 
         private float GetTrackLength(ISessionDataProvider sessionDataProvider)

@@ -305,7 +305,7 @@ namespace VISOR.ViewModels
         private static void LogLatch(string what, SVappsLABSnapshot snapshot, int lap, int lapsRemaining, double timeRemain)
         {
             Log.Info($"[Countdown] {what} latched on lap {lap}: SessionState {snapshot.SessionState}, " +
-                     $"flags 0x{snapshot.SessionFlags & 0x7:X}, lapsRemain {lapsRemaining}, timeRemain {timeRemain:F0}s");
+                     $"flags 0x{snapshot.SessionFlags & IRacingIds.FinishFlagsMask:X}, lapsRemain {lapsRemaining}, timeRemain {timeRemain:F0}s");
         }
 
         /// <summary>

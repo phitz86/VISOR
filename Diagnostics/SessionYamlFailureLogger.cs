@@ -54,9 +54,7 @@ namespace VISOR.Diagnostics
         {
             try
             {
-                string dir = Path.Combine(Log.GetDiagnosticsDirectory(), "SessionYaml");
-                Directory.CreateDirectory(dir);
-                string path = Path.Combine(dir, $"parse-failure_{DateTime.Now:yyyyMMdd-HHmmss}_{_filesWritten + 1}.yaml");
+                string path = DiagnosticFiles.NewPath("SessionYaml", "parse-failure", ".yaml");
                 string where = position is { } p ? $"line {p.Line}, column {p.Column}" : "an unknown position";
                 string error = $"{ex.GetType().Name}: {ex.Message}";
 

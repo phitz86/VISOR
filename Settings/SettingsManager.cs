@@ -54,7 +54,7 @@ namespace VISOR.Settings
             double contentHeight = CalculateDynamicMainWindowHeight(sessionDataProvider);
             double baseWidth = MAIN_WINDOW_WIDTH_LARGE;
 
-            double scaleFactor = GetMainWindowScaleFactor(_settings.WindowSize);
+            double scaleFactor = WindowScale.ForMainWindow(_settings.WindowSize);
             double scaledWidth = baseWidth * scaleFactor;
 
             // Scale the content, then add the unscaled Border chrome. At Large this equals
@@ -67,12 +67,8 @@ namespace VISOR.Settings
 
         public Size GetRadarWindowSize()
         {
-            return _settings.WindowSize switch
-            {
-                WindowSizePreset.Small => new Size(RADAR_WINDOW_WIDTH_LARGE * 0.8, RADAR_WINDOW_HEIGHT_LARGE * 0.8),
-                WindowSizePreset.Medium => new Size(RADAR_WINDOW_WIDTH_LARGE * 0.9, RADAR_WINDOW_HEIGHT_LARGE * 0.9),
-                _ => new Size(RADAR_WINDOW_WIDTH_LARGE, RADAR_WINDOW_HEIGHT_LARGE)
-            };
+            double scale = WindowScale.ForRadar(_settings.WindowSize);
+            return new Size(RADAR_WINDOW_WIDTH_LARGE * scale, RADAR_WINDOW_HEIGHT_LARGE * scale);
         }
 
         /// <summary>
@@ -120,16 +116,6 @@ namespace VISOR.Settings
             totalHeight += WINDOW_PADDING;
 
             return Math.Max(totalHeight, 200.0);
-        }
-
-        private double GetMainWindowScaleFactor(WindowSizePreset sizePreset)
-        {
-            return sizePreset switch
-            {
-                WindowSizePreset.Small => 0.6,
-                WindowSizePreset.Medium => 0.8,
-                _ => 1.0
-            };
         }
 
         #endregion

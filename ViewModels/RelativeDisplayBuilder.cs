@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Windows;
-using System.Windows.Media;
 using VISOR.Diagnostics;
 using VISOR.Settings;
 using VISOR.Telemetry;
@@ -18,27 +16,7 @@ namespace VISOR.ViewModels
     {
         #region Constants
 
-        // Time gap thresholds (seconds) for proximity segment coloring.
-        private const float TIME_SEG5_CRITICAL = 0.6f;
-        private const float TIME_SEG4_DANGER = 1.5f;
-        private const float TIME_SEG3_WARNING = 3.0f;
-        private const float TIME_SEG2_AWARE = 5.0f;
-        private const float TIME_SEG1_INFO = 8.0f;
-
-        // Deactivation requires exceeding the threshold by this margin to prevent flicker.
-        private const float SEGMENT_HYSTERESIS = 0.2f;
-
-        private const float METERS_TO_FEET = 3.28084f;
-        private const int MAX_DISTANCE_FEET = 999;
-
-        // Upper sanity bound for the time-gap readout. The history buffer is the real limiter
-        // (it can only return a gap as deep as the history it stores); beyond this is noise.
-        private const float MAX_TIME_GAP_SECONDS = 600f;
-
-        // The gap is a real transponder-style measurement all the way out to half a lap, which on a
-        // long circuit is minutes. Past this it has stopped being proximity information and is just
-        // a wide number crowding the column, so it collapses to a bounded "99+" form.
-        private const float MAX_PRECISE_GAP_SECONDS = 99.9f;
+        // Row colours, segment thresholds and the gap readout's limits are in RelativeRowStyler.
 
         // Ahead/behind hysteresis: a car must separate from the player by this much before its row
         // slot (and gap sign) flips. Expressed in metres (converted via track length) so it stays a
@@ -48,23 +26,6 @@ namespace VISOR.ViewModels
         private const float AHEAD_BEHIND_HYSTERESIS_DEFAULT_PCT = 0.0004f; // ~2 m on a ~5 km track
 
         private const int DEBUG_LOG_INTERVAL = 60; // ~1s at 60Hz
-
-        private static readonly Color NeutralColor = (Color)ColorConverter.ConvertFromString("#80404040");
-        private static readonly Color AheadAlertColor = (Color)ColorConverter.ConvertFromString("#FF00FFFF");
-        private static readonly Color BehindAlertColor = (Color)ColorConverter.ConvertFromString("#FFFF9900");
-        private static readonly Color PitGrayColor = (Color)ColorConverter.ConvertFromString("#60808080");
-
-        // Every brush the rows use, built once and frozen, so no frame allocates any. Segment 1 is
-        // the neutral colour, each segment after it a quarter closer to the alert colour, and
-        // segment 5 the alert colour itself.
-        private static readonly SolidColorBrush PitGrayBrush = Frozen(PitGrayColor);
-        private static readonly SolidColorBrush StationaryYellowBrush = Frozen(Colors.Yellow);
-        private static readonly SolidColorBrush[] AheadSegmentBrushes = BuildSegmentBrushes(AheadAlertColor);
-        private static readonly SolidColorBrush[] BehindSegmentBrushes = BuildSegmentBrushes(BehindAlertColor);
-
-        // Segment n lights once the gap is at or under its threshold (segment 1 = widest gap).
-        private static readonly float[] SegmentThresholds =
-            { TIME_SEG1_INFO, TIME_SEG2_AWARE, TIME_SEG3_WARNING, TIME_SEG4_DANGER, TIME_SEG5_CRITICAL };
         #endregion
 
         #region Private Fields
@@ -173,7 +134,7 @@ namespace VISOR.ViewModels
                     // rather than location handles parking anywhere — in pit lane, past the
                     // pit-exit line, on the apron — since CarIdxOnPitRoad goes false the moment
                     // it rolls beyond the pit surface.
-                    bool isPaceCar = (carClassIDs[i] == 11);
+                    bool isPaceCar = carClassIDs[i] == IRacingIds.PaceCarClassId;
                     bool isOnPitRoad = (onPitRoad != null && i < onPitRoad.Length) && onPitRoad[i];
 
                     // Optionally hide pit-road cars from the relative display only. Read live so the
@@ -300,9 +261,9 @@ namespace VISOR.ViewModels
             foreach (var row in displayRows)
             {
                 AssignClassPositionDisplay(row, isFastestLapMode, useOverall);
-                AssignNameColor(row, playerRow);
+                RelativeRowStyler.AssignNameColor(row, playerRow);
                 AssignClassBackgroundColor(row, carClassColors, carClassIDs);
-                AssignFontStyle(row);
+                RelativeRowStyler.AssignFontStyle(row);
                 AssignProximitySegments(row, playerRow, snapshot);
             }
         }
@@ -325,18 +286,6 @@ namespace VISOR.ViewModels
             }
         }
 
-        private void AssignNameColor(RelativeRowViewModel row, RelativeRowViewModel playerRow)
-        {
-            if (row.IsPlayer)
-                row.NameColor = Brushes.Yellow;
-            else if (row.CurrentLap > playerRow.CurrentLap)
-                row.NameColor = Brushes.Red;
-            else if (row.CurrentLap < playerRow.CurrentLap)
-                row.NameColor = Brushes.CornflowerBlue;
-            else
-                row.NameColor = Brushes.White;
-        }
-
         private void AssignClassBackgroundColor(
             RelativeRowViewModel row,
             int[] carClassColors,
@@ -348,17 +297,11 @@ namespace VISOR.ViewModels
             row.ClassBackground = _classColorManager.GetClassColor(row.ClassID, carClassColors, carClassIDs);
         }
 
-        private void AssignFontStyle(RelativeRowViewModel row)
-        {
-            row.FontStyle = row.IsOnPitRoad ? FontStyles.Italic : FontStyles.Normal;
-        }
-
         private void AssignProximitySegments(RelativeRowViewModel row, RelativeRowViewModel playerRow, SVappsLABSnapshot snapshot)
         {
             if (row.IsPlayer)
             {
-                row.GapText = string.Empty;
-                ClearSegments(row);
+                RelativeRowStyler.ShowNoGap(row);
                 return;
             }
 
@@ -373,13 +316,7 @@ namespace VISOR.ViewModels
 
             if (row.IsOnPitRoad)
             {
-                row.GapText = "PIT";
-                row.GapColor = PitGrayBrush;
-                row.Segment1Color = PitGrayBrush;
-                row.Segment2Color = PitGrayBrush;
-                row.Segment3Color = PitGrayBrush;
-                row.Segment4Color = PitGrayBrush;
-                row.Segment5Color = PitGrayBrush;
+                RelativeRowStyler.ShowInPits(row);
                 return;
             }
 
@@ -388,20 +325,8 @@ namespace VISOR.ViewModels
             if (oppBuffer != null && oppBuffer.IsStationary())
             {
                 float trackLengthMeters = _historyManager.TrackLengthMeters;
-                if (trackLengthMeters > 0)
-                {
-                    float distanceMeters = Math.Abs(distDelta) * trackLengthMeters;
-                    int distanceFeet = Math.Min((int)(distanceMeters * METERS_TO_FEET), MAX_DISTANCE_FEET);
-
-                    row.GapText = $"{distanceFeet}ft";
-                    row.GapColor = StationaryYellowBrush;
-                    row.GapFontWeight = FontWeights.Bold;
-                }
-                else
-                {
-                    row.GapText = string.Empty;
-                }
-                ClearSegments(row);
+                RelativeRowStyler.ShowStationary(row,
+                    trackLengthMeters > 0 ? Math.Abs(distDelta) * trackLengthMeters : null);
                 return;
             }
 
@@ -441,51 +366,13 @@ namespace VISOR.ViewModels
             row.UpdateSmoothedGap(nativeTimeGap);
             float displayGap = row.SmoothedGap;
 
-            // Show the gap whenever it's in a sane range. The history buffer naturally limits how
-            // far back a crossing can be found, so this just guards against garbage values.
-            if (displayGap > 0 && displayGap < MAX_TIME_GAP_SECONDS)
-            {
-                string sign = isAhead ? "+" : "-";
-                row.GapText = (displayGap > MAX_PRECISE_GAP_SECONDS)
-                    ? $"{sign}99+"
-                    : $"{sign}{displayGap:F1}";
-            }
-            else
-            {
-                row.GapText = string.Empty;
-            }
-
-            row.GapColor = Brushes.White;
-            row.GapFontWeight = FontWeights.SemiBold;
-
-            if (_debugFrameCounter % DEBUG_LOG_INTERVAL == 0 && displayGap <= TIME_SEG2_AWARE)
+            if (_debugFrameCounter % DEBUG_LOG_INTERVAL == 0 && displayGap <= RelativeRowStyler.TIME_SEG2_AWARE)
             {
                 string relation = isAhead ? "AHEAD" : "BEHIND";
                 Log.Debug($"[Buffer] #{row.CarNum} ({relation}): Gap={displayGap:F2}s");
             }
 
-            // Count active segments. Hysteresis: once lit, a segment stays on until
-            // the gap exceeds its threshold + margin, preventing flicker at boundaries.
-            int prevSegments = row._lastActiveSegmentCount;
-            int activeSegments = 0;
-
-            for (int s = 0; s < SegmentThresholds.Length; s++)
-            {
-                float deactivateAt = (s < prevSegments) ? SegmentThresholds[s] + SEGMENT_HYSTERESIS : SegmentThresholds[s];
-                if (displayGap <= deactivateAt)
-                    activeSegments = s + 1;
-            }
-
-            // Explicitly set every segment — either colored or Transparent — so segments
-            // that are no longer active get cleared without needing a blanket reset at the top.
-            var segmentBrushes = isAhead ? AheadSegmentBrushes : BehindSegmentBrushes;
-            row.Segment1Color = (activeSegments >= 1) ? segmentBrushes[0] : Brushes.Transparent;
-            row.Segment2Color = (activeSegments >= 2) ? segmentBrushes[1] : Brushes.Transparent;
-            row.Segment3Color = (activeSegments >= 3) ? segmentBrushes[2] : Brushes.Transparent;
-            row.Segment4Color = (activeSegments >= 4) ? segmentBrushes[3] : Brushes.Transparent;
-            row.Segment5Color = (activeSegments >= 5) ? segmentBrushes[4] : Brushes.Transparent;
-
-            row._lastActiveSegmentCount = activeSegments;
+            RelativeRowStyler.ShowGap(row, displayGap, isAhead);
         }
 
         /// <summary>
@@ -500,41 +387,6 @@ namespace VISOR.ViewModels
             if (crossingTime.HasValue && sessionTime > crossingTime.Value)
                 return (float)(sessionTime - crossingTime.Value);
             return -1f;
-        }
-
-        private static void ClearSegments(RelativeRowViewModel row)
-        {
-            row.Segment1Color = Brushes.Transparent;
-            row.Segment2Color = Brushes.Transparent;
-            row.Segment3Color = Brushes.Transparent;
-            row.Segment4Color = Brushes.Transparent;
-            row.Segment5Color = Brushes.Transparent;
-            row._lastActiveSegmentCount = 0;
-        }
-
-        private static SolidColorBrush[] BuildSegmentBrushes(Color alertColor) => new[]
-        {
-            Frozen(BlendColors(NeutralColor, alertColor, 0.0)),
-            Frozen(BlendColors(NeutralColor, alertColor, 0.25)),
-            Frozen(BlendColors(NeutralColor, alertColor, 0.50)),
-            Frozen(BlendColors(NeutralColor, alertColor, 0.75)),
-            Frozen(alertColor)
-        };
-
-        private static SolidColorBrush Frozen(Color color)
-        {
-            var brush = new SolidColorBrush(color);
-            brush.Freeze();
-            return brush;
-        }
-
-        private static Color BlendColors(Color color1, Color color2, double ratio)
-        {
-            byte r = (byte)(color1.R + (color2.R - color1.R) * ratio);
-            byte g = (byte)(color1.G + (color2.G - color1.G) * ratio);
-            byte b = (byte)(color1.B + (color2.B - color1.B) * ratio);
-            byte a = (byte)(color1.A + (color2.A - color1.A) * ratio);
-            return Color.FromArgb(a, r, g, b);
         }
         #endregion
     }
