@@ -2,9 +2,14 @@
 
   <!-- Unit tests for VISOR's platform-independent logic. Targets plain net10.0 (no WPF) so it
        runs anywhere: `dotnet test Tests/VISOR.Tests`. Source files under test are linked in
-       rather than referencing the WPF app project. -->
+       rather than referencing the WPF app project.
+
+       xUnit.net v3, run through VSTest (xunit.v3.mtp-off + xunit.runner.visualstudio), so Visual
+       Studio's Test Explorer and CI's `dotnet test` options work unchanged. v3 test projects are
+       executables. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
@@ -33,9 +38,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
-    <PackageReference Include="xunit" Version="2.9.3" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageReference Include="xunit.v3.mtp-off" Version="4.0.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1" />
     <!-- For the SDK's session-info model (TelemetrySessionInfo) and the YAML library it uses, at
          the app's versions. -->
     <PackageReference Include="SVappsLAB.iRacingTelemetrySDK" Version="2.5.0" />

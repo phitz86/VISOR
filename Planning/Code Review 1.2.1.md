@@ -423,6 +423,7 @@ This follows the order you set: a broader CI test pipeline first, then the archi
    - coverage reported, with no threshold
    - build, test and lint set as required checks in branch protection (a GitHub setting you change)
 5. **Dependabot for NuGet.** *Recommended: yes.* The test packages are already behind (Microsoft.NET.Test.Sdk 17.14 vs 18.10, the xUnit runner 3.1 vs 4.0). It means more bot PRs.
+   - *Done (Pass 5).* Since then the tests moved to xUnit.net v3: NuGet marks xUnit v2 as legacy. They use `xunit.v3.mtp-off` 4.0.2 with `xunit.runner.visualstudio` 4.0.1 and Microsoft.NET.Test.Sdk 18.10.1. That keeps the classic VSTest runner, so Test Explorer and CI's `dotnet test` options (TRX results, coverage) are unchanged. The plain `xunit.v3` package would switch to Microsoft Testing Platform v2, which needs a repo-wide `global.json` setting and different CI options; that move can come later.
 6. **A5, the user catalog override.** This is a feature, not a fix. It is independent of everything else, so it can go into 1.3 at any point, or wait.
 7. **A4, one UI tick for both windows.** *Recommended: only if a problem shows up.* The rig shows `[FrameBacklog]` only at session loads.
 
