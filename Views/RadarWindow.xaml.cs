@@ -48,6 +48,13 @@ namespace VISOR.Views
             _settingsManager.WindowSizeChanged += OnWindowSizeChanged;
             _configModeManager.ConfigModeChanged += OnConfigModeChanged;
 
+            // A radar switched on from the Config window is created while config mode is already
+            // on, and only hears about later changes, so start it in the current mode: drag
+            // handle shown and kept visible, as the Config window does for an existing radar.
+            bool inConfigMode = _configModeManager.IsInConfigMode;
+            DragHandle.Visibility = inConfigMode ? Visibility.Visible : Visibility.Collapsed;
+            SetForceVisible(inConfigMode);
+
             Loaded += RadarWindow_Loaded;
 
             UpdatePlayerCarDisplay();

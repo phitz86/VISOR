@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -36,6 +37,11 @@ namespace VISOR.Diagnostics
         // Logs get shared (GitHub issues, Discord), and a path under the user's profile carries
         // their Windows user name, so such paths are logged as %USERPROFILE%\... instead.
         private static readonly string _userProfilePrefix = GetUserProfilePrefix();
+
+        // Lines logged before StartNewSession opens the file (settings load, corrupt-settings
+        // recovery, the settings upgrade) are kept here and written after the session header.
+        private const int MaxEarlyLines = 100;
+        private static readonly List<string> _earlyLines = new();
 
         /// <summary>
         /// Minimum log level to record. Messages below this level are ignored.
@@ -100,11 +106,22 @@ namespace VISOR.Diagnostics
                     _currentLogFilePath = Path.Combine(GetLogsDirectory(), fileName);
 
                     WriteSessionHeader();
+                    FlushEarlyLines();
                 }
             }
             catch (Exception ex)
             {
                 throw new InvalidOperationException("Failed to start new logging session", ex);
+            }
+        }
+
+        private static void FlushEarlyLines()
+        {
+            lock (_earlyLines)
+            {
+                foreach (string line in _earlyLines)
+                    _logQueue.Add(line);
+                _earlyLines.Clear();
             }
         }
 
@@ -220,6 +237,14 @@ namespace VISOR.Diagnostics
                 if (!string.IsNullOrEmpty(_currentLogFilePath))
                 {
                     _logQueue.Add(logEntry);
+                }
+                else
+                {
+                    lock (_earlyLines)
+                    {
+                        if (_earlyLines.Count < MaxEarlyLines)
+                            _earlyLines.Add(logEntry);
+                    }
                 }
             }
             catch (Exception ex)

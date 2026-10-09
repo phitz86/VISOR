@@ -412,10 +412,9 @@ This follows the order you set: a broader CI test pipeline first, then the archi
 
 #### Decisions for you
 
-1. **Release first, or fold everything into 1.3?** *Recommended: release Phase 1 plus Pass 4 as 1.2.2, then start the rest on a fresh branch from `master`.*
-   - Phase 1 is rig-validated and fixes problems users can see: radar ghosts, out-of-order frames and the installer wipe.
-   - The architecture passes will take a while and shouldn't hold those fixes back.
-   - Whichever release bumps the version must include B11.
+1. **Release first, or fold everything into 1.3?** *Decided (2026-10-09): no release yet.* There are no other users, so the release waits until the review and update work is finished.
+   - Passes 4–7 go in order, one commit each, then one combined rig check before Pass 8 (see "Combined rig check for Passes 4–7" below).
+   - Whichever release bumps the version must include B11 (it does: Pass 4).
 2. **B10 timing.** *Recommended: Pass 6, right after the CI foundation, so the repair lands with its tests.* If the 1.3 work runs long, Pass 6 can ship on its own as a point release.
 3. **Test project shape.** *Recommended: keep `Tests/VISOR.Tests` as a plain `net10.0` project that links source files.* It runs on Linux CI runners and in Visual Studio's Test Explorer. A Windows-only project that references the app would only be needed if WPF code ever needs testing.
 4. **CI strictness.** *Recommended:*
@@ -432,16 +431,16 @@ This follows the order you set: a broader CI test pipeline first, then the archi
   - Add an `UpgradeRequired` setting, default true.
   - In `CreateWithRecovery`, once the current file has loaded, call `Upgrade()` once, set the flag to false and save.
   - Put the upgrade in its own try/catch, so a corrupt *previous-version* file is skipped with a warning. Otherwise it would reach the recovery path, which backs up and deletes the file.
-  - After a corrupt-file reset, the next start re-imports the previous version's settings if there are any. That is the better outcome.
+  - Carry over only when this version has no settings file of its own yet. The first build with the fix is still 1.2.1.0 and already has one, and an older version's values (1.2.0.0, say) must not overwrite it. The same rule means a corrupt-settings reset keeps the defaults rather than re-importing an older version.
 - **B13, radar drag handle:** when the radar window is created, apply the current config mode and forced visibility.
 - **Gate (rig):**
   - Build a test installer with the version bumped (for example 1.2.2.0), install it over the current build, and check that settings and window positions survive.
   - Start with the radar off, open the Config window, turn the radar on, and drag it.
-- **Then release (your steps):**
+- **At release time (your steps), now after Phase 2:**
   - the S7 licence check
   - the PDF
   - the version bump: CI requires `Version`, `FileVersion` and `AssemblyVersion` to be equal and four-part
-  - mark PR #42 ready, merge it, and tag
+  - mark the PR ready, merge it, and tag
 
 #### Pass 5: CI test pipeline foundation, T1 (CI)
 - **Solution:** add `Tests/VISOR.Tests` to `VISOR.sln`. Anything under `Tests/` is already excluded from the app's compile, and the installer only packs the app's output folder.
@@ -504,6 +503,20 @@ These are pure code moves and consolidations: behaviour is unchanged, apart from
   - `ShiftPointProvider`: the calibration tracker and the progress-log formatting move out, with care around its lock.
   - New files are added to the test project's links.
 - **Gate (CI):** CI green, plus one short session on a Debug build to check that the `ShiftPoints` and `WetResearch` files are still written.
+
+#### Combined rig check for Passes 4–7
+One session on a Debug build from VS covers all four passes:
+- **B11 (Pass 4):**
+  - Change a setting and move a window, then close VISOR.
+  - Temporarily set `Version`, `FileVersion` and `AssemblyVersion` in `VISOR.csproj` to 1.2.2.0 (don't commit it), and run again.
+  - The settings and window positions should still be there, and the log should show `Settings carried over from the previous version` once. The next start shouldn't show it again.
+  - Then set the version back.
+- **B13 (Pass 4):** start with the radar off, open the Config window, turn the radar on, and drag it.
+- **CI (Pass 5):** green on the PR, and the tests show in Visual Studio's Test Explorer.
+- **B10 (Pass 6):** normal sessions log no repair warnings, and the HUD becomes ready as usual.
+- **Tidy-ups (Pass 7):**
+  - The overlay, relative and radar look and behave as before, including zone highlights and multiclass colours.
+  - The `ShiftPoints` and `WetResearch` debug files are still written.
 
 #### Pass 8: PositionCalculator characterization tests, T2 and the A3 input record (rig)
 - **Input record:** `Update` takes a plain `PositionFrame` record, filled from the snapshot by `MainViewModel`.

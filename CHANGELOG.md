@@ -64,6 +64,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   doesn't.
 - **No waiting on the display during shutdown** — connection and session-state changes no longer
   block on the display, which could delay exit by up to two seconds.
+- **Settings carry over to a new version** — VISOR stores its settings per version, and nothing
+  copied them forward, so every update started again from the default window positions and
+  options. The first start of a new version now brings the previous version's settings across
+  (logged as `Settings carried over from the previous version`).
+- **A radar switched on from the Config window can be dragged into place** — with the radar off
+  at start-up, turning it on with the Config window open left its drag handle hidden, and it could
+  fade out, until the Config window was closed and reopened.
+- **Start-up messages reach the log file** — lines logged before the log file opened (such as a
+  corrupt-settings recovery) only went to the debugger. They are now written after the header.
 
 ### Changed
 

@@ -41,6 +41,7 @@ namespace VISOR.Settings
             {
                 // Force the user.config to load by touching a persisted value.
                 _ = settings.WindowSize;
+                CarryOverFromPreviousVersion(settings);
                 return settings;
             }
             catch (ConfigurationErrorsException ex)
@@ -60,6 +61,50 @@ namespace VISOR.Settings
                     Log.Error("Failed to reset settings after corruption recovery", inner);
                 }
                 return settings;
+            }
+        }
+
+        /// <summary>
+        /// Settings are stored per app version (in a folder named after the version), so a new
+        /// version starts from defaults unless the previous version's values are copied forward.
+        /// UpgradeRequired is true in a version's fresh settings, so this does its work once per
+        /// version: on the first start after an update, or after a fresh install, where there is
+        /// nothing to copy.
+        /// </summary>
+        private static void CarryOverFromPreviousVersion(UserSettings settings)
+        {
+            if (!settings.UpgradeRequired)
+                return;
+
+            try
+            {
+                // Only a version with no settings file of its own is new. A build that adds this
+                // check without changing the version already has one, and an older version's
+                // values must not overwrite it. GetPreviousVersion is null when no earlier
+                // version's settings exist.
+                string currentFile = ConfigurationManager
+                    .OpenExeConfiguration(ConfigurationUserLevel.PerUserRoamingAndLocal).FilePath;
+                if (!File.Exists(currentFile) && settings.GetPreviousVersion(nameof(WindowSize)) != null)
+                {
+                    settings.Upgrade();
+                    Log.Info("Settings carried over from the previous version");
+                }
+            }
+            catch (Exception ex)
+            {
+                // A corrupt previous-version file must not reach the corrupt-config recovery in
+                // CreateWithRecovery, which would delete it. Keep this version's settings instead.
+                Log.Warning($"Could not carry settings over from the previous version ({ex.GetType().Name}: {ex.Message}); keeping this version's settings");
+            }
+
+            try
+            {
+                settings.UpgradeRequired = false;
+                settings.Save();
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Failed to save settings after carrying them over", ex);
             }
         }
 
@@ -331,6 +376,22 @@ namespace VISOR.Settings
         {
             get => (bool)this["CheckForUpdatesOnStartup"];
             set => this["CheckForUpdatesOnStartup"] = value;
+        }
+
+        #endregion
+
+        #region Version Upgrade
+
+        /// <summary>
+        /// True until this version's settings have been carried over from the previous version's
+        /// (see CarryOverFromPreviousVersion). Internal bookkeeping; not shown in the Config window.
+        /// </summary>
+        [UserScopedSetting]
+        [DefaultSettingValue("true")]
+        public bool UpgradeRequired
+        {
+            get => (bool)this["UpgradeRequired"];
+            set => this["UpgradeRequired"] = value;
         }
 
         #endregion
