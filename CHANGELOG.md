@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Session info the SDK can't read no longer leaves the HUD blank** — iRacing writes session info
+  (track, drivers, sessions) without quoting its values, and a line break, or a colon in a field the
+  SDK doesn't quote, made it unreadable: VISOR then got no session data for the whole event. VISOR
+  now checks each update, and when the SDK can't read one it reads the session info itself
+  (rejoining broken lines and quoting values) until iRacing disconnects, noting it once in the log
+  (`[SessionInfo] The SDK could not read this session's info...`). Sessions the SDK reads are
+  handled exactly as before.
 - **Radar no longer leaves "ghost" cars behind** — after a disconnect, a session change or lone
   qualifying, the radar cleared its list of cars but left their shapes on screen. Those stale
   blocks reappeared at their old positions when the radar faded back in, and more piled up with

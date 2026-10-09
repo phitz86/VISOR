@@ -21,6 +21,9 @@
 
   <ItemGroup>
     <PackageReference Include="SVappsLAB.iRacingTelemetrySDK" Version="2.5.0" />
+    <!-- Also comes with the SDK; referenced directly because SessionInfoYaml uses it to read
+         session info the SDK can't. Keep it at the SDK's version. -->
+    <PackageReference Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>
 
   <ItemGroup>

@@ -47,10 +47,10 @@ Status reflects the revision plan agreed after the review (see "Agreed revision 
 | B7 | Low | Two shift-model saves can collide on the same temp file | Small | **Done** (Pass 1) |
 | B8 | Low | `PrimedStateChanged` fires on every session update, not only on change | Small | **Done** (Pass 1) |
 | B9 | Low | Possible 2 s hang on exit (thread-blocking pattern) | — | **Done** (Pass 2) |
-| B10 | Med | Session info the SDK can't parse leaves VISOR blank for a whole event | Small–Med | **Proposed:** Pass 6 (Debug capture already added) |
-| B11 | Med | Settings reset to defaults on every version bump | Small | **Proposed:** Pass 4, before the next version bump |
+| B10 | Med | Session info the SDK can't parse leaves VISOR blank for a whole event | Small–Med | **Done** (Pass 6); rig check pending |
+| B11 | Med | Settings reset to defaults on every version bump | Small | **Done** (Pass 4); rig check pending |
 | B12 | Low–Med | At the finish, a car whose telemetry stops isn't held: the car behind moves up and two cars can show the same position | Small | **Proposed:** Pass 8 (pinned by a test, then fixed) |
-| B13 | Low | Radar switched on from the Config window can't be dragged into place | Small | **Proposed:** Pass 4 |
+| B13 | Low | Radar switched on from the Config window can't be dragged into place | Small | **Done** (Pass 4); rig check pending |
 | D1 | Low | `System.Management` package unused but shipped | Mech | **Done** (Pass 1) |
 | D2, D4 | Low | Unused members and events | Mech | **Done** (Pass 1) |
 | D3 | Low | Session data parsed but never read | Mech | **Skipped** (cheap; unused reads have come in handy) |
@@ -75,7 +75,7 @@ Status reflects the revision plan agreed after the review (see "Agreed revision 
 | S5 | Low | Named-object squatting | — | **Accepted** |
 | S6 | Low | Installer `DelTree` scope | — | **Done** (with B4) |
 | S7 | Low | Inno Setup prints "Non-commercial use only" | — | **Open:** check the licence terms (yours) |
-| T1 | Med | CI never builds or runs the tests | Small | **Proposed:** Pass 5 |
+| T1 | Med | CI never builds or runs the tests | Small | **Done** (Pass 5) |
 | T2 | Med | No tests for PositionCalculator (needed before splitting it) | Mech | **Proposed:** Pass 8 |
 
 ---
@@ -477,7 +477,8 @@ This follows the order you set: a broader CI test pipeline first, then the archi
   - Deserialize into the SDK's own `TelemetrySessionInfo` with the SDK's exact settings (`IgnoreUnmatchedProperties`, default naming).
   - Apply the result through `ApplySdkSession`, the entry point the SDK's own result uses.
 - **Safety:**
-  - A sequence guard, so a repaired update can't overwrite a newer one the SDK parsed itself. The two arrive on different threads.
+  - *As built:* the first update the SDK can't read switches VISOR to reading every update itself until iRacing disconnects (`SessionInfoFallback`), so the two sources never alternate. Choosing the source and applying the result happen under one lock, so an SDK result already on its way can't land after a newer one from VISOR.
+  - While VISOR reads session info itself, the SDK's repeated parse errors for it go to Debug level; the first one is logged in full.
   - The handler catches everything: an exception escaping an SDK handler stops telemetry for good.
   - An explicit `YamlDotNet` 18.1.0 package reference. Today it arrives only through the SDK.
 - **Logging:** one Release-level warning per distinct failure. The Debug capture stays.

@@ -20,6 +20,8 @@
     <Compile Include="..\..\Update\UpdateChecker.cs" Link="Linked\UpdateChecker.cs" />
     <!-- Log writes nothing to disk until StartNewSession, which tests never call. -->
     <Compile Include="..\..\Diagnostics\Log.cs" Link="Linked\Log.cs" />
+    <Compile Include="..\..\Telemetry\SessionInfoYaml.cs" Link="Linked\SessionInfoYaml.cs" />
+    <Compile Include="..\..\Telemetry\SessionInfoFallback.cs" Link="Linked\SessionInfoFallback.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -31,6 +33,10 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <!-- For the SDK's session-info model (TelemetrySessionInfo) and the YAML library it uses, at
+         the app's versions. -->
+    <PackageReference Include="SVappsLAB.iRacingTelemetrySDK" Version="2.5.0" />
+    <PackageReference Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>
 
 </Project>

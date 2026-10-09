@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK;
 using System;
 using System.Collections.Generic;
@@ -8,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using VISOR.Diagnostics;
 using VISOR.ViewModels;
+using YamlDotNet.Core;
 
 namespace VISOR.Telemetry
 {
@@ -38,8 +38,14 @@ namespace VISOR.Telemetry
     {
         #region Private Fields
         private ITelemetryClient<TelemetryData> _client = null!;
-        private readonly ILogger _logger;
+        private readonly VisorSdkLogger<SVappsLABSDKWrapper> _logger;
         private readonly SessionDataCoordinator _sessionCoordinator;
+
+        // Session info arrives on two SDK threads: the SDK's parsed result, and the raw YAML that
+        // SessionInfoFallback reads itself when the SDK can't. The lock makes checking which one
+        // is in charge and applying the result one step.
+        private readonly SessionInfoFallback _sessionInfoFallback = new();
+        private readonly object _sessionApplyLock = new();
 #if DEBUG
         private readonly SessionYamlFailureLogger _sessionYamlFailures = new();
 #endif
@@ -126,12 +132,8 @@ namespace VISOR.Telemetry
                         OnTelemetryUpdate = data => { OnTelemetryUpdate(data); return Task.CompletedTask; },
                         OnSessionInfoUpdate = info => { OnSessionInfoUpdate(info); return Task.CompletedTask; },
                         OnConnectStateChanged = state => { OnConnectStateChanged(state); return Task.CompletedTask; },
-                        OnError = ex => { Log.Error("[SDK Stream] error from SDK", ex); return Task.CompletedTask; },
-#if DEBUG
-                        // The SDK reports a session-info parse failure without the text; keep a copy of any
-                        // that fails (SessionYamlFailureLogger catches its own exceptions).
-                        OnRawSessionInfoUpdate = yaml => { _sessionYamlFailures.Check(yaml); return Task.CompletedTask; },
-#endif
+                        OnError = ex => { OnSdkError(ex); return Task.CompletedTask; },
+                        OnRawSessionInfoUpdate = yaml => { OnRawSessionInfoUpdate(yaml); return Task.CompletedTask; },
                     };
 
                     // Defensive detector #3: stream fault logger.
@@ -194,6 +196,11 @@ namespace VISOR.Telemetry
 
                 if (!_isConnected)
                 {
+                    lock (_sessionApplyLock)
+                    {
+                        _sessionInfoFallback.Reset();
+                        _logger.QuietSessionInfoErrors = false;
+                    }
                     _sessionCoordinator.ClearCache();
                     _lastSessionNumForLog = -1;
                     // Reset frame-gap baseline so the wall-clock gap across a disconnect
@@ -232,16 +239,65 @@ namespace VISOR.Telemetry
         {
             try
             {
+                ApplySessionInfo(info, fromSdk: true);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("OnSessionInfoUpdate error", ex);
+            }
+        }
+
+        private void OnRawSessionInfoUpdate(string yaml)
+        {
+            try
+            {
+                bool wellFormed = SessionInfoYaml.IsWellFormed(yaml);
+#if DEBUG
+                // Debug builds keep a copy of session info that won't parse as-is.
+                if (!wellFormed)
+                    _sessionYamlFailures.Check(yaml);
+#endif
+                var info = _sessionInfoFallback.Read(yaml, wellFormed);
+                if (info != null)
+                    ApplySessionInfo(info, fromSdk: false);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("OnRawSessionInfoUpdate error", ex);
+            }
+        }
+
+        // Once VISOR reads session info itself, the SDK's results are ignored until the next
+        // disconnect. Deciding that and applying happen under one lock, so an SDK result that was
+        // already on its way can't land after a newer one VISOR applied.
+        private void ApplySessionInfo(TelemetrySessionInfo info, bool fromSdk)
+        {
+            lock (_sessionApplyLock)
+            {
+                if (fromSdk && _sessionInfoFallback.IsActive)
+                    return;
+                if (!fromSdk)
+                {
+                    _sessionInfoFallback.Activate();
+                    _logger.QuietSessionInfoErrors = true;
+                }
+
                 if (_sessionCoordinator.ApplySdkSession(info))
                 {
                     CheckPrimedStateChange();
                     CheckForSessionTransitionLog();
                 }
             }
-            catch (Exception ex)
-            {
-                Log.Error("OnSessionInfoUpdate error", ex);
-            }
+        }
+
+        private void OnSdkError(Exception ex)
+        {
+            // While VISOR reads session info itself, the SDK's failure to parse it repeats on
+            // every update; the first one was logged in full.
+            if (_sessionInfoFallback.IsActive && (ex is YamlException || ex.InnerException is YamlException))
+                Log.Debug($"[SDK Stream] session info parse error (VISOR is reading it itself): {ex.Message}");
+            else
+                Log.Error("[SDK Stream] error from SDK", ex);
         }
 
         private void CheckForSessionTransitionLog()
@@ -385,43 +441,6 @@ namespace VISOR.Telemetry
         public void Dispose()
         {
             Shutdown();
-        }
-    }
-
-    /// <summary>
-    /// Bridges Microsoft.Extensions.Logging output from the SVappsLAB SDK into VISOR's Log.cs.
-    /// Warnings and errors are always surfaced; Info/Debug are forwarded when VISOR debug mode is on.
-    /// </summary>
-    public class VisorSdkLogger<T> : ILogger<T>
-    {
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-
-        public bool IsEnabled(LogLevel logLevel) =>
-            logLevel >= LogLevel.Warning || Diagnostics.Log.DebugModeEnabled;
-
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-        {
-            if (!IsEnabled(logLevel)) return;
-            if (formatter == null) return;
-
-            string message = $"[SDK] {formatter(state, exception)}";
-
-            switch (logLevel)
-            {
-                case LogLevel.Critical:
-                case LogLevel.Error:
-                    Diagnostics.Log.Error(message, exception);
-                    break;
-                case LogLevel.Warning:
-                    Diagnostics.Log.Warning(exception == null ? message : $"{message} ({exception.GetType().Name}: {exception.Message})");
-                    break;
-                case LogLevel.Information:
-                    Diagnostics.Log.Info(message);
-                    break;
-                default:
-                    Diagnostics.Log.Debug(message);
-                    break;
-            }
         }
     }
 }
