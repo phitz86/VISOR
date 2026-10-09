@@ -5,6 +5,8 @@ Risk appetite for 1.2.1: fix bugs, delete dead code, and split files mechanicall
 
 ## Summary
 
+**Status (2026-10-09):** all three revision passes are done and validated on the rig (results under "Agreed revision plan"). Testing turned up three new items (B10, B11, S7). What remains is listed under "What's left" at the end.
+
 - **Overall:** the code is in good shape. The new shift-point work (learner, store, cue) is well isolated, its untrusted input is validated, and it is the only part of the app with tests. Most problems are older code that grew, or plumbing nobody uses any more.
 - **No significant CPU or RAM bottleneck.** Steady-state garbage is roughly 1 MB/s, all short-lived. Fixed buffers total about 2.4 MB. Nothing grows without bound in release builds except the radar ghost elements (B1).
 - **No exploitable vulnerability.** The two items worth acting on are in the CI pipeline (S1, S2), not in the app.
@@ -36,30 +38,34 @@ Status reflects the revision plan agreed after the review (see "Agreed revision 
 
 | ID | Sev | Finding | Risk | Status |
 |---|---|---|---|---|
-| B1 | Med | Radar leaves "ghost" car shapes on screen after any reset | Small | **Pass 1** |
-| B2 | Med | Config window opened from the overlay's ⚙: "Exit VISOR" does nothing, and a second launch can't bring VISOR forward | Small | **Pass 1** |
-| B3 | Med | Telemetry frames can be processed out of order | Retest | **Pass 2** (own commit) |
-| B4 | Med | Installer upgrade wipes the whole install folder recursively | Small | **Pass 3** |
-| B5 | Low–Med | Crash safety net shows a modal dialog for *every* error | Small | **Pass 1** |
-| B6 | Low | One bad entry in TrackSections.json disables or misroutes the whole catalog | Small | **Pass 1** |
-| B7 | Low | Two shift-model saves can collide on the same temp file | Small | **Pass 1** |
-| B8 | Low | `PrimedStateChanged` fires on every session update, not only on change | Small | **Pass 1** |
-| B9 | Low | Possible 2 s hang on exit (thread-blocking pattern) | — | **Pass 2** (with B3) |
-| D1 | Low | `System.Management` package unused but shipped | Mech | **Pass 1** |
-| D2, D4 | Low | Unused members and events | Mech | **Pass 1** |
+| B1 | Med | Radar leaves "ghost" car shapes on screen after any reset | Small | **Done** (Pass 1) |
+| B2 | Med | Config window opened from the overlay's ⚙: "Exit VISOR" does nothing, and a second launch can't bring VISOR forward | Small | **Done** (Pass 1) |
+| B3 | Med | Telemetry frames can be processed out of order | Retest | **Done** (Pass 2) |
+| B4 | Med | Installer upgrade wipes the whole install folder recursively | Small | **Done** (Pass 3) |
+| B5 | Low–Med | Crash safety net shows a modal dialog for *every* error | Small | **Done** (Pass 1) |
+| B6 | Low | One bad entry in TrackSections.json disables or misroutes the whole catalog | Small | **Done** (Pass 1) |
+| B7 | Low | Two shift-model saves can collide on the same temp file | Small | **Done** (Pass 1) |
+| B8 | Low | `PrimedStateChanged` fires on every session update, not only on change | Small | **Done** (Pass 1) |
+| B9 | Low | Possible 2 s hang on exit (thread-blocking pattern) | — | **Done** (Pass 2) |
+| B10 | Med | Session info the SDK can't parse leaves VISOR blank for a whole event | Small–Med | **Open:** Debug capture added; safety net before release or in 1.3 is your call |
+| B11 | Med | Settings reset to defaults on every version bump | Small | **Open:** fix before the next version bump |
+| D1 | Low | `System.Management` package unused but shipped | Mech | **Done** (Pass 1) |
+| D2, D4 | Low | Unused members and events | Mech | **Done** (Pass 1) |
 | D3 | Low | Session data parsed but never read | Mech | **Skipped** (cheap; unused reads have come in handy) |
-| D5 | Low | Stale files in `Planning/` and the repo root; dead csproj entries | Mech | **Pass 1**, except the stale PDF, which you regenerate before release |
-| C1–C3, C5, C7 | Low | Duplicated helpers, scale factors, magic numbers | Mech | Deferred to the post-pass plan update |
+| D5 | Low | Stale files in `Planning/` and the repo root; dead csproj entries | Mech | **Done** (Pass 1), except the stale PDF, which you regenerate before release |
+| C1–C3, C7 | Low | Duplicated helpers, scale factors, magic numbers | Mech | Open (mechanical tidy-ups) |
+| C5 | Low | Fastest-lap positioning rebuilt per row | Mech | **Done** (as P2) |
 | C4, C6, C8 | Low | Larger consolidations | — | Deferred (architecture work) |
-| F1–F4 | — | Files over 500 lines: split plans | Mech | Deferred to the post-pass plan update (F1 needs T2) |
+| F1–F4 | — | Files over 500 lines: split plans | Mech | Open: F2–F4 mechanical; F1 needs T2 |
 | A1–A5 | — | Separation-of-concerns items | — | Deferred until after the CI pipeline work |
-| P1–P4 | Low | Small per-frame waste (brushes, list copies, log I/O, notifications) | Small | **Pass 3** |
+| P1–P4 | Low | Small per-frame waste (brushes, list copies, log I/O, notifications) | Small | **Done** (Pass 3) |
 | P5 | — | Measure the transparent-window rendering cost on your rig | — | **Skipped** |
-| S1 | Med | CI token has write access during the build job | Small | **Pass 3** |
-| S2 | Med | CI actions and Inno Setup not pinned to fixed versions | Small | **Pass 3** |
-| S3, S4 | Low | Log privacy, license notice | Small | **Pass 3** |
+| S1 | Med | CI token has write access during the build job | Small | **Done** (Pass 3) |
+| S2 | Med | CI actions and Inno Setup not pinned to fixed versions | Small | **Done** (Pass 3) |
+| S3, S4 | Low | Log privacy, license notice | Small | **Done** (Pass 3) |
 | S5 | Low | Named-object squatting | — | **Accepted** |
-| S6 | Low | Installer `DelTree` scope | — | Covered by B4 |
+| S6 | Low | Installer `DelTree` scope | — | **Done** (with B4) |
+| S7 | Low | Inno Setup prints "Non-commercial use only" | — | **Open:** check the licence terms (yours) |
 | T1 | Med | CI never builds or runs the tests | Small | Deferred to the CI pipeline discussion |
 | T2 | Med | No tests for PositionCalculator (needed before splitting it) | Mech | Deferred to the CI pipeline discussion |
 
@@ -130,6 +136,27 @@ The periodic background save (`ShiftPointProvider.ScheduleSave`) and the synchro
 ### B9: Possible exit delay (Low; fixed by B3)
 On exit, `Shutdown()` waits up to 2 s on the UI thread for the SDK task. Meanwhile an SDK handler can be blocked in `Dispatcher.Invoke`, waiting for that same UI thread.
 Canary: `Run task did not shut down gracefully` in the log.
+
+### B10: Session info the SDK can't parse leaves VISOR blank (Medium; found 2026-10-09, during Pass 3 testing)
+In one official race (GT4 Challenge at Road Atlanta, 9 October), every session-info update failed inside the SDK: 17 of 17 over two minutes, through the end of practice and into the next session. Each failed with `While scanning a multiline plain scalar, found invalid mapping`. VISOR never received session data, so the HUD never became ready, and nothing on screen says why.
+
+- **Not caused by the passes.** The SDK parses session info before VISOR sees it, 1.2.1 ships the same SDK, and the same build worked in every other session that day.
+- **What breaks it.** That exact error is what YamlDotNet raises for a value with a line break inside it (reproduced). The SDK's repair quotes six name fields one line at a time, so it can't fix a value split across lines; that is why both of its attempts failed.
+- **Ruled out:**
+  - the network (session info is read from shared memory on the PC)
+  - the perf-logging tools
+  - the car: a Mercedes-AMG GT4 test session parsed cleanly
+  - the race drivers' names (results CSV)
+- **Most likely** something in that event's practice field (drivers who left before the race, spectators) or its event details. It couldn't be reproduced.
+- **Done:** Debug builds save any session info that fails to parse to `Diagnostics\SessionYaml`, with the error position and an excerpt in the log (commits ca9502c and 628f4a9).
+- **Proposed fix:** when the SDK's parse fails, VISOR rejoins values split across lines, quotes values, and parses the result itself; report it to SVappsLAB as well. It can be tested with made-up samples of the confirmed failure, which makes it a good first test for the CI pipeline. **Decision pending:** before release or in 1.3.
+
+### B11: Settings reset on every version bump (Medium; pre-1.0)
+`UserSettings` uses .NET's standard settings store, which keeps `user.config` in a folder named after the assembly version. Nothing calls `Upgrade()`, so after a version change (for example 1.2.1.0 → 1.3.0.0) VISOR starts from defaults: window positions and every option in the Config window. Today's upgrade test didn't show it because the version is still 1.2.1.0.
+
+- **Fix:** the standard pattern. Add an `UpgradeRequired` setting (default true); at startup, if it's true, call `Upgrade()`, set it to false and save.
+- **Confirm first:** under `%LOCALAPPDATA%`, a VISOR settings folder with one subfolder per past version means each earlier upgrade started fresh.
+- **Verify:** bump the version locally, install over the current build, and check that settings survive.
 
 ### Checked and found sound
 - **ShiftPointProvider threading:** the lock discipline is correct, and the one write outside the lock (`_car`) is a harmless reference swap.
@@ -267,6 +294,7 @@ Attack surface: local files (settings, shift models, track catalog, logs), one H
 - **S4 (Low; 1.2.1): license notice.** The imported lovely-track-data is CC BY-NC-SA 4.0. That is credited in the README and in the catalog's `_readme`, but not in `LICENSE.txt`'s third-party section, where the Symbola font is listed. Add a matching line. The NC (non-commercial) term is worth a moment's thought given CephasMedia is a company, though a free GPL tool should be fine.
 - **S5 (Low; accept):** the `Global\` mutex and event can be opened or pre-created by any local process (to signal "come to front", or squat the mutex so VISOR won't start). It's needed for the installer's `AppMutex`, and a local attacker could simply kill the process anyway. Accept.
 - **S6 (Low):** the installer's `DelTree` scope, already covered as B4. The catalog validation in B6 is about robustness, not privilege, since the file needs admin rights to edit.
+- **S7 (Low; found in the CI log):** the installer compiler (Inno Setup 6.7.1) prints `Non-commercial use only`. VISOR is free and GPL, but it is published under a company name (CephasMedia). Check Inno Setup's current licence terms (jrsoftware.org) for whether that counts as commercial use. Not a code issue.
 
 **Checked and found sound**
 - **ShiftModels loading:**
@@ -376,6 +404,21 @@ Each pass:
   - S3: no machine name in the log header, and `%USERPROFILE%` in place of the profile path.
   - S4: the lovely-track-data license notice in `LICENSE.txt`, and a README note that catalog edits are replaced on upgrade.
 - **Installer:** B4. The recursive `DelTree` goes, replaced by targeted `[InstallDelete]` entries for VISOR's own DLLs, `deps.json`/`runtimeconfig.json` and `runtimes\`.
+- **Rig results** (installer from the PR #42 CI build):
+  - **Installs:**
+    - The upgrade over 1.2.1 was clean. `System.Management.dll` and the `runtimes\` folder are gone, and the eight DLLs left match the Release build exactly.
+    - A fresh install (uninstall, then reinstall) was clean too, and settings survived it.
+  - **Second launch:** it brings the Config window forward when that window is open. With it closed, the overlay is the target and is already on top, so nothing visibly changes; that is by design.
+  - **Log:**
+    - The header has no machine name, and paths show `%USERPROFILE%`.
+    - A session with Debug Mode on logged cleanly.
+    - Opening the log while VISOR runs was dropped from the checklist (not needed).
+  - **Performance** (typeperf, 5 s samples; 46 min with Debug Mode off, 27 min with it on):
+    - On track, VISOR used about 17–18% of one core in both runs; on a 16-thread CPU that is roughly 1% of the whole CPU. Off track it used about 3%.
+    - Memory levelled off around 125 MB, and threads held steady at 19–22.
+    - Debug Mode had no measurable cost.
+  - **Other:** a clean race on the installed build, and CI green with the pinned actions.
+  - **Found during testing:** B10 (session info that won't parse), which the passes didn't cause.
 - **Rig checklist:**
   - Carried over from Pass 1: with the config window closed, launch VISOR a second time; the running instance comes to the front.
   - Clean the build output first (Build → Clean Solution, or delete `bin\` and `obj\`). Otherwise a stale `bin\Release\...\runtimes\` folder from older builds still holds `System.Management.dll`, and the installer packs every DLL under `bin\Release`.
@@ -386,8 +429,41 @@ Each pass:
   - CPU and memory over about 30 minutes, compared with Pass 2.
   - CI is green with the pinned actions.
 
-### Next (after Pass 3)
+### What's left (updated after Pass 3, 2026-10-09)
 
-1. Update this plan with what's left: D3 (skipped), the C items, the F splits, T1/T2, A1–A5 and P5.
-2. A broader discussion about a full CI test pipeline, then build it (T1, T2 and beyond).
-3. The architecture work (A1–A5, C4, C6, C8), with that test pipeline in place.
+**Before release**
+1. **B11, settings upgrade:** small, and it has to land before the version bump, or every user's settings reset on upgrade. Recommended.
+2. **B10, session-info safety net:** before release or in 1.3; your call.
+3. **S7, Inno Setup licence:** check the terms (yours).
+4. **Release housekeeping (yours):**
+   - regenerate the user-guide PDF
+   - bump the version
+   - mark PR #42 ready and merge it
+
+**Mechanical tidy-ups (low risk; any time before the architecture work)**
+- C1–C3 and C7: duplicated helpers, scale factors, magic numbers, and the radar zone switch blocks.
+- File splits:
+  - F2: `ShiftPointLearner.cs`, 645 lines.
+  - F3: `ShiftPointProvider.cs`, 626 lines.
+  - F4: `RelativeDisplayBuilder.cs`, 541 lines (the P1 brush tables added about 30).
+- C5 is done (as P2).
+
+**CI pipeline discussion (next)**
+- T1: build and run the existing 59 tests in CI.
+- T2: characterization tests for `PositionCalculator`, needed before F1.
+- Candidates:
+  - tests for B10's safety net, using made-up session-info samples
+  - `tools/validate_track_catalog.py` as a CI step
+
+**Architecture (after the CI pipeline)**
+- F1: split `PositionCalculator.cs` (1,137 lines); needs T2.
+- A1–A5, C4, C6 and C8.
+
+**Skipped or accepted**
+- D3 and P5 were skipped; S5 was accepted.
+
+**Watch items**
+- **Radar ghosts (B1):** fixed, but the original case never reproduced on demand.
+- **Session-info parse failures (B10):** run Debug builds when convenient, so a real sample gets captured.
+- **Memory over long sessions:** both perf runs levelled off around 125 MB, but were still rising about 1 MB per 5 minutes near the end. One perf log over a session of an hour or more would settle it.
+- **Track catalog gap:** Oulton Park Fosters has no section data.
