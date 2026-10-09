@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Capture of session info that won't parse (debug builds only)** — when iRacing's session info
+  (track, drivers, sessions) can't be read, VISOR gets no session data and the HUD never becomes
+  ready. The SDK reports the failure but not the text, so debug builds now save any session info
+  that fails to parse, with the line and column of the error, to `Diagnostics\SessionYaml` (at
+  most five files a run). The files contain every driver's name and iRacing ID. Release builds
+  don't collect it.
+
 ### Security
 
 - **Build pipeline hardened** — the CI build job now runs with a read-only token, and only the

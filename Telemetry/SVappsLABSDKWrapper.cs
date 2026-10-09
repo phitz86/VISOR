@@ -40,6 +40,9 @@ namespace VISOR.Telemetry
         private ITelemetryClient<TelemetryData> _client = null!;
         private readonly ILogger _logger;
         private readonly SessionDataCoordinator _sessionCoordinator;
+#if DEBUG
+        private readonly SessionYamlFailureLogger _sessionYamlFailures = new();
+#endif
         private CancellationTokenSource _cancellationTokenSource = null!;
         private Task _monitoringTask = null!;
         private bool _isConnected = false;
@@ -123,7 +126,12 @@ namespace VISOR.Telemetry
                         OnTelemetryUpdate = data => { OnTelemetryUpdate(data); return Task.CompletedTask; },
                         OnSessionInfoUpdate = info => { OnSessionInfoUpdate(info); return Task.CompletedTask; },
                         OnConnectStateChanged = state => { OnConnectStateChanged(state); return Task.CompletedTask; },
-                        OnError = ex => { Log.Error("[SDK Stream] error from SDK", ex); return Task.CompletedTask; }
+                        OnError = ex => { Log.Error("[SDK Stream] error from SDK", ex); return Task.CompletedTask; },
+#if DEBUG
+                        // The SDK reports a session-info parse failure without the text; keep a copy of any
+                        // that fails (SessionYamlFailureLogger catches its own exceptions).
+                        OnRawSessionInfoUpdate = yaml => { _sessionYamlFailures.Check(yaml); return Task.CompletedTask; },
+#endif
                     };
 
                     // Defensive detector #3: stream fault logger.
