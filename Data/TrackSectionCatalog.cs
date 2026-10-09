@@ -41,8 +41,12 @@ namespace VISOR.TrackData
         private static readonly object _loadLock = new();
 
         public static TrackSectionSet? Resolve(string trackName, string trackDisplayName, string trackConfig)
+            => Resolve(GetTracks(), trackName, trackDisplayName, trackConfig);
+
+        /// <summary>Resolve against a given catalog (the loaded one, or a test's).</summary>
+        internal static TrackSectionSet? Resolve(IReadOnlyList<TrackSectionSet> tracks,
+            string trackName, string trackDisplayName, string trackConfig)
         {
-            var tracks = GetTracks();
             if (tracks.Count == 0)
                 return null;
 
@@ -123,36 +127,9 @@ namespace VISOR.TrackData
                     return null;
                 }
 
-                using var doc = JsonDocument.Parse(File.ReadAllText(path));
-                if (!doc.RootElement.TryGetProperty("tracks", out var tracksElement) ||
-                    tracksElement.ValueKind != JsonValueKind.Array)
-                {
-                    Log.Warning("[TrackSections] Catalog has no 'tracks' array");
-                    return null;
-                }
-
-                // The catalog is hand-edited, so entries are read one at a time: a malformed entry
-                // is skipped with a warning instead of taking every other track down with it.
-                var tracks = new List<TrackSectionSet>();
-                int index = 0;
-                foreach (var element in tracksElement.EnumerateArray())
-                {
-                    try
-                    {
-                        var track = element.Deserialize<TrackSectionSet>();
-                        if (track != null && Normalize(track))
-                            tracks.Add(track);
-                        else
-                            Log.Warning($"[TrackSections] Skipping entry {index} ('{track?.Track}'): no usable match keys or sections");
-                    }
-                    catch (JsonException ex)
-                    {
-                        Log.Warning($"[TrackSections] Skipping malformed entry {index}: {ex.Message}");
-                    }
-                    index++;
-                }
-
-                Log.Info($"[TrackSections] Loaded {tracks.Count} track entries from catalog");
+                var tracks = Parse(File.ReadAllText(path));
+                if (tracks != null)
+                    Log.Info($"[TrackSections] Loaded {tracks.Count} track entries from catalog");
                 return tracks;
             }
             catch (Exception ex)
@@ -160,6 +137,43 @@ namespace VISOR.TrackData
                 Log.Warning($"[TrackSections] Failed to load catalog: {ex.Message}");
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Parses catalog JSON into normalized entries. Returns null when there is no 'tracks'
+        /// array; a document that isn't JSON at all throws JsonException.
+        /// </summary>
+        internal static List<TrackSectionSet>? Parse(string json)
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("tracks", out var tracksElement) ||
+                tracksElement.ValueKind != JsonValueKind.Array)
+            {
+                Log.Warning("[TrackSections] Catalog has no 'tracks' array");
+                return null;
+            }
+
+            // The catalog is hand-edited, so entries are read one at a time: a malformed entry
+            // is skipped with a warning instead of taking every other track down with it.
+            var tracks = new List<TrackSectionSet>();
+            int index = 0;
+            foreach (var element in tracksElement.EnumerateArray())
+            {
+                try
+                {
+                    var track = element.Deserialize<TrackSectionSet>();
+                    if (track != null && Normalize(track))
+                        tracks.Add(track);
+                    else
+                        Log.Warning($"[TrackSections] Skipping entry {index} ('{track?.Track}'): no usable match keys or sections");
+                }
+                catch (JsonException ex)
+                {
+                    Log.Warning($"[TrackSections] Skipping malformed entry {index}: {ex.Message}");
+                }
+                index++;
+            }
+            return tracks;
         }
 
         /// <summary>

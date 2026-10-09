@@ -14,6 +14,17 @@
     <Compile Include="..\..\Telemetry\ShiftPointLearner.cs" Link="Linked\ShiftPointLearner.cs" />
     <Compile Include="..\..\Telemetry\ShiftModelStore.cs" Link="Linked\ShiftModelStore.cs" />
     <Compile Include="..\..\ViewModels\ShiftCue.cs" Link="Linked\ShiftCue.cs" />
+    <Compile Include="..\..\ViewModels\FuelViewModel.cs" Link="Linked\FuelViewModel.cs" />
+    <Compile Include="..\..\Telemetry\PositionHistoryBuffer.cs" Link="Linked\PositionHistoryBuffer.cs" />
+    <Compile Include="..\..\Data\TrackSectionCatalog.cs" Link="Linked\TrackSectionCatalog.cs" />
+    <Compile Include="..\..\Update\UpdateChecker.cs" Link="Linked\UpdateChecker.cs" />
+    <!-- Log writes nothing to disk until StartNewSession, which tests never call. -->
+    <Compile Include="..\..\Diagnostics\Log.cs" Link="Linked\Log.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The shipped catalog, where TrackSectionCatalog looks for it (beside the binaries). -->
+    <None Include="..\..\Data\TrackSections.json" Link="Data\TrackSections.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

@@ -76,6 +76,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Tests and checks run on every build** — CI now runs the unit tests (100, up from 59: the new
+  ones cover the fuel estimate, the position history behind the gap figures, the track catalog and
+  the update check) and checks the track catalog, code whitespace and packages with known
+  vulnerabilities, on every push and pull request. Build warnings fail CI, and a release is only
+  signed once all of it passes.
 - **Less work per frame** — the relative display reuses ten pre-built colour brushes instead of
   creating up to 1,800 a second, and looks up practice/qualifying positions once per frame
   instead of once per row. The delta bar only signals a redraw when it actually changes.

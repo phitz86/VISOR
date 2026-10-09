@@ -115,6 +115,18 @@ dotnet build VISOR.sln --configuration Release
 You can also open `VISOR.sln` in Visual Studio 2026 (or newer; .NET 10 is not supported in VS 2022) and build the
 **Release** configuration.
 
+### Run the tests
+
+```powershell
+dotnet test Tests/VISOR.Tests
+```
+
+The unit tests cover the platform-independent logic (shift-point learning, fuel, gap history,
+the track catalog, the update check). They target plain `net10.0`, so they also run on Linux,
+and they appear in Visual Studio's Test Explorer. CI runs them on every push and pull request,
+together with the track-catalog validator (`tools/validate_track_catalog.py`), a whitespace
+check (`dotnet format whitespace --folder --verify-no-changes`) and a vulnerable-package check.
+
 ### Build the installer
 
 ```powershell

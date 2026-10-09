@@ -444,7 +444,7 @@ This follows the order you set: a broader CI test pipeline first, then the archi
 
 #### Pass 5: CI test pipeline foundation, T1 (CI)
 - **Solution:** add `Tests/VISOR.Tests` to `VISOR.sln`. Anything under `Tests/` is already excluded from the app's compile, and the installer only packs the app's output folder.
-- **Log test seam:** `Log`'s static constructor creates `%LOCALAPPDATA%\VISOR\Logs` and starts a writer, so tests run on your PC would write into your real log folder. Add a way for tests to keep it in memory or in a temp folder.
+- **Log test seam:** not needed after Pass 4. `Log` writes nothing to disk until `StartNewSession`, which tests never call; it only creates the log folder, which already exists on your PC.
 - **New `test` job** (ubuntu, in parallel with `build`):
   - `dotnet test` with TRX results and Cobertura coverage, uploaded as an artifact
   - a summary written to the run page

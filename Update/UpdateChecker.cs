@@ -101,7 +101,7 @@ namespace VISOR.Update
         /// Extracts a Version from a release tag such as "v0.9.13", "0.9.13.0",
         /// or "v1.0.0-rc1". Returns null if no version-like substring is found.
         /// </summary>
-        private static Version? ParseVersion(string? tag)
+        internal static Version? ParseVersion(string? tag)
         {
             if (string.IsNullOrWhiteSpace(tag))
                 return null;
@@ -117,7 +117,7 @@ namespace VISOR.Update
         /// Pads a Version to four components so comparisons between tags like
         /// "0.9.13" and "0.9.13.0" behave intuitively (unset components are -1).
         /// </summary>
-        private static Version Normalize(Version v)
+        internal static Version Normalize(Version v)
         {
             return new Version(
                 v.Major < 0 ? 0 : v.Major,
