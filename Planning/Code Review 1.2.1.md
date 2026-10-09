@@ -5,7 +5,7 @@ Risk appetite for 1.2.1: fix bugs, delete dead code, and split files mechanicall
 
 ## Summary
 
-**Status (2026-10-09):** all three revision passes are done and validated on the rig (results under "Agreed revision plan"). Testing turned up three new items (B10, B11, S7). What remains is listed under "What's left" at the end.
+**Status (2026-10-09):** Phase 1, the three revision passes, is done and validated on the rig. Testing turned up B10, B11 and S7, and the research for Phase 2 found B12 and B13. Phase 2 (pre-release fixes, the CI test pipeline, then the architecture work) is proposed under "Revision plan" at the end, with the decisions that are yours.
 
 - **Overall:** the code is in good shape. The new shift-point work (learner, store, cue) is well isolated, its untrusted input is validated, and it is the only part of the app with tests. Most problems are older code that grew, or plumbing nobody uses any more.
 - **No significant CPU or RAM bottleneck.** Steady-state garbage is roughly 1 MB/s, all short-lived. Fixed buffers total about 2.4 MB. Nothing grows without bound in release builds except the radar ghost elements (B1).
@@ -47,17 +47,26 @@ Status reflects the revision plan agreed after the review (see "Agreed revision 
 | B7 | Low | Two shift-model saves can collide on the same temp file | Small | **Done** (Pass 1) |
 | B8 | Low | `PrimedStateChanged` fires on every session update, not only on change | Small | **Done** (Pass 1) |
 | B9 | Low | Possible 2 s hang on exit (thread-blocking pattern) | — | **Done** (Pass 2) |
-| B10 | Med | Session info the SDK can't parse leaves VISOR blank for a whole event | Small–Med | **Open:** Debug capture added; safety net before release or in 1.3 is your call |
-| B11 | Med | Settings reset to defaults on every version bump | Small | **Open:** fix before the next version bump |
+| B10 | Med | Session info the SDK can't parse leaves VISOR blank for a whole event | Small–Med | **Proposed:** Pass 6 (Debug capture already added) |
+| B11 | Med | Settings reset to defaults on every version bump | Small | **Proposed:** Pass 4, before the next version bump |
+| B12 | Low–Med | At the finish, a car whose telemetry stops isn't held: the car behind moves up and two cars can show the same position | Small | **Proposed:** Pass 8 (pinned by a test, then fixed) |
+| B13 | Low | Radar switched on from the Config window can't be dragged into place | Small | **Proposed:** Pass 4 |
 | D1 | Low | `System.Management` package unused but shipped | Mech | **Done** (Pass 1) |
 | D2, D4 | Low | Unused members and events | Mech | **Done** (Pass 1) |
 | D3 | Low | Session data parsed but never read | Mech | **Skipped** (cheap; unused reads have come in handy) |
 | D5 | Low | Stale files in `Planning/` and the repo root; dead csproj entries | Mech | **Done** (Pass 1), except the stale PDF, which you regenerate before release |
-| C1–C3, C7 | Low | Duplicated helpers, scale factors, magic numbers | Mech | Open (mechanical tidy-ups) |
+| C1–C3, C7 | Low | Duplicated helpers, scale factors, magic numbers, radar zone switches | Mech | **Proposed:** Pass 7 |
 | C5 | Low | Fastest-lap positioning rebuilt per row | Mech | **Done** (as P2) |
-| C4, C6, C8 | Low | Larger consolidations | — | Deferred (architecture work) |
-| F1–F4 | — | Files over 500 lines: split plans | Mech | Open: F2–F4 mechanical; F1 needs T2 |
-| A1–A5 | — | Separation-of-concerns items | — | Deferred until after the CI pipeline work |
+| C4 | Low | Session type re-derived under a lock many times per frame | — | **Proposed:** Pass 10 |
+| C6 | Low | Overlay and radar code-behind duplicate their plumbing | — | **Proposed:** Pass 12 |
+| C8 | Low | Debug loggers each re-implement folder, file name and flush | Mech | **Proposed:** Pass 7 |
+| F2–F4 | — | Files over 500 lines: split plans | Mech | **Proposed:** Pass 7 |
+| F1 | — | `PositionCalculator.cs` (1,137 lines): split plan | Mech | **Proposed:** Pass 9, after T2 |
+| A1 | — | Radar view model builds WPF elements | — | **Proposed:** Pass 11 |
+| A2 | — | Leaky session interface; Settings depends on Telemetry | — | **Proposed:** Pass 10 |
+| A3 | — | PositionCalculator in the wrong layer, untestable | — | **Proposed:** Passes 8–9 |
+| A4 | — | One UI tick for both windows | — | Only if a problem appears |
+| A5 | — | User-editable catalog lives in Program Files | — | Optional feature; your call |
 | P1–P4 | Low | Small per-frame waste (brushes, list copies, log I/O, notifications) | Small | **Done** (Pass 3) |
 | P5 | — | Measure the transparent-window rendering cost on your rig | — | **Skipped** |
 | S1 | Med | CI token has write access during the build job | Small | **Done** (Pass 3) |
@@ -66,8 +75,8 @@ Status reflects the revision plan agreed after the review (see "Agreed revision 
 | S5 | Low | Named-object squatting | — | **Accepted** |
 | S6 | Low | Installer `DelTree` scope | — | **Done** (with B4) |
 | S7 | Low | Inno Setup prints "Non-commercial use only" | — | **Open:** check the licence terms (yours) |
-| T1 | Med | CI never builds or runs the tests | Small | Deferred to the CI pipeline discussion |
-| T2 | Med | No tests for PositionCalculator (needed before splitting it) | Mech | Deferred to the CI pipeline discussion |
+| T1 | Med | CI never builds or runs the tests | Small | **Proposed:** Pass 5 |
+| T2 | Med | No tests for PositionCalculator (needed before splitting it) | Mech | **Proposed:** Pass 8 |
 
 ---
 
@@ -158,6 +167,20 @@ In one official race (GT4 Challenge at Road Atlanta, 9 October), every session-i
 - **Confirm first:** under `%LOCALAPPDATA%`, a VISOR settings folder with one subfolder per past version means each earlier upgrade started fresh.
 - **Verify:** bump the version locally, install over the current build, and check that settings survive.
 
+### B12: A car whose telemetry stops at the finish isn't held (Low–Medium; found 2026-10-09, Phase 2 research)
+`FreezeDepartedCars` (`ViewModels/PositionCalculator.cs:517-568`) is meant to hold the finishing slot of a car that leaves during the checkered, including, as its comment says, "a car whose telemetry simply stops". But about three seconds after its data stops, such a car drops out of the running order one frame before it leaves the roster. When the hold runs, the car's overall position already reads −1, so it is skipped.
+
+The car behind then slides up, while the departed car keeps a stale class position, so two cars can show the same class position. This was reproduced in a scratch test harness: two cars at P2. Cars that drop out of the session's driver list (the usual offline and AI case) are held correctly.
+
+- **Fix:** after T2 pins it with a test, hold the car on its last valid positions rather than the current frame's.
+- **Verify:** the T2 test, then a race where a car disconnects under the checkered.
+
+### B13: Radar switched on from the Config window can't be positioned (Low; found 2026-10-09, Phase 2 research)
+When the radar is off at start-up and switched on in the Config window, `App.ShowRadarWindow` (`App.xaml.cs:361`) creates it while config mode is already on. The new window subscribes to later config-mode changes but never reads the current state. It also isn't forced visible: `ConfigWindow.xaml.cs:42` only does that for a radar that already existed when the Config window opened. As a result its drag handle stays hidden, and it may stay faded out, until the Config window is closed and reopened.
+
+- **Fix:** apply the current config mode and forced visibility when the window is created. C6 later moves this into a shared behaviour.
+- **Verify:** start with the radar off, open the Config window, turn the radar on, and drag it.
+
 ### Checked and found sound
 - **ShiftPointProvider threading:** the lock discipline is correct, and the one write outside the lock (`_car`) is a harmless reference swap.
 - **SDK arrays:** they are fresh per frame (the SDK doesn't pool them), so off-thread reads can't see a half-updated frame.
@@ -241,12 +264,14 @@ Test-only members to **keep**: `ShiftPointLearner.RelativeTorqueAt` and `ShiftCu
 
 ## File size (target: about 500 lines of C#)
 
+Line counts as of 2026-10-09.
+
 | File | Lines | Split (code moves only; public API unchanged) |
 |---|---|---|
-| `ViewModels/PositionCalculator.cs` | 1152 | `FinishTracker` (freeze at checkered, departed cars, finish diagnostics), `CarTrackingCache` (valid roster, prediction, lap-desync correction), `RunningOrder` (sort, grid fallback, slot assignment). `PositionCalculator` stays as the thin front door the view models already call. Do **T2** first. |
-| `Telemetry/ShiftPointLearner.cs` | 648 | Records and enums (`ShiftSample`, `GearShiftEstimate`, `SkipReason`, `ShiftModelState`) → `ShiftModelTypes.cs`. `RatioTracker` → own file. Cholesky solver → `LinearSolver.cs`. |
+| `ViewModels/PositionCalculator.cs` | 1137 | `FinishTracker` (freeze at checkered, departed cars, finish diagnostics), `CarTrackingCache` (valid roster, prediction, lap-desync correction), `RunningOrder` (sort, grid fallback, slot assignment). `PositionCalculator` stays as the thin front door the view models already call. Do **T2** first. |
+| `Telemetry/ShiftPointLearner.cs` | 645 | Records and enums (`ShiftSample`, `GearShiftEstimate`, `SkipReason`, `ShiftModelState`) → `ShiftModelTypes.cs`. `RatioTracker` → own file. Cholesky solver → `LinearSolver.cs`. |
 | `ViewModels/ShiftPointProvider.cs` | 626 | Calibration/stability tracking → `ShiftCalibrationTracker`. Progress-log formatting → `ShiftProgressLog`. What remains is lookup plus learning orchestration. |
-| `ViewModels/RelativeDisplayBuilder.cs` | 576 | Removing the relative-gap debug plumbing (about 50 lines; see the debug table) and the brush cache (P1) get it near 500. Then move row styling and segment colours into `RelativeRowStyler`. |
+| `ViewModels/RelativeDisplayBuilder.cs` | 541 | The relative-gap plumbing is gone (Pass 1); the P1 brush tables added about 30 lines back. Move row styling and segment colours into `RelativeRowStyler`. |
 | `Tests/.../ShiftPointLearnerTests.cs` | 501 | Soft limit; leave it. |
 | `Views/MainWindow.xaml` | 476 | XAML; leave it. |
 
@@ -320,7 +345,7 @@ Attack surface: local files (settings, shift models, track catalog, logs), one H
 
 ## Tests and CI
 
-- **T1 (Medium; 1.2.1):** CI never builds or runs `Tests/VISOR.Tests`, and the project isn't in `VISOR.sln`. A change to the shift learner can break the tests without anyone noticing. Add a `dotnet test Tests/VISOR.Tests` step. It targets plain `net10.0`, so it adds well under a minute.
+- **T1 (Medium; 1.2.1):** CI never builds or runs `Tests/VISOR.Tests`, and the project isn't in `VISOR.sln`. A change to the shift learner can break the tests without anyone noticing. Add a `dotnet test Tests/VISOR.Tests` step. It targets plain `net10.0`, so it adds well under a minute. *Proposed for Pass 5, as part of the CI pipeline below.*
 - **T2 (Medium; 1.2.1):** the position calculator has more changelog fixes than anything else and no tests. Before splitting it (F1), add *characterization tests*, which record what it does today:
   - lap-desync correction
   - grid-source selection
@@ -328,7 +353,7 @@ Attack surface: local files (settings, shift models, track catalog, logs), one H
   - departed-car holds
   - pace-car exclusion
 
-  The tests must pass unchanged after the split. To make it testable, `PositionCalculator.Update` takes a small plain input record (the per-car arrays and scalars it reads) that the overlay fills from the snapshot. That is a signature change only; the logic stays the same.
+  The tests must pass unchanged after the split. To make it testable, `PositionCalculator.Update` takes a small plain input record (the per-car arrays and scalars it reads) that the overlay fills from the snapshot. That is a signature change only; the logic stays the same. *Proposed for Pass 8.*
 
 ---
 
@@ -345,125 +370,209 @@ Attack surface: local files (settings, shift models, track catalog, logs), one H
 | Frame-gap / handler-latency detectors | Release | Telemetry health | Cheap, useful | **Keep** |
 | Debug Mode LapDistPct readout | Release (user-visible) | Catalog calibration | Useful | **Keep** |
 | `[ShiftPoint] progress` log | Release, Info | Learner progress | Already throttled to 10 min once settled | **Keep** |
+| `SessionYamlFailureLogger` (added 2026-10-09) | Debug | Saves session info that fails to parse (B10), at most five files a run | New | **Keep** until B10 has a real sample, or for good as a safety net |
 
 ---
 
-## Agreed revision plan: three gated passes
 
-Each pass:
-- builds Debug and Release with 0 warnings and 0 errors before it is pushed to `claude/zen-carson-2vx0dk`
-- adds `[Unreleased]` entries to `CHANGELOG.md` (the version bump is left until release)
-- **stops** for compile-and-test on your rig before the next pass starts
+## Revision plan
 
-### Pass 1: dead code, three debug loggers, small bug fixes (one commit)
+Ground rules for every pass:
+- **Build:** Debug and Release build with 0 warnings and 0 errors before anything is pushed to `claude/zen-carson-2vx0dk`. From Pass 5 on, CI's tests and checks must be green as well.
+- **Changelog:** each pass adds `[Unreleased]` entries to `CHANGELOG.md`. The version bump waits until release.
+- **Gate:** each pass **stops** at a gate.
+  - **Rig** passes wait for an on-track test on your rig.
+  - **CI** passes change no runtime behaviour, so green CI plus a short smoke run is the gate.
 
-- **Dead code:** D1, D2, D4 and D5 (not the PDF).
-  - `RelativeRowViewModel.IncidentCount` stays: it is the same kind of unused read as D3.
-  - Also kept on purpose:
-    - `ShiftPointLearner.RelativeTorqueAt` and `ShiftCue.RpmRate`, which the tests use.
-    - `RelativeViewModel`'s `INotifyPropertyChanged`, which avoids WPF's binding memory leak and a CS0067 warning.
-- **Loggers removed:** RelativeGap, TelemetryCSV and SessionData, including the raw session-YAML stash that only SessionData used.
-- **Bug fixes:** B1, B2 (including the same lifetime fix for a radar window closed with Alt+F4), B5, B6, B7, B8.
-- **Rig results:**
-  - Verified: Exit from the ⚙ window, the radar toggle, track location (66 entries loaded), shift points, and the debug-build folders.
-  - Track location: Oulton Park Fosters shows no readout because that layout isn't in the catalog, as expected.
-  - WetResearch wasn't exercised (dry race), and its code is unchanged.
-  - Radar ghosts moves to the Pass 2 checklist, and the second-launch check to Pass 3.
-- **Rig checklist:**
-  - **Radar ghosts:** leave a session and join another; no stuck car blocks on the radar.
-  - **Exit from the ⚙ window:** close the config window with Done, click ⚙ on the overlay, then **Exit VISOR**; VISOR closes.
-  - **Second launch:** with the config window closed, launch VISOR again (or press the Stream Deck button); the running instance comes to the front.
-  - **Radar toggle:** turn the radar off and on.
-  - **Track location:** the readout still resolves, and the log shows `[TrackSections] Loaded 66 track entries`.
-  - **Shift points:** shift models still save, and the indicator and calibration dot behave as before.
-  - **Debug build only:** no `Telemetry`, `RelativeGap` or `SessionData` folders under `%LOCALAPPDATA%\VISOR\Diagnostics`; `ShiftPoints` and `WetResearch` are still written.
+### Phase 1 (1.2.x): three gated passes, done
 
-### Pass 2: ordered frame delivery (B3, with B9; one commit)
+| Pass | Commits | Scope | Rig result |
+|---|---|---|---|
+| 1 | `f23f1ae` | Dead code (D1, D2, D4, D5); the RelativeGap, TelemetryCSV and SessionData loggers; bugs B1, B2, B5–B8 | 8 Oct: verified Exit from the ⚙ window, the radar toggle, track location (66 entries), shift points and the debug folders |
+| 2 | `7c85e70` | Ordered frame delivery (B3) and the exit-hang fix (B9) | 8 Oct: a full multiclass practice → qualifying → race at Road Atlanta with no issues; `[FrameBacklog]` only at session loads |
+| 3 | `4030869`, `71e9595`, `c5d76f6` | P1–P4; S1–S4; installer B4 | 9 Oct: see below |
+| — | `ca9502c`, `628f4a9` | Debug builds save session info that fails to parse (B10) | — |
 
-- **Frame delivery:** snapshots are raised on the SDK's single telemetry thread and posted to the UI with a non-blocking `BeginInvoke` at the same priority as today. That keeps frames in order, and a capped backlog drops frames rather than queueing them when the UI stalls; drops are logged as `[FrameBacklog]`.
-- **Exit hang (B9):** the connection-state and primed-state handlers stop blocking too.
-- **Rig results:**
-  - A full practice → qualifying → race at Road Atlanta (multiclass) showed no issues.
-  - Radar ghosts didn't show up. That case is hard to reproduce on purpose, so keep an eye out.
-  - `[FrameBacklog]` and `[FrameGap]` appeared together twice, at session loads. That is expected: iRacing sends a burst of frames after a load stall.
-  - One `Session time went backwards` in practice and none in the race. Since frames now arrive in order, this means iRacing's own session clock went backwards (for example during a replay or a session restart).
-- **Rig checklist:**
-  - A full practice → qualifying → race through the checkered: Final Lap and FINISHED latch, finishing positions hold, and the qualifying lap countdown is correct.
-  - Carried over from Pass 1: leave a session and join another; no ghost cars on the radar.
-  - Relative gaps and positions are steady.
-  - Exit is prompt.
-  - Logs show none of `Session time went backwards`, `raised on the same sample` or `did not shut down gracefully` mid-session; `[FrameBacklog]` is rare or absent.
-  - CPU is comparable to Pass 1.
+Pass 3 rig results (9 Oct):
+- The upgrade and fresh installs were clean.
+- Second launch, the log header and Debug Mode logging were verified.
+- Two perf runs: about 17–18% of one core on track, and memory levelling off at about 125 MB. Debug Mode had no measurable cost.
+- A clean race on the installed build.
 
-### Pass 3: performance, security and docs, installer (one commit per theme)
+Decisions carried forward:
+- D3 and P5 were skipped, and S5 was accepted.
+- `RelativeRowViewModel.IncidentCount` and the finish diagnostics stay.
+- The PDF is yours to regenerate.
 
-- **Performance:** P1 (cached frozen brushes), P2 (fastest-lap lookup once per frame), P3 (persistent log writer), P4 (delta bar change checks).
-- **Security and docs:**
-  - S1: the CI build job gets read-only access; only the sign job can write.
-  - S2: actions pinned to commit SHAs, a pinned Inno Setup version, and Dependabot for GitHub Actions.
-  - S3: no machine name in the log header, and `%USERPROFILE%` in place of the profile path.
-  - S4: the lovely-track-data license notice in `LICENSE.txt`, and a README note that catalog edits are replaced on upgrade.
-- **Installer:** B4. The recursive `DelTree` goes, replaced by targeted `[InstallDelete]` entries for VISOR's own DLLs, `deps.json`/`runtimeconfig.json` and `runtimes\`.
-- **Rig results** (installer from the PR #42 CI build):
-  - **Installs:**
-    - The upgrade over 1.2.1 was clean. `System.Management.dll` and the `runtimes\` folder are gone, and the eight DLLs left match the Release build exactly.
-    - A fresh install (uninstall, then reinstall) was clean too, and settings survived it.
-  - **Second launch:** it brings the Config window forward when that window is open. With it closed, the overlay is the target and is already on top, so nothing visibly changes; that is by design.
-  - **Log:**
-    - The header has no machine name, and paths show `%USERPROFILE%`.
-    - A session with Debug Mode on logged cleanly.
-    - Opening the log while VISOR runs was dropped from the checklist (not needed).
-  - **Performance** (typeperf, 5 s samples; 46 min with Debug Mode off, 27 min with it on):
-    - On track, VISOR used about 17–18% of one core in both runs; on a 16-thread CPU that is roughly 1% of the whole CPU. Off track it used about 3%.
-    - Memory levelled off around 125 MB, and threads held steady at 19–22.
-    - Debug Mode had no measurable cost.
-  - **Other:** a clean race on the installed build, and CI green with the pinned actions.
-  - **Found during testing:** B10 (session info that won't parse), which the passes didn't cause.
-- **Rig checklist:**
-  - Carried over from Pass 1: with the config window closed, launch VISOR a second time; the running instance comes to the front.
-  - Clean the build output first (Build → Clean Solution, or delete `bin\` and `obj\`). Otherwise a stale `bin\Release\...\runtimes\` folder from older builds still holds `System.Management.dll`, and the installer packs every DLL under `bin\Release`.
-  - Compile the installer.
-  - Do a fresh install and an upgrade over 1.2.1. Settings, logs and shift models survive; there are no stale DLLs and no `System.Management.dll`.
-  - The overlay and radar behave as before.
-  - The log has no machine name, and it can be opened while VISOR runs.
-  - CPU and memory over about 30 minutes, compared with Pass 2.
-  - CI is green with the pinned actions.
+Testing in Phase 1 found B10, B11 and S7.
 
-### What's left (updated after Pass 3, 2026-10-09)
+### Phase 2 (proposed): release, CI pipeline, then architecture
 
-**Before release**
-1. **B11, settings upgrade:** small, and it has to land before the version bump, or every user's settings reset on upgrade. Recommended.
-2. **B10, session-info safety net:** before release or in 1.3; your call.
-3. **S7, Inno Setup licence:** check the terms (yours).
-4. **Release housekeeping (yours):**
-   - regenerate the user-guide PDF
-   - bump the version
-   - mark PR #42 ready and merge it
+This follows the order you set: a broader CI test pipeline first, then the architecture work. Research for it covered the position calculator, the session-data layer, the UI and radar, and the tests and CI setup. It also found B12 and B13.
 
-**Mechanical tidy-ups (low risk; any time before the architecture work)**
-- C1–C3 and C7: duplicated helpers, scale factors, magic numbers, and the radar zone switch blocks.
-- File splits:
-  - F2: `ShiftPointLearner.cs`, 645 lines.
-  - F3: `ShiftPointProvider.cs`, 626 lines.
-  - F4: `RelativeDisplayBuilder.cs`, 541 lines (the P1 brush tables added about 30).
-- C5 is done (as P2).
+#### Decisions for you
 
-**CI pipeline discussion (next)**
-- T1: build and run the existing 59 tests in CI.
-- T2: characterization tests for `PositionCalculator`, needed before F1.
-- Candidates:
-  - tests for B10's safety net, using made-up session-info samples
-  - `tools/validate_track_catalog.py` as a CI step
+1. **Release first, or fold everything into 1.3?** *Recommended: release Phase 1 plus Pass 4 as 1.2.2, then start the rest on a fresh branch from `master`.*
+   - Phase 1 is rig-validated and fixes problems users can see: radar ghosts, out-of-order frames and the installer wipe.
+   - The architecture passes will take a while and shouldn't hold those fixes back.
+   - Whichever release bumps the version must include B11.
+2. **B10 timing.** *Recommended: Pass 6, right after the CI foundation, so the repair lands with its tests.* If the 1.3 work runs long, Pass 6 can ship on its own as a point release.
+3. **Test project shape.** *Recommended: keep `Tests/VISOR.Tests` as a plain `net10.0` project that links source files.* It runs on Linux CI runners and in Visual Studio's Test Explorer. A Windows-only project that references the app would only be needed if WPF code ever needs testing.
+4. **CI strictness.** *Recommended:*
+   - warnings as errors in CI (there are 0 warnings today)
+   - a whitespace-only format check, not style rules
+   - coverage reported, with no threshold
+   - build, test and lint set as required checks in branch protection (a GitHub setting you change)
+5. **Dependabot for NuGet.** *Recommended: yes.* The test packages are already behind (Microsoft.NET.Test.Sdk 17.14 vs 18.10, the xUnit runner 3.1 vs 4.0). It means more bot PRs.
+6. **A5, the user catalog override.** This is a feature, not a fix. It is independent of everything else, so it can go into 1.3 at any point, or wait.
+7. **A4, one UI tick for both windows.** *Recommended: only if a problem shows up.* The rig shows `[FrameBacklog]` only at session loads.
 
-**Architecture (after the CI pipeline)**
-- F1: split `PositionCalculator.cs` (1,137 lines); needs T2.
-- A1–A5, C4, C6 and C8.
+#### Pass 4: pre-release fixes (rig)
+- **B11, settings upgrade:**
+  - Add an `UpgradeRequired` setting, default true.
+  - In `CreateWithRecovery`, once the current file has loaded, call `Upgrade()` once, set the flag to false and save.
+  - Put the upgrade in its own try/catch, so a corrupt *previous-version* file is skipped with a warning. Otherwise it would reach the recovery path, which backs up and deletes the file.
+  - After a corrupt-file reset, the next start re-imports the previous version's settings if there are any. That is the better outcome.
+- **B13, radar drag handle:** when the radar window is created, apply the current config mode and forced visibility.
+- **Gate (rig):**
+  - Build a test installer with the version bumped (for example 1.2.2.0), install it over the current build, and check that settings and window positions survive.
+  - Start with the radar off, open the Config window, turn the radar on, and drag it.
+- **Then release (your steps):**
+  - the S7 licence check
+  - the PDF
+  - the version bump: CI requires `Version`, `FileVersion` and `AssemblyVersion` to be equal and four-part
+  - mark PR #42 ready, merge it, and tag
 
-**Skipped or accepted**
-- D3 and P5 were skipped; S5 was accepted.
+#### Pass 5: CI test pipeline foundation, T1 (CI)
+- **Solution:** add `Tests/VISOR.Tests` to `VISOR.sln`. Anything under `Tests/` is already excluded from the app's compile, and the installer only packs the app's output folder.
+- **Log test seam:** `Log`'s static constructor creates `%LOCALAPPDATA%\VISOR\Logs` and starts a writer, so tests run on your PC would write into your real log folder. Add a way for tests to keep it in memory or in a temp folder.
+- **New `test` job** (ubuntu, in parallel with `build`):
+  - `dotnet test` with TRX results and Cobertura coverage, uploaded as an artifact
+  - a summary written to the run page
+  - no extra token permissions, which keeps S1 intact
+- **New `lint` job** (ubuntu, about a minute):
+  - `tools/validate_track_catalog.py`, which needs only the Python standard library and exits 1 on structural errors
+  - `dotnet format whitespace --verify-no-changes`, after fixing the three whitespace issues it finds today (`ShiftPointProvider.cs:497-500`)
+  - `dotnet list package --vulnerable --include-transitive`
+- **`build` job:** warnings as errors.
+- **`sign` job:** `needs: [build, test, lint]`, so an untested tag can't be signed.
+- **Housekeeping:**
+  - a `concurrency` group that cancels superseded PR runs
+  - every new action pinned to a SHA
+  - the `nuget` ecosystem added to Dependabot (decision 5)
+- **First new tests**, all pure logic with no WPF or SDK:
+  - `FuelViewModel`: the rolling per-lap average.
+  - `PositionHistoryBuffer`: teleport and stationary detection, and crossing-time interpolation, which is the core of the gap figures.
+  - `TrackSectionCatalog.Resolve` against the shipped catalog, as a C# check alongside the Python mirror.
+  - `UpdateChecker` version parsing, made `internal` with `InternalsVisibleTo`.
+- **Cost:** about 1–1.5 minutes per parallel job. That adds little wall time, because the Windows build stays the longest job.
+- **Gate (CI):** CI green on the PR, and the tests pass in Visual Studio.
 
-**Watch items**
+#### Pass 6: session-info safety net, B10 (rig)
+- **When VISOR steps in:**
+  - VISOR registers the SDK's raw session-info handler in all builds.
+  - For each update it repeats the SDK's two checks, syntax-only and cheap: the text as-is, then with the SDK's six-field quoting.
+  - Only when both would fail does VISOR step in, so normal sessions take exactly the path they take today.
+- **The repair:**
+  - Rejoin values split across lines, and quote scalar values. Nested-mapping keys, `- Key: value` list lines and values already quoted are left alone.
+  - Deserialize into the SDK's own `TelemetrySessionInfo` with the SDK's exact settings (`IgnoreUnmatchedProperties`, default naming).
+  - Apply the result through `ApplySdkSession`, the entry point the SDK's own result uses.
+- **Safety:**
+  - A sequence guard, so a repaired update can't overwrite a newer one the SDK parsed itself. The two arrive on different threads.
+  - The handler catches everything: an exception escaping an SDK handler stops telemetry for good.
+  - An explicit `YamlDotNet` 18.1.0 package reference. Today it arrives only through the SDK.
+- **Logging:** one Release-level warning per distinct failure. The Debug capture stays.
+- **Tests:**
+  - synthetic YAML fixtures, with no real names, for each confirmed breaking shape
+  - valid YAML passes through untouched
+  - the "would the SDK fail?" decision
+  - the repaired text deserializes to the expected values
+- **Upstream:** report the six-field limitation to SVappsLAB. I can draft the issue.
+- **Gate (rig):** a few normal sessions with no repair warnings, and the HUD becomes ready as usual. The repair path itself is proven by the tests unless the problem comes back.
+
+#### Pass 7: mechanical tidy-ups (CI)
+These are pure code moves and consolidations: behaviour is unchanged, apart from log wording where noted. The build and the tests protect them.
+- **C2:** one `WindowScale` table for the main and radar size presets, in place of four copies.
+- **C3:** shared constants for SessionState values, flag masks and the pace-car class. Check the SDK's generated `SessionState` enum first.
+- **C1, then C8:**
+  - The loggers use `ShiftModelStore.SafeFileStem`, with its algorithm unchanged: saved models are found by that file name.
+  - Then a small `DiagnosticFiles` helper for the three debug loggers' folders and file names.
+- **C7:** one table from the CarLeftRight state to radar zones, driving both the zone assignment and the highlights. It replaces six parallel switches across `RadarViewModel` and `RadarWindow`; only log wording changes.
+- **F2–F4:**
+  - `ShiftPointLearner`: its types, `RatioTracker` and the Cholesky solver move into their own files.
+  - `RelativeDisplayBuilder`: row styling moves into `RelativeRowStyler`. `AssignProximitySegments` splits into measuring and colouring, keeping its early returns.
+  - `ShiftPointProvider`: the calibration tracker and the progress-log formatting move out, with care around its lock.
+  - New files are added to the test project's links.
+- **Gate (CI):** CI green, plus one short session on a Debug build to check that the `ShiftPoints` and `WetResearch` files are still written.
+
+#### Pass 8: PositionCalculator characterization tests, T2 and the A3 input record (rig)
+- **Input record:** `Update` takes a plain `PositionFrame` record, filled from the snapshot by `MainViewModel`.
+  - It holds the eight values the calculator computes with (two scalars and six per-car arrays) and the five it only logs. The 64-length arrays are guaranteed.
+  - This is a signature change only. It takes the SDK out of the tests, so they don't need a copy of the telemetry-variable list.
+- **Test helpers:** a fake `ISessionDataProvider` and a frame-sequence builder.
+- **About 25–30 tests** pinning today's behaviour:
+  - lap-desync correction at the line: lap counter late or early, a stuck counter, the first frame after a gap
+  - grid order before the green: live arrays vs qualifying results, the coverage tie-break, the green latch
+  - leader-gated finish freezing: the leader first, lapped cars and slower classes not frozen, frozen slots skipped
+  - departed-car holds under the checkered, and none before it
+  - pace-car exclusion
+  - roster entry and expiry timing, practice and qualifying mode, reset, session transition
+- **B12:** a test that describes the correct result is marked as a known bug, then B12 gets its own small fix commit.
+- **Gate (rig):** one race to the checkered, because the per-frame call changed.
+
+#### Pass 9: PositionCalculator split, F1 and A3 (rig)
+- **Split:** `FinishTracker`, `CarTrackingCache` and `RunningOrder` sit behind the existing `PositionCalculator` front door, moved to a `Race/` folder (A3).
+- **Must stay exactly as is:**
+  - the frame order: finish → roster → departed → prediction → sort
+  - every clear in `Reset` and in the session transition
+  - the 64-length assumption
+  - the exact `[Finish]` and `[Leader]` log text
+- **Tests:** the Pass 8 tests must pass unchanged.
+- **Gate (rig):** a full practice → qualifying → race with a finish, ideally multiclass.
+
+#### Pass 10: one session snapshot, A2 and C4 (rig)
+- **The snapshot:** `ApplySdkSession` builds one immutable session view per parse and publishes it by a single reference; `ClearCache` publishes an empty one. Each frame then reads one consistent view, instead of taking the coordinator's lock 20–35 times.
+- **Session type:** derived once per parse. Today's matching is kept unless you want it changed:
+  - "Lone Qualify" also counts as qualifying, and "Heat Race" as a race.
+  - Warmup and Testing use race positioning.
+- **Downcasts:**
+  - The four downcasts to `SessionDataCoordinator` go: track length, name, config and display name join the view.
+  - Settings takes a plain "hide relative" bool, so the Settings layer no longer depends on Telemetry.
+- **Small fixes along the way:**
+  - The session schedule is rebuilt on each parse. Today, sessions from an earlier subsession can linger until a disconnect.
+  - The track-location readout reads its three values from one view.
+- **Tests:** `ApplySdkSession` fed YAML fixtures, reusing Pass 6's.
+- **Gate (rig):** practice, qualifying, lone qualifying (the relative hides) and a race.
+
+#### Pass 11: the radar draws itself, A1 (rig)
+- **Design:**
+  - The view model publishes a list of plain car items: position, colour, number and pit state.
+  - `RadarWindow` draws them with an `ItemsControl` over a `Canvas`.
+  - Items are reused from frame to frame. Rebuilding them would recreate the number shadows every frame, which is the expensive part.
+  - `Reset` becomes `Clear()`, so ghost cars (B1) can't come back.
+- **Two visible changes:**
+  - Cars already on the radar resize when the size preset changes; today they keep their old size.
+  - Each car's number draws over its own rectangle, rather than all numbers over all rectangles.
+- **Gate (rig):** all three sizes, pit cars, multiclass colours, fade in and out, and a session hop.
+
+#### Pass 12: shared window plumbing, C6 (rig)
+- **Changes:**
+  - An attached behaviour for the config-mode drag handle. It replaces four duplicated blocks and absorbs the B13 fix.
+  - A small helper for the SDK subscriptions, the frame poster and one marshalling priority for both windows. Today the overlay and the radar use different priorities for the "HUD ready" change.
+- **Gate (rig):** config mode on and off, drag both windows, disconnect and reconnect, and exit.
+
+#### Optional
+- **A5, user catalog override:**
+  - Load `%LOCALAPPDATA%\VISOR\TrackSections.json` as well as the shipped file, with user entries winning track by track. That needs a tiered lookup: the current resolver prefers config-specific matches, so simply listing user entries first isn't enough.
+  - Merge the two, so catalog updates still arrive.
+  - The README, the user guide, the catalog's `_readme` and the validator (which needs a path argument) change with it.
+- **A4, one UI tick:** if it's ever needed, the first step is one shared frame poster for both windows. That's about 30 lines, and easier after C6.
+- **Replay tests:**
+  - The SDK can play back `.ibt` recordings, so a test of the whole pipeline without iRacing is possible later.
+  - Caveat: recordings may lack most per-car arrays, and they contain driver names and IDs, so scripted frames stay the main tool.
+
+#### Watch items
 - **Radar ghosts (B1):** fixed, but the original case never reproduced on demand.
 - **Session-info parse failures (B10):** run Debug builds when convenient, so a real sample gets captured.
-- **Memory over long sessions:** both perf runs levelled off around 125 MB, but were still rising about 1 MB per 5 minutes near the end. One perf log over a session of an hour or more would settle it.
+- **Memory over long sessions:** both perf runs levelled off at about 125 MB, but were still rising about 1 MB per 5 minutes near the end. One perf log over a session of an hour or more would settle it.
 - **Track catalog gap:** Oulton Park Fosters has no section data.
