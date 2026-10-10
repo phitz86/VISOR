@@ -47,10 +47,10 @@ Status reflects the revision plan agreed after the review (see "Agreed revision 
 | B7 | Low | Two shift-model saves can collide on the same temp file | Small | **Done** (Pass 1) |
 | B8 | Low | `PrimedStateChanged` fires on every session update, not only on change | Small | **Done** (Pass 1) |
 | B9 | Low | Possible 2 s hang on exit (thread-blocking pattern) | — | **Done** (Pass 2) |
-| B10 | Med | Session info the SDK can't parse leaves VISOR blank for a whole event | Small–Med | **Done** (Pass 6); rig check pending |
-| B11 | Med | Settings reset to defaults on every version bump | Small | **Done** (Pass 4); rig check pending |
+| B10 | Med | Session info the SDK can't parse leaves VISOR blank for a whole event | Small–Med | **Done** (Pass 6; rig-checked 10 Oct) |
+| B11 | Med | Settings reset to defaults on every version bump | Small | **Done** (Pass 4; rig-checked 10 Oct) |
 | B12 | Low–Med | At the finish, a car whose telemetry stops isn't held: the car behind moves up and two cars can show the same position | Small | **Proposed:** Pass 8 (pinned by a test, then fixed) |
-| B13 | Low | Radar switched on from the Config window can't be dragged into place | Small | **Done** (Pass 4); rig check pending |
+| B13 | Low | Radar switched on from the Config window can't be dragged into place | Small | **Done** (Pass 4; rig-checked 10 Oct) |
 | D1 | Low | `System.Management` package unused but shipped | Mech | **Done** (Pass 1) |
 | D2, D4 | Low | Unused members and events | Mech | **Done** (Pass 1) |
 | D3 | Low | Session data parsed but never read | Mech | **Skipped** (cheap; unused reads have come in handy) |
@@ -519,6 +519,16 @@ One session on a Debug build from VS covers all four passes:
 - **Tidy-ups (Pass 7):**
   - The overlay, relative and radar look and behave as before, including zone highlights and multiclass colours.
   - The `ShiftPoints` and `WetResearch` debug files are still written.
+
+**Results (10 Oct): passed.**
+- **B11:** with the version bumped to 1.2.2.0, settings and window positions survived, and the log showed `Settings carried over from the previous version`.
+- **B13:** a radar switched on from the Config window can be dragged.
+- **Tests:** 115 green in Test Explorer.
+  - Getting there needed two follow-ups. The tests moved to xUnit.net v3 (`7ba7187`), because NuGet marks v2 as legacy.
+  - Two session-info tests also failed on a Windows checkout, whose CRLF line endings broke their multi-line edits. They were fixed, and CI now runs the tests on Windows too (`187c81d`).
+- **Normal sessions:** no `[SessionInfo]` repair warnings, and the HUD became ready as usual.
+- **Visuals:** the overlay, relative and radar passed a quick check; keep an eye on them in later rig checks.
+- **Debug files:** the `ShiftPoints` and `WetResearch` files are still written.
 
 #### Pass 8: PositionCalculator characterization tests, T2 and the A3 input record (rig)
 - **Input record:** `Update` takes a plain `PositionFrame` record, filled from the snapshot by `MainViewModel`.
