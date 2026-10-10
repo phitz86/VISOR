@@ -11,8 +11,10 @@ namespace VISOR.Tests
     public class SessionInfoYamlTests
     {
         // Made-up session info in iRacing's layout: unquoted values, one-space indents, lists
-        // written "- Key: value" at their parent's indent. No real names or IDs.
-        private const string Session = """
+        // written "- Key: value" at their parent's indent. No real names or IDs. A raw string
+        // takes the source file's line endings, which are CRLF in a Windows checkout, so they're
+        // fixed to "\n" here (iRacing's own) and the multi-line edits below find their text.
+        private static readonly string Session = """
             ---
             WeekendInfo:
              TrackName: testtrack gp
@@ -70,7 +72,7 @@ namespace VISOR.Tests
                StartingPressure: 172 kPa
 
             ...
-            """;
+            """.ReplaceLineEndings("\n");
 
         private static TelemetrySessionInfo ReadOrFail(string yaml, string expectedAttempt)
         {
