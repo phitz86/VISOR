@@ -5,7 +5,7 @@ Risk appetite for 1.2.1: fix bugs, delete dead code, and split files mechanicall
 
 ## Summary
 
-**Status (2026-10-09):** Phase 1, the three revision passes, is done and validated on the rig. Testing turned up B10, B11 and S7, and the research for Phase 2 found B12 and B13. Phase 2 (pre-release fixes, the CI test pipeline, then the architecture work) is proposed under "Revision plan" at the end, with the decisions that are yours.
+**Status (2026-10-10):** Phase 1, the three revision passes, is done and validated on the rig. Testing turned up B10, B11 and S7, and the research for Phase 2 found B12 and B13. Phase 2 (pre-release fixes, the CI test pipeline, then the architecture work) is under "Revision plan" at the end. Passes 4–7 are done and rig-checked; Pass 8 is committed and waiting for its rig check.
 
 - **Overall:** the code is in good shape. The new shift-point work (learner, store, cue) is well isolated, its untrusted input is validated, and it is the only part of the app with tests. Most problems are older code that grew, or plumbing nobody uses any more.
 - **No significant CPU or RAM bottleneck.** Steady-state garbage is roughly 1 MB/s, all short-lived. Fixed buffers total about 2.4 MB. Nothing grows without bound in release builds except the radar ghost elements (B1).
@@ -49,7 +49,7 @@ Status reflects the revision plan agreed after the review (see "Agreed revision 
 | B9 | Low | Possible 2 s hang on exit (thread-blocking pattern) | — | **Done** (Pass 2) |
 | B10 | Med | Session info the SDK can't parse leaves VISOR blank for a whole event | Small–Med | **Done** (Pass 6; rig-checked 10 Oct) |
 | B11 | Med | Settings reset to defaults on every version bump | Small | **Done** (Pass 4; rig-checked 10 Oct) |
-| B12 | Low–Med | At the finish, a car whose telemetry stops isn't held: the car behind moves up and two cars can show the same position | Small | **Proposed:** Pass 8 (pinned by a test, then fixed) |
+| B12 | Low–Med | At the finish, a car whose telemetry stops isn't held: the car behind moves up and two cars can show the same position | Small | **Pinned** (Pass 8: a skipped test describes the right result); the fix is its own commit |
 | B13 | Low | Radar switched on from the Config window can't be dragged into place | Small | **Done** (Pass 4; rig-checked 10 Oct) |
 | D1 | Low | `System.Management` package unused but shipped | Mech | **Done** (Pass 1) |
 | D2, D4 | Low | Unused members and events | Mech | **Done** (Pass 1) |
@@ -64,7 +64,7 @@ Status reflects the revision plan agreed after the review (see "Agreed revision 
 | F1 | — | `PositionCalculator.cs` (1,137 lines): split plan | Mech | **Proposed:** Pass 9, after T2 |
 | A1 | — | Radar view model builds WPF elements | — | **Proposed:** Pass 11 |
 | A2 | — | Leaky session interface; Settings depends on Telemetry | — | **Proposed:** Pass 10 |
-| A3 | — | PositionCalculator in the wrong layer, untestable | — | **Proposed:** Passes 8–9 |
+| A3 | — | PositionCalculator in the wrong layer, untestable | — | **Partly done** (Pass 8: plain input record); the move to `Race/` is Pass 9 |
 | A4 | — | One UI tick for both windows | — | Only if a problem appears |
 | A5 | — | User-editable catalog lives in Program Files | — | Optional feature; your call |
 | P1–P4 | Low | Small per-frame waste (brushes, list copies, log I/O, notifications) | Small | **Done** (Pass 3) |
@@ -76,7 +76,7 @@ Status reflects the revision plan agreed after the review (see "Agreed revision 
 | S6 | Low | Installer `DelTree` scope | — | **Done** (with B4) |
 | S7 | Low | Inno Setup prints "Non-commercial use only" | — | **Open:** check the licence terms (yours) |
 | T1 | Med | CI never builds or runs the tests | Small | **Done** (Pass 5) |
-| T2 | Med | No tests for PositionCalculator (needed before splitting it) | Mech | **Proposed:** Pass 8 |
+| T2 | Med | No tests for PositionCalculator (needed before splitting it) | Mech | **Done** (Pass 8; 29 tests); rig check pending |
 
 ---
 
@@ -544,6 +544,16 @@ One session on a Debug build from VS covers all four passes:
   - roster entry and expiry timing, practice and qualifying mode, reset, session transition
 - **B12:** a test that describes the correct result is marked as a known bug, then B12 gets its own small fix commit.
 - **Gate (rig):** one race to the checkered, because the per-frame call changed.
+- **Result (2026-10-10):**
+  - `PositionFrame` (`Telemetry/PositionFrame.cs`) is filled by `SVappsLABSnapshot.ToPositionFrame()`. Arrays that already cover all 64 cars are passed through, not copied. The calculator's logic and log text are unchanged.
+  - 29 tests in `PositionCalculatorTests`, run through a scripted-race helper (`PositionCalculatorHarness.cs`). The suite is 144 tests.
+  - Each finish test was checked by breaking the code it covers, and the matching test failed each time:
+    - the leader gate on class P1 instead of overall P1
+    - frozen slots not skipped
+    - −1 stored as the lap-completed baseline
+    - the baseline seeded on the first checkered frame (the old leader-latch bug)
+    - no lap offset for a car predicted across the line
+  - B12 is pinned by `Departed_UnderTheCheckered_ACarWhoseTelemetryStopsKeepsItsPlace`, skipped until its fix.
 
 #### Pass 9: PositionCalculator split, F1 and A3 (rig)
 - **Split:** `FinishTracker`, `CarTrackingCache` and `RunningOrder` sit behind the existing `PositionCalculator` front door, moved to a `Race/` folder (A3).

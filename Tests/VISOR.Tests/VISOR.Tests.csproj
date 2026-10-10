@@ -30,6 +30,10 @@
     <Compile Include="..\..\Diagnostics\Log.cs" Link="Linked\Log.cs" />
     <Compile Include="..\..\Telemetry\SessionInfoYaml.cs" Link="Linked\SessionInfoYaml.cs" />
     <Compile Include="..\..\Telemetry\SessionInfoFallback.cs" Link="Linked\SessionInfoFallback.cs" />
+    <Compile Include="..\..\ViewModels\PositionCalculator.cs" Link="Linked\PositionCalculator.cs" />
+    <Compile Include="..\..\Telemetry\PositionFrame.cs" Link="Linked\PositionFrame.cs" />
+    <Compile Include="..\..\Telemetry\SessionDataProvider.cs" Link="Linked\SessionDataProvider.cs" />
+    <Compile Include="..\..\Telemetry\SessionDataModels.cs" Link="Linked\SessionDataModels.cs" />
   </ItemGroup>
 
   <ItemGroup>

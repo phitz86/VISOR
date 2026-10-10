@@ -91,9 +91,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   position calculator, whose split waits for its tests). Debug builds only: the radar's zone log
   lines are worded consistently, and captured session info is saved as
   `parse-failure_<time>.yaml`.
-- **Tests and checks run on every build** — CI now runs the unit tests (100, up from 59: the new
-  ones cover the fuel estimate, the position history behind the gap figures, the track catalog and
-  the update check) and checks the track catalog, code whitespace and packages with known
+- **Tests and checks run on every build** — CI now runs the unit tests (144, up from 59: the new
+  ones cover the fuel estimate, the position history behind the gap figures, the track catalog,
+  the update check, reading session info, and the position calculator's running order, grid
+  order, lap-counter handling at the line and finishing positions) and checks the track catalog, code whitespace and packages with known
   vulnerabilities, on every push and pull request. Build warnings fail CI, and a release is only
   signed once all of it passes. The tests moved to xUnit.net v3 (v2 is retired), still run
   through the classic test runner so Visual Studio and CI run them the same way.

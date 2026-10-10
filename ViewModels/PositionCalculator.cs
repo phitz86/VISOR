@@ -102,16 +102,16 @@ namespace VISOR.ViewModels
 
         #region Public Methods
         /// <summary>
-        /// Update the position calculator with the latest telemetry snapshot.
+        /// Update the position calculator with the latest telemetry frame.
         /// Processes every frame (60Hz) with prediction for smooth display.
         /// </summary>
-        public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider? sessionDataProvider)
+        public void Update(PositionFrame frame, ISessionDataProvider? sessionDataProvider)
         {
-            if (snapshot == null || sessionDataProvider == null || !sessionDataProvider.IsDataReady)
+            if (frame == null || sessionDataProvider == null || !sessionDataProvider.IsDataReady)
                 return;
 
             _globalFrameCounter++;
-            ProcessUpdate(snapshot, sessionDataProvider);
+            ProcessUpdate(frame, sessionDataProvider);
         }
 
         /// <summary>
@@ -229,21 +229,21 @@ namespace VISOR.ViewModels
         #endregion
 
         #region Private Methods - Update Processing
-        private void ProcessUpdate(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        private void ProcessUpdate(PositionFrame frame, ISessionDataProvider sessionDataProvider)
         {
-            DetectSessionTransition(snapshot);
-            TrackCheckeredFlagState(snapshot);
-            LogFinishPhaseTransitions(snapshot, sessionDataProvider);
-            FreezeFinishingPositions(snapshot, sessionDataProvider);
+            DetectSessionTransition(frame);
+            TrackCheckeredFlagState(frame);
+            LogFinishPhaseTransitions(frame, sessionDataProvider);
+            FreezeFinishingPositions(frame, sessionDataProvider);
 
             UpdateValidCarTracking(sessionDataProvider);
             FreezeDepartedCars(sessionDataProvider);
-            UpdatePredictiveCache(snapshot, sessionDataProvider);
+            UpdatePredictiveCache(frame, sessionDataProvider);
 
             if (!sessionDataProvider.ShouldUseFastestLapPositioning())
             {
-                UpdateGreenFlagStatus(snapshot, sessionDataProvider);
-                CalculateRacePositions(snapshot, sessionDataProvider);
+                UpdateGreenFlagStatus(frame, sessionDataProvider);
+                CalculateRacePositions(frame, sessionDataProvider);
             }
             else
             {
@@ -257,9 +257,9 @@ namespace VISOR.ViewModels
         /// <summary>
         /// Detect session transitions and clear finishing positions when session changes.
         /// </summary>
-        private void DetectSessionTransition(SVappsLABSnapshot snapshot)
+        private void DetectSessionTransition(PositionFrame frame)
         {
-            int currentSessionNum = snapshot.SessionNum;
+            int currentSessionNum = frame.SessionNum;
 
             if (_lastSessionNum != -1 && currentSessionNum != _lastSessionNum)
             {
@@ -281,9 +281,9 @@ namespace VISOR.ViewModels
         /// Track checkered flag state based on SessionState.
         /// SessionState: 5 = Checkered, 6 = CoolDown
         /// </summary>
-        private void TrackCheckeredFlagState(SVappsLABSnapshot snapshot)
+        private void TrackCheckeredFlagState(PositionFrame frame)
         {
-            int sessionState = snapshot.SessionState;
+            int sessionState = frame.SessionState;
             bool wasCheckeredFlag = _isCheckeredFlag;
 
             _isCheckeredFlag = SessionStates.IsCheckered(sessionState);
@@ -306,11 +306,11 @@ namespace VISOR.ViewModels
         /// at the line, it logs ~0.999 or a value just past the wrap. Positions come from the
         /// previous frame's sort, which is the same data the freeze reads.
         /// </summary>
-        private void LogFinishPhaseTransitions(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        private void LogFinishPhaseTransitions(PositionFrame frame, ISessionDataProvider sessionDataProvider)
         {
             // Masked so the finish diagnostics don't log on every caution or start-light change.
-            int finishFlags = snapshot.SessionFlags & IRacingIds.FinishFlagsMask;
-            int sessionState = snapshot.SessionState;
+            int finishFlags = frame.SessionFlags & IRacingIds.FinishFlagsMask;
+            int sessionState = frame.SessionState;
 
             if (finishFlags == _lastLoggedFinishFlags && sessionState == _lastLoggedSessionState)
             {
@@ -321,7 +321,7 @@ namespace VISOR.ViewModels
             _lastLoggedSessionState = sessionState;
 
             Log.Info($"[Finish] SessionState {sessionState}, flags [{DescribeFinishFlags(finishFlags)}] - " +
-                     $"{DescribeLeader(snapshot, sessionDataProvider)}; {DescribePlayer(snapshot)}");
+                     $"{DescribeLeader(frame, sessionDataProvider)}; {DescribePlayer(frame)}");
         }
 
         /// <summary>
@@ -329,17 +329,17 @@ namespace VISOR.ViewModels
         /// car, a fixed lead ahead of that car's own line, so the player's position at the moment a
         /// bit changes (not the leader's) is what shows whether that lead is a distance or a time.
         /// </summary>
-        private static string DescribePlayer(SVappsLABSnapshot snapshot)
+        private static string DescribePlayer(PositionFrame frame)
         {
-            int playerIdx = snapshot.PlayerCarIdx;
-            var lapDistPct = snapshot.CarIdxLapDistPct;
-            var lapCompleted = snapshot.CarIdxLapCompleted;
+            int playerIdx = frame.PlayerCarIdx;
+            var lapDistPct = frame.CarIdxLapDistPct;
+            var lapCompleted = frame.CarIdxLapCompleted;
 
             if (playerIdx < 0 || playerIdx >= lapDistPct.Length || playerIdx >= lapCompleted.Length)
                 return "player n/a";
 
             return $"player at LapDistPct {lapDistPct[playerIdx]:F4}, LapCompleted {lapCompleted[playerIdx]}, " +
-                   $"CarIdxLap {FormatLap(snapshot, playerIdx)}";
+                   $"CarIdxLap {FormatLap(frame, playerIdx)}";
         }
 
         /// <summary>
@@ -347,9 +347,9 @@ namespace VISOR.ViewModels
         /// to the sort that none of the other logging shows, and it is what a leader that is
         /// impossible by LapDistPct/LapCompleted would have to be disagreeing about.
         /// </summary>
-        private static string FormatLap(SVappsLABSnapshot snapshot, int carIdx)
+        private static string FormatLap(PositionFrame frame, int carIdx)
         {
-            var lap = snapshot.CarIdxLap;
+            var lap = frame.CarIdxLap;
             return (carIdx >= 0 && carIdx < lap.Length) ? lap[carIdx].ToString() : "n/a";
         }
 
@@ -370,7 +370,7 @@ namespace VISOR.ViewModels
         /// position cache, so it reports whoever the running order currently has at P1 — which is
         /// itself worth seeing, since a wrong leader is one of the ways the freeze goes astray.
         /// </summary>
-        private string DescribeLeader(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        private string DescribeLeader(PositionFrame frame, ISessionDataProvider sessionDataProvider)
         {
             foreach (var entry in _cachedOverallPositions)
             {
@@ -379,14 +379,14 @@ namespace VISOR.ViewModels
 
                 int carIdx = entry.Key;
                 var carNumbers = sessionDataProvider.CarNumbers;
-                var lapDistPct = snapshot.CarIdxLapDistPct;
-                var lapCompleted = snapshot.CarIdxLapCompleted;
+                var lapDistPct = frame.CarIdxLapDistPct;
+                var lapCompleted = frame.CarIdxLapCompleted;
 
                 string number = (carNumbers != null && carIdx < carNumbers.Length) ? carNumbers[carIdx] : "?";
                 float pct = (lapDistPct != null && carIdx < lapDistPct.Length) ? lapDistPct[carIdx] : -1f;
                 int laps = (lapCompleted != null && carIdx < lapCompleted.Length) ? lapCompleted[carIdx] : -1;
 
-                return $"leader #{number} (idx {carIdx}) at LapDistPct {pct:F4}, LapCompleted {laps}, CarIdxLap {FormatLap(snapshot, carIdx)}";
+                return $"leader #{number} (idx {carIdx}) at LapDistPct {pct:F4}, LapCompleted {laps}, CarIdxLap {FormatLap(frame, carIdx)}";
             }
 
             // Finished cars are excluded from the live sort, so once the leader freezes there is no
@@ -416,11 +416,11 @@ namespace VISOR.ViewModels
         /// leader never latched, and with the leader gate never opening nothing was ever frozen —
         /// so every car that then logged out handed a free position to everyone behind it.
         /// </summary>
-        private void FreezeFinishingPositions(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        private void FreezeFinishingPositions(PositionFrame frame, ISessionDataProvider sessionDataProvider)
         {
             var carClassIDs = sessionDataProvider.CarClassIDs;
             var carNumbers = sessionDataProvider.CarNumbers;
-            var carLapCompleted = snapshot.CarIdxLapCompleted;
+            var carLapCompleted = frame.CarIdxLapCompleted;
 
             if (carClassIDs == null || carNumbers == null || carLapCompleted == null)
             {
@@ -578,15 +578,15 @@ namespace VISOR.ViewModels
         /// takes the green many seconds apart, so leaders latch and race while the tail stays on grid
         /// order until each car actually reaches S/F.
         /// </summary>
-        private void UpdateGreenFlagStatus(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        private void UpdateGreenFlagStatus(PositionFrame frame, ISessionDataProvider sessionDataProvider)
         {
             // No car can take the green before the green flag is out. Until then everyone stays on
             // grid order (handled by GetPreGreenSortKey), which is steady through the parade lap.
-            if (snapshot.SessionState < SessionStates.Racing)
+            if (frame.SessionState < SessionStates.Racing)
                 return;
 
-            var lapCompleted = snapshot.CarIdxLapCompleted;
-            var lapDistPct = snapshot.CarIdxLapDistPct;
+            var lapCompleted = frame.CarIdxLapCompleted;
+            var lapDistPct = frame.CarIdxLapDistPct;
             var carNumbers = sessionDataProvider.CarNumbers;
 
             if (lapCompleted == null || lapDistPct == null || carNumbers == null)
@@ -608,7 +608,7 @@ namespace VISOR.ViewModels
                 {
                     _carsHavingTakenGreen.Add(carIdx);
                     Log.Debug($"Car #{carNumbers[carIdx]} (idx {carIdx}) took the green flag - switching to live position calc " +
-                              $"(CarIdxLap {FormatLap(snapshot, carIdx)}, LapCompleted {lapCompleted[carIdx]}, LapDistPct {lapDistPct[carIdx]:F4})");
+                              $"(CarIdxLap {FormatLap(frame, carIdx)}, LapCompleted {lapCompleted[carIdx]}, LapDistPct {lapDistPct[carIdx]:F4})");
                 }
             }
         }
@@ -710,11 +710,11 @@ namespace VISOR.ViewModels
         #endregion
 
         #region Private Methods - Predictive Cache
-        private void UpdatePredictiveCache(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        private void UpdatePredictiveCache(PositionFrame frame, ISessionDataProvider sessionDataProvider)
         {
-            var lapDistPct = snapshot.CarIdxLapDistPct;
-            var currentLap = snapshot.CarIdxLap;
-            var onPitRoad = snapshot.CarIdxOnPitRoad;
+            var lapDistPct = frame.CarIdxLapDistPct;
+            var currentLap = frame.CarIdxLap;
+            var onPitRoad = frame.CarIdxOnPitRoad;
             var carNumbers = sessionDataProvider.CarNumbers;
 
             if (lapDistPct == null || currentLap == null || onPitRoad == null || carNumbers == null)
@@ -733,10 +733,10 @@ namespace VISOR.ViewModels
                 // Log once per invalid stretch so mid-race telemetry gaps are captured without spamming.
                 if (!hasValidData && !_carsWithInvalidLapDistPctLogged.Contains(i))
                 {
-                    var trackSurface = snapshot.CarIdxTrackSurface;
-                    var carLaps = snapshot.CarIdxLap;
-                    var bestLaps = snapshot.CarIdxBestLapTime;
-                    var estTime = snapshot.CarIdxEstTime;
+                    var trackSurface = frame.CarIdxTrackSurface;
+                    var carLaps = frame.CarIdxLap;
+                    var bestLaps = frame.CarIdxBestLapTime;
+                    var estTime = frame.CarIdxEstTime;
 
                     int surface = (trackSurface != null && i < trackSurface.Length) ? trackSurface[i] : -999;
                     int lap = (carLaps != null && i < carLaps.Length) ? carLaps[i] : -999;
@@ -939,11 +939,11 @@ namespace VISOR.ViewModels
         #endregion
 
         #region Private Methods - Race Position Calculation
-        private void CalculateRacePositions(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        private void CalculateRacePositions(PositionFrame frame, ISessionDataProvider sessionDataProvider)
         {
             var carClassIDs = sessionDataProvider.CarClassIDs;
-            var currentLap = snapshot.CarIdxLap;
-            var lapDistPct = snapshot.CarIdxLapDistPct;
+            var currentLap = frame.CarIdxLap;
+            var lapDistPct = frame.CarIdxLapDistPct;
 
             if (carClassIDs == null || currentLap == null || lapDistPct == null)
                 return;
@@ -1009,8 +1009,8 @@ namespace VISOR.ViewModels
             if (preGreenCars.Count > 0)
             {
                 var qualPositions = sessionDataProvider.GetQualifyResultsPositions();
-                var classGrid = SelectGridSource(snapshot.CarIdxClassPosition, qualPositions, preGreenCars);
-                var overallGrid = SelectGridSource(snapshot.CarIdxPosition, qualPositions, preGreenCars);
+                var classGrid = SelectGridSource(frame.CarIdxClassPosition, qualPositions, preGreenCars);
+                var overallGrid = SelectGridSource(frame.CarIdxPosition, qualPositions, preGreenCars);
 
                 foreach (var car in carsWithPositions)
                 {
@@ -1023,7 +1023,7 @@ namespace VISOR.ViewModels
             }
 
             AssignOverallPositions(carsWithPositions);
-            LogLeaderChange(carsWithPositions, snapshot, sessionDataProvider);
+            LogLeaderChange(carsWithPositions, frame, sessionDataProvider);
 
             var classGroups = carsWithPositions.GroupBy(c => c.ClassId);
 
@@ -1061,7 +1061,7 @@ namespace VISOR.ViewModels
         /// up here with the CarIdxLap/LapDistPct that produced it. Leader changes are rare, so
         /// this stays quiet.
         /// </summary>
-        private void LogLeaderChange(List<CarPositionData> carsWithPositions, SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        private void LogLeaderChange(List<CarPositionData> carsWithPositions, PositionFrame frame, ISessionDataProvider sessionDataProvider)
         {
             if (!_cachedOverallPositions.Any(kv => kv.Value == 1))
                 return;
@@ -1077,12 +1077,12 @@ namespace VISOR.ViewModels
                 return;
 
             var carNumbers = sessionDataProvider.CarNumbers;
-            var lapCompleted = snapshot.CarIdxLapCompleted;
+            var lapCompleted = frame.CarIdxLapCompleted;
             string number = (carNumbers != null && leaderIdx < carNumbers.Length) ? carNumbers[leaderIdx] : "?";
             int completed = leaderIdx < lapCompleted.Length ? lapCompleted[leaderIdx] : -1;
 
             Log.Debug($"[Leader] Overall leader is now #{number} (idx {leaderIdx}) - effective lap {leader.CurrentLap} " +
-                      $"(raw CarIdxLap {FormatLap(snapshot, leaderIdx)}), LapCompleted {completed}, LapDistPct {leader.LapDistPct:F4}, " +
+                      $"(raw CarIdxLap {FormatLap(frame, leaderIdx)}), LapCompleted {completed}, LapDistPct {leader.LapDistPct:F4}, " +
                       $"sort key {leader.OverallSortKey:F4}, green latched {leader.HasTakenGreen}");
         }
 

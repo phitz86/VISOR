@@ -106,7 +106,7 @@ namespace VISOR.ViewModels
             CheckSessionStateTransitions(snapshot);
             CheckForSessionTransition(snapshot, sessionDataProvider);
 
-            _positionCalculator.Update(snapshot, sessionDataProvider);
+            _positionCalculator.Update(snapshot.ToPositionFrame(), sessionDataProvider);
 
             FuelVM.Update(snapshot.FuelLevel, snapshot.Lap);
             RelativeVM.Update(snapshot, sessionDataProvider);
