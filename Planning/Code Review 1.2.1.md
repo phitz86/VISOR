@@ -49,7 +49,7 @@ Status reflects the revision plan agreed after the review (see "Agreed revision 
 | B9 | Low | Possible 2 s hang on exit (thread-blocking pattern) | — | **Done** (Pass 2) |
 | B10 | Med | Session info the SDK can't parse leaves VISOR blank for a whole event | Small–Med | **Done** (Pass 6; rig-checked 10 Oct) |
 | B11 | Med | Settings reset to defaults on every version bump | Small | **Done** (Pass 4; rig-checked 10 Oct) |
-| B12 | Low–Med | At the finish, a car whose telemetry stops isn't held: the car behind moves up and two cars can show the same position | Small | **Pinned** (Pass 8: a skipped test describes the right result); the fix is its own commit |
+| B12 | Low–Med | At the finish, a car whose telemetry stops isn't held: the car behind moves up and two cars can show the same position | Small | **Done** (Pass 8, own commit); rig check pending |
 | B13 | Low | Radar switched on from the Config window can't be dragged into place | Small | **Done** (Pass 4; rig-checked 10 Oct) |
 | D1 | Low | `System.Management` package unused but shipped | Mech | **Done** (Pass 1) |
 | D2, D4 | Low | Unused members and events | Mech | **Done** (Pass 1) |
@@ -76,7 +76,7 @@ Status reflects the revision plan agreed after the review (see "Agreed revision 
 | S6 | Low | Installer `DelTree` scope | — | **Done** (with B4) |
 | S7 | Low | Inno Setup prints "Non-commercial use only" | — | **Open:** check the licence terms (yours) |
 | T1 | Med | CI never builds or runs the tests | Small | **Done** (Pass 5) |
-| T2 | Med | No tests for PositionCalculator (needed before splitting it) | Mech | **Done** (Pass 8; 29 tests); rig check pending |
+| T2 | Med | No tests for PositionCalculator (needed before splitting it) | Mech | **Done** (Pass 8; 30 tests); rig check pending |
 
 ---
 
@@ -174,6 +174,10 @@ The car behind then slides up, while the departed car keeps a stale class positi
 
 - **Fix:** after T2 pins it with a test, hold the car on its last valid positions rather than the current frame's.
 - **Verify:** the T2 test, then a race where a car disconnects under the checkered.
+- **Done (Pass 8, own commit):** under the checkered, a car is held on the frame it drops out of the running order, on the previous frame's positions, so the car behind never moves up, not even for one frame.
+  - The hold (`HoldCarsWhoseTelemetryStopped`) runs inside the sort, before the overall positions are replaced.
+  - It shares its freeze and leader-gate update with `FreezeDepartedCars` (`TryHoldLastPlace`), which still handles cars that leave the driver list.
+  - Before the checkered such a car still makes way, which a test pins.
 
 ### B13: Radar switched on from the Config window can't be positioned (Low; found 2026-10-09, Phase 2 research)
 When the radar is off at start-up and switched on in the Config window, `App.ShowRadarWindow` (`App.xaml.cs:361`) creates it while config mode is already on. The new window subscribes to later config-mode changes but never reads the current state. It also isn't forced visible: `ConfigWindow.xaml.cs:42` only does that for a radar that already existed when the Config window opened. As a result its drag handle stays hidden, and it may stay faded out, until the Config window is closed and reopened.
@@ -547,6 +551,7 @@ One session on a Debug build from VS covers all four passes:
 - **Result (2026-10-10):**
   - `PositionFrame` (`Telemetry/PositionFrame.cs`) is filled by `SVappsLABSnapshot.ToPositionFrame()`. Arrays that already cover all 64 cars are passed through, not copied. The calculator's logic and log text are unchanged.
   - 29 tests in `PositionCalculatorTests`, run through a scripted-race helper (`PositionCalculatorHarness.cs`). The suite is 144 tests.
+  - The B12 fix followed in its own commit. It un-skipped its test and added one for the same stop before the checkered: 30 calculator tests, 145 in all.
   - Each finish test was checked by breaking the code it covers, and the matching test failed each time:
     - the leader gate on class P1 instead of overall P1
     - frozen slots not skipped
@@ -554,11 +559,14 @@ One session on a Debug build from VS covers all four passes:
     - the baseline seeded on the first checkered frame (the old leader-latch bug)
     - no lap offset for a car predicted across the line
   - B12 is pinned by `Departed_UnderTheCheckered_ACarWhoseTelemetryStopsKeepsItsPlace`, skipped until its fix.
+- **Rig check for Pass 8 and B12:** one race to the checkered.
+  - Positions and the finish (Final Lap, FINISHED, finishing positions held) look as before.
+  - If a car goes to the garage or disconnects under the checkered, the log shows `telemetry stopped during the checkered - holding P...` or `left during the checkered - holding P...`, and the car behind keeps its own place.
 
 #### Pass 9: PositionCalculator split, F1 and A3 (rig)
 - **Split:** `FinishTracker`, `CarTrackingCache` and `RunningOrder` sit behind the existing `PositionCalculator` front door, moved to a `Race/` folder (A3).
 - **Must stay exactly as is:**
-  - the frame order: finish → roster → departed → prediction → sort
+  - the frame order: finish → roster → departed → prediction → sort (the B12 telemetry-stop hold runs inside the sort, before the overall positions are assigned)
   - every clear in `Reset` and in the session transition
   - the 64-length assumption
   - the exact `[Finish]` and `[Leader]` log text

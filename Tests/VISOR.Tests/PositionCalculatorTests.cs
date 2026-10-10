@@ -487,16 +487,40 @@ namespace VISOR.Tests
             Assert.Equal(2, race.ClassPos(3));
         }
 
-        [Fact(Skip = "Known bug B12 (review doc): a car whose telemetry stops under the checkered drops out of the running order one frame before it leaves the roster, so its place isn't held and the car behind takes it.")]
+        [Fact]
         public void Departed_UnderTheCheckered_ACarWhoseTelemetryStopsKeepsItsPlace()
         {
             var race = ThreeCarsLeaderHome();
 
+            // B12: about three seconds in, the car drops out of the running order a frame before
+            // it leaves the roster. The car behind must not take its place, even for that frame.
+            race.LoseTelemetry(2);
+            for (int i = 0; i < 200; i++)
+            {
+                race.Frame();
+                Assert.Equal(3, race.ClassPos(3));
+            }
+
+            Assert.DoesNotContain(2, race.Calc.ValidCarIndices);
+            Assert.Equal((2, 2), (race.ClassPos(2), race.Overall(2)));
+            Assert.Equal(3, race.Overall(3));
+        }
+
+        [Fact]
+        public void Departed_BeforeTheCheckered_ACarWhoseTelemetryStopsMakesWay()
+        {
+            var race = new Race();
+            race.Car(1).Car(2).Car(3);
+            race.Place(1, 10, 0.50f);
+            race.Place(2, 10, 0.40f);
+            race.Place(3, 10, 0.30f);
+            race.Frame(2);
+
             race.LoseTelemetry(2);
             race.Frame(200);
 
-            Assert.Equal(2, race.ClassPos(2));
-            Assert.Equal(3, race.ClassPos(3));
+            Assert.DoesNotContain(2, race.Calc.ValidCarIndices);
+            Assert.Equal((2, 2), (race.ClassPos(3), race.Overall(3)));
         }
 
         // --- Pace car, practice and qualifying, resets ---

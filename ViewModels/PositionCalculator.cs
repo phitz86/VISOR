@@ -502,8 +502,9 @@ namespace VISOR.ViewModels
         /// <summary>
         /// Hold the finishing slot of a car that drops out of the session during the checkered
         /// instead of letting everyone behind it slide up a place. Cars in an offline or AI race
-        /// leave the moment they finish, and a car whose telemetry simply stops is never seen to
-        /// complete a lap, so the crossing-based freeze above can miss it entirely.
+        /// leave the moment they finish, so the crossing-based freeze above can miss them. A car
+        /// whose telemetry stops is held by <see cref="HoldCarsWhoseTelemetryStopped"/> instead,
+        /// a frame before it would leave the roster.
         ///
         /// Only runs under the checkered, so a mid-race telemetry dropout still recovers normally.
         /// A car that leaves and rejoins during the checkered keeps the slot it left on, which is
@@ -538,28 +539,59 @@ namespace VISOR.ViewModels
                     continue;
                 }
 
-                int classPosition = GetClassPosition(carIdx, carClassIDs[carIdx]);
-                int overallPosition = GetOverallPosition(carIdx);
-
-                if (classPosition <= 0 || overallPosition <= 0)
+                if (TryHoldLastPlace(carIdx, carClassIDs[carIdx], out int classPosition, out int overallPosition))
                 {
-                    continue;
+                    Log.Info($"Car #{carNumbers[carIdx]} (idx {carIdx}) left during the checkered - holding P{classPosition} (overall P{overallPosition})");
                 }
-
-                _finishingClassPositions[carIdx] = classPosition;
-                _finishingOverallPositions[carIdx] = overallPosition;
-                _carsFinished.Add(carIdx);
-
-                // Keep the leader gate coherent: if the car that left was holding overall P1, the
-                // winner is home and the crossing-based freeze can start on everyone else. Overall,
-                // not class: a slower class's leader leaving says nothing about the race winner.
-                if (overallPosition == 1)
-                {
-                    _leaderHasFinished = true;
-                }
-
-                Log.Info($"Car #{carNumbers[carIdx]} (idx {carIdx}) left during the checkered - holding P{classPosition} (overall P{overallPosition})");
             }
+        }
+
+        /// <summary>
+        /// Hold the finishing slot of a car whose telemetry has stopped for longer than the
+        /// prediction covers (<see cref="MAX_CACHE_AGE_FRAMES"/>), during the checkered. Called
+        /// from the sort on the frame the car drops out of it, which is one frame before it leaves
+        /// the roster: by then <see cref="FreezeDepartedCars"/> would find no position to hold,
+        /// and the car behind would already have taken its place. The positions held are the
+        /// previous frame's, since this frame's sort hasn't replaced them yet.
+        /// </summary>
+        private void HoldCarsWhoseTelemetryStopped(List<int> carIndices, int[] carClassIDs, string[] carNumbers)
+        {
+            foreach (int carIdx in carIndices)
+            {
+                if (TryHoldLastPlace(carIdx, carClassIDs[carIdx], out int classPosition, out int overallPosition))
+                {
+                    Log.Info($"Car #{carNumbers[carIdx]} (idx {carIdx}) telemetry stopped during the checkered - holding P{classPosition} (overall P{overallPosition})");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Freeze a car that has gone during the checkered at the place it had in the last sort.
+        /// False when it had none (the pace car has no overall place, a car never placed has neither).
+        /// </summary>
+        private bool TryHoldLastPlace(int carIdx, int classId, out int classPosition, out int overallPosition)
+        {
+            classPosition = GetClassPosition(carIdx, classId);
+            overallPosition = GetOverallPosition(carIdx);
+
+            if (classPosition <= 0 || overallPosition <= 0)
+            {
+                return false;
+            }
+
+            _finishingClassPositions[carIdx] = classPosition;
+            _finishingOverallPositions[carIdx] = overallPosition;
+            _carsFinished.Add(carIdx);
+
+            // Keep the leader gate coherent: if the car that left was holding overall P1, the
+            // winner is home and the crossing-based freeze can start on everyone else. Overall,
+            // not class: a slower class's leader leaving says nothing about the race winner.
+            if (overallPosition == 1)
+            {
+                _leaderHasFinished = true;
+            }
+
+            return true;
         }
         #endregion
 
@@ -950,6 +982,7 @@ namespace VISOR.ViewModels
 
             var carsWithPositions = new List<CarPositionData>();
             var preGreenCars = new List<int>();
+            List<int>? stoppedUnderCheckered = null;
 
             foreach (int carIdx in _validCarIndices)
             {
@@ -982,7 +1015,12 @@ namespace VISOR.ViewModels
                 }
 
                 if (effectiveLapDistPct < 0f)
+                {
+                    // The prediction has run out: the car leaves the roster next frame.
+                    if (_isCheckeredFlag)
+                        (stoppedUnderCheckered ??= new List<int>()).Add(carIdx);
                     continue;
+                }
 
                 float trackPosition = effectiveCurrentLap + effectiveLapDistPct;
 
@@ -1021,6 +1059,10 @@ namespace VISOR.ViewModels
                     car.OverallSortKey = GetPreGreenSortKey(car.CarIdx, overallGrid);
                 }
             }
+
+            // Before the overall sort replaces last frame's positions, which are the ones to hold.
+            if (stoppedUnderCheckered != null)
+                HoldCarsWhoseTelemetryStopped(stoppedUnderCheckered, carClassIDs, sessionDataProvider.CarNumbers);
 
             AssignOverallPositions(carsWithPositions);
             LogLeaderChange(carsWithPositions, frame, sessionDataProvider);

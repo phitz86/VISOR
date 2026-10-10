@@ -35,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (rejoining broken lines and quoting values) until iRacing disconnects, noting it once in the log
   (`[SessionInfo] The SDK could not read this session's info...`). Sessions the SDK reads are
   handled exactly as before.
+- **A car whose telemetry stops at the finish keeps its place** — when a car's data stopped under
+  the checkered (it went to the garage or lost its connection, but stayed in the session), about
+  three seconds later it dropped out of the running order a frame before VISOR's departed-car
+  hold looked for it. The car behind then moved up, and two cars could show the same position.
+  It is now held at its last place on the frame it drops out (`telemetry stopped during the
+  checkered - holding P...` in the log). Mid-race, such a car still makes way as before.
 - **Radar no longer leaves "ghost" cars behind** — after a disconnect, a session change or lone
   qualifying, the radar cleared its list of cars but left their shapes on screen. Those stale
   blocks reappeared at their old positions when the radar faded back in, and more piled up with
@@ -91,11 +97,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   position calculator, whose split waits for its tests). Debug builds only: the radar's zone log
   lines are worded consistently, and captured session info is saved as
   `parse-failure_<time>.yaml`.
-- **Tests and checks run on every build** — CI now runs the unit tests (144, up from 59: the new
+- **Tests and checks run on every build** — CI now runs the unit tests (145, up from 59: the new
   ones cover the fuel estimate, the position history behind the gap figures, the track catalog,
   the update check, reading session info, and the position calculator's running order, grid
-  order, lap-counter handling at the line and finishing positions) and checks the track catalog, code whitespace and packages with known
-  vulnerabilities, on every push and pull request. Build warnings fail CI, and a release is only
+  order, lap-counter handling at the line and finishing positions) and checks the track catalog,
+  code whitespace and packages with known vulnerabilities, on every push and pull request. Build warnings fail CI, and a release is only
   signed once all of it passes. The tests moved to xUnit.net v3 (v2 is retired), still run
   through the classic test runner so Visual Studio and CI run them the same way.
 - **Less work per frame** — the relative display reuses ten pre-built colour brushes instead of
