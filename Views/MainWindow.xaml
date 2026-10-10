@@ -19,7 +19,6 @@
 
             <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
             <viewModels:DeltaBarWidthConverter x:Key="DeltaBarWidthConverter"/>
-            <converters:ProximityToWidthConverter x:Key="ProximityToWidthConverter"/>
 
             <Style x:Key="BaseTextBlock" TargetType="TextBlock">
                 <Setter Property="FontFamily" Value="Segoe UI"/>

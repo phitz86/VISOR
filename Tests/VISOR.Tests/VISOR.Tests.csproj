@@ -2,9 +2,14 @@
 
   <!-- Unit tests for VISOR's platform-independent logic. Targets plain net10.0 (no WPF) so it
        runs anywhere: `dotnet test Tests/VISOR.Tests`. Source files under test are linked in
-       rather than referencing the WPF app project. -->
+       rather than referencing the WPF app project.
+
+       xUnit.net v3, run through VSTest (xunit.v3.mtp-off + xunit.runner.visualstudio), so Visual
+       Studio's Test Explorer and CI's `dotnet test` options work unchanged. v3 test projects are
+       executables. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
@@ -12,14 +17,38 @@
 
   <ItemGroup>
     <Compile Include="..\..\Telemetry\ShiftPointLearner.cs" Link="Linked\ShiftPointLearner.cs" />
+    <Compile Include="..\..\Telemetry\ShiftModelTypes.cs" Link="Linked\ShiftModelTypes.cs" />
+    <Compile Include="..\..\Telemetry\RatioTracker.cs" Link="Linked\RatioTracker.cs" />
+    <Compile Include="..\..\Telemetry\LinearSolver.cs" Link="Linked\LinearSolver.cs" />
     <Compile Include="..\..\Telemetry\ShiftModelStore.cs" Link="Linked\ShiftModelStore.cs" />
     <Compile Include="..\..\ViewModels\ShiftCue.cs" Link="Linked\ShiftCue.cs" />
+    <Compile Include="..\..\ViewModels\FuelViewModel.cs" Link="Linked\FuelViewModel.cs" />
+    <Compile Include="..\..\Telemetry\PositionHistoryBuffer.cs" Link="Linked\PositionHistoryBuffer.cs" />
+    <Compile Include="..\..\Data\TrackSectionCatalog.cs" Link="Linked\TrackSectionCatalog.cs" />
+    <Compile Include="..\..\Update\UpdateChecker.cs" Link="Linked\UpdateChecker.cs" />
+    <!-- Log writes nothing to disk until StartNewSession, which tests never call. -->
+    <Compile Include="..\..\Diagnostics\Log.cs" Link="Linked\Log.cs" />
+    <Compile Include="..\..\Telemetry\SessionInfoYaml.cs" Link="Linked\SessionInfoYaml.cs" />
+    <Compile Include="..\..\Telemetry\SessionInfoFallback.cs" Link="Linked\SessionInfoFallback.cs" />
+    <Compile Include="..\..\ViewModels\PositionCalculator.cs" Link="Linked\PositionCalculator.cs" />
+    <Compile Include="..\..\Telemetry\PositionFrame.cs" Link="Linked\PositionFrame.cs" />
+    <Compile Include="..\..\Telemetry\SessionDataProvider.cs" Link="Linked\SessionDataProvider.cs" />
+    <Compile Include="..\..\Telemetry\SessionDataModels.cs" Link="Linked\SessionDataModels.cs" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
-    <PackageReference Include="xunit" Version="2.9.3" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <!-- The shipped catalog, where TrackSectionCatalog looks for it (beside the binaries). -->
+    <None Include="..\..\Data\TrackSections.json" Link="Data\TrackSections.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageReference Include="xunit.v3.mtp-off" Version="4.0.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1" />
+    <!-- For the SDK's session-info model (TelemetrySessionInfo) and the YAML library it uses, at
+         the app's versions. -->
+    <PackageReference Include="SVappsLAB.iRacingTelemetrySDK" Version="2.5.0" />
+    <PackageReference Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>
 
 </Project>

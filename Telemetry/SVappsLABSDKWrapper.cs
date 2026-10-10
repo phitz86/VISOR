@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK;
 using System;
 using System.Collections.Generic;
@@ -8,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using VISOR.Diagnostics;
 using VISOR.ViewModels;
+using YamlDotNet.Core;
 
 namespace VISOR.Telemetry
 {
@@ -38,21 +38,24 @@ namespace VISOR.Telemetry
     {
         #region Private Fields
         private ITelemetryClient<TelemetryData> _client = null!;
-        private readonly ILogger _logger;
+        private readonly VisorSdkLogger<SVappsLABSDKWrapper> _logger;
         private readonly SessionDataCoordinator _sessionCoordinator;
+
+        // Session info arrives on two SDK threads: the SDK's parsed result, and the raw YAML that
+        // SessionInfoFallback reads itself when the SDK can't. The lock makes checking which one
+        // is in charge and applying the result one step.
+        private readonly SessionInfoFallback _sessionInfoFallback = new();
+        private readonly object _sessionApplyLock = new();
 #if DEBUG
-        private readonly SessionDataLogger _sessionLogger;
-        private readonly TelemetryCSVLogger _telemetryLogger;
+        private readonly SessionYamlFailureLogger _sessionYamlFailures = new();
 #endif
-        private SVappsLABSnapshot _latestSnapshot = null!;
         private CancellationTokenSource _cancellationTokenSource = null!;
         private Task _monitoringTask = null!;
         private bool _isConnected = false;
 
-        // Cached raw YAML from onRawSessionInfoUpdate; consumed only by the
-        // DEBUG SessionDataLogger. Reference assignment is atomic in C#, so
-        // the lock-free read pattern matches the volatile driver-cache arrays.
-        private volatile string _cachedRawYaml = string.Empty;
+        // Set when Shutdown starts. The UI thread then waits for the SDK to stop, so frames
+        // raised meanwhile could only pile up behind it; they are no longer raised.
+        private volatile bool _isShuttingDown;
 
         private int _lastSessionNumForLog = -1;
         private bool _lastPrimedState = false;
@@ -72,7 +75,6 @@ namespace VISOR.Telemetry
         #endregion
 
         #region Public Properties
-        public string Name => "SVappsLAB iRacingTelemetrySDK";
         public bool IsSessionDataReady => _sessionCoordinator.IsDataReady;
         public bool IsConnected => _isConnected;
         public bool IsPrimed => _isConnected && _sessionCoordinator.IsDataReady;
@@ -90,16 +92,11 @@ namespace VISOR.Telemetry
             _logger = new VisorSdkLogger<SVappsLABSDKWrapper>();
             _sessionCoordinator = new SessionDataCoordinator();
 
-#if DEBUG
-            _sessionLogger = new SessionDataLogger(() => _cachedRawYaml);
-            _telemetryLogger = new TelemetryCSVLogger();
-#endif
-
             _frameGapFlushTimer = new System.Timers.Timer(5000) { AutoReset = true };
             _frameGapFlushTimer.Elapsed += OnFrameGapFlushTimer;
         }
 
-        public async Task<bool> Initialize()
+        public bool Initialize()
         {
             try
             {
@@ -110,7 +107,6 @@ namespace VISOR.Telemetry
                 _frameGapFlushTimer.Start();
                 _monitoringTask = Task.Run(() => RunAsync(_cancellationTokenSource.Token));
 
-                await Task.Delay(200);
                 Log.Info("SVappsLAB SDK initialized successfully");
                 return true;
             }
@@ -134,10 +130,10 @@ namespace VISOR.Telemetry
                     var handlers = new TelemetryHandlers<TelemetryData>
                     {
                         OnTelemetryUpdate = data => { OnTelemetryUpdate(data); return Task.CompletedTask; },
-                        OnRawSessionInfoUpdate = yaml => { OnRawSessionInfoUpdate(yaml); return Task.CompletedTask; },
                         OnSessionInfoUpdate = info => { OnSessionInfoUpdate(info); return Task.CompletedTask; },
                         OnConnectStateChanged = state => { OnConnectStateChanged(state); return Task.CompletedTask; },
-                        OnError = ex => { Log.Error("[SDK Stream] error from SDK", ex); return Task.CompletedTask; }
+                        OnError = ex => { OnSdkError(ex); return Task.CompletedTask; },
+                        OnRawSessionInfoUpdate = yaml => { OnRawSessionInfoUpdate(yaml); return Task.CompletedTask; },
                     };
 
                     // Defensive detector #3: stream fault logger.
@@ -165,8 +161,6 @@ namespace VISOR.Telemetry
                 Log.Error("[StreamFault] SDK Monitor faulted", ex);
             }
         }
-
-        public SVappsLABSnapshot GetSnapshot() => _latestSnapshot;
 
         private void OnConnectStateChanged(ConnectState state)
         {
@@ -202,8 +196,12 @@ namespace VISOR.Telemetry
 
                 if (!_isConnected)
                 {
+                    lock (_sessionApplyLock)
+                    {
+                        _sessionInfoFallback.Reset();
+                        _logger.QuietSessionInfoErrors = false;
+                    }
                     _sessionCoordinator.ClearCache();
-                    _cachedRawYaml = string.Empty;
                     _lastSessionNumForLog = -1;
                     // Reset frame-gap baseline so the wall-clock gap across a disconnect
                     // doesn't get reported as a single huge gap on the first frame after reconnect.
@@ -220,13 +218,12 @@ namespace VISOR.Telemetry
         private void CheckPrimedStateChange()
         {
             bool isPrimed = _isConnected && _sessionCoordinator.IsDataReady;
-            if (isPrimed != _lastPrimedState)
-            {
-                Log.Info(isPrimed
-                    ? "HUD ready: iRacing connected and session data parsed"
-                    : "HUD no longer primed: waiting for connection or session data");
-                _lastPrimedState = isPrimed;
-            }
+            if (isPrimed == _lastPrimedState) return;
+
+            Log.Info(isPrimed
+                ? "HUD ready: iRacing connected and session data parsed"
+                : "HUD no longer primed: waiting for connection or session data");
+            _lastPrimedState = isPrimed;
 
             try
             {
@@ -238,26 +235,69 @@ namespace VISOR.Telemetry
             }
         }
 
-        private void OnRawSessionInfoUpdate(string sessionInfo)
-        {
-            // Stash for the DEBUG-only SessionDataLogger; parsing happens in OnSessionInfoUpdate.
-            _cachedRawYaml = sessionInfo ?? string.Empty;
-        }
-
         private void OnSessionInfoUpdate(TelemetrySessionInfo info)
         {
             try
             {
+                ApplySessionInfo(info, fromSdk: true);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("OnSessionInfoUpdate error", ex);
+            }
+        }
+
+        private void OnRawSessionInfoUpdate(string yaml)
+        {
+            try
+            {
+                bool wellFormed = SessionInfoYaml.IsWellFormed(yaml);
+#if DEBUG
+                // Debug builds keep a copy of session info that won't parse as-is.
+                if (!wellFormed)
+                    _sessionYamlFailures.Check(yaml);
+#endif
+                var info = _sessionInfoFallback.Read(yaml, wellFormed);
+                if (info != null)
+                    ApplySessionInfo(info, fromSdk: false);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("OnRawSessionInfoUpdate error", ex);
+            }
+        }
+
+        // Once VISOR reads session info itself, the SDK's results are ignored until the next
+        // disconnect. Deciding that and applying happen under one lock, so an SDK result that was
+        // already on its way can't land after a newer one VISOR applied.
+        private void ApplySessionInfo(TelemetrySessionInfo info, bool fromSdk)
+        {
+            lock (_sessionApplyLock)
+            {
+                if (fromSdk && _sessionInfoFallback.IsActive)
+                    return;
+                if (!fromSdk)
+                {
+                    _sessionInfoFallback.Activate();
+                    _logger.QuietSessionInfoErrors = true;
+                }
+
                 if (_sessionCoordinator.ApplySdkSession(info))
                 {
                     CheckPrimedStateChange();
                     CheckForSessionTransitionLog();
                 }
             }
-            catch (Exception ex)
-            {
-                Log.Error("OnSessionInfoUpdate error", ex);
-            }
+        }
+
+        private void OnSdkError(Exception ex)
+        {
+            // While VISOR reads session info itself, the SDK's failure to parse it repeats on
+            // every update; the first one was logged in full.
+            if (_sessionInfoFallback.IsActive && (ex is YamlException || ex.InnerException is YamlException))
+                Log.Debug($"[SDK Stream] session info parse error (VISOR is reading it itself): {ex.Message}");
+            else
+                Log.Error("[SDK Stream] error from SDK", ex);
         }
 
         private void CheckForSessionTransitionLog()
@@ -270,10 +310,6 @@ namespace VISOR.Telemetry
                 double sessionTimeSeconds = _sessionCoordinator.GetSessionTimeSeconds(currentSessionNum);
 
                 Log.Info($"Session transition: {sessionName} (Type: {sessionType}, Duration: {sessionTimeSeconds}s)");
-
-#if DEBUG
-                _sessionLogger?.ScheduleSessionAwareLogs(currentSessionNum, sessionName, sessionTimeSeconds);
-#endif
                 _lastSessionNumForLog = currentSessionNum;
             }
         }
@@ -293,6 +329,8 @@ namespace VISOR.Telemetry
 
         private void ProcessTelemetryUpdate(TelemetryData telemetryData)
         {
+            if (_isShuttingDown) return;
+
             // Defensive detector #1: frame-gap detector. 60Hz expected, flag gaps >33ms.
             var now = Stopwatch.GetTimestamp();
             if (_lastTickTs != 0)
@@ -309,42 +347,41 @@ namespace VISOR.Telemetry
             }
             _lastTickTs = now;
 
-            // Defensive detector #2: handler latency timer. Times the inline body below.
-            // Post-offload the inline cost is just snapshot construction (a thin typed wrapper);
-            // a warning here means something heavy crept back onto the SDK stream thread.
+            // Defensive detector #2: handler latency timer. Times the inline body below: snapshot
+            // construction (a thin typed wrapper) and the subscribers queuing the frame for the UI.
+            // A warning here means something heavy crept back onto the SDK stream thread.
             var handlerStart = Stopwatch.GetTimestamp();
 
             SVappsLABSnapshot? snapshot = null;
             try
             {
-                snapshot = new SVappsLABSnapshot(telemetryData, DateTime.UtcNow);
-                _latestSnapshot = snapshot;
+                snapshot = new SVappsLABSnapshot(telemetryData);
             }
             catch (Exception ex)
             {
                 Log.Error("Telemetry update error", ex);
             }
 
-            // Offload the fan-out and DEBUG-only file I/O so the SDK stream thread isn't
-            // blocked on consumer work. The SDK's telemetry channel is a 60-sample ring buffer
-            // and oldest samples are silently dropped when consumption is slow; keeping
-            // the on-thread cost minimal is the prescribed mitigation.
-            if (snapshot != null)
+            // Raised right here, one frame at a time, so subscribers receive frames in the order the
+            // SDK delivers them. (Each frame used to go out on its own Task.Run, and a later frame's
+            // task could reach the UI first.) Subscribers must only queue work - the windows post
+            // the frame to their UI thread - because the SDK's telemetry channel is a 60-sample ring
+            // buffer that silently drops the oldest samples when consumption is slow. Each
+            // subscriber is guarded on its own so one failing window can't starve the other.
+            var subscribers = SnapshotAvailable;
+            if (snapshot != null && subscribers != null)
             {
-                _ = Task.Run(() =>
+                foreach (Action<SVappsLABSnapshot> subscriber in subscribers.GetInvocationList())
                 {
                     try
                     {
-#if DEBUG
-                        _telemetryLogger?.LogSnapshot(snapshot, _sessionCoordinator);
-#endif
-                        SnapshotAvailable?.Invoke(snapshot);
+                        subscriber(snapshot);
                     }
                     catch (Exception ex)
                     {
-                        Log.Error("[SnapshotFanout] error in offloaded snapshot fan-out", ex);
+                        Log.Error("[SnapshotFanout] snapshot subscriber error", ex);
                     }
-                });
+                }
             }
 
             var elapsedMs = (Stopwatch.GetTimestamp() - handlerStart) * 1000.0 / Stopwatch.Frequency;
@@ -379,13 +416,9 @@ namespace VISOR.Telemetry
             try
             {
                 Log.Info("SVappsLAB SDK shutdown initiated");
+                _isShuttingDown = true;
                 _frameGapFlushTimer?.Stop();
                 _frameGapFlushTimer?.Dispose();
-
-#if DEBUG
-                _sessionLogger?.Dispose();
-                _telemetryLogger?.Dispose();
-#endif
 
                 _cancellationTokenSource?.Cancel();
 
@@ -408,43 +441,6 @@ namespace VISOR.Telemetry
         public void Dispose()
         {
             Shutdown();
-        }
-    }
-
-    /// <summary>
-    /// Bridges Microsoft.Extensions.Logging output from the SVappsLAB SDK into VISOR's Log.cs.
-    /// Warnings and errors are always surfaced; Info/Debug are forwarded when VISOR debug mode is on.
-    /// </summary>
-    public class VisorSdkLogger<T> : ILogger<T>
-    {
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-
-        public bool IsEnabled(LogLevel logLevel) =>
-            logLevel >= LogLevel.Warning || Diagnostics.Log.DebugModeEnabled;
-
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-        {
-            if (!IsEnabled(logLevel)) return;
-            if (formatter == null) return;
-
-            string message = $"[SDK] {formatter(state, exception)}";
-
-            switch (logLevel)
-            {
-                case LogLevel.Critical:
-                case LogLevel.Error:
-                    Diagnostics.Log.Error(message, exception);
-                    break;
-                case LogLevel.Warning:
-                    Diagnostics.Log.Warning(exception == null ? message : $"{message} ({exception.GetType().Name}: {exception.Message})");
-                    break;
-                case LogLevel.Information:
-                    Diagnostics.Log.Info(message);
-                    break;
-                default:
-                    Diagnostics.Log.Debug(message);
-                    break;
-            }
         }
     }
 }

@@ -8,7 +8,6 @@ namespace VISOR.Settings
     public class SettingsManager
     {
         private const double MAIN_WINDOW_WIDTH_LARGE = 640.0;
-        private const double MAIN_WINDOW_HEIGHT_LARGE = 640.0;
         private const double RADAR_WINDOW_WIDTH_LARGE = 240.0;
         private const double RADAR_WINDOW_HEIGHT_LARGE = 396.0;
 
@@ -40,11 +39,8 @@ namespace VISOR.Settings
             }
         }
 
-        public event EventHandler<SettingsChangedEventArgs>? SettingsChanged;
         public event EventHandler<WindowSizeChangedEventArgs>? WindowSizeChanged;
-        public event EventHandler<ElementVisibilityChangedEventArgs>? ElementVisibilityChanged;
-        public event EventHandler<RadarVisibilityChangedEventArgs>? RadarVisibilityChanged;
-        public event EventHandler<PositionDisplayModeChangedEventArgs>? PositionDisplayModeChanged;
+        public event EventHandler? ElementVisibilityChanged;
 
         private SettingsManager()
         {
@@ -58,7 +54,7 @@ namespace VISOR.Settings
             double contentHeight = CalculateDynamicMainWindowHeight(sessionDataProvider);
             double baseWidth = MAIN_WINDOW_WIDTH_LARGE;
 
-            double scaleFactor = GetMainWindowScaleFactor(_settings.WindowSize);
+            double scaleFactor = WindowScale.ForMainWindow(_settings.WindowSize);
             double scaledWidth = baseWidth * scaleFactor;
 
             // Scale the content, then add the unscaled Border chrome. At Large this equals
@@ -71,7 +67,8 @@ namespace VISOR.Settings
 
         public Size GetRadarWindowSize()
         {
-            return GetBaseDimensions(_settings.WindowSize, isMainWindow: false);
+            double scale = WindowScale.ForRadar(_settings.WindowSize);
+            return new Size(RADAR_WINDOW_WIDTH_LARGE * scale, RADAR_WINDOW_HEIGHT_LARGE * scale);
         }
 
         /// <summary>
@@ -119,36 +116,6 @@ namespace VISOR.Settings
             totalHeight += WINDOW_PADDING;
 
             return Math.Max(totalHeight, 200.0);
-        }
-
-        private Size GetBaseDimensions(WindowSizePreset sizePreset, bool isMainWindow)
-        {
-            if (isMainWindow)
-            {
-                return sizePreset switch
-                {
-                    WindowSizePreset.Small => new Size(MAIN_WINDOW_WIDTH_LARGE * 0.6, MAIN_WINDOW_HEIGHT_LARGE * 0.6),
-                    WindowSizePreset.Medium => new Size(MAIN_WINDOW_WIDTH_LARGE * 0.8, MAIN_WINDOW_HEIGHT_LARGE * 0.8),
-                    _ => new Size(MAIN_WINDOW_WIDTH_LARGE, MAIN_WINDOW_HEIGHT_LARGE)
-                };
-            }
-
-            return sizePreset switch
-            {
-                WindowSizePreset.Small => new Size(RADAR_WINDOW_WIDTH_LARGE * 0.8, RADAR_WINDOW_HEIGHT_LARGE * 0.8),
-                WindowSizePreset.Medium => new Size(RADAR_WINDOW_WIDTH_LARGE * 0.9, RADAR_WINDOW_HEIGHT_LARGE * 0.9),
-                _ => new Size(RADAR_WINDOW_WIDTH_LARGE, RADAR_WINDOW_HEIGHT_LARGE)
-            };
-        }
-
-        private double GetMainWindowScaleFactor(WindowSizePreset sizePreset)
-        {
-            return sizePreset switch
-            {
-                WindowSizePreset.Small => 0.6,
-                WindowSizePreset.Medium => 0.8,
-                _ => 1.0
-            };
         }
 
         #endregion
@@ -260,8 +227,6 @@ namespace VISOR.Settings
         public void UpdateElementVisibility(bool showRow0, bool showRow1, bool showRow2,
             bool showRow3, bool showRow4, bool showRow5, bool showRadar)
         {
-            var oldRadarVisible = _settings.ShowRadar;
-
             _settings.ShowRow0 = showRow0;
             _settings.ShowRow1 = showRow1;
             _settings.ShowRow2 = showRow2;
@@ -271,22 +236,7 @@ namespace VISOR.Settings
             _settings.ShowRadar = showRadar;
             _settings.SaveSettings();
 
-            ElementVisibilityChanged?.Invoke(this, new ElementVisibilityChangedEventArgs
-            {
-                ShowPositionAndGear = showRow0,
-                ShowTimeAndFuel = showRow1,
-                ShowLapDelta = showRow2,
-                ShowLapTimes = showRow3,
-                ShowRelative = showRow4,
-                ShowWarnings = showRow5
-            });
-
-            if (oldRadarVisible != showRadar)
-            {
-                RadarVisibilityChanged?.Invoke(this, new RadarVisibilityChangedEventArgs { IsVisible = showRadar });
-            }
-
-            SettingsChanged?.Invoke(this, new SettingsChangedEventArgs { ChangeType = SettingsChangeType.ElementVisibility });
+            ElementVisibilityChanged?.Invoke(this, EventArgs.Empty);
         }
 
         /// <summary>
@@ -301,30 +251,13 @@ namespace VISOR.Settings
             _settings.ShowTrackTemp = showTrackTemp;
             _settings.SaveSettings();
 
-            ElementVisibilityChanged?.Invoke(this, new ElementVisibilityChangedEventArgs
-            {
-                ShowPositionAndGear = _settings.ShowRow0,
-                ShowTimeAndFuel = _settings.ShowRow1,
-                ShowLapDelta = _settings.ShowRow2,
-                ShowLapTimes = _settings.ShowRow3,
-                ShowRelative = _settings.ShowRow4,
-                ShowWarnings = _settings.ShowRow5
-            });
-
-            SettingsChanged?.Invoke(this, new SettingsChangedEventArgs { ChangeType = SettingsChangeType.ElementVisibility });
+            ElementVisibilityChanged?.Invoke(this, EventArgs.Empty);
         }
 
         public void UpdatePositionDisplayMode(PositionDisplayMode newMode)
         {
-            var oldMode = _settings.PositionDisplayMode;
             _settings.PositionDisplayMode = newMode;
             _settings.SaveSettings();
-
-            if (oldMode != newMode)
-            {
-                PositionDisplayModeChanged?.Invoke(this, new PositionDisplayModeChangedEventArgs { NewMode = newMode });
-                SettingsChanged?.Invoke(this, new SettingsChangedEventArgs { ChangeType = SettingsChangeType.PositionDisplayMode });
-            }
         }
 
         public void UpdateWindowSize(WindowSizePreset newSize)
@@ -335,14 +268,7 @@ namespace VISOR.Settings
 
             if (oldSize != newSize)
             {
-                WindowSizeChanged?.Invoke(this, new WindowSizeChangedEventArgs
-                {
-                    NewSize = newSize,
-                    NewMainWindowSize = GetMainWindowSize(),
-                    NewRadarWindowSize = GetRadarWindowSize()
-                });
-
-                SettingsChanged?.Invoke(this, new SettingsChangedEventArgs { ChangeType = SettingsChangeType.WindowSize });
+                WindowSizeChanged?.Invoke(this, new WindowSizeChangedEventArgs { NewSize = newSize });
             }
         }
 
@@ -357,44 +283,9 @@ namespace VISOR.Settings
 
     #region Event Args
 
-    public class SettingsChangedEventArgs : EventArgs
-    {
-        public SettingsChangeType ChangeType { get; set; }
-    }
-
     public class WindowSizeChangedEventArgs : EventArgs
     {
         public WindowSizePreset NewSize { get; set; }
-        public Size NewMainWindowSize { get; set; }
-        public Size NewRadarWindowSize { get; set; }
-    }
-
-    public class ElementVisibilityChangedEventArgs : EventArgs
-    {
-        public bool ShowPositionAndGear { get; set; }
-        public bool ShowTimeAndFuel { get; set; }
-        public bool ShowLapDelta { get; set; }
-        public bool ShowLapTimes { get; set; }
-        public bool ShowRelative { get; set; }
-        public bool ShowWarnings { get; set; }
-    }
-
-    public class RadarVisibilityChangedEventArgs : EventArgs
-    {
-        public bool IsVisible { get; set; }
-    }
-
-    public class PositionDisplayModeChangedEventArgs : EventArgs
-    {
-        public PositionDisplayMode NewMode { get; set; }
-    }
-
-    public enum SettingsChangeType
-    {
-        ElementVisibility,
-        WindowSize,
-        WindowPosition,
-        PositionDisplayMode
     }
 
     #endregion

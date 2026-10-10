@@ -1,7 +1,6 @@
 using System;
 using System.Globalization;
 using System.IO;
-using System.Text.RegularExpressions;
 using VISOR.Telemetry;
 
 namespace VISOR.Diagnostics
@@ -68,10 +67,7 @@ namespace VISOR.Diagnostics
             if (_failed) return false;
             try
             {
-                string dir = Path.Combine(Log.GetDiagnosticsDirectory(), "WetResearch");
-                Directory.CreateDirectory(dir);
-                string stem = Regex.Replace(_carPath, "[^A-Za-z0-9_-]", "_");
-                string path = Path.Combine(dir, $"{stem}_{DateTime.Now:yyyyMMdd-HHmmss}.csv");
+                string path = DiagnosticFiles.NewPath("WetResearch", _carPath, ".csv");
                 _writer = new StreamWriter(path) { AutoFlush = false };
                 _writer.WriteLine("session_time,lap,lap_dist_pct,lat,lon," +
                                   "track_wetness,precipitation,declared_wet,tire_compound," +

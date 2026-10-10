@@ -51,9 +51,9 @@ namespace VISOR.ViewModels
         public ShiftState Update(double sessionTime, int gear, float rpm, bool active, bool revLimiterActive,
             float redLine, int shiftRpm, int approachRpm)
         {
-            // Frames can arrive slightly out of order (they're fanned out on worker tasks); a
-            // frame a little older than the last one is stale and ignored. A much older one means
-            // the session clock restarted.
+            // Frames reach the UI in order, but a frame no newer than the last one (a repeated
+            // sample) is ignored rather than read as a zero-time step. A much older one means the
+            // session clock restarted.
             if (!double.IsNaN(_lastTime) && sessionTime <= _lastTime && sessionTime > _lastTime - StaleWindow)
                 return State;
 

@@ -53,7 +53,8 @@ relative gaps, and surrounding traffic — without a cluttered screen.
   ("Eau Rouge", "Kemmel Straight"), like a sign hanging over the track surface.
   Driven by an editable catalog (`Data/TrackSections.json`) covering 66 layouts
   out of the box — the Nordschleife, Le Mans, and most iRacing road courses —
-  tune boundaries or add tracks with a text editor. Measured turn positions and
+  tune boundaries or add tracks with a text editor. Setup replaces the file when
+  you upgrade, so keep a copy of any edits. Measured turn positions and
   many names imported from [lovely-track-data](https://github.com/Lovely-Sim-Racing/lovely-track-data)
   by [Lovely Sim Racing](https://lsr.gg) (CC BY-NC-SA 4.0).
 - **AI driver detection** and per-driver incident counts pulled from session data.
@@ -113,6 +114,18 @@ dotnet build VISOR.sln --configuration Release
 
 You can also open `VISOR.sln` in Visual Studio 2026 (or newer; .NET 10 is not supported in VS 2022) and build the
 **Release** configuration.
+
+### Run the tests
+
+```powershell
+dotnet test Tests/VISOR.Tests
+```
+
+The unit tests cover the platform-independent logic (shift-point learning, fuel, gap history,
+the track catalog, the update check). They target plain `net10.0`, so they also run on Linux,
+and they appear in Visual Studio's Test Explorer. CI runs them on every push and pull request,
+together with the track-catalog validator (`tools/validate_track_catalog.py`), a whitespace
+check (`dotnet format whitespace --folder --verify-no-changes`) and a vulnerable-package check.
 
 ### Build the installer
 

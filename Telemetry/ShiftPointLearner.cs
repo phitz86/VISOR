@@ -3,57 +3,6 @@ using System;
 namespace VISOR.Telemetry
 {
     /// <summary>
-    /// One telemetry frame as the shift-point learner sees it. Plain values only, so the learner
-    /// has no dependency on the SDK or WPF and can be unit-tested with synthetic data.
-    /// </summary>
-    public readonly record struct ShiftSample(
-        double SessionTime,     // s; used to detect gear changes and skip the post-shift transient
-        int Gear,               // -1 R, 0 N, 1..n
-        float Rpm,
-        float Speed,            // m/s
-        float LongAccel,        // m/s^2, including gravity
-        float LatAccel,         // m/s^2; hard cornering is excluded from the torque fit
-        float Throttle,         // 0..1
-        float Brake,            // 0..1
-        float Clutch,           // 0..1, 1 = fully engaged
-        bool Eligible);         // caller's gate: on track, not in pits/replay/limiter, track dry
-
-    /// <summary>
-    /// Result of solving for one gear's optimal upshift.
-    /// </summary>
-    /// <remarks>
-    /// <see cref="BandsSeen"/> / <see cref="BandsNeeded"/>: how many of the 250-RPM torque bands
-    /// around the shift point (in this gear and where the next gear lands) have enough data yet.
-    /// <see cref="NextGearThrustAtRedlinePct"/>: the next gear's thrust as a % of this gear's when
-    /// shifting at the redline (same road speed). Below 100 means holding to the redline beats
-    /// shifting there; the further below, the more clear-cut. Only meaningful near 100 (for gears
-    /// that hold to the redline); far above it for a peaky engine it's noisy and irrelevant, since
-    /// the shift then happens well before the redline. NaN when not computed.
-    /// <see cref="Provisional"/> / <see cref="ProvenRpm"/>: not confident yet, but the data proves
-    /// this gear still out-pulls the next up to <see cref="ProvenRpm"/>, so the best shift is at
-    /// least that high. <see cref="Rpm"/> is then one step (250 RPM) past it, capped at the
-    /// model's estimate: where to cue next so the driver revs high enough to confirm the step.
-    /// </remarks>
-    public readonly record struct GearShiftEstimate(int Gear, int Rpm, bool Confident, string Reason,
-        int BandsSeen = 0, int BandsNeeded = 0, string MissingBands = "", double NextGearThrustAtRedlinePct = double.NaN,
-        bool Provisional = false, int ProvenRpm = 0);
-
-    /// <summary>Why a frame was left out of the torque model (for progress logging).</summary>
-    public enum SkipReason
-    {
-        Ineligible,     // caller's gate: pits, off track, replay, limiter, wet
-        NotInGear,
-        PostShift,
-        LowSpeed,
-        ClutchOrBrake,
-        PartThrottle,
-        Cornering,
-        RatioWarmup,    // gear ratio not measured yet this session
-        Wheelspin,
-        OutOfRange
-    }
-
-    /// <summary>
     /// Learns a car's optimal upshift RPM per gear from the driver's own full-throttle telemetry.
     ///
     /// Physics: at the same road speed, drag and rolling resistance are identical in either gear,
@@ -174,8 +123,6 @@ namespace VISOR.Telemetry
             }
             return anyMatch;
         }
-
-        public double GetBinWeight(int bin) => bin >= 0 && bin < BinCount ? _binWeight[bin] : 0;
 
         /// <summary>
         /// Feeds one frame. Updates the gear-ratio estimate whenever the drivetrain is locked up,
@@ -326,16 +273,15 @@ namespace VISOR.Telemetry
             double dTop = Diff(redLine);
             if (dTop <= 0)
             {
-                double prevR = redLine, prevD = dTop;
+                double prevD = dTop;
                 for (double r = redLine - step; r >= minRpm; r -= step)
                 {
                     double d = Diff(r);
                     if (d > 0)
                     {
-                        crossover = r + step * d / (d - prevD);   // interpolate between r and prevR
+                        crossover = r + step * d / (d - prevD);   // interpolate between r and r + step
                         break;
                     }
-                    prevR = r;
                     prevD = d;
                 }
                 if (double.IsNaN(crossover)) crossesBelowHalf = true;   // next gear stronger everywhere we look
@@ -510,42 +456,7 @@ namespace VISOR.Telemetry
             double ridge = 1e-6 * avgDiag + 1e-9;
             for (int i = 0; i < n; i++) m[i * n + i] += ridge;
 
-            return CholeskySolve(m, rhs, n);
-        }
-
-        private static double[]? CholeskySolve(double[] a, double[] b, int n)
-        {
-            // In-place lower-triangular factorization: a = L L^T.
-            for (int j = 0; j < n; j++)
-            {
-                double sum = a[j * n + j];
-                for (int k = 0; k < j; k++) sum -= a[j * n + k] * a[j * n + k];
-                if (sum <= 0 || !double.IsFinite(sum)) return null;
-                double ljj = Math.Sqrt(sum);
-                a[j * n + j] = ljj;
-                for (int i = j + 1; i < n; i++)
-                {
-                    double s = a[i * n + j];
-                    for (int k = 0; k < j; k++) s -= a[i * n + k] * a[j * n + k];
-                    a[i * n + j] = s / ljj;
-                }
-            }
-            var y = new double[n];
-            for (int i = 0; i < n; i++)
-            {
-                double s = b[i];
-                for (int k = 0; k < i; k++) s -= a[i * n + k] * y[k];
-                y[i] = s / a[i * n + i];
-            }
-            var x = new double[n];
-            for (int i = n - 1; i >= 0; i--)
-            {
-                double s = y[i];
-                for (int k = i + 1; k < n; k++) s -= a[k * n + i] * x[k];
-                x[i] = s / a[i * n + i];
-            }
-            foreach (var v in x) if (!double.IsFinite(v)) return null;
-            return x;
+            return LinearSolver.CholeskySolve(m, rhs, n);
         }
 
         #region Persistence
@@ -595,54 +506,5 @@ namespace VISOR.Telemetry
         }
 
         #endregion
-
-        /// <summary>
-        /// Rolling median of a gear's RPM/speed ratio. A median rather than a mean so brief
-        /// wheelspin or a locked wheel doesn't drag the estimate.
-        /// </summary>
-        private sealed class RatioTracker
-        {
-            private const int Capacity = 240;   // ~4 s at 60 Hz
-            private const int RecomputeEvery = 30;
-            private readonly double[] _buf = new double[Capacity];
-            private readonly double[] _scratch = new double[Capacity];
-            private int _next;
-            private int _sinceMedian = RecomputeEvery;
-            private double _median;
-
-            public int Count { get; private set; }
-
-            public void Add(double v)
-            {
-                _buf[_next] = v;
-                _next = (_next + 1) % Capacity;
-                if (Count < Capacity) Count++;
-                if (_sinceMedian < RecomputeEvery) _sinceMedian++;
-            }
-
-            public double Median
-            {
-                get
-                {
-                    // Recompute at most every RecomputeEvery adds; the ratio doesn't change mid-gear.
-                    if (_sinceMedian >= RecomputeEvery && Count > 0)
-                    {
-                        Array.Copy(_buf, _scratch, Count);
-                        Array.Sort(_scratch, 0, Count);
-                        _median = _scratch[Count / 2];
-                        _sinceMedian = 0;
-                    }
-                    return _median;
-                }
-            }
-        }
     }
-
-    /// <summary>The persisted torque statistics of a <see cref="ShiftPointLearner"/>.</summary>
-    /// <remarks>
-    /// <see cref="GearRatios"/> (index = gear, 0 = unknown) are optional: older saved models don't
-    /// have them. They're only ever used as a fallback; see <see cref="ShiftPointLearner.GetRatio"/>.
-    /// </remarks>
-    public sealed record ShiftModelState(double[] AtaUpper, double[] Atb, double[] BinWeights, long SampleCount,
-        double[]? GearRatios = null);
 }

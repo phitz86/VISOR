@@ -7,6 +7,124 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Capture of session info that won't parse (debug builds only)** — when iRacing's session info
+  (track, drivers, sessions) can't be read, VISOR gets no session data and the HUD never becomes
+  ready. The SDK reports the failure but not the text, so debug builds now save any session info
+  that fails to parse, with the line and column of the error, to `Diagnostics\SessionYaml` (at
+  most five files a run). The files contain every driver's name and iRacing ID. Release builds
+  don't collect it.
+
+### Security
+
+- **Build pipeline hardened** — the CI build job now runs with a read-only token, and only the
+  signing job (which never runs repository code) can write to the repository. Every GitHub
+  Action is pinned to an exact commit, with Dependabot proposing updates. Inno Setup is
+  installed at a pinned version, and the build no longer leaves its token in the checkout.
+- **Logs no longer identify the PC or Windows user** — the session header drops the machine name,
+  and paths under your user profile are written as `%USERPROFILE%\...`, so a log can be shared
+  as-is.
+
+### Fixed
+
+- **Session info the SDK can't read no longer leaves the HUD blank** — iRacing writes session info
+  (track, drivers, sessions) without quoting its values, and a line break, or a colon in a field the
+  SDK doesn't quote, made it unreadable: VISOR then got no session data for the whole event. VISOR
+  now checks each update, and when the SDK can't read one it reads the session info itself
+  (rejoining broken lines and quoting values) until iRacing disconnects, noting it once in the log
+  (`[SessionInfo] The SDK could not read this session's info...`). Sessions the SDK reads are
+  handled exactly as before.
+- **A car whose telemetry stops at the finish keeps its place** — when a car's data stopped under
+  the checkered (it went to the garage or lost its connection, but stayed in the session), about
+  three seconds later it dropped out of the running order a frame before VISOR's departed-car
+  hold looked for it. The car behind then moved up, and two cars could show the same position.
+  It is now held at its last place on the frame it drops out (`telemetry stopped during the
+  checkered - holding P...` in the log). Mid-race, such a car still makes way as before.
+- **Radar no longer leaves "ghost" cars behind** — after a disconnect, a session change or lone
+  qualifying, the radar cleared its list of cars but left their shapes on screen. Those stale
+  blocks reappeared at their old positions when the radar faded back in, and more piled up with
+  every reset.
+- **"Exit VISOR" works from a Config window opened with the overlay's ⚙ button** — that window
+  wasn't connected to the app, so its Exit button did nothing. All Config windows are now opened
+  the same way.
+- **A second launch brings VISOR forward again after the Config window is closed** — VISOR kept
+  trying to surface the closed Config window instead of the overlay, so pressing a Stream Deck
+  launch button a second time did nothing. A radar window closed with Alt+F4 can likewise be
+  reopened from the Config window.
+- **Error pop-ups can't stack up over the sim** — an unexpected error still gets logged every
+  time, but its dialog now appears at most once a minute and never while one is already open.
+- **One bad entry in `Data\TrackSections.json` no longer disables the whole catalog** — malformed
+  entries, blank match or config keys, and sections without a name or outside the lap are now
+  skipped with a warning in the log. A blank config key could previously throw when that track
+  loaded.
+- **Shift-point model saves can't collide** — the periodic background save and the save on car
+  change, disconnect or exit could write the same temporary file at once, and an older save
+  could land after a newer one. Saves now take turns, and an older one is skipped.
+- **"HUD ready" state is only announced when it changes** — it was re-announced on every
+  session-info update.
+- **Telemetry frames are handled strictly in order** — each frame used to reach the overlay and
+  radar on its own background task, and a later frame could occasionally overtake an earlier
+  one. That could cost a Final Lap or FINISHED latch, count a qualifying lap twice, reset the
+  track-temperature trend, or glitch a gap or position for a frame. Frames are now queued for
+  the display in the order iRacing sends them. If the display ever falls more than four frames
+  behind, newer frames are skipped and noted in the log as `[FrameBacklog]`.
+- **Upgrading no longer wipes the whole install folder** — Setup used to delete everything in the
+  install folder, recursively, before installing the new version. That was harmless in
+  `Program Files\VISOR`, but would have emptied any shared folder VISOR had been installed into.
+  It now removes only VISOR's own program files (its DLLs, `.deps.json`, `.runtimeconfig.json`
+  and `runtimes\` folder), which still clears out DLLs that older versions shipped and this one
+  doesn't.
+- **No waiting on the display during shutdown** — connection and session-state changes no longer
+  block on the display, which could delay exit by up to two seconds.
+- **Settings carry over to a new version** — VISOR stores its settings per version, and nothing
+  copied them forward, so every update started again from the default window positions and
+  options. The first start of a new version now brings the previous version's settings across
+  (logged as `Settings carried over from the previous version`).
+- **A radar switched on from the Config window can be dragged into place** — with the radar off
+  at start-up, turning it on with the Config window open left its drag handle hidden, and it could
+  fade out, until the Config window was closed and reopened.
+- **Start-up messages reach the log file** — lines logged before the log file opened (such as a
+  corrupt-settings recovery) only went to the debugger. They are now written after the header.
+
+### Changed
+
+- **Internal tidy-ups, no change in behaviour** — named constants replace the session-state,
+  flag and pace-car magic numbers; the size-preset scale factors, car-name-to-file-name rules and
+  debug-log file naming each live in one place; one table drives the radar's side-zone
+  assignment and highlights; and the shift-point learner, the shift-point provider and the
+  relative display builder are split into smaller files (none now much over 500 lines except the
+  position calculator, whose split waits for its tests). Debug builds only: the radar's zone log
+  lines are worded consistently, and captured session info is saved as
+  `parse-failure_<time>.yaml`.
+- **Tests and checks run on every build** — CI now runs the unit tests (145, up from 59: the new
+  ones cover the fuel estimate, the position history behind the gap figures, the track catalog,
+  the update check, reading session info, and the position calculator's running order, grid
+  order, lap-counter handling at the line and finishing positions) and checks the track catalog,
+  code whitespace and packages with known vulnerabilities, on every push and pull request. Build warnings fail CI, and a release is only
+  signed once all of it passes. The tests moved to xUnit.net v3 (v2 is retired), still run
+  through the classic test runner so Visual Studio and CI run them the same way.
+- **Less work per frame** — the relative display reuses ten pre-built colour brushes instead of
+  creating up to 1,800 a second, and looks up practice/qualifying positions once per frame
+  instead of once per row. The delta bar only signals a redraw when it actually changes.
+- **Log file stays open for the session** — VISOR now keeps the log open instead of opening and
+  closing it for every line. It stays readable in an editor while VISOR runs, and lines reach
+  the disk as soon as each burst of logging finishes.
+
+- **Third-party track data credited in `LICENSE.txt`** — the lovely-track-data turn positions and
+  names (CC BY-NC-SA 4.0) are now listed alongside the Symbola font. The README notes that
+  Setup replaces `Data\TrackSections.json` on upgrade, so local edits need a backup.
+
+### Removed
+
+- **Unused code and settings plumbing** — about 50 unused members, events and helpers, and the
+  unused `System.Management` package (one less DLL in the install folder).
+- **Three debug-build loggers whose investigations are finished** — the relative-gap CSV, the 1 Hz
+  telemetry CSV and the session-YAML dumps (iRacing's own `.ibt` recordings capture the same
+  data). Release builds never ran them. The wet-research and shift-point loggers stay.
+- **Stale planning files** — the old file plan, prompt and a raw session dump. The track-identity
+  list used by `tools/validate_track_catalog.py` moved to `tools/`.
+
 ## [1.2.1] - 2026-10-04
 
 ### Added

@@ -61,13 +61,7 @@ namespace VISOR.ViewModels
         public bool ShowIncidentElement => _settingsManager.Settings.ShowIncidentCounter;
         public bool ShowTrackTempElement => _settingsManager.Settings.ShowTrackTemp;
 
-        public double ScaleFactor => _settingsManager.Settings.WindowSize switch
-        {
-            WindowSizePreset.Small => 0.6,
-            WindowSizePreset.Medium => 0.8,
-            WindowSizePreset.Large => 1.0,
-            _ => 1.0
-        };
+        public double ScaleFactor => WindowScale.ForMainWindow(_settingsManager.Settings.WindowSize);
 
         public MainViewModel()
         {
@@ -112,7 +106,7 @@ namespace VISOR.ViewModels
             CheckSessionStateTransitions(snapshot);
             CheckForSessionTransition(snapshot, sessionDataProvider);
 
-            _positionCalculator.Update(snapshot, sessionDataProvider);
+            _positionCalculator.Update(snapshot.ToPositionFrame(), sessionDataProvider);
 
             FuelVM.Update(snapshot.FuelLevel, snapshot.Lap);
             RelativeVM.Update(snapshot, sessionDataProvider);
@@ -277,26 +271,14 @@ namespace VISOR.ViewModels
         /// <summary>Saves any unsaved shift-point learning. Called on disconnect and app exit.</summary>
         public void FlushShiftPoints() => _shiftPoints.Flush();
 
-        private static string GetStateName(int state) => state switch
-        {
-            0 => "Invalid",
-            1 => "GetInCar",
-            2 => "Warmup",
-            3 => "ParadeLaps",
-            4 => "Racing",
-            5 => "Checkered",
-            6 => "CoolDown",
-            _ => $"Unknown({state})"
-        };
-
         private void CheckSessionStateTransitions(SVappsLABSnapshot snapshot)
         {
             int currentSessionState = snapshot.SessionState;
             if (currentSessionState != _lastSessionState)
             {
-                Log.Info($"Session state transition: {GetStateName(_lastSessionState)} -> {GetStateName(currentSessionState)}");
+                Log.Info($"Session state transition: {SessionStates.Name(_lastSessionState)} -> {SessionStates.Name(currentSessionState)}");
 
-                if (_lastSessionState == 6 && currentSessionState == 1)
+                if (_lastSessionState == SessionStates.CoolDown && currentSessionState == SessionStates.GetInCar)
                 {
                     ClearSessionUI();
                 }

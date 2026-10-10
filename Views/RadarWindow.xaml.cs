@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using VISOR.Diagnostics;
 using VISOR.Settings;
 using VISOR.Telemetry;
@@ -19,6 +20,7 @@ namespace VISOR.Views
         private readonly SVappsLABSDKWrapper _sdk;
         private readonly SettingsManager _settingsManager;
         private readonly ConfigModeManager _configModeManager;
+        private readonly FramePoster _framePoster;
 
         private int _lastVisibleCarCount = 0;
         private bool _isFadedOut = false;
@@ -31,8 +33,9 @@ namespace VISOR.Views
             _sdk = sdkWrapper;
             _settingsManager = SettingsManager.Instance;
             _configModeManager = ConfigModeManager.Instance;
-            _viewModel = new RadarViewModel(classColorManager);
+            _viewModel = new RadarViewModel(classColorManager, CarsContainer);
             DataContext = _viewModel;
+            _framePoster = new FramePoster(Dispatcher, "RadarWindow", ProcessSnapshot);
 
             AllowsTransparency = true;
             WindowStyle = WindowStyle.None;
@@ -44,6 +47,13 @@ namespace VISOR.Views
 
             _settingsManager.WindowSizeChanged += OnWindowSizeChanged;
             _configModeManager.ConfigModeChanged += OnConfigModeChanged;
+
+            // A radar switched on from the Config window is created while config mode is already
+            // on, and only hears about later changes, so start it in the current mode: drag
+            // handle shown and kept visible, as the Config window does for an existing radar.
+            bool inConfigMode = _configModeManager.IsInConfigMode;
+            DragHandle.Visibility = inConfigMode ? Visibility.Visible : Visibility.Collapsed;
+            SetForceVisible(inConfigMode);
 
             Loaded += RadarWindow_Loaded;
 
@@ -92,15 +102,14 @@ namespace VISOR.Views
             RadarCanvas.Height = height;
 
             double zoneWidth = width / 5;
-            double centerY = height / 2;
 
-            UpdateRadarLines(width, height, scaleFactor);
-            UpdateZoneHighlights(width, height, zoneWidth);
-            UpdatePlayerCar(width, height, scaleFactor, zoneWidth);
-            UpdateZoneLabelsGrid(width, height);
+            UpdateRadarLines(width, height);
+            UpdateZoneHighlights(height, zoneWidth);
+            UpdatePlayerCar(height, scaleFactor, zoneWidth);
+            UpdateZoneLabelsGrid(width);
         }
 
-        private void UpdateRadarLines(double width, double height, double scaleFactor)
+        private void UpdateRadarLines(double width, double height)
         {
             var lines = RadarCanvas.Children.OfType<Line>().ToList();
 
@@ -138,7 +147,7 @@ namespace VISOR.Views
             }
         }
 
-        private void UpdateZoneHighlights(double width, double height, double zoneWidth)
+        private void UpdateZoneHighlights(double height, double zoneWidth)
         {
             var highlights = new[] { LeftZone1Highlight, LeftZone2Highlight, CenterZoneHighlight, RightZone2Highlight, RightZone1Highlight };
 
@@ -152,7 +161,7 @@ namespace VISOR.Views
             }
         }
 
-        private void UpdatePlayerCar(double width, double height, double scaleFactor, double zoneWidth)
+        private void UpdatePlayerCar(double height, double scaleFactor, double zoneWidth)
         {
             double baseCarWidth = 24;
             double baseCarHeight = 36;
@@ -176,7 +185,7 @@ namespace VISOR.Views
             PlayerCarNumber.FontSize = Math.Max(8, 12 * scaleFactor);
         }
 
-        private void UpdateZoneLabelsGrid(double width, double height)
+        private void UpdateZoneLabelsGrid(double width)
         {
             var grid = RadarCanvas.Children.OfType<Grid>().FirstOrDefault();
             if (grid != null)
@@ -235,9 +244,11 @@ namespace VISOR.Views
             }
         }
 
+        // Connection and primed-state changes are raised on SDK threads. Queued rather than
+        // invoked, so the SDK never waits on the UI thread (see MainWindow).
         private void OnConnectionStateChanged(bool isConnected)
         {
-            Dispatcher.Invoke(() =>
+            Dispatcher.BeginInvoke(DispatcherPriority.Send, new Action(() =>
             {
                 if (!isConnected)
                 {
@@ -253,12 +264,12 @@ namespace VISOR.Views
                     DebugText.Text = "Radar: Connected";
                     CarLeftRightIndicator.Text = "Connecting";
                 }
-            });
+            }));
         }
 
         private void OnPrimedStateChanged(bool isPrimed)
         {
-            Dispatcher.Invoke(() =>
+            Dispatcher.BeginInvoke(DispatcherPriority.Send, new Action(() =>
             {
                 if (isPrimed)
                 {
@@ -274,44 +285,45 @@ namespace VISOR.Views
                     UpdatePlayerCarDisplay();
                     FadeOut();
                 }
-            });
+            }));
         }
 
-        private void OnSnapshotAvailable(SVappsLABSnapshot snapshot)
+        // SDK telemetry thread: queue the frame for the UI thread, in order (see FramePoster).
+        private void OnSnapshotAvailable(SVappsLABSnapshot snapshot) => _framePoster.Post(snapshot);
+
+        // UI thread.
+        private void ProcessSnapshot(SVappsLABSnapshot snapshot)
         {
-            Dispatcher.Invoke(() =>
+            if (_sdk.IsSessionDataReady)
             {
-                if (_sdk.IsSessionDataReady)
-                {
-                    if (ShouldHideRadar())
-                    {
-                        _viewModel.Reset();
-                        ResetZoneHighlights();
-                        FadeOut();
-                        DebugText.Text = "Radar: Hidden (Lone Qualifying)";
-                        CarLeftRightIndicator.Text = "Hidden";
-                        return;
-                    }
-
-                    UpdatePlayerCarDisplay(snapshot);
-
-                    _viewModel.UpdateFromTelemetry(snapshot, _sdk.Coordinator, CarsContainer);
-
-                    UpdateZoneHighlights(snapshot);
-
-                    UpdateFadeState(_viewModel.VisibleCarCount);
-
-                    DebugText.Text = $"Cars: {_viewModel.VisibleCarCount}";
-                }
-                else
+                if (ShouldHideRadar())
                 {
                     _viewModel.Reset();
                     ResetZoneHighlights();
                     FadeOut();
-                    DebugText.Text = "Radar: No session data";
-                    CarLeftRightIndicator.Text = "No Data";
+                    DebugText.Text = "Radar: Hidden (Lone Qualifying)";
+                    CarLeftRightIndicator.Text = "Hidden";
+                    return;
                 }
-            });
+
+                UpdatePlayerCarDisplay(snapshot);
+
+                _viewModel.UpdateFromTelemetry(snapshot, _sdk.Coordinator);
+
+                UpdateZoneHighlights(snapshot);
+
+                UpdateFadeState(_viewModel.VisibleCarCount);
+
+                DebugText.Text = $"Cars: {_viewModel.VisibleCarCount}";
+            }
+            else
+            {
+                _viewModel.Reset();
+                ResetZoneHighlights();
+                FadeOut();
+                DebugText.Text = "Radar: No session data";
+                CarLeftRightIndicator.Text = "No Data";
+            }
         }
 
         private void UpdatePlayerCarDisplay(SVappsLABSnapshot? snapshot = null)
@@ -343,37 +355,19 @@ namespace VISOR.Views
 
             const double highlightOpacity = 0.15;
 
-            switch (carLeftRight)
-            {
-                case "CarLeft":
-                    LeftZone2Highlight.Opacity = highlightOpacity;
-                    break;
-
-                case "CarRight":
-                    RightZone2Highlight.Opacity = highlightOpacity;
-                    break;
-
-                case "CarLeftRight":
-                    LeftZone2Highlight.Opacity = highlightOpacity;
-                    RightZone2Highlight.Opacity = highlightOpacity;
-                    break;
-
-                case "TwoCarsLeft":
-                    LeftZone1Highlight.Opacity = highlightOpacity;
-                    LeftZone2Highlight.Opacity = highlightOpacity;
-                    break;
-
-                case "TwoCarsRight":
-                    RightZone1Highlight.Opacity = highlightOpacity;
-                    RightZone2Highlight.Opacity = highlightOpacity;
-                    break;
-
-                case "Clear":
-                case "Off":
-                default:
-                    break;
-            }
+            foreach (var zone in RadarViewModel.SideZonesFor(carLeftRight))
+                HighlightFor(zone).Opacity = highlightOpacity;
         }
+
+        // Zone 1 is the outer ("far") lane on each side, zone 2 the inner ("near") one.
+        private UIElement HighlightFor(RadarZone zone) => zone switch
+        {
+            RadarZone.LeftFar => LeftZone1Highlight,
+            RadarZone.LeftNear => LeftZone2Highlight,
+            RadarZone.RightNear => RightZone2Highlight,
+            RadarZone.RightFar => RightZone1Highlight,
+            _ => CenterZoneHighlight,
+        };
 
         private void ResetZoneHighlights()
         {

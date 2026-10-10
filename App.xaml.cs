@@ -29,11 +29,16 @@ namespace VISOR
         private SVappsLABSDKWrapper _sdkWrapper = null!;
         private MainWindow _mainWindow = null!;
         private RadarWindow? _radarWindow;
-        private ConfigWindow _configWindow = null!;
+        private ConfigWindow? _configWindow;
+
+        // Unhandled UI-thread errors: at most one dialog open at a time, and at most one a minute.
+        private static readonly TimeSpan ErrorDialogInterval = TimeSpan.FromMinutes(1);
+        private bool _errorDialogOpen;
+        private DateTime _lastErrorDialogUtc = DateTime.MinValue;
 
         public RadarWindow? CurrentRadarWindow => _radarWindow;
 
-        protected override async void OnStartup(StartupEventArgs e)
+        protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
 
@@ -74,7 +79,7 @@ namespace VISOR
 
                 _sdkWrapper = new SVappsLABSDKWrapper();
 
-                bool initialized = await _sdkWrapper.Initialize();
+                bool initialized = _sdkWrapper.Initialize();
                 Log.Info($"SDK initialization result: {initialized}");
 
                 if (!initialized)
@@ -126,12 +131,27 @@ namespace VISOR
             // session mid-race. The error is logged for diagnosis.
             e.Handled = true;
 
-            MessageBox.Show(
-                $"VISOR encountered an unexpected error and tried to recover.\n\n" +
-                $"{e.Exception.Message}\n\nDetails were written to the log file:\n{Log.GetCurrentLogPath()}",
-                "VISOR Error",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+            // An error that repeats every frame must not stack modal dialogs over the sim. Every
+            // occurrence is logged above; the dialog is only the heads-up that something went wrong.
+            var now = DateTime.UtcNow;
+            if (_errorDialogOpen || now - _lastErrorDialogUtc < ErrorDialogInterval)
+                return;
+
+            _errorDialogOpen = true;
+            _lastErrorDialogUtc = now;
+            try
+            {
+                MessageBox.Show(
+                    $"VISOR encountered an unexpected error and tried to recover.\n\n" +
+                    $"{e.Exception.Message}\n\nDetails were written to the log file:\n{Log.GetCurrentLogPath()}",
+                    "VISOR Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+            finally
+            {
+                _errorDialogOpen = false;
+            }
         }
 
         private void OnAppDomainUnhandledException(object sender, UnhandledExceptionEventArgs e)
@@ -254,8 +274,6 @@ namespace VISOR
                     _radarWindow = new RadarWindow(_sdkWrapper, _mainWindow.ViewModel.ClassColorManager);
                 }
 
-                _configWindow = new ConfigWindow(_sdkWrapper, _mainWindow);
-
                 _mainWindow.WindowState = WindowState.Normal;
                 _mainWindow.ShowActivated = true;
                 _mainWindow.Show();
@@ -268,17 +286,13 @@ namespace VISOR
                     _radarWindow.Show();
                 }
 
-                _configWindow.WindowState = WindowState.Normal;
-                _configWindow.ShowActivated = true;
-                _configWindow.Show();
+                ShowConfigWindow();
 
                 MainWindow = _mainWindow;
 
                 _mainWindow.Closed += OnMainWindowClosed;
                 if (_radarWindow != null)
                     _radarWindow.Closed += OnRadarWindowClosed;
-                _configWindow.Closed += OnConfigWindowClosed;
-                _configWindow.ExitRequested += OnConfigExitRequested;
 
                 Log.Info("All windows launched successfully");
             }
@@ -296,20 +310,52 @@ namespace VISOR
             Shutdown();
         }
 
+        // A closed window can't be shown again, so both close handlers drop the reference: the
+        // next ShowRadarWindow / ShowConfigWindow builds a fresh one, and BringToForeground falls
+        // back to the overlay instead of trying to surface a closed config window.
         private void OnRadarWindowClosed(object? sender, EventArgs e)
         {
             Log.Info("RadarWindow closed independently");
+            if (ReferenceEquals(sender, _radarWindow))
+                _radarWindow = null;
         }
 
         private void OnConfigWindowClosed(object? sender, EventArgs e)
         {
             Log.Info("ConfigWindow closed independently");
+            if (ReferenceEquals(sender, _configWindow))
+                _configWindow = null;
         }
 
         private void OnConfigExitRequested(object? sender, EventArgs e)
         {
             Log.Info("Config window requested application exit");
             Shutdown();
+        }
+
+        /// <summary>
+        /// Opens the Config window, or brings the open one forward. The only place a Config window
+        /// is created, so every instance is wired to Exit and tracked for BringToForeground.
+        /// </summary>
+        public void ShowConfigWindow()
+        {
+            if (_configWindow != null)
+            {
+                if (_configWindow.WindowState == WindowState.Minimized)
+                    _configWindow.WindowState = WindowState.Normal;
+                _configWindow.Activate();
+                return;
+            }
+
+            if (_mainWindow == null)
+                return;
+
+            _configWindow = new ConfigWindow(_mainWindow);
+            _configWindow.Closed += OnConfigWindowClosed;
+            _configWindow.ExitRequested += OnConfigExitRequested;
+            _configWindow.WindowState = WindowState.Normal;
+            _configWindow.ShowActivated = true;
+            _configWindow.Show();
         }
 
         public void ShowRadarWindow()

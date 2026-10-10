@@ -1,7 +1,6 @@
 using System;
 using System.Globalization;
 using System.IO;
-using System.Text.RegularExpressions;
 using VISOR.Telemetry;
 
 namespace VISOR.Diagnostics
@@ -21,10 +20,7 @@ namespace VISOR.Diagnostics
         {
             try
             {
-                string dir = Path.Combine(Log.GetDiagnosticsDirectory(), "ShiftPoints");
-                Directory.CreateDirectory(dir);
-                string stem = Regex.Replace(carPath ?? "car", "[^A-Za-z0-9_-]", "_");
-                string path = Path.Combine(dir, $"{stem}_{DateTime.Now:yyyyMMdd-HHmmss}.csv");
+                string path = DiagnosticFiles.NewPath("ShiftPoints", carPath, ".csv");
                 _writer = new StreamWriter(path) { AutoFlush = false };
                 _writer.WriteLine("type,session_time,gear,rpm,speed_mps,long_accel,lat_accel,ratio,est_rpm,confident,reason");
                 Log.Info($"[ShiftPointCSV] Output: {path}");

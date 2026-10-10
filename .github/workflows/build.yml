@@ -1,6 +1,8 @@
-name: Build & Sign
+name: Build, Test & Sign
 
-# Builds VISOR and the Inno Setup installer on Windows.
+# Builds VISOR and the Inno Setup installer on Windows, and in parallel runs the unit tests on
+# Linux and Windows (test) and the cheap checks on Linux (lint: track catalog, whitespace,
+# vulnerable packages).
 #
 # - On pushes/PRs to main/master, and manual runs: builds and uploads the
 #   UNSIGNED installer as a workflow artifact (CI sanity + something to download).
@@ -15,6 +17,16 @@ name: Build & Sign
 # The signing job stays dormant until the SignPath repository variables/secret
 # are configured (see the env block + repo settings), so this file is safe to
 # merge before your SignPath project is approved.
+#
+# Gates: build warnings fail the build, and a tag is only signed once build, test and lint have
+# all passed. To block merging a red PR, mark build, lint and both test jobs (ubuntu and windows)
+# as required checks in the branch protection settings.
+#
+# Supply chain: every action is pinned to a full commit SHA (the version it
+# corresponds to is in the trailing comment; .github/dependabot.yml proposes
+# updates), and Inno Setup is installed at a pinned version. The token is
+# read-only by default; only the sign job, which never runs repository code,
+# can write.
 
 on:
   push:
@@ -25,7 +37,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # needed to attach the signed installer to the Release
+  contents: read    # default for every job; the sign job below asks for more
+
+# A newer push to the same PR supersedes the run in progress; pushes to master and tags always
+# finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   # ---- SignPath configuration -------------------------------------------------
@@ -44,10 +62,12 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false   # nothing here pushes; don't leave the token in .git/config
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
@@ -95,10 +115,12 @@ jobs:
         run: dotnet restore VISOR.sln
 
       - name: Build (Release)
-        run: dotnet build VISOR.sln --configuration Release --no-restore
+        run: dotnet build VISOR.sln --configuration Release --no-restore -warnaserror
 
       - name: Install Inno Setup
-        run: choco install innosetup --no-progress -y
+        # The runner image ships Inno Setup too; pinning (and allowing a downgrade) makes the
+        # version that compiles the installer ours, not whatever the image updated to.
+        run: choco install innosetup --version=6.7.1 --allow-downgrade --no-progress -y
 
       - name: Build installer
         run: |
@@ -127,20 +149,114 @@ jobs:
 
       - name: Upload unsigned installer
         id: upload
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: VISOR-installer-unsigned
           path: installer/VISOR-Setup-${{ env.EXPECTED_VERSION }}.exe
           if-no-files-found: error
 
-  sign:
-    needs: build
+  test:
+    # Windows too: a Windows checkout has CRLF line endings (.gitattributes text=auto), as in
+    # Visual Studio, and tests that pass on Linux can still trip over that.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # Coverage is limited to the app sources linked into the tests (see coverage.runsettings).
+      - name: Run unit tests
+        shell: bash
+        run: >
+          dotnet test Tests/VISOR.Tests/VISOR.Tests.csproj --configuration Release
+          --settings Tests/VISOR.Tests/coverage.runsettings --collect "Code Coverage"
+          --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+
+      - name: Write test summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Unit tests (${{ matrix.os }})"
+            trx=$(find TestResults -name 'test-results.trx' 2>/dev/null | head -n 1)
+            if [ -n "$trx" ]; then
+              counters=$(grep -o '<Counters [^>]*' "$trx" | head -n 1)
+              get() { echo "$counters" | grep -o " $1=\"[0-9]*\"" | grep -o '[0-9]*'; }
+              echo "Passed $(get passed) of $(get total); failed $(get failed)."
+            else
+              echo "No test results: the run didn't finish (see the step above)."
+            fi
+            cov=$(find TestResults -name '*.cobertura.xml' 2>/dev/null | head -n 1)
+            if [ -n "$cov" ]; then
+              rate=$(grep -o 'line-rate="[0-9.]*"' "$cov" | head -n 1 | grep -o '[0-9.]*')
+              echo ""
+              echo "Line coverage of the app code under test: $(awk -v r="$rate" 'BEGIN { printf "%.0f%%", r * 100 }')"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results-${{ matrix.os }}
+          path: TestResults/
+          if-no-files-found: ignore
+
+  lint:
     runs-on: ubuntu-latest
+    env:
+      EnableWindowsTargeting: 'true'   # lets the WPF project restore on Linux for the package check
+      PYTHONUTF8: '1'                   # the catalog report prints non-ASCII track names
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Validate track catalog
+        run: python3 tools/validate_track_catalog.py
+
+      # Whitespace only (indentation, spacing, line breaks), not style rules. Folder mode needs no
+      # build. To fix locally: dotnet format whitespace --folder
+      - name: Check whitespace formatting
+        run: dotnet format whitespace --folder --verify-no-changes --exclude obj bin Tests/VISOR.Tests/obj Tests/VISOR.Tests/bin
+
+      # dotnet list doesn't fail on its own when it finds one, so check its report.
+      - name: Check for vulnerable packages
+        shell: bash
+        run: |
+          dotnet list VISOR.sln package --vulnerable --include-transitive | tee packages.txt
+          if grep -qi "has the following vulnerable packages" packages.txt; then
+            echo "::error::A package with a known vulnerability is referenced (see above)."
+            exit 1
+          fi
+
+  sign:
+    needs: [build, test, lint]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # attach the signed installer to the Release
+      actions: read     # let SignPath fetch the unsigned installer artifact from this run
     # Only sign tagged releases, and only once the SignPath org id is configured.
     if: startsWith(github.ref, 'refs/tags/v') && vars.SIGNPATH_ORGANIZATION_ID != ''
     steps:
       - name: Submit to SignPath and download signed installer
-        uses: signpath/github-action-submit-signing-request@v1
+        uses: signpath/github-action-submit-signing-request@ced31329c0317e779dad2eec2a7c3bb46ea1343e # v1.3
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
@@ -161,6 +277,6 @@ jobs:
           echo "Verified signed installer $f"
 
       - name: Attach signed installer to the Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           files: signed/VISOR-Setup-${{ needs.build.outputs.version }}.exe

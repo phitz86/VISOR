@@ -4,7 +4,6 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using VISOR.Diagnostics;
-using VISOR.Telemetry;
 using VISOR.Settings;
 using VISOR.Update;
 
@@ -12,7 +11,6 @@ namespace VISOR.Views
 {
     public partial class ConfigWindow : Window
     {
-        private readonly SVappsLABSDKWrapper _telemetry;
         private readonly MainWindow _mainWindow;
         private readonly SettingsManager _settingsManager;
         private readonly ConfigModeManager _configModeManager;
@@ -20,11 +18,10 @@ namespace VISOR.Views
 
         public event EventHandler? ExitRequested;
 
-        public ConfigWindow(SVappsLABSDKWrapper telemetry, MainWindow mainWindow)
+        public ConfigWindow(MainWindow mainWindow)
         {
             InitializeComponent();
 
-            _telemetry = telemetry;
             _mainWindow = mainWindow;
             _settingsManager = SettingsManager.Instance;
             _configModeManager = ConfigModeManager.Instance;

@@ -8,14 +8,6 @@ using VISOR.Telemetry;
 
 namespace VISOR.ViewModels
 {
-    /// <summary>Calibration status of the current gear's shift point (the dot by the ⚙).</summary>
-    public enum ShiftCalibration
-    {
-        None,           // no shift point applies: hidden
-        Calibrating,    // red: still on the car's light, or stepping up
-        Settled         // green: learned and stable
-    }
-
     /// <summary>
     /// Decides the shift point for the current gear and runs the shift-point learner.
     ///
@@ -59,22 +51,10 @@ namespace VISOR.ViewModels
         private TimeSpan _lastProgress;
         private static readonly TimeSpan SettledProgressInterval = TimeSpan.FromMinutes(10);
 
-        // Calibration dot: per-gear cue stability (UI thread only: Update and GetCalibration).
-        private readonly CueStability[] _stability = NewStability();
-        // True for a gear whose next gear hasn't been driven (no ratio, live or saved): it's
-        // effectively this driver's top gear here, so there's nothing to calibrate against.
-        private readonly bool[] _nextGearUnused = NewFlags();
-        private static bool[] NewFlags() { var a = new bool[ShiftPointLearner.MaxGears + 1]; Array.Fill(a, true); return a; }
-        private double _drivingSecondsSinceCheck;
+        // Calibration dot (UI thread only: Update and GetCalibration).
+        private readonly ShiftCalibrationTracker _calibration = new();
         private TimeSpan _lastStabilityCheck;
         private static readonly TimeSpan StabilityCheckInterval = TimeSpan.FromSeconds(5);
-
-        private static CueStability[] NewStability()
-        {
-            var a = new CueStability[ShiftPointLearner.MaxGears + 1];
-            for (int i = 0; i < a.Length; i++) a[i] = new CueStability();
-            return a;
-        }
         private static readonly TimeSpan ProgressInterval = TimeSpan.FromSeconds(60);
         private GearShiftEstimate[] _lastEstimates = Array.Empty<GearShiftEstimate>();
         private long _lastFitSampleCount = -1;
@@ -147,44 +127,18 @@ namespace VISOR.ViewModels
         /// Calibrating otherwise; None when no shift point applies (neutral, reverse, top gear, no
         /// car). UI thread.
         /// </summary>
-        public ShiftCalibration GetCalibration(int gear, PlayerCarInfo? car)
-        {
-            if (car == null || gear < 1 || gear >= _stability.Length) return ShiftCalibration.None;
-            if (car.GearNumForward > 0 && gear >= car.GearNumForward) return ShiftCalibration.None;
-            if (_nextGearUnused[gear]) return ShiftCalibration.None;
-            return _stability[gear].Settled ? ShiftCalibration.Settled : ShiftCalibration.Calibrating;
-        }
-
-        private bool AllGearsSettled(PlayerCarInfo car)
-        {
-            int top = Math.Min(car.GearNumForward, _stability.Length);
-            if (top < 2) return false;
-            bool any = false;
-            for (int g = 1; g < top; g++)
-            {
-                if (_nextGearUnused[g]) continue;    // e.g. 5th when 6th is never used here
-                if (!_stability[g].Settled) return false;
-                any = true;
-            }
-            return any;
-        }
+        public ShiftCalibration GetCalibration(int gear, PlayerCarInfo? car) => _calibration.Get(gear, car);
 
         // UI thread, every few seconds: feed each gear's current cue to its stability tracker.
         private void CheckStability(SVappsLABSnapshot snapshot, PlayerCarInfo car)
         {
             int baseline = Baseline(snapshot, car);
-            int top = car.GearNumForward > 0 ? Math.Min(car.GearNumForward, _stability.Length) : _stability.Length;
             lock (_lock)
             {
-                for (int g = 1; g < _nextGearUnused.Length; g++)
-                    _nextGearUnused[g] = _learner == null || g + 1 > ShiftPointLearner.MaxGears || _learner.GetRatio(g + 1) <= 0;
+                _calibration.SetNextGearUnused(g =>
+                    _learner == null || g + 1 > ShiftPointLearner.MaxGears || _learner.GetRatio(g + 1) <= 0);
             }
-            for (int g = 1; g < top; g++)
-            {
-                int cue = CueFor(g, baseline, out bool fromLearning);
-                _stability[g].Observe(cue, fromLearning, _drivingSecondsSinceCheck);
-            }
-            _drivingSecondsSinceCheck = 0;
+            _calibration.Observe(car.GearNumForward, (int g, out bool fromLearning) => CueFor(g, baseline, out fromLearning));
         }
 
         /// <summary>
@@ -240,7 +194,7 @@ namespace VISOR.ViewModels
             }
 
             // Only time spent actually driving counts toward a cue settling (not the pits/garage).
-            if (sample.Eligible) _drivingSecondsSinceCheck += 1.0 / 60.0;
+            if (sample.Eligible) _calibration.AddDrivingTime(1.0 / 60.0);
 
             var now = _clock.Elapsed;
             if (now - _lastStabilityCheck >= StabilityCheckInterval)
@@ -254,7 +208,7 @@ namespace VISOR.ViewModels
                 ScheduleFit();
             }
             // Progress log: every minute while anything is still calibrating, every 10 once settled.
-            if (now - _lastProgress >= (AllGearsSettled(car) ? SettledProgressInterval : ProgressInterval))
+            if (now - _lastProgress >= (_calibration.AllGearsSettled(car) ? SettledProgressInterval : ProgressInterval))
             {
                 _lastProgress = now;
                 LogProgress();
@@ -279,7 +233,7 @@ namespace VISOR.ViewModels
                 // so log it to keep the log's numbers consistent.
                 if (_car != null)
                 {
-                    string changes = DescribeCarChanges(_car, car);
+                    string changes = ShiftProgressLog.DescribeCarChanges(_car, car);
                     if (changes.Length > 0) Log.Info($"[ShiftPoint] {Describe(car)}: car data updated - {changes}");
                 }
                 _car = car;
@@ -302,9 +256,7 @@ namespace VISOR.ViewModels
                 _lastFitSampleCount = -1;
                 _learnedRpm = new int[ShiftPointLearner.MaxGears + 1];
                 _provisionalRpm = new int[ShiftPointLearner.MaxGears + 1];
-                foreach (var st in _stability) st.Reset();
-                Array.Fill(_nextGearUnused, true);
-                _drivingSecondsSinceCheck = 0;
+                _calibration.Reset();
                 for (int i = 0; i < _recentProvisional.Length; i++) _recentProvisional[i] = Array.Empty<int>();
                 _lastEstimates = Array.Empty<GearShiftEstimate>();
                 for (int i = 0; i < _recentFits.Length; i++) _recentFits[i] = Array.Empty<int>();
@@ -420,7 +372,7 @@ namespace VISOR.ViewModels
                         next[e.Gear] = value;
                         if (old == 0 || Math.Abs(old - value) > LogChangeRpm)
                         {
-                            Log.Info($"[ShiftPoint] {Describe(car)} gear {e.Gear}: iRacing {car.SLShiftRPM:F0} -> learned {value} RPM ({Explain(e, car)})");
+                            Log.Info($"[ShiftPoint] {Describe(car)} gear {e.Gear}: iRacing {car.SLShiftRPM:F0} -> learned {value} RPM ({ShiftProgressLog.Explain(e, car)})");
 #if DEBUG
                             changed = true;
 #endif
@@ -483,22 +435,6 @@ namespace VISOR.ViewModels
             return true;
         }
 
-        // "holds to redline; at 7500, 5th would pull 4% less" / "crossover; 3rd pulls equal at 7210"
-        private static string Explain(GearShiftEstimate e, PlayerCarInfo car)
-        {
-            string next = Ordinal(e.Gear + 1);
-            if (e.Reason == "holds to redline" && !double.IsNaN(e.NextGearThrustAtRedlinePct))
-                return $"holds to redline; at {car.RedLine:F0}, {next} would pull {100 - e.NextGearThrustAtRedlinePct:F0}% less";
-            if (e.Reason == "crossover")
-                return $"crossover; {next} pulls equal at {e.Rpm}";
-            return e.Reason;
-        }
-
-        private static string Ordinal(int n) => n switch
-        {
-            1 => "1st", 2 => "2nd", 3 => "3rd", _ => $"{n}th"
-        };
-
         private void ScheduleSave()
         {
             string carPath, carVersion;
@@ -558,68 +494,17 @@ namespace VISOR.ViewModels
         /// </summary>
         private void LogProgress()
         {
-            string line;
+            string? line;
             lock (_lock)
             {
                 if (_learner == null || _car == null) return;
                 var (kept, skipped) = _learner.TakeCounters();
-                long active = kept;
-                for (int i = 0; i < skipped.Length; i++)
-                    if (i != (int)SkipReason.Ineligible) active += skipped[i];
-                if (active == 0) return;
-
-                var sb = new System.Text.StringBuilder();
-                sb.Append($"[ShiftPoint] progress ({Describe(_car)}): {kept} frames kept, skipped:");
-                for (int i = 0; i < skipped.Length; i++)
-                    if (skipped[i] > 0) sb.Append($" {(SkipReason)i} {skipped[i]},");
-                if (sb[^1] == ',') sb.Length--;
-                else sb.Append(" none");
-                sb.Append(" | total model samples ").Append(_learner.SampleCount);
-
-                var learned = _learnedRpm;
-                foreach (var e in _lastEstimates)
-                {
-                    sb.Append(" | g").Append(e.Gear).Append(' ');
-                    if (e.Gear < learned.Length && learned[e.Gear] > 0)
-                    {
-                        sb.Append("learned ").Append(learned[e.Gear]);
-                        // Only for holds-to-redline gears, where it says how close the call was.
-                        if (e.Reason == "holds to redline" && !double.IsNaN(e.NextGearThrustAtRedlinePct))
-                            sb.Append($" (next gear {e.NextGearThrustAtRedlinePct - 100:+0;-0}% at redline)");
-                    }
-                    else if (e.Gear < _provisionalRpm.Length && _provisionalRpm[e.Gear] > 0)
-                    {
-                        sb.Append($"stepping up {_provisionalRpm[e.Gear]}");
-                        if (e.Provisional) sb.Append($" (proven to {e.ProvenRpm})");
-                    }
-                    else if (e.BandsNeeded > 0)
-                    {
-                        sb.Append($"waiting (est {e.Rpm}): {e.BandsSeen}/{e.BandsNeeded} RPM bands seen");
-                        if (e.MissingBands.Length > 0) sb.Append($" (missing {e.MissingBands})");
-                    }
-                    else sb.Append("waiting: ").Append(e.Reason);
-                }
-                if (_lastEstimates.Length == 0) sb.Append(" | no fit yet");
-                line = sb.ToString();
+                line = ShiftProgressLog.Format(_car, kept, skipped, _learner.SampleCount, _lastEstimates, _learnedRpm, _provisionalRpm);
             }
-            Log.Info(line);
+            if (line != null) Log.Info(line);
         }
 
-        private static string DescribeCarChanges(PlayerCarInfo a, PlayerCarInfo b)
-        {
-            var parts = new System.Collections.Generic.List<string>();
-            void Cmp(string name, float x, float y) { if (x != y) parts.Add($"{name} {x:F0} -> {y:F0}"); }
-            Cmp("redline", a.RedLine, b.RedLine);
-            Cmp("light first", a.SLFirstRPM, b.SLFirstRPM);
-            Cmp("light shift", a.SLShiftRPM, b.SLShiftRPM);
-            Cmp("light last", a.SLLastRPM, b.SLLastRPM);
-            Cmp("light blink", a.SLBlinkRPM, b.SLBlinkRPM);
-            Cmp("gears", a.GearNumForward, b.GearNumForward);
-            return string.Join(", ", parts);
-        }
-
-        private static string Describe(PlayerCarInfo car) =>
-            string.IsNullOrEmpty(car.CarScreenName) ? car.CarPath : car.CarScreenName;
+        private static string Describe(PlayerCarInfo car) => ShiftProgressLog.CarName(car);
 
         #endregion
     }

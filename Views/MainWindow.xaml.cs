@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using VISOR.Diagnostics;
 using VISOR.Settings;
 using VISOR.Telemetry;
@@ -17,6 +18,7 @@ namespace VISOR.Views
         private readonly SVappsLABSDKWrapper _sdk;
         private readonly SettingsManager _settingsManager;
         private readonly ConfigModeManager _configModeManager;
+        private readonly FramePoster _framePoster;
         private bool _lastRelativeVisibility = true;
 
         public MainViewModel ViewModel => _viewModel;
@@ -30,6 +32,7 @@ namespace VISOR.Views
             _configModeManager = ConfigModeManager.Instance;
             _viewModel = new MainViewModel();
             DataContext = _viewModel;
+            _framePoster = new FramePoster(Dispatcher, "MainWindow", ProcessSnapshot);
 
             AllowsTransparency = true;
             WindowStyle = WindowStyle.None;
@@ -66,7 +69,7 @@ namespace VISOR.Views
             Top = windowPosition.Y;
         }
 
-        private void OnElementVisibilityChanged(object? sender, ElementVisibilityChangedEventArgs e)
+        private void OnElementVisibilityChanged(object? sender, EventArgs e)
         {
             Dispatcher.Invoke(() =>
             {
@@ -120,26 +123,24 @@ namespace VISOR.Views
             }
         }
 
+        // Raised on an SDK thread. Queued rather than invoked, so the SDK never waits on the UI
+        // thread, which during shutdown is itself waiting for the SDK to stop.
         private void OnConnectionStateChanged(bool isConnected)
         {
-            try
+            Dispatcher.BeginInvoke(DispatcherPriority.Send, new Action(() =>
             {
-                Dispatcher.Invoke(() =>
+                if (!isConnected)
                 {
-                    if (!isConnected)
-                    {
-                        _viewModel.Reset();
-                        StatusText.Text = "Disconnected. Waiting for iRacing...";
-                        StatusText.Visibility = Visibility.Visible;
-                    }
-                    else
-                    {
-                        StatusText.Text = "Connected, waiting for session data...";
-                        StatusText.Visibility = Visibility.Visible;
-                    }
-                });
-            }
-            catch (TaskCanceledException) { }
+                    _viewModel.Reset();
+                    StatusText.Text = "Disconnected. Waiting for iRacing...";
+                    StatusText.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    StatusText.Text = "Connected, waiting for session data...";
+                    StatusText.Visibility = Visibility.Visible;
+                }
+            }));
         }
 
         private async void OnPrimedStateChanged(bool isPrimed)
@@ -171,32 +172,29 @@ namespace VISOR.Views
             catch (OperationCanceledException) { }
         }
 
-        private void OnSnapshotAvailable(SVappsLABSnapshot snapshot)
-        {
-            try
-            {
-                Dispatcher.Invoke(() =>
-                {
-                    if (_sdk.IsSessionDataReady)
-                    {
-                        _viewModel.UpdateFromTelemetry(snapshot, _sdk.Coordinator);
+        // SDK telemetry thread: queue the frame for the UI thread, in order (see FramePoster).
+        private void OnSnapshotAvailable(SVappsLABSnapshot snapshot) => _framePoster.Post(snapshot);
 
-                        bool currentRelativeVisibility = !_sdk.Coordinator.ShouldHideRelativeDisplay();
-                        if (currentRelativeVisibility != _lastRelativeVisibility)
-                        {
-                            Log.Info($"[MainWindow] Relative display visibility changed: {_lastRelativeVisibility} -> {currentRelativeVisibility}");
-                            ApplyWindowSizing();
-                            _lastRelativeVisibility = currentRelativeVisibility;
-                        }
-                    }
-                    else
-                    {
-                        Log.Debug("[MainWindow] Session data not ready - passing null");
-                        _viewModel.UpdateFromTelemetry(snapshot, null);
-                    }
-                });
+        // UI thread.
+        private void ProcessSnapshot(SVappsLABSnapshot snapshot)
+        {
+            if (_sdk.IsSessionDataReady)
+            {
+                _viewModel.UpdateFromTelemetry(snapshot, _sdk.Coordinator);
+
+                bool currentRelativeVisibility = !_sdk.Coordinator.ShouldHideRelativeDisplay();
+                if (currentRelativeVisibility != _lastRelativeVisibility)
+                {
+                    Log.Info($"[MainWindow] Relative display visibility changed: {_lastRelativeVisibility} -> {currentRelativeVisibility}");
+                    ApplyWindowSizing();
+                    _lastRelativeVisibility = currentRelativeVisibility;
+                }
             }
-            catch (TaskCanceledException) { }
+            else
+            {
+                Log.Debug("[MainWindow] Session data not ready - passing null");
+                _viewModel.UpdateFromTelemetry(snapshot, null);
+            }
         }
 
         private void UpdateUIState()
@@ -232,17 +230,7 @@ namespace VISOR.Views
 
         private void ConfigButton_Click(object? sender, RoutedEventArgs e)
         {
-            foreach (Window window in Application.Current.Windows)
-            {
-                if (window is ConfigWindow)
-                {
-                    window.Activate();
-                    return;
-                }
-            }
-
-            ConfigWindow configWindow = new ConfigWindow(_sdk, this);
-            configWindow.Show();
+            ((App)Application.Current).ShowConfigWindow();
         }
 
         protected override void OnClosed(EventArgs e)

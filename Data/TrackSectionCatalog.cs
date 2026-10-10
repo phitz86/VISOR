@@ -41,8 +41,12 @@ namespace VISOR.TrackData
         private static readonly object _loadLock = new();
 
         public static TrackSectionSet? Resolve(string trackName, string trackDisplayName, string trackConfig)
+            => Resolve(GetTracks(), trackName, trackDisplayName, trackConfig);
+
+        /// <summary>Resolve against a given catalog (the loaded one, or a test's).</summary>
+        internal static TrackSectionSet? Resolve(IReadOnlyList<TrackSectionSet> tracks,
+            string trackName, string trackDisplayName, string trackConfig)
         {
-            var tracks = GetTracks();
             if (tracks.Count == 0)
                 return null;
 
@@ -123,25 +127,9 @@ namespace VISOR.TrackData
                     return null;
                 }
 
-                using var doc = JsonDocument.Parse(File.ReadAllText(path));
-                if (!doc.RootElement.TryGetProperty("tracks", out var tracksElement))
-                {
-                    Log.Warning("[TrackSections] Catalog has no 'tracks' array");
-                    return null;
-                }
-
-                var tracks = tracksElement.Deserialize<List<TrackSectionSet>>() ?? new List<TrackSectionSet>();
-
-                // Normalize once at load: lowercase match keys, sections in lap order.
-                foreach (var track in tracks)
-                {
-                    track.Match = track.Match.Select(m => m.ToLowerInvariant()).ToArray();
-                    track.Configs = track.Configs.Select(c => c.ToLowerInvariant()).ToArray();
-                    track.Sections.Sort((a, b) => a.Pct.CompareTo(b.Pct));
-                }
-                tracks.RemoveAll(t => t.Sections.Count == 0 || t.Match.Length == 0);
-
-                Log.Info($"[TrackSections] Loaded {tracks.Count} track entries from catalog");
+                var tracks = Parse(File.ReadAllText(path));
+                if (tracks != null)
+                    Log.Info($"[TrackSections] Loaded {tracks.Count} track entries from catalog");
                 return tracks;
             }
             catch (Exception ex)
@@ -149,6 +137,68 @@ namespace VISOR.TrackData
                 Log.Warning($"[TrackSections] Failed to load catalog: {ex.Message}");
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Parses catalog JSON into normalized entries. Returns null when there is no 'tracks'
+        /// array; a document that isn't JSON at all throws JsonException.
+        /// </summary>
+        internal static List<TrackSectionSet>? Parse(string json)
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("tracks", out var tracksElement) ||
+                tracksElement.ValueKind != JsonValueKind.Array)
+            {
+                Log.Warning("[TrackSections] Catalog has no 'tracks' array");
+                return null;
+            }
+
+            // The catalog is hand-edited, so entries are read one at a time: a malformed entry
+            // is skipped with a warning instead of taking every other track down with it.
+            var tracks = new List<TrackSectionSet>();
+            int index = 0;
+            foreach (var element in tracksElement.EnumerateArray())
+            {
+                try
+                {
+                    var track = element.Deserialize<TrackSectionSet>();
+                    if (track != null && Normalize(track))
+                        tracks.Add(track);
+                    else
+                        Log.Warning($"[TrackSections] Skipping entry {index} ('{track?.Track}'): no usable match keys or sections");
+                }
+                catch (JsonException ex)
+                {
+                    Log.Warning($"[TrackSections] Skipping malformed entry {index}: {ex.Message}");
+                }
+                index++;
+            }
+            return tracks;
+        }
+
+        /// <summary>
+        /// Normalizes one entry in place (lowercase keys, sections in lap order) and drops the
+        /// parts Resolve can't use safely: a blank match key would match every track, a blank
+        /// config key makes the whole-word search run off the end of the string, and a section
+        /// without a name or with a pct outside the lap has nothing to show. Returns false when
+        /// no match key or no section is left.
+        /// </summary>
+        private static bool Normalize(TrackSectionSet track)
+        {
+            track.Match = (track.Match ?? Array.Empty<string>())
+                .Where(m => !string.IsNullOrWhiteSpace(m) && m.Trim() != "=")
+                .Select(m => m.ToLowerInvariant())
+                .ToArray();
+            track.Configs = (track.Configs ?? Array.Empty<string>())
+                .Where(c => !string.IsNullOrWhiteSpace(c))
+                .Select(c => c.ToLowerInvariant())
+                .ToArray();
+            track.Sections = (track.Sections ?? new List<TrackSection>())
+                .Where(s => s != null && !string.IsNullOrWhiteSpace(s.Name) && s.Pct >= 0f && s.Pct <= 1f)
+                .ToList();
+            track.Sections.Sort((a, b) => a.Pct.CompareTo(b.Pct));
+
+            return track.Match.Length > 0 && track.Sections.Count > 0;
         }
     }
 }
