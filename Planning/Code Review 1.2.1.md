@@ -5,7 +5,7 @@ Risk appetite for 1.2.1: fix bugs, delete dead code, and split files mechanicall
 
 ## Summary
 
-**Status (2026-10-10):** Phase 1, the three revision passes, is done and validated on the rig. Testing turned up B10, B11 and S7, and the research for Phase 2 found B12 and B13. Phase 2 (pre-release fixes, the CI test pipeline, then the architecture work) is under "Revision plan" at the end. Passes 4–7 are done and rig-checked; Pass 8 is committed and waiting for its rig check.
+**Status (2026-10-10):** Phase 1, the three revision passes, is done and validated on the rig. Testing turned up B10, B11 and S7, and the research for Phase 2 found B12 and B13. Phase 2 (pre-release fixes, the CI test pipeline, then the architecture work) is under "Revision plan" at the end. Passes 4–8 are done and rig-checked; Pass 9 (the PositionCalculator split) is next.
 
 - **Overall:** the code is in good shape. The new shift-point work (learner, store, cue) is well isolated, its untrusted input is validated, and it is the only part of the app with tests. Most problems are older code that grew, or plumbing nobody uses any more.
 - **No significant CPU or RAM bottleneck.** Steady-state garbage is roughly 1 MB/s, all short-lived. Fixed buffers total about 2.4 MB. Nothing grows without bound in release builds except the radar ghost elements (B1).
@@ -49,7 +49,7 @@ Status reflects the revision plan agreed after the review (see "Agreed revision 
 | B9 | Low | Possible 2 s hang on exit (thread-blocking pattern) | — | **Done** (Pass 2) |
 | B10 | Med | Session info the SDK can't parse leaves VISOR blank for a whole event | Small–Med | **Done** (Pass 6; rig-checked 10 Oct) |
 | B11 | Med | Settings reset to defaults on every version bump | Small | **Done** (Pass 4; rig-checked 10 Oct) |
-| B12 | Low–Med | At the finish, a car whose telemetry stops isn't held: the car behind moves up and two cars can show the same position | Small | **Done** (Pass 8, own commit); rig check pending |
+| B12 | Low–Med | At the finish, a car whose telemetry stops isn't held: the car behind moves up and two cars can show the same position | Small | **Done** (Pass 8, own commit; rig-checked 10 Oct) |
 | B13 | Low | Radar switched on from the Config window can't be dragged into place | Small | **Done** (Pass 4; rig-checked 10 Oct) |
 | D1 | Low | `System.Management` package unused but shipped | Mech | **Done** (Pass 1) |
 | D2, D4 | Low | Unused members and events | Mech | **Done** (Pass 1) |
@@ -76,7 +76,7 @@ Status reflects the revision plan agreed after the review (see "Agreed revision 
 | S6 | Low | Installer `DelTree` scope | — | **Done** (with B4) |
 | S7 | Low | Inno Setup prints "Non-commercial use only" | — | **Open:** check the licence terms (yours) |
 | T1 | Med | CI never builds or runs the tests | Small | **Done** (Pass 5) |
-| T2 | Med | No tests for PositionCalculator (needed before splitting it) | Mech | **Done** (Pass 8; 30 tests); rig check pending |
+| T2 | Med | No tests for PositionCalculator (needed before splitting it) | Mech | **Done** (Pass 8; 30 tests; rig-checked 10 Oct) |
 
 ---
 
@@ -562,6 +562,9 @@ One session on a Debug build from VS covers all four passes:
 - **Rig check for Pass 8 and B12:** one race to the checkered.
   - Positions and the finish (Final Lap, FINISHED, finishing positions held) look as before.
   - If a car goes to the garage or disconnects under the checkered, the log shows `telemetry stopped during the checkered - holding P...` or `left during the checkered - holding P...`, and the car behind keeps its own place.
+- **Rig check result (2026-10-10): passed.** A 20-minute Ferrari Challenge race at Le Mans, on a Debug build run from Visual Studio. VISOR worked as normal.
+  - iRacing crashed to the desktop at the start of qualifying. VISOR kept running, and returned to normal once the session was restarted.
+  - The crash is very unlikely to be VISOR's. VISOR only reads iRacing's telemetry: its one SDK call is the telemetry read, it sends iRacing no commands, it makes no direct calls into Windows, and it runs in its own process.
 
 #### Pass 9: PositionCalculator split, F1 and A3 (rig)
 - **Split:** `FinishTracker`, `CarTrackingCache` and `RunningOrder` sit behind the existing `PositionCalculator` front door, moved to a `Race/` folder (A3).
