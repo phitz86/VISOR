@@ -5,7 +5,7 @@ Risk appetite for 1.2.1: fix bugs, delete dead code, and split files mechanicall
 
 ## Summary
 
-**Status (2026-10-10):** Phase 1, the three revision passes, is done and validated on the rig. Testing turned up B10, B11 and S7, and the research for Phase 2 found B12 and B13. Phase 2 (pre-release fixes, the CI test pipeline, then the architecture work) is under "Revision plan" at the end. Passes 4–8 are done and rig-checked; Pass 9 (the PositionCalculator split) is next.
+**Status (2026-10-10):** Phase 1, the three revision passes, is done and validated on the rig. Testing turned up B10, B11 and S7, and the research for Phase 2 found B12 and B13. Phase 2 (pre-release fixes, the CI test pipeline, then the architecture work) is under "Revision plan" at the end. Passes 4–8 are done and rig-checked. Pass 9 (the PositionCalculator split) is committed and waiting for its rig check.
 
 - **Overall:** the code is in good shape. The new shift-point work (learner, store, cue) is well isolated, its untrusted input is validated, and it is the only part of the app with tests. Most problems are older code that grew, or plumbing nobody uses any more.
 - **No significant CPU or RAM bottleneck.** Steady-state garbage is roughly 1 MB/s, all short-lived. Fixed buffers total about 2.4 MB. Nothing grows without bound in release builds except the radar ghost elements (B1).
@@ -61,10 +61,10 @@ Status reflects the revision plan agreed after the review (see "Agreed revision 
 | C6 | Low | Overlay and radar code-behind duplicate their plumbing | — | **Proposed:** Pass 12 |
 | C8 | Low | Debug loggers each re-implement folder, file name and flush | Mech | **Done** (Pass 7; file naming shared, flushing left to each logger) |
 | F2–F4 | — | Files over 500 lines: split plans | Mech | **Done** (Pass 7) |
-| F1 | — | `PositionCalculator.cs` (1,137 lines): split plan | Mech | **Proposed:** Pass 9, after T2 |
+| F1 | — | `PositionCalculator.cs` (1,137 lines): split plan | Mech | **Done** (Pass 9; largest file 423 lines); rig check pending |
 | A1 | — | Radar view model builds WPF elements | — | **Proposed:** Pass 11 |
 | A2 | — | Leaky session interface; Settings depends on Telemetry | — | **Proposed:** Pass 10 |
-| A3 | — | PositionCalculator in the wrong layer, untestable | — | **Partly done** (Pass 8: plain input record); the move to `Race/` is Pass 9 |
+| A3 | — | PositionCalculator in the wrong layer, untestable | — | **Done** (Pass 8: plain input record; Pass 9: moved to `Race/`); rig check pending |
 | A4 | — | One UI tick for both windows | — | Only if a problem appears |
 | A5 | — | User-editable catalog lives in Program Files | — | Optional feature; your call |
 | P1–P4 | Low | Small per-frame waste (brushes, list copies, log I/O, notifications) | Small | **Done** (Pass 3) |
@@ -575,6 +575,24 @@ One session on a Debug build from VS covers all four passes:
   - the exact `[Finish]` and `[Leader]` log text
 - **Tests:** the Pass 8 tests must pass unchanged.
 - **Gate (rig):** a full practice → qualifying → race with a finish, ideally multiclass.
+- **Result (2026-10-11):**
+  - Five files in `Race/` (namespace `VISOR.Race`), together replacing `ViewModels/PositionCalculator.cs`:
+
+    | File | Lines | What it holds |
+    |---|---|---|
+    | `PositionCalculator.cs` | 173 | The front door: the same public API, and the frame order as a list of steps |
+    | `CarTrackingCache.cs` | 423 | Roster, prediction through gaps, lap-counter correction at S/F |
+    | `RunningOrder.cs` | 415 | Green-flag latch, grid order before it, the class and overall sort |
+    | `FinishTracker.cs` | 382 | Checkered state, finish freezing, departed and telemetry-stop holds, `[Finish]` diagnostics |
+    | `FinishingPositions.cs` | 37 | The places frozen at the finish. `FinishTracker` writes them and `RunningOrder` reads them, so the two never call each other. |
+
+  - The method bodies were moved by line range, not retyped, then compared with the originals: 20 of the 34 are identical. The other 14 differ only where a call now reaches another piece, where a field became a call, or where `Reset` and the session-change clears are now shared between the pieces.
+  - Two intended differences:
+    - The B12 telemetry-stop hold is its own step, run just before the sort instead of inside it. It has the same inputs (the roster, each car's prediction, the previous frame's places) and holds the same cars on the same frame. Switching it off fails the B12 test.
+    - The finished-car set is gone. It always held the same cars as the frozen positions, so `IsFinished` reads those.
+  - `PositionCalculatorTests.cs` is unchanged. The harness only swaps `using VISOR.ViewModels` for `using VISOR.Race`. All 145 tests pass.
+  - The test project now links all of `Race\*.cs`. Because it is a plain `net10.0` project, it fails to build if anything in `Race/` starts depending on WPF.
+  - The log text is unchanged: the logger adds no class or file name, and every log line moved verbatim.
 
 #### Pass 10: one session snapshot, A2 and C4 (rig)
 - **The snapshot:** `ApplySdkSession` builds one immutable session view per parse and publishes it by a single reference; `ClearCache` publishes an empty one. Each frame then reads one consistent view, instead of taking the coordinator's lock 20–35 times.

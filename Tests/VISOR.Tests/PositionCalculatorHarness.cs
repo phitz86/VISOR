@@ -1,6 +1,6 @@
 using System.Collections.Generic;
+using VISOR.Race;
 using VISOR.Telemetry;
-using VISOR.ViewModels;
 
 namespace VISOR.Tests
 {

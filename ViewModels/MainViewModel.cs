@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using VISOR.Diagnostics;
+using VISOR.Race;
 using VISOR.Telemetry;
 using VISOR.Views;
 using VISOR.Settings;
