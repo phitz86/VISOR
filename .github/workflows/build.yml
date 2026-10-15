@@ -188,17 +188,19 @@ jobs:
         run: |
           {
             echo "### Unit tests (${{ matrix.os }})"
-            trx=$(find TestResults -name 'test-results.trx' 2>/dev/null | head -n 1)
+            # No pipeline here may stop reading early (head -n 1): with pipefail, the writer's
+            # broken pipe would fail the step. find -quit and awk's exit stop at the first match.
+            trx=$(find TestResults -name 'test-results.trx' -print -quit 2>/dev/null || true)
             if [ -n "$trx" ]; then
-              counters=$(grep -o '<Counters [^>]*' "$trx" | head -n 1)
+              counters=$(awk 'match($0, /<Counters [^>]*/) { print substr($0, RSTART, RLENGTH); exit }' "$trx")
               get() { echo "$counters" | grep -o " $1=\"[0-9]*\"" | grep -o '[0-9]*'; }
               echo "Passed $(get passed) of $(get total); failed $(get failed)."
             else
               echo "No test results: the run didn't finish (see the step above)."
             fi
-            cov=$(find TestResults -name '*.cobertura.xml' 2>/dev/null | head -n 1)
+            cov=$(find TestResults -name '*.cobertura.xml' -print -quit 2>/dev/null || true)
             if [ -n "$cov" ]; then
-              rate=$(grep -o 'line-rate="[0-9.]*"' "$cov" | head -n 1 | grep -o '[0-9.]*')
+              rate=$(awk 'match($0, /line-rate="[0-9.]*"/) { print substr($0, RSTART + 11, RLENGTH - 12); exit }' "$cov")
               echo ""
               echo "Line coverage of the app code under test: $(awk -v r="$rate" 'BEGIN { printf "%.0f%%", r * 100 }')"
             fi
