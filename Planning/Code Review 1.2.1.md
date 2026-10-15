@@ -5,7 +5,7 @@ Risk appetite for 1.2.1: fix bugs, delete dead code, and split files mechanicall
 
 ## Summary
 
-**Status (2026-10-10):** Phase 1, the three revision passes, is done and validated on the rig. Testing turned up B10, B11 and S7, and the research for Phase 2 found B12 and B13. Phase 2 (pre-release fixes, the CI test pipeline, then the architecture work) is under "Revision plan" at the end. Passes 4–8 are done and rig-checked. Pass 9 (the PositionCalculator split) is committed and waiting for its rig check.
+**Status (2026-10-10):** Phase 1, the three revision passes, is done and validated on the rig. Testing turned up B10, B11 and S7, and the research for Phase 2 found B12 and B13. Phase 2 (pre-release fixes, the CI test pipeline, then the architecture work) is under "Revision plan" at the end. Passes 4–9 are done and rig-checked; Pass 10 (one session snapshot) is next.
 
 - **Overall:** the code is in good shape. The new shift-point work (learner, store, cue) is well isolated, its untrusted input is validated, and it is the only part of the app with tests. Most problems are older code that grew, or plumbing nobody uses any more.
 - **No significant CPU or RAM bottleneck.** Steady-state garbage is roughly 1 MB/s, all short-lived. Fixed buffers total about 2.4 MB. Nothing grows without bound in release builds except the radar ghost elements (B1).
@@ -59,12 +59,13 @@ Status reflects the revision plan agreed after the review (see "Agreed revision 
 | C5 | Low | Fastest-lap positioning rebuilt per row | Mech | **Done** (as P2) |
 | C4 | Low | Session type re-derived under a lock many times per frame | — | **Proposed:** Pass 10 |
 | C6 | Low | Overlay and radar code-behind duplicate their plumbing | — | **Proposed:** Pass 12 |
+| C9 | Low | Leaving cool-down for the next session resets the overlay twice | Small | **Proposed:** Pass 10 (found on the Pass 9 rig check) |
 | C8 | Low | Debug loggers each re-implement folder, file name and flush | Mech | **Done** (Pass 7; file naming shared, flushing left to each logger) |
 | F2–F4 | — | Files over 500 lines: split plans | Mech | **Done** (Pass 7) |
-| F1 | — | `PositionCalculator.cs` (1,137 lines): split plan | Mech | **Done** (Pass 9; largest file 423 lines); rig check pending |
+| F1 | — | `PositionCalculator.cs` (1,137 lines): split plan | Mech | **Done** (Pass 9; largest file 423 lines; rig-checked 15 Oct) |
 | A1 | — | Radar view model builds WPF elements | — | **Proposed:** Pass 11 |
 | A2 | — | Leaky session interface; Settings depends on Telemetry | — | **Proposed:** Pass 10 |
-| A3 | — | PositionCalculator in the wrong layer, untestable | — | **Done** (Pass 8: plain input record; Pass 9: moved to `Race/`); rig check pending |
+| A3 | — | PositionCalculator in the wrong layer, untestable | — | **Done** (Pass 8: plain input record; Pass 9: moved to `Race/`; rig-checked 15 Oct) |
 | A4 | — | One UI tick for both windows | — | Only if a problem appears |
 | A5 | — | User-editable catalog lives in Program Files | — | Optional feature; your call |
 | P1–P4 | Low | Small per-frame waste (brushes, list copies, log I/O, notifications) | Small | **Done** (Pass 3) |
@@ -446,6 +447,7 @@ This follows the order you set: a broader CI test pipeline first, then the archi
   - the PDF
   - the version bump: CI requires `Version`, `FileVersion` and `AssemblyVersion` to be equal and four-part
   - mark the PR ready, merge it, and tag
+  - publish the tag as a GitHub release. The update check reads GitHub's latest published release, which is still v1.0.0, so no install hears about a new version until then.
 
 #### Pass 5: CI test pipeline foundation, T1 (CI)
 - **Solution:** add `Tests/VISOR.Tests` to `VISOR.sln`. Anything under `Tests/` is already excluded from the app's compile, and the installer only packs the app's output folder.
@@ -593,6 +595,13 @@ One session on a Debug build from VS covers all four passes:
   - `PositionCalculatorTests.cs` is unchanged. The harness only swaps `using VISOR.ViewModels` for `using VISOR.Race`. All 145 tests pass.
   - The test project now links all of `Race\*.cs`. Because it is a plain `net10.0` project, it fails to build if anything in `Race/` starts depending on WPF.
   - The log text is unchanged: the logger adds no class or file name, and every log line moved verbatim.
+- **Rig check result (2026-10-15): passed.** Debug build from Visual Studio, at Summit Point: practice, lone qualifying, then a 30-minute two-class race of about 35 cars.
+  - **Finish:** the race was timed. The session went to Checkered with the leader at LapDistPct 0.89, and the leader froze at P1 as it crossed six seconds later. 26 cars then froze as they took the flag, with no repeated class or overall position. Final Lap and FINISHED latched in qualifying and in the race. Positions held in the overlay and the relative.
+  - **Grid order:** held through warmup and the parade laps.
+  - **Name anomaly:** one driver's surname showed garbled. It was UTF-8 text read as Latin-1, then title-cased. iRacing's own results show the same text, and an accented name in the same session displayed correctly. VISOR changes no name text, so it is in iRacing's data. Nothing to fix.
+  - **Frame gaps:** practice logged frequent `[FrameGap]` lines (40–100 ms) while drivers joined the session; the race had almost none. There was one mid-race `[HandlerLatency]` of 52 ms with three frames dropped, a one-off under the debugger. Watch for it in the Release build.
+  - **Update check:** "latest 1.0.0.0" is correct. GitHub's newest published release is v1.0.0, because 1.1.0 to 1.2.1 were never published there.
+  - **Found:** C9. Leaving cool-down for the next session runs two resets on the same frame: the CoolDown → GetInCar reset (`ClearSessionUI`) and the session-number reset (`ResetSessionData`). Each clears the class colours and the position calculator. It is harmless, but it is folded into Pass 10, which reworks session-change handling.
 
 #### Pass 10: one session snapshot, A2 and C4 (rig)
 - **The snapshot:** `ApplySdkSession` builds one immutable session view per parse and publishes it by a single reference; `ClearCache` publishes an empty one. Each frame then reads one consistent view, instead of taking the coordinator's lock 20–35 times.
@@ -603,6 +612,7 @@ One session on a Debug build from VS covers all four passes:
   - The four downcasts to `SessionDataCoordinator` go: track length, name, config and display name join the view.
   - Settings takes a plain "hide relative" bool, so the Settings layer no longer depends on Telemetry.
 - **Small fixes along the way:**
+  - C9: one reset per session change, where today leaving cool-down runs two.
   - The session schedule is rebuilt on each parse. Today, sessions from an earlier subsession can linger until a disconnect.
   - The track-location readout reads its three values from one view.
 - **Tests:** `ApplySdkSession` fed YAML fixtures, reusing Pass 6's.
