@@ -45,7 +45,7 @@ namespace VISOR.ViewModels
         public string SectionName { get => _sectionName; private set { _sectionName = value; OnPropertyChanged(); } }
         public bool LocationVisible { get => _locationVisible; private set { _locationVisible = value; OnPropertyChanged(); } }
 
-        public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider)
+        public void Update(SVappsLABSnapshot snapshot, SessionView dataProvider)
         {
             int playerIdx = snapshot.PlayerCarIdx;
             if (playerIdx < 0)
@@ -150,15 +150,12 @@ namespace VISOR.ViewModels
             return sections.Count - 1;
         }
 
-        private void ResolveTrackIfChanged(ISessionDataProvider dataProvider)
+        private void ResolveTrackIfChanged(SessionView dataProvider)
         {
-            // Track identity is coordinator-derived, not telemetry (same pattern as the radar's
-            // track length lookup).
-            if (dataProvider is not SessionDataCoordinator coordinator)
-                return;
-
-            string trackName = coordinator.GetTrackName();
-            string trackConfig = coordinator.GetTrackConfig();
+            // Track identity is from the session info, not telemetry: all three values from one view.
+            var track = dataProvider.Track;
+            string trackName = track.Name;
+            string trackConfig = track.Config;
             string key = trackName + "|" + trackConfig;
             if (key == _resolvedTrackKey)
                 return;
@@ -167,7 +164,7 @@ namespace VISOR.ViewModels
             _displayedIdx = -1;
             _pendingIdx = -1;
             _sectionSet = TrackSectionCatalog.Resolve(
-                trackName, coordinator.GetTrackDisplayName(), trackConfig);
+                trackName, track.DisplayName, trackConfig);
 
             Log.Info(_sectionSet != null
                 ? $"[TrackLocation] '{trackName}' ({trackConfig}) -> {_sectionSet.Track}, {_sectionSet.Sections.Count} sections"

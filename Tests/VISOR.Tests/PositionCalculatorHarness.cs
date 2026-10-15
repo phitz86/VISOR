@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using VISOR.Race;
 using VISOR.Telemetry;
 
@@ -10,27 +9,11 @@ namespace VISOR.Tests
         public bool IsDataReady { get; set; } = true;
         public string[] UserNames { get; } = new string[PositionFrame.CarCount];
         public string[] CarNumbers { get; } = new string[PositionFrame.CarCount];
-        public int[] CarNumberRaw { get; } = new int[PositionFrame.CarCount];
         public int[] CarClassIDs { get; } = new int[PositionFrame.CarCount];
-        public int[] CarClassColors { get; } = new int[PositionFrame.CarCount];
-        public bool[] CarIsAI { get; } = new bool[PositionFrame.CarCount];
-        public float[] CarClassEstLapTimes { get; } = new float[PositionFrame.CarCount];
-        public int[] CurDriverIncidentCount { get; } = new int[PositionFrame.CarCount];
-        public int IncidentLimit => 0;
-        public int CurrentSessionNum => 0;
-        public string SubSessionId => "1";
-        public PlayerCarInfo? PlayerCar => null;
-
-        public int GetSessionLaps(int sessionNum) => 0;
-        public double GetSessionTimeSeconds(int sessionNum) => 0;
-        public bool IsQualifyingSession(int sessionNum) => false;
 
         /// <summary>Practice and qualifying order by fastest lap, so the calculator stands aside.</summary>
         public bool FastestLapMode { get; set; }
         public bool ShouldUseFastestLapPositioning() => FastestLapMode;
-        public bool ShouldHideRelativeDisplay() => false;
-        public List<(int carIdx, float fastestTime, int classPosition, int overallPosition)> GetFastestLapPositioning() => new();
-        public float[] GetQualifyResultsFastestTimes() => new float[PositionFrame.CarCount];
 
         /// <summary>Field-wide qualifying order, 1-based; 0 = no result.</summary>
         public int[] QualifyPositions { get; } = new int[PositionFrame.CarCount];

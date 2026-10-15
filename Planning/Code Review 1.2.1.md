@@ -5,7 +5,7 @@ Risk appetite for 1.2.1: fix bugs, delete dead code, and split files mechanicall
 
 ## Summary
 
-**Status (2026-10-10):** Phase 1, the three revision passes, is done and validated on the rig. Testing turned up B10, B11 and S7, and the research for Phase 2 found B12 and B13. Phase 2 (pre-release fixes, the CI test pipeline, then the architecture work) is under "Revision plan" at the end. Passes 4–9 are done and rig-checked; Pass 10 (one session snapshot) is next.
+**Status (2026-10-15):** Phase 1, the three revision passes, is done and validated on the rig. Testing turned up B10, B11 and S7, and the research for Phase 2 found B12 and B13. Phase 2 (pre-release fixes, the CI test pipeline, then the architecture work) is under "Revision plan" at the end. Passes 4–9 are done and rig-checked. Pass 10 (one session snapshot) is committed and waiting for its rig check.
 
 - **Overall:** the code is in good shape. The new shift-point work (learner, store, cue) is well isolated, its untrusted input is validated, and it is the only part of the app with tests. Most problems are older code that grew, or plumbing nobody uses any more.
 - **No significant CPU or RAM bottleneck.** Steady-state garbage is roughly 1 MB/s, all short-lived. Fixed buffers total about 2.4 MB. Nothing grows without bound in release builds except the radar ghost elements (B1).
@@ -57,14 +57,14 @@ Status reflects the revision plan agreed after the review (see "Agreed revision 
 | D5 | Low | Stale files in `Planning/` and the repo root; dead csproj entries | Mech | **Done** (Pass 1), except the stale PDF, which you regenerate before release |
 | C1–C3, C7 | Low | Duplicated helpers, scale factors, magic numbers, radar zone switches | Mech | **Done** (Pass 7) |
 | C5 | Low | Fastest-lap positioning rebuilt per row | Mech | **Done** (as P2) |
-| C4 | Low | Session type re-derived under a lock many times per frame | — | **Proposed:** Pass 10 |
+| C4 | Low | Session type re-derived under a lock many times per frame | — | **Done** (Pass 10; once per update); rig check pending |
 | C6 | Low | Overlay and radar code-behind duplicate their plumbing | — | **Proposed:** Pass 12 |
-| C9 | Low | Leaving cool-down for the next session resets the overlay twice | Small | **Proposed:** Pass 10 (found on the Pass 9 rig check) |
+| C9 | Low | Leaving cool-down for the next session resets the overlay twice | Small | **Done** (Pass 10; found on the Pass 9 rig check); rig check pending |
 | C8 | Low | Debug loggers each re-implement folder, file name and flush | Mech | **Done** (Pass 7; file naming shared, flushing left to each logger) |
 | F2–F4 | — | Files over 500 lines: split plans | Mech | **Done** (Pass 7) |
 | F1 | — | `PositionCalculator.cs` (1,137 lines): split plan | Mech | **Done** (Pass 9; largest file 423 lines; rig-checked 15 Oct) |
 | A1 | — | Radar view model builds WPF elements | — | **Proposed:** Pass 11 |
-| A2 | — | Leaky session interface; Settings depends on Telemetry | — | **Proposed:** Pass 10 |
+| A2 | — | Leaky session interface; Settings depends on Telemetry | — | **Done** (Pass 10: no downcasts, Settings takes a bool); rig check pending |
 | A3 | — | PositionCalculator in the wrong layer, untestable | — | **Done** (Pass 8: plain input record; Pass 9: moved to `Race/`; rig-checked 15 Oct) |
 | A4 | — | One UI tick for both windows | — | Only if a problem appears |
 | A5 | — | User-editable catalog lives in Program Files | — | Optional feature; your call |
@@ -617,6 +617,24 @@ One session on a Debug build from VS covers all four passes:
   - The track-location readout reads its three values from one view.
 - **Tests:** `ApplySdkSession` fed YAML fixtures, reusing Pass 6's.
 - **Gate (rig):** practice, qualifying, lone qualifying (the relative hides) and a race.
+- **Result (2026-10-15):**
+  - **`SessionView`** (`Telemetry/SessionView.cs`): one read-only update of the session info, which `SessionViewBuilder` builds from the SDK's parse. It replaces `SessionDataAdapter` and the mutable `StaticEventData`, `SessionTransitionData` and `LiveSessionData`.
+    - The coordinator (now 77 lines, from 423) publishes it by one volatile reference. Readers never lock; the lock is for writers only.
+    - An update without drivers or sessions isn't published, so the previous view stays whole. Before, such an update was half-applied.
+  - **Read once per frame:** `MainWindow` and `RadarWindow` each take `Coordinator.Current` once per frame and pass that view down, so every reader in a frame sees the same update.
+  - **Interface:** `ISessionDataProvider` shrinks to the six members the race logic reads. `SessionView` implements it, and the view models take a `SessionView`. The four downcasts are gone.
+  - **Settings:** `SettingsManager.GetMainWindowSize` takes a plain `relativeHidden` bool, and Settings no longer references Telemetry.
+  - **C4:** each session's type is classified once, when the update is built, with today's matching kept. The fastest-lap order and the qualifying grid are built once per update too, so frames no longer allocate them.
+  - **Rebuilt each update:** the schedule and the qualifying results. An earlier subsession's sessions and grid no longer linger until a disconnect.
+  - **D3 kept:** fields that are parsed but unused are still in the view (event type, short track name, all results fields, every session's results, qualifying times).
+  - **C9:** `MainViewModel` checks both session-change conditions, then resets once. One `ResetSessionUI` replaces `ClearSessionUI` and `ResetSessionData`, and it clears what either cleared, as the disconnect reset already did. A session change on its own now also resets the incident count, the track-temperature trend and the track location, or on the cool-down path the gear and shift displays.
+  - **Tests:** 22 new, in `SessionViewTests`. The Pass 6 fixture moved to `SessionFixtures`, and a second race-weekend fixture was added; both use made-up names. 167 tests in all.
+- **Rig check for Pass 10:**
+  - **Practice:** the relative, positions and the class colours as before.
+  - **Lone qualifying:** the relative and the radar hide, and the main window shrinks to match. The Countdown logs "Lap-limited qualifying initialized".
+  - **Race:** grid order before the green, then the finish as in Pass 9.
+  - **Session changes:** "PositionCalculator reset" and "[ClassColorManager] Reset" appear once per change, not twice.
+  - **Track location:** the readout still resolves (`[TrackLocation] ... -> <track>, N sections`).
 
 #### Pass 11: the radar draws itself, A1 (rig)
 - **Design:**

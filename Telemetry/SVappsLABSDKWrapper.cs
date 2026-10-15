@@ -75,7 +75,6 @@ namespace VISOR.Telemetry
         #endregion
 
         #region Public Properties
-        public bool IsSessionDataReady => _sessionCoordinator.IsDataReady;
         public bool IsConnected => _isConnected;
         public bool IsPrimed => _isConnected && _sessionCoordinator.IsDataReady;
         public SessionDataCoordinator Coordinator => _sessionCoordinator;
@@ -302,12 +301,14 @@ namespace VISOR.Telemetry
 
         private void CheckForSessionTransitionLog()
         {
-            int currentSessionNum = _sessionCoordinator.CurrentSessionNum;
+            var session = _sessionCoordinator.Current;
+            int currentSessionNum = session.CurrentSessionNum;
             if (currentSessionNum >= 0 && currentSessionNum != _lastSessionNumForLog)
             {
-                string sessionType = _sessionCoordinator.GetSessionType(currentSessionNum);
-                string sessionName = _sessionCoordinator.GetSessionName(currentSessionNum);
-                double sessionTimeSeconds = _sessionCoordinator.GetSessionTimeSeconds(currentSessionNum);
+                var current = session.CurrentSession;
+                string sessionType = current?.SessionType ?? string.Empty;
+                string sessionName = current?.SessionName ?? string.Empty;
+                double sessionTimeSeconds = current?.SessionTimeSeconds ?? 0.0;
 
                 Log.Info($"Session transition: {sessionName} (Type: {sessionType}, Duration: {sessionTimeSeconds}s)");
                 _lastSessionNumForLog = currentSessionNum;

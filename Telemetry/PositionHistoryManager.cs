@@ -41,16 +41,12 @@ namespace VISOR.Telemetry
         /// Called every telemetry frame (60Hz). Handles decimation to 10Hz,
         /// pit road transitions, and buffer recording for all valid cars.
         /// </summary>
-        public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider)
+        public void Update(SVappsLABSnapshot snapshot, SessionView dataProvider)
         {
             if (_trackLengthMeters <= 0f)
             {
-                // TrackLength is coordinator-derived, not telemetry; the former snapshot-dict
-                // fallback was the same coordinator value re-packed, so it has been dropped.
-                if (dataProvider is SessionDataCoordinator coordinator)
-                {
-                    _trackLengthMeters = coordinator.GetTrackLength();
-                }
+                // TrackLength is from the session info, not telemetry.
+                _trackLengthMeters = dataProvider.Track.LengthMeters;
 
                 if (_trackLengthMeters > 0f)
                 {

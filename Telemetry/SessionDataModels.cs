@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 
 namespace VISOR.Telemetry
 {
@@ -65,59 +64,6 @@ namespace VISOR.Telemetry
     }
 
     /// <summary>
-    /// Static event data that never changes during an event
-    /// </summary>
-    public class StaticEventData
-    {
-        public readonly Dictionary<int, DriverInfo> Drivers = new();
-        public readonly SessionSchedule Schedule = new();
-        public readonly WeekendInfo Weekend = new();
-        public int IncidentLimit { get; set; }
-        public PlayerCarInfo? PlayerCar { get; set; }
-
-        public class DriverInfo
-        {
-            public string UserName { get; set; } = string.Empty;
-            public string CarNumber { get; set; } = string.Empty;
-            public int CarNumberRaw { get; set; }
-            public int CarClassID { get; set; }
-            public int CarClassColor { get; set; }
-            public bool IsAI { get; set; }
-
-            public float CarClassEstLapTime { get; set; }
-        }
-
-        public class SessionSchedule
-        {
-            public readonly Dictionary<int, SessionDefinition> Sessions = new();
-
-            public class SessionDefinition
-            {
-                public int SessionNum { get; set; }
-                public string SessionType { get; set; } = string.Empty;
-                public string SessionName { get; set; } = string.Empty;
-                public int SessionLaps { get; set; } = -1;
-                public double SessionTimeSeconds { get; set; }
-            }
-        }
-
-        public class WeekendInfo
-        {
-            public string TrackName { get; set; } = string.Empty;
-            public string TrackConfig { get; set; } = string.Empty;
-            public float TrackLength { get; set; } = 0f;
-            public string TrackDisplayName { get; set; } = string.Empty;
-            public string TrackDisplayShortName { get; set; } = string.Empty;
-
-            // EventType ("Practice"/"Race"/...) and SubSessionID uniquely (the latter) identify the
-            // iRacing session you're in. A change in either signals a genuinely new session even when
-            // SessionNum is unchanged (e.g. open practice -> a race weekend's practice).
-            public string EventType { get; set; } = string.Empty;
-            public string SubSessionId { get; set; } = string.Empty;
-        }
-    }
-
-    /// <summary>
     /// The player's car as described by the session YAML (DriverInfo + the player's Drivers
     /// entry). Immutable: a new instance is published on every session-info parse, so the 60Hz
     /// path can read it without a lock.
@@ -132,40 +78,4 @@ namespace VISOR.Telemetry
         int GearNumForward,
         float SLLastRPM = 0f,
         float SLBlinkRPM = 0f);
-
-    public class SessionTransitionData
-    {
-        public int CurrentSessionNum { get; set; } = -1;
-        public readonly Dictionary<int, int> DriverIncidentCounts = new();
-
-        public string CurrentSessionType { get; set; } = string.Empty;
-        public string CurrentSessionName { get; set; } = string.Empty;
-    }
-
-    public class LiveSessionData
-    {
-        public readonly Dictionary<int, List<ResultPosition>> SessionResultsPositions = new();
-        public readonly Dictionary<int, List<FastestLapResult>> SessionFastestLaps = new();
-
-        public readonly Dictionary<int, int> QualifyPositions = new();
-        public readonly Dictionary<int, float> QualifyFastestTimes = new();
-
-        public class ResultPosition
-        {
-            public int Position { get; set; }
-            public int ClassPosition { get; set; }
-            public int CarIdx { get; set; }
-            public int Lap { get; set; }
-            public float Time { get; set; }
-            public float FastestTime { get; set; }
-            public float LastTime { get; set; }
-        }
-
-        public class FastestLapResult
-        {
-            public int CarIdx { get; set; }
-            public int FastestLap { get; set; }
-            public float FastestTime { get; set; }
-        }
-    }
 }

@@ -80,7 +80,7 @@ namespace VISOR.ViewModels
 
         private double GetScaleFactor() => WindowScale.ForRadar(_settingsManager.Settings.WindowSize);
 
-        public void UpdateFromTelemetry(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider)
+        public void UpdateFromTelemetry(SVappsLABSnapshot snapshot, SessionView sessionDataProvider)
         {
             if (snapshot == null || sessionDataProvider == null || !sessionDataProvider.IsDataReady)
             {
@@ -228,18 +228,11 @@ namespace VISOR.ViewModels
                 Log.Debug($"[Radar] All cars assigned to Center zone (state: {carLeftRightState})");
         }
 
-        private float GetTrackLength(ISessionDataProvider sessionDataProvider)
+        // From the session info, not telemetry; 5 km when iRacing gave no length.
+        private static float GetTrackLength(SessionView sessionDataProvider)
         {
-            // TrackLength is coordinator-derived, not telemetry. The old snapshot-dict fallback
-            // was just this same coordinator value re-packed, so it has been dropped as redundant.
-            if (sessionDataProvider is SessionDataCoordinator coordinator)
-            {
-                float trackLength = coordinator.GetTrackLength();
-                if (trackLength > 0)
-                    return trackLength;
-            }
-
-            return 5000f;
+            float trackLength = sessionDataProvider.Track.LengthMeters;
+            return trackLength > 0 ? trackLength : 5000f;
         }
 
         private void UpdateRadarDisplay(List<RadarCarData> visibleCars, int[] carClassColors, int[] carClassIDs)

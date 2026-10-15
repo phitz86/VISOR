@@ -98,13 +98,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   moves out of the display code into its own `Race` folder. Debug builds only: the radar's zone log
   lines are worded consistently, and captured session info is saved as
   `parse-failure_<time>.yaml`.
-- **Tests and checks run on every build** — CI now runs the unit tests (145, up from 59: the new
+- **Tests and checks run on every build** — CI now runs the unit tests (167, up from 59: the new
   ones cover the fuel estimate, the position history behind the gap figures, the track catalog,
-  the update check, reading session info, and the position calculator's running order, grid
-  order, lap-counter handling at the line and finishing positions) and checks the track catalog,
+  the update check, reading session info, the session snapshot, and the position calculator's
+  running order, grid order, lap-counter handling at the line and finishing positions) and checks the track catalog,
   code whitespace and packages with known vulnerabilities, on every push and pull request. Build warnings fail CI, and a release is only
   signed once all of it passes. The tests moved to xUnit.net v3 (v2 is retired), still run
   through the classic test runner so Visual Studio and CI run them the same way.
+- **Session info is read as one snapshot per update** — each time iRacing updates the session
+  info (drivers, classes, sessions, results), VISOR builds one read-only snapshot of it, and the
+  overlay, relative and radar all read that same snapshot for the whole frame. Before, they read
+  it piece by piece, under a lock, 20 to 35 times a frame. Each snapshot comes from that update
+  alone, so an earlier subsession's schedule and qualifying results no longer linger until a
+  disconnect, and an update missing its drivers or sessions is ignored whole rather than
+  half-applied. Going from cool-down into the next session now resets the overlay once, not
+  twice.
 - **Less work per frame** — the relative display reuses ten pre-built colour brushes instead of
   creating up to 1,800 a second, and looks up practice/qualifying positions once per frame
   instead of once per row. The delta bar only signals a redraw when it actually changes.

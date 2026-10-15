@@ -35,6 +35,9 @@
     <Compile Include="..\..\Telemetry\PositionFrame.cs" Link="Linked\PositionFrame.cs" />
     <Compile Include="..\..\Telemetry\SessionDataProvider.cs" Link="Linked\SessionDataProvider.cs" />
     <Compile Include="..\..\Telemetry\SessionDataModels.cs" Link="Linked\SessionDataModels.cs" />
+    <Compile Include="..\..\Telemetry\SessionView.cs" Link="Linked\SessionView.cs" />
+    <Compile Include="..\..\Telemetry\SessionViewBuilder.cs" Link="Linked\SessionViewBuilder.cs" />
+    <Compile Include="..\..\Telemetry\SessionDataCoordinator.cs" Link="Linked\SessionDataCoordinator.cs" />
   </ItemGroup>
 
   <ItemGroup>

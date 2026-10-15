@@ -51,13 +51,10 @@ namespace VISOR.Views
 
         private void ApplyWindowSizing()
         {
-            ISessionDataProvider? sessionProvider = null;
-            if (_sdk?.IsSessionDataReady == true)
-            {
-                sessionProvider = _sdk.Coordinator;
-            }
+            var session = _sdk?.Coordinator.Current;
+            bool relativeHidden = session != null && session.IsDataReady && session.IsLoneQualifying;
 
-            var windowSize = _settingsManager.GetMainWindowSize(sessionProvider);
+            var windowSize = _settingsManager.GetMainWindowSize(relativeHidden);
             Width = windowSize.Width;
             Height = windowSize.Height;
         }
@@ -178,11 +175,14 @@ namespace VISOR.Views
         // UI thread.
         private void ProcessSnapshot(SVappsLABSnapshot snapshot)
         {
-            if (_sdk.IsSessionDataReady)
+            // One view for the whole frame: every reader below sees the same session update.
+            var session = _sdk.Coordinator.Current;
+            if (session.IsDataReady)
             {
-                _viewModel.UpdateFromTelemetry(snapshot, _sdk.Coordinator);
+                _viewModel.UpdateFromTelemetry(snapshot, session);
 
-                bool currentRelativeVisibility = !_sdk.Coordinator.ShouldHideRelativeDisplay();
+                // The relative hides in lone qualifying.
+                bool currentRelativeVisibility = !session.IsLoneQualifying;
                 if (currentRelativeVisibility != _lastRelativeVisibility)
                 {
                     Log.Info($"[MainWindow] Relative display visibility changed: {_lastRelativeVisibility} -> {currentRelativeVisibility}");

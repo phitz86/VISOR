@@ -10,69 +10,7 @@ namespace VISOR.Tests
 {
     public class SessionInfoYamlTests
     {
-        // Made-up session info in iRacing's layout: unquoted values, one-space indents, lists
-        // written "- Key: value" at their parent's indent. No real names or IDs. A raw string
-        // takes the source file's line endings, which are CRLF in a Windows checkout, so they're
-        // fixed to "\n" here (iRacing's own) and the multi-line edits below find their text.
-        private static readonly string Session = """
-            ---
-            WeekendInfo:
-             TrackName: testtrack gp
-             TrackID: 999
-             TrackLength: 4.21 km
-             TrackDisplayName: Test Raceway
-             TrackConfigName: Grand Prix
-             WeekendOptions:
-              NumStarters: 3
-            SessionInfo:
-             Sessions:
-             - SessionNum: 0
-               SessionLaps: unlimited
-               SessionTime: 1800.0000 sec
-               SessionType: Practice
-               SessionName: PRACTICE
-             - SessionNum: 1
-               SessionLaps: 12
-               SessionTime: unlimited
-               SessionType: Race
-               SessionName: RACE
-            DriverInfo:
-             DriverCarIdx: 1
-             Drivers:
-             - CarIdx: 0
-               UserName: Pace Car
-               AbbrevName:
-               UserID: -1
-               CarNumber: 0
-               CarClassID: 11
-               CarScreenName: Safety Car
-               CarIsPaceCar: 1
-             - CarIdx: 1
-               UserName: Alex Example
-               AbbrevName: Example, A
-               UserID: 100001
-               CarNumber: 7
-               ClubName: Test Club
-               CarClassID: 2268
-               CarScreenName: Test GT4
-               CarIsPaceCar: 0
-             - CarIdx: 2
-               UserName: Sam Sample
-               AbbrevName: Sample, S
-               UserID: 100002
-               CarNumber: 21
-               ClubName: Test Club
-               CarClassID: 2268
-               CarScreenName: Test GT4
-               CarIsPaceCar: 0
-            CarSetup:
-             UpdateCount: 2
-             Tires:
-              LeftFront:
-               StartingPressure: 172 kPa
-
-            ...
-            """.ReplaceLineEndings("\n");
+        private static readonly string Session = SessionFixtures.Basic;
 
         private static TelemetrySessionInfo ReadOrFail(string yaml, string expectedAttempt)
         {

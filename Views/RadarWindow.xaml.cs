@@ -294,9 +294,12 @@ namespace VISOR.Views
         // UI thread.
         private void ProcessSnapshot(SVappsLABSnapshot snapshot)
         {
-            if (_sdk.IsSessionDataReady)
+            // One view for the whole frame: every reader below sees the same session update.
+            var session = _sdk.Coordinator.Current;
+            if (session.IsDataReady)
             {
-                if (ShouldHideRadar())
+                // Alone on track in lone qualifying: nothing to show.
+                if (session.IsLoneQualifying)
                 {
                     _viewModel.Reset();
                     ResetZoneHighlights();
@@ -306,9 +309,9 @@ namespace VISOR.Views
                     return;
                 }
 
-                UpdatePlayerCarDisplay(snapshot);
+                UpdatePlayerCarDisplay(snapshot, session);
 
-                _viewModel.UpdateFromTelemetry(snapshot, _sdk.Coordinator);
+                _viewModel.UpdateFromTelemetry(snapshot, session);
 
                 UpdateZoneHighlights(snapshot);
 
@@ -326,9 +329,9 @@ namespace VISOR.Views
             }
         }
 
-        private void UpdatePlayerCarDisplay(SVappsLABSnapshot? snapshot = null)
+        private void UpdatePlayerCarDisplay(SVappsLABSnapshot? snapshot = null, SessionView? session = null)
         {
-            if (snapshot == null || !_sdk.IsSessionDataReady)
+            if (snapshot == null || session == null || !session.IsDataReady)
             {
                 PlayerCarNumber.Text = "??";
                 return;
@@ -337,7 +340,7 @@ namespace VISOR.Views
             var playerCarIdx = snapshot.PlayerCarIdx;
             if (playerCarIdx >= 0)
             {
-                var carNumbers = _sdk.Coordinator.CarNumbers;
+                var carNumbers = session.CarNumbers;
                 if (carNumbers != null && carNumbers.Length > playerCarIdx)
                 {
                     PlayerCarNumber.Text = carNumbers[playerCarIdx] ?? "??";
@@ -453,12 +456,6 @@ namespace VISOR.Views
             };
 
             this.BeginAnimation(Window.OpacityProperty, fadeIn);
-        }
-
-        private bool ShouldHideRadar()
-        {
-            int currentSession = _sdk.Coordinator.CurrentSessionNum;
-            return _sdk.Coordinator.IsLoneQualifying(currentSession);
         }
 
         protected override void OnClosed(EventArgs e)

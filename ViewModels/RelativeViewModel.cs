@@ -37,7 +37,7 @@ namespace VISOR.ViewModels
             _builder = new RelativeDisplayBuilder(_carCache, classColorManager, positionCalculator, _historyManager);
         }
 
-        public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider? sessionDataProvider)
+        public void Update(SVappsLABSnapshot snapshot, SessionView? sessionDataProvider)
         {
             if (snapshot.PlayerCarIdx == -1 ||
                 sessionDataProvider == null ||
@@ -46,7 +46,8 @@ namespace VISOR.ViewModels
                 return;
             }
 
-            if (sessionDataProvider.ShouldHideRelativeDisplay())
+            // Alone on track in lone qualifying: the relative hides.
+            if (sessionDataProvider.IsLoneQualifying)
             {
                 if (RelativeRows.Count > 0) RelativeRows.Clear();
                 return;

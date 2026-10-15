@@ -88,7 +88,7 @@ namespace VISOR.ViewModels
         /// <summary>
         /// Initializes state based on the type of session that is starting.
         /// </summary>
-        public void OnSessionTransition(ISessionDataProvider sessionDataProvider, int newSessionNum)
+        public void OnSessionTransition(SessionView sessionDataProvider, int newSessionNum)
         {
             Reset();
 
@@ -113,7 +113,7 @@ namespace VISOR.ViewModels
         /// <summary>
         /// Processes a new telemetry snapshot to update the timer display.
         /// </summary>
-        public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider? sessionDataProvider)
+        public void Update(SVappsLABSnapshot snapshot, SessionView? sessionDataProvider)
         {
             int lapsRemaining = snapshot.SessionLapsRemain;
             double timeRemain = snapshot.SessionTimeRemain;

@@ -57,7 +57,7 @@ namespace VISOR.ViewModels
         #endregion
 
         #region Public Methods
-        public List<RelativeRowViewModel> Calculate(SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider)
+        public List<RelativeRowViewModel> Calculate(SVappsLABSnapshot snapshot, SessionView dataProvider)
         {
             _debugFrameCounter++;
 
@@ -90,7 +90,7 @@ namespace VISOR.ViewModels
             if (useFastestLap)
             {
                 _fastestLapByCar.Clear();
-                foreach (var entry in dataProvider.GetFastestLapPositioning())
+                foreach (var entry in dataProvider.FastestLapPositions)
                     _fastestLapByCar.TryAdd(entry.carIdx, (entry.fastestTime, entry.classPosition, entry.overallPosition));
             }
             ApplyDisplayLogic(finalRows, useFastestLap, carClassColors, carClassIDs, snapshot);

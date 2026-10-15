@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Windows;
 using VISOR.Diagnostics;
-using VISOR.Telemetry;
 
 namespace VISOR.Settings
 {
@@ -49,9 +48,10 @@ namespace VISOR.Settings
 
         #region Window Dimensions
 
-        public Size GetMainWindowSize(ISessionDataProvider? sessionDataProvider = null)
+        /// <param name="relativeHidden">The session hides the relative (lone qualifying), so its row takes no space.</param>
+        public Size GetMainWindowSize(bool relativeHidden = false)
         {
-            double contentHeight = CalculateDynamicMainWindowHeight(sessionDataProvider);
+            double contentHeight = CalculateDynamicMainWindowHeight(relativeHidden);
             double baseWidth = MAIN_WINDOW_WIDTH_LARGE;
 
             double scaleFactor = WindowScale.ForMainWindow(_settings.WindowSize);
@@ -76,7 +76,7 @@ namespace VISOR.Settings
         /// unscaled. This is the content the scaled grid needs; the window's fixed Border
         /// chrome is added separately (and unscaled) in <see cref="GetMainWindowSize"/>.
         /// </summary>
-        private double CalculateDynamicMainWindowHeight(ISessionDataProvider? sessionDataProvider = null)
+        private double CalculateDynamicMainWindowHeight(bool relativeHidden)
         {
             double totalHeight = 0.0;
 
@@ -92,22 +92,7 @@ namespace VISOR.Settings
             if (_settings.ShowRow3)
                 totalHeight += ROW_HEIGHT_LAP_TIMES;
 
-            bool showRelativeEffectively = _settings.ShowRow4;
-            if (showRelativeEffectively && sessionDataProvider != null)
-            {
-                var coordinator = sessionDataProvider as SessionDataCoordinator;
-                if (coordinator != null)
-                {
-                    int currentSession = coordinator.CurrentSessionNum;
-                    bool isLoneQualifying = coordinator.IsLoneQualifying(currentSession);
-                    if (isLoneQualifying)
-                    {
-                        showRelativeEffectively = false;
-                    }
-                }
-            }
-
-            if (showRelativeEffectively)
+            if (_settings.ShowRow4 && !relativeHidden)
                 totalHeight += ROW_HEIGHT_RELATIVE;
 
             if (_settings.ShowRow5)
