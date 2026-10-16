@@ -33,7 +33,7 @@ namespace VISOR.Views
             _sdk = sdkWrapper;
             _settingsManager = SettingsManager.Instance;
             _configModeManager = ConfigModeManager.Instance;
-            _viewModel = new RadarViewModel(classColorManager, CarsContainer);
+            _viewModel = new RadarViewModel(classColorManager);
             DataContext = _viewModel;
             _framePoster = new FramePoster(Dispatcher, "RadarWindow", ProcessSnapshot);
 
@@ -252,7 +252,7 @@ namespace VISOR.Views
             {
                 if (!isConnected)
                 {
-                    _viewModel.Reset();
+                    _viewModel.Clear();
                     DebugText.Text = "Radar: Disconnected";
                     CarLeftRightIndicator.Text = "Offline";
                     ResetZoneHighlights();
@@ -280,7 +280,7 @@ namespace VISOR.Views
                 {
                     DebugText.Text = "Radar: Waiting for session data";
                     CarLeftRightIndicator.Text = "Waiting";
-                    _viewModel.Reset();
+                    _viewModel.Clear();
                     ResetZoneHighlights();
                     UpdatePlayerCarDisplay();
                     FadeOut();
@@ -301,7 +301,7 @@ namespace VISOR.Views
                 // Alone on track in lone qualifying: nothing to show.
                 if (session.IsLoneQualifying)
                 {
-                    _viewModel.Reset();
+                    _viewModel.Clear();
                     ResetZoneHighlights();
                     FadeOut();
                     DebugText.Text = "Radar: Hidden (Lone Qualifying)";
@@ -321,7 +321,7 @@ namespace VISOR.Views
             }
             else
             {
-                _viewModel.Reset();
+                _viewModel.Clear();
                 ResetZoneHighlights();
                 FadeOut();
                 DebugText.Text = "Radar: No session data";

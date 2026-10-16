@@ -5,7 +5,7 @@ Risk appetite for 1.2.1: fix bugs, delete dead code, and split files mechanicall
 
 ## Summary
 
-**Status (2026-10-15):** Phase 1, the three revision passes, is done and validated on the rig. Testing turned up B10, B11 and S7, and the research for Phase 2 found B12 and B13. Phase 2 (pre-release fixes, the CI test pipeline, then the architecture work) is under "Revision plan" at the end. Passes 4–9 are done and rig-checked. Pass 10 (one session snapshot) is committed and waiting for its rig check.
+**Status (2026-10-16):** Phase 1, the three revision passes, is done and validated on the rig. Testing turned up B10, B11 and S7, and the research for Phase 2 found B12 and B13. Phase 2 (pre-release fixes, the CI test pipeline, then the architecture work) is under "Revision plan" at the end. Passes 4–10 are done and rig-checked. Pass 11 (the radar draws itself) is committed and waiting for its rig check.
 
 - **Overall:** the code is in good shape. The new shift-point work (learner, store, cue) is well isolated, its untrusted input is validated, and it is the only part of the app with tests. Most problems are older code that grew, or plumbing nobody uses any more.
 - **No significant CPU or RAM bottleneck.** Steady-state garbage is roughly 1 MB/s, all short-lived. Fixed buffers total about 2.4 MB. Nothing grows without bound in release builds except the radar ghost elements (B1).
@@ -57,14 +57,14 @@ Status reflects the revision plan agreed after the review (see "Agreed revision 
 | D5 | Low | Stale files in `Planning/` and the repo root; dead csproj entries | Mech | **Done** (Pass 1), except the stale PDF, which you regenerate before release |
 | C1–C3, C7 | Low | Duplicated helpers, scale factors, magic numbers, radar zone switches | Mech | **Done** (Pass 7) |
 | C5 | Low | Fastest-lap positioning rebuilt per row | Mech | **Done** (as P2) |
-| C4 | Low | Session type re-derived under a lock many times per frame | — | **Done** (Pass 10; once per update); rig check pending |
+| C4 | Low | Session type re-derived under a lock many times per frame | — | **Done** (Pass 10; once per update; rig-checked 16 Oct) |
 | C6 | Low | Overlay and radar code-behind duplicate their plumbing | — | **Proposed:** Pass 12 |
-| C9 | Low | Leaving cool-down for the next session resets the overlay twice | Small | **Done** (Pass 10; found on the Pass 9 rig check); rig check pending |
+| C9 | Low | Leaving cool-down for the next session resets the overlay twice | Small | **Done** (Pass 10; found on the Pass 9 rig check; rig-checked 16 Oct) |
 | C8 | Low | Debug loggers each re-implement folder, file name and flush | Mech | **Done** (Pass 7; file naming shared, flushing left to each logger) |
 | F2–F4 | — | Files over 500 lines: split plans | Mech | **Done** (Pass 7) |
 | F1 | — | `PositionCalculator.cs` (1,137 lines): split plan | Mech | **Done** (Pass 9; largest file 423 lines; rig-checked 15 Oct) |
-| A1 | — | Radar view model builds WPF elements | — | **Proposed:** Pass 11 |
-| A2 | — | Leaky session interface; Settings depends on Telemetry | — | **Done** (Pass 10: no downcasts, Settings takes a bool); rig check pending |
+| A1 | — | Radar view model builds WPF elements | — | **Done** (Pass 11); rig check pending |
+| A2 | — | Leaky session interface; Settings depends on Telemetry | — | **Done** (Pass 10: no downcasts, Settings takes a bool; rig-checked 16 Oct) |
 | A3 | — | PositionCalculator in the wrong layer, untestable | — | **Done** (Pass 8: plain input record; Pass 9: moved to `Race/`; rig-checked 15 Oct) |
 | A4 | — | One UI tick for both windows | — | Only if a problem appears |
 | A5 | — | User-editable catalog lives in Program Files | — | Optional feature; your call |
@@ -635,6 +635,7 @@ One session on a Debug build from VS covers all four passes:
   - **Race:** grid order before the green, then the finish as in Pass 9.
   - **Session changes:** "PositionCalculator reset" and "[ClassColorManager] Reset" appear once per change, not twice.
   - **Track location:** the readout still resolves (`[TrackLocation] ... -> <track>, N sections`).
+- **Rig check result (2026-10-16):** passed.
 
 #### Pass 11: the radar draws itself, A1 (rig)
 - **Design:**
@@ -646,6 +647,13 @@ One session on a Debug build from VS covers all four passes:
   - Cars already on the radar resize when the size preset changes; today they keep their old size.
   - Each car's number draws over its own rectangle, rather than all numbers over all rectangles.
 - **Gate (rig):** all three sizes, pit cars, multiclass colours, fade in and out, and a session hop.
+- **Result (2026-10-16):**
+  - `RadarCarItem` is one car as plain data: placement and size, number, class colour and number colour, shadow and pit state. Its setters notify only on a real change.
+  - `RadarViewModel` keeps one item per car in range in an `ObservableCollection` (`Cars`) and updates it in place each frame. It no longer references `Canvas`, `Rectangle`, `TextBlock` or `DropShadowEffect`, only class brushes.
+  - `Reset` is now `Clear()`. The window draws exactly the list, so a car can't be left behind on screen (B1).
+  - `RadarWindow.xaml` draws the list with an `ItemsControl` over a `Canvas`. Each item is a template of a body rectangle and a number; triggers drop the shadow for black numbers and fade pit cars.
+  - Correction to the plan above: the old code already added each car's rectangle and number as a pair, so the drawing order is unchanged. The one visible change is the resize.
+  - It can't run here (no WPF on Linux). Debug and Release, XAML included, build with no warnings; the bindings are checked on the rig.
 
 #### Pass 12: shared window plumbing, C6 (rig)
 - **Changes:**

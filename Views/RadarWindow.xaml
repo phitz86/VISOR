@@ -73,8 +73,57 @@
                                Width="48" Height="396"
                                Fill="Red" Opacity="0" />
 
-                    <!-- Container for car elements -->
-                    <Canvas x:Name="CarsContainer" />
+                    <!-- The cars in range (RadarViewModel.Cars), one template each, placed on a
+                         canvas. Items are updated in place, so a car's shapes are built once. -->
+                    <ItemsControl x:Name="CarsLayer"
+                                  ItemsSource="{Binding Cars}"
+                                  IsHitTestVisible="False" Focusable="False">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <Canvas />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemContainerStyle>
+                            <Style TargetType="ContentPresenter">
+                                <Setter Property="Canvas.Left" Value="{Binding Left}" />
+                                <Setter Property="Canvas.Top" Value="{Binding Top}" />
+                            </Style>
+                        </ItemsControl.ItemContainerStyle>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Canvas Width="{Binding Width}" Height="{Binding Height}">
+                                    <Rectangle x:Name="Body"
+                                               Width="{Binding Width}" Height="{Binding Height}"
+                                               Fill="{Binding Fill}"
+                                               Stroke="Black" StrokeThickness="{Binding StrokeThickness}" />
+                                    <TextBlock x:Name="Number"
+                                               Canvas.Top="{Binding NumberTop}"
+                                               Width="{Binding Width}"
+                                               Text="{Binding Number}"
+                                               Foreground="{Binding NumberBrush}"
+                                               FontSize="{Binding FontSize}" FontWeight="Bold"
+                                               TextAlignment="Center">
+                                        <TextBlock.Effect>
+                                            <DropShadowEffect Color="Black" Direction="0"
+                                                              ShadowDepth="{Binding ShadowDepth}"
+                                                              BlurRadius="{Binding ShadowBlur}" />
+                                        </TextBlock.Effect>
+                                    </TextBlock>
+                                </Canvas>
+                                <DataTemplate.Triggers>
+                                    <!-- Black numbers: no shadow, it would only smudge. -->
+                                    <DataTrigger Binding="{Binding HasNumberShadow}" Value="False">
+                                        <Setter TargetName="Number" Property="Effect" Value="{x:Null}" />
+                                    </DataTrigger>
+                                    <!-- On pit road: faded, with an italic number. -->
+                                    <DataTrigger Binding="{Binding IsOnPitRoad}" Value="True">
+                                        <Setter TargetName="Body" Property="Opacity" Value="0.5" />
+                                        <Setter TargetName="Number" Property="FontStyle" Value="Italic" />
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
 
                     <!-- Player car indicator (center zone, middle) -->
                     <Rectangle x:Name="PlayerCar"

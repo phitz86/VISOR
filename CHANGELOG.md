@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Radar cars follow a size-preset change** — cars already on the radar kept their old size
+  until they left range; they now resize with the radar.
 - **Session info the SDK can't read no longer leaves the HUD blank** — iRacing writes session info
   (track, drivers, sessions) without quoting its values, and a line break, or a colon in a field the
   SDK doesn't quote, made it unreadable: VISOR then got no session data for the whole event. VISOR
@@ -94,7 +96,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   debug-log file naming each live in one place; one table drives the radar's side-zone
   assignment and highlights; and the shift-point learner, the shift-point provider, the relative
   display builder and the position calculator are split into smaller files, none now much over
-  500 lines. The position calculator, which works out the running order and finishing positions,
+  500 lines. The radar window now draws its cars from a plain list the radar keeps, instead of
+  the radar building the on-screen shapes itself. The position calculator, which works out the running order and finishing positions,
   moves out of the display code into its own `Race` folder. Debug builds only: the radar's zone log
   lines are worded consistently, and captured session info is saved as
   `parse-failure_<time>.yaml`.
