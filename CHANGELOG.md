@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Radar cars follow a size-preset change** — cars already on the radar kept their old size
   until they left range; they now resize with the radar.
+- **Radar grid lines survive a size-preset change** — changing the size with the radar open
+  moved all four lane lines to the left edge and crept the distance lines up the radar a
+  little further with each change. Each line is now placed from its original position at
+  every size.
 - **Session info the SDK can't read no longer leaves the HUD blank** — iRacing writes session info
   (track, drivers, sessions) without quoting its values, and a line break, or a colon in a field the
   SDK doesn't quote, made it unreadable: VISOR then got no session data for the whole event. VISOR

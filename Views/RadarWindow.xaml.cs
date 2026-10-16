@@ -26,6 +26,14 @@ namespace VISOR.Views
         private bool _isFadedOut = false;
         private bool _forceVisible = false;
 
+        // The radar's design size, which RadarWindow.xaml's grid lines are drawn at.
+        private const double DesignWidth = 240.0;
+        private const double DesignHeight = 396.0;
+
+        // Each grid line as RadarWindow.xaml draws it, recorded before the first resize. Every
+        // resize places the lines from these, never from where the last resize left them (B14).
+        private readonly (Line Line, bool Vertical, double DesignX, double DesignY)[] _gridLines;
+
         public RadarWindow(SVappsLABSDKWrapper sdkWrapper, ClassColorManager classColorManager)
         {
             InitializeComponent();
@@ -33,6 +41,10 @@ namespace VISOR.Views
             _sdk = sdkWrapper;
             _settingsManager = SettingsManager.Instance;
             _configModeManager = ConfigModeManager.Instance;
+            _gridLines = RadarCanvas.Children.OfType<Line>()
+                .Select(line => (line, Math.Abs(line.X1 - line.X2) < 0.1, line.X1, line.Y1))
+                .ToArray();
+
             _viewModel = new RadarViewModel(classColorManager);
             DataContext = _viewModel;
             _framePoster = new FramePoster(Dispatcher, "RadarWindow", ProcessSnapshot);
@@ -109,40 +121,21 @@ namespace VISOR.Views
             UpdateZoneLabelsGrid(width);
         }
 
+        // Zone separators keep their share of the width (a fifth each) and run full height; the
+        // centre line and distance markers keep their share of the height and run full width.
         private void UpdateRadarLines(double width, double height)
         {
-            var lines = RadarCanvas.Children.OfType<Line>().ToList();
-
-            foreach (var line in lines)
+            foreach (var (line, vertical, designX, designY) in _gridLines)
             {
-                if (Math.Abs(line.X1 - line.X2) < 0.1)
+                if (vertical)
                 {
-                    double originalX = line.X1;
-                    double newX = 0;
-
-                    if (Math.Abs(originalX - 48) < 0.1) newX = width * 0.2;
-                    else if (Math.Abs(originalX - 96) < 0.1) newX = width * 0.4;
-                    else if (Math.Abs(originalX - 144) < 0.1) newX = width * 0.6;
-                    else if (Math.Abs(originalX - 192) < 0.1) newX = width * 0.8;
-
-                    line.X1 = line.X2 = newX;
+                    line.X1 = line.X2 = designX / DesignWidth * width;
                     line.Y2 = height;
                 }
-                else if (Math.Abs(line.Y1 - line.Y2) < 0.1)
+                else
                 {
-                    double originalY = line.Y1;
-
-                    if (Math.Abs(originalY - 198) < 5)
-                    {
-                        line.Y1 = line.Y2 = height / 2;
-                        line.X2 = width;
-                    }
-                    else
-                    {
-                        double relativeY = originalY / 396.0;
-                        line.Y1 = line.Y2 = relativeY * height;
-                        line.X2 = width;
-                    }
+                    line.Y1 = line.Y2 = designY / DesignHeight * height;
+                    line.X2 = width;
                 }
             }
         }

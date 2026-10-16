@@ -51,6 +51,7 @@ Status reflects the revision plan agreed after the review (see "Agreed revision 
 | B11 | Med | Settings reset to defaults on every version bump | Small | **Done** (Pass 4; rig-checked 10 Oct) |
 | B12 | Low–Med | At the finish, a car whose telemetry stops isn't held: the car behind moves up and two cars can show the same position | Small | **Done** (Pass 8, own commit; rig-checked 10 Oct) |
 | B13 | Low | Radar switched on from the Config window can't be dragged into place | Small | **Done** (Pass 4; rig-checked 10 Oct) |
+| B14 | Low | Radar grid lines collapse after a size-preset change | Small | **Done** (own commit after Pass 11; found on its rig check); rig check pending |
 | D1 | Low | `System.Management` package unused but shipped | Mech | **Done** (Pass 1) |
 | D2, D4 | Low | Unused members and events | Mech | **Done** (Pass 1) |
 | D3 | Low | Session data parsed but never read | Mech | **Skipped** (cheap; unused reads have come in handy) |
@@ -654,6 +655,10 @@ One session on a Debug build from VS covers all four passes:
   - `RadarWindow.xaml` draws the list with an `ItemsControl` over a `Canvas`. Each item is a template of a body rectangle and a number; triggers drop the shadow for black numbers and fade pit cars.
   - Correction to the plan above: the old code already added each car's rectangle and number as a pair, so the drawing order is unchanged. The one visible change is the resize.
   - It can't run here (no WPF on Linux). Debug and Release, XAML included, build with no warnings; the bindings are checked on the rig.
+- **Rig check (2026-10-16):** the car template works: pit styling, black numbers on light classes, and placement. It turned up B14.
+  - **B14:** the grid lines broke on a size change. This bug predates Pass 11; the code dates from 2025.
+  - **Cause:** `UpdateRadarLines` worked out each line's new position from its current one. After the first resize, the lane lines no longer sat at 48, 96, 144 or 192, so they matched no case and went to x = 0, and each later resize scaled the horizontal lines again.
+  - **Fix:** the window records each line's design position from `RadarWindow.xaml` before the first resize and places the line from that at every size, using the same fractions as before. It is its own commit.
 
 #### Pass 12: shared window plumbing, C6 (rig)
 - **Changes:**
