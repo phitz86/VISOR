@@ -668,3 +668,18 @@ One session on a Debug build from VS covers all four passes:
 - **Session-info parse failures (B10):** run Debug builds when convenient, so a real sample gets captured.
 - **Memory over long sessions:** both perf runs levelled off at about 125 MB, but were still rising about 1 MB per 5 minutes near the end. One perf log over a session of an hour or more would settle it.
 - **Track catalog gap:** Oulton Park Fosters has no section data.
+- **Torn session-info reads (found during Pass 10; decided 2026-10-16: wait for evidence):**
+  - **The risk:** iRacing rewrites session info in place in shared memory and then bumps an update counter. The SDK (2.5.0, `DataProviderBase.GetSessionInfoYaml`) copies the text after seeing the counter change, but never re-checks the counter afterwards.
+  - **What can happen:** a rewrite that starts during the copy gives text that is half old and half new. Most such text won't parse, and the B10 path handles that. A rare copy could parse with mixed or missing content.
+  - **What limits it:**
+    - The window is well under a millisecond, and updates are seconds apart.
+    - If iRacing bumps the counter after writing, which is likely but not confirmed, the next read follows about 16 ms later.
+    - Since Pass 10, a bad update replaces the snapshot whole and is itself replaced by the next good one.
+  - **The two fields with lasting effects:**
+    - The subsession ID: a change resets the overlay, which would wipe frozen finishing positions.
+    - The player's car: the shift-point model switches. The real model is saved first, so nothing learned is lost.
+  - **Evidence:** none in any rig log so far.
+  - **Options, if it ever shows:**
+    - A. Ask SVappsLAB to re-check the counter after copying. This could join the six-field quoting issue.
+    - B. Refuse incomplete updates before publishing (your car and the current session present, a track name and a subsession ID), and log the refusal.
+    - C. Act on a new subsession ID or player car only once two updates agree.
