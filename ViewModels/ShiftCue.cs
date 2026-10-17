@@ -43,7 +43,12 @@ namespace VISOR.ViewModels
         /// <summary>Smoothed RPM change per second in the current gear.</summary>
         public double RpmRate => _rate;
 
+        /// <param name="sessionTime">This frame's SessionTime, in seconds.</param>
+        /// <param name="gear">Current gear: -1 reverse, 0 neutral.</param>
+        /// <param name="rpm">Engine RPM.</param>
         /// <param name="active">Indicator on and applicable (setting on, on track, not in pits or on the pit limiter).</param>
+        /// <param name="revLimiterActive">The car reports its rev limiter is active (EngineWarnings).</param>
+        /// <param name="redLine">The car's redline, in RPM.</param>
         /// <param name="shiftRpm">Shift point for this gear; 0 when there's nothing to shift to (top gear).</param>
         /// <param name="approachRpm">Where amber starts.</param>
         public ShiftState Update(double sessionTime, int gear, float rpm, bool active, bool revLimiterActive,

@@ -20,8 +20,8 @@ namespace VISOR.Settings
         // The overlay's rounded-corner Border (MainWindow.xaml, Margin="10") frames the
         // scaled content grid, so its 10px-per-side chrome is applied in window space and
         // does NOT scale with the size preset. It must be added to the window height as a
-        // constant. The old code folded this into the scaled padding budget instead, which
-        // shrank it to ~14px at the 0.6x Small preset and clipped the bottom of Row 5.
+        // constant: folded into the scaled padding instead, it shrinks to ~14px at the 0.6x
+        // Small preset and clips the bottom of Row 5.
         private const double BORDER_CHROME_HEIGHT = 20.0;
 
         private readonly UserSettings _settings;
@@ -48,9 +48,7 @@ namespace VISOR.Settings
             double scaleFactor = WindowScale.ForMainWindow(_settings.WindowSize);
             double scaledWidth = baseWidth * scaleFactor;
 
-            // Scale the content, then add the unscaled Border chrome. At Large this equals
-            // the previous (contentHeight + WINDOW_PADDING) * 1.0, so Large/Medium are
-            // visually unchanged; Small gains back the ~8px it was being clipped by.
+            // Scale the content, then add the unscaled Border chrome.
             double scaledHeight = contentHeight * scaleFactor + BORDER_CHROME_HEIGHT;
 
             return new Size(scaledWidth, scaledHeight);

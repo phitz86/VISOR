@@ -23,10 +23,7 @@ namespace VISOR.ViewModels
             private set => Set(ref _rightBarWidth, value);
         }
 
-        /// <summary>
-        /// Update the delta bar based on lap delta to session best
-        /// </summary>
-        /// <param name="snapshot">Telemetry snapshot containing delta data</param>
+        /// <summary>Sets the bars from the lap delta to the session best, capped at ±3 s.</summary>
         public void Update(SVappsLABSnapshot snapshot)
         {
             // Positive = slower than session best, negative = faster.

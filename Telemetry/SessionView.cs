@@ -54,7 +54,7 @@
             QualifyPositions = qualifyPositions;
             QualifyFastestTimes = qualifyFastestTimes;
 
-            // Worked out once per update rather than on every read (C4).
+            // Worked out once per update rather than on every read.
             CurrentSession = sessions.GetValueOrDefault(currentSessionNum);
             _useFastestLapPositioning = CurrentSession is { IsRace: false } s && (s.IsPractice || s.IsQualifying);
             IsLoneQualifying = CurrentSession?.IsLoneQualifying ?? false;

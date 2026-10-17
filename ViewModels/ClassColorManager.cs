@@ -35,20 +35,16 @@ namespace VISOR.ViewModels
         }
 
         /// <summary>
-        /// Gets the color assigned to a specific car class.
-        /// Uses CarClassColor from YAML data for accurate iRacing class colors.
+        /// The class's colour from the session info (CarClassColor, per car), cached for the
+        /// session. <paramref name="carClassColors"/> and <paramref name="carClassIDs"/> are
+        /// indexed by CarIdx.
         /// </summary>
-        /// <param name="classID">The car class ID</param>
-        /// <param name="carClassColors">Array of hex colors from YAML (indexed by carIdx)</param>
-        /// <param name="carClassIDs">Array of class IDs (indexed by carIdx)</param>
-        /// <returns>The brush color for this class</returns>
         public Brush GetClassColor(int classID, int[]? carClassColors = null, int[]? carClassIDs = null)
         {
             // Class ID 0 is a real class here, not a missing one: online Test sessions and offline
-            // custom races are single-class and iRacing reports every driver as CarClassID 0. It
-            // used to short-circuit to Transparent, which left the car-number swatch unpainted in
-            // exactly those sessions. Callers only ask about cars that have YAML driver data, so
-            // there is no empty-slot case to guard against.
+            // custom races are single-class and iRacing reports every driver as CarClassID 0.
+            // Callers only ask about cars that have YAML driver data, so there is no empty-slot
+            // case to guard against.
 
             if (_classColorMap.TryGetValue(classID, out var existingColor))
                 return existingColor;
@@ -114,11 +110,7 @@ namespace VISOR.ViewModels
             return brightness >= LIGHT_FILL_THRESHOLD;
         }
 
-        /// <summary>
-        /// Converts iRacing hex color format (0xRRGGBB) to WPF SolidColorBrush.
-        /// </summary>
-        /// <param name="hexColor">Hex color value from YAML (e.g., 0xff5888)</param>
-        /// <returns>SolidColorBrush for WPF rendering</returns>
+        /// <summary>iRacing's 0xRRGGBB colour (e.g. 0xff5888) as a brush.</summary>
         private SolidColorBrush ConvertHexColorToBrush(int hexColor)
         {
             byte r = (byte)((hexColor >> 16) & 0xFF);

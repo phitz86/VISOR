@@ -40,8 +40,7 @@ namespace VISOR.Race
 
         #region Checkered Flag
         /// <summary>
-        /// Track checkered flag state based on SessionState.
-        /// SessionState: 5 = Checkered, 6 = CoolDown
+        /// Whether the session is at the checkered (or cool-down), from SessionState.
         /// </summary>
         public void TrackCheckeredFlagState(PositionFrame frame)
         {
@@ -60,7 +59,7 @@ namespace VISOR.Race
         #region Freezing Finishing Positions
         /// <summary>
         /// Freeze class positions for cars as they take the checkered flag.
-        /// Only begins freezing after the P1 car (class leader) crosses S/F.
+        /// Only begins freezing after the overall leader crosses S/F.
         /// Monitors CarIdxLapCompleted increments during checkered flag state.
         ///
         /// The CarIdxLapCompleted baseline is tracked from the moment the session starts, NOT from
@@ -114,7 +113,7 @@ namespace VISOR.Race
                     }
                     else if (_leaderHasFinished && currentPosition > 0)
                     {
-                        // Don't freeze lapped traffic ahead of the class leader until the leader has crossed.
+                        // The winner is home: every car that crosses from now on has finished.
                         _finishing.Freeze(carIdx, currentPosition, currentOverall);
 
                         Log.Info($"Car #{carNumbers[carIdx]} (idx {carIdx}) took checkered flag - frozen at P{currentPosition} (overall P{currentOverall}) (LapCompleted: {lastLapCompleted} -> {currentLapCompleted})");

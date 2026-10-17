@@ -231,9 +231,7 @@ namespace VISOR.Settings
 
         #region Helper Methods
 
-        /// <summary>
-        /// Save current settings to storage
-        /// </summary>
+        /// <summary>Saves the settings, logging rather than throwing on failure.</summary>
         public void SaveSettings()
         {
             try

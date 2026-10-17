@@ -262,7 +262,7 @@ namespace VISOR.ViewModels
             int[] carClassIDs)
         {
             // No ClassID == 0 guard: that is the real class in single-class sessions (online Test,
-            // offline custom races), and skipping it left the swatch at its Transparent default.
+            // offline custom races), and skipping it would leave the swatch transparent.
             // ClassColorManager resolves an unknown or uncoloured class to a legible light grey.
             row.ClassBackground = _classColorManager.GetClassColor(row.ClassID, carClassColors, carClassIDs);
         }

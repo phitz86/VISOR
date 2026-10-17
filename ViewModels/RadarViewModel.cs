@@ -29,7 +29,7 @@ namespace VISOR.ViewModels
 
         // The cars RadarWindow draws, one item per car in range, kept and updated in place while
         // the car stays in range. The window draws exactly this list, so a car that leaves it
-        // leaves the radar: nothing can be left behind on screen (B1).
+        // leaves the radar: nothing can be left behind on screen.
         public ObservableCollection<RadarCarItem> Cars { get; } = new();
 
         private readonly Dictionary<int, RadarCarItem> _carItems = new();

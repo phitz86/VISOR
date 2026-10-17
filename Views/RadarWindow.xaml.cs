@@ -25,7 +25,7 @@ namespace VISOR.Views
         private const double DesignHeight = 396.0;
 
         // Each grid line as RadarWindow.xaml draws it, recorded before the first resize. Every
-        // resize places the lines from these, never from where the last resize left them (B14).
+        // resize places the lines from these, never from where the last resize left them.
         private readonly (Line Line, bool Vertical, double DesignX, double DesignY)[] _gridLines;
 
         public RadarWindow(SVappsLABSDKWrapper sdkWrapper, ClassColorManager classColorManager)

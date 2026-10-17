@@ -9,8 +9,8 @@ namespace VISOR.Views
     /// <summary>
     /// The drag handle the overlay and the radar show in config mode: visible only while config
     /// mode is on, and dragging it moves its window. It reads the current mode when its window
-    /// opens, so a window created while config mode is already on starts with its handle showing
-    /// (B13), and it stops listening when its window closes.
+    /// opens, so a window created while config mode is already on starts with its handle showing,
+    /// and it stops listening when its window closes.
     /// </summary>
     public partial class ConfigDragHandle : UserControl
     {

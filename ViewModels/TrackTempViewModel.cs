@@ -9,8 +9,7 @@ namespace VISOR.ViewModels
     /// (°C or °F per user setting) plus a trend arrow — red up when the track is heating,
     /// blue down when cooling.
     ///
-    /// TrackTempCrew is direct telemetry, so unlike the removed vehicle-health inference there
-    /// is nothing to guess here. The only care needed is in the trend: the value moves in small
+    /// TrackTempCrew is direct telemetry, so there is nothing to guess here. The only care needed is in the trend: the value moves in small
     /// steps, so the arrow compares against a reference sample a few minutes old and uses a
     /// Schmitt trigger (enter/exit thresholds) so it can't flicker at a threshold boundary.
     /// </summary>

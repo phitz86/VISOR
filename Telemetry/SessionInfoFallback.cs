@@ -8,7 +8,7 @@ namespace VISOR.Telemetry
     /// (<see cref="SessionInfoYaml"/>).
     ///
     /// Each raw update is checked first. While the SDK can read it, nothing changes: the SDK's
-    /// result is applied as before. The first update the SDK can't read switches VISOR to reading
+    /// result is applied as usual. The first update the SDK can't read switches VISOR to reading
     /// every update itself until iRacing disconnects. The two never alternate, so a slow result
     /// from one can't land after a newer one from the other.
     ///
@@ -27,6 +27,7 @@ namespace VISOR.Telemetry
         /// Returns the session info VISOR should apply from this update, or null when it is the
         /// SDK's to handle, or when not even the repair could read it.
         /// </summary>
+        /// <param name="yaml">The raw session-info text.</param>
         /// <param name="wellFormed">The update passed <see cref="SessionInfoYaml.IsWellFormed"/>.</param>
         public TelemetrySessionInfo? Read(string yaml, bool wellFormed)
         {

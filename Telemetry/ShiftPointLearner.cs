@@ -122,11 +122,6 @@ namespace VISOR.Telemetry
             return anyMatch;
         }
 
-        /// <summary>
-        /// Feeds one frame. Updates the gear-ratio estimate whenever the drivetrain is locked up,
-        /// and adds a torque-model sample when the frame is a clean full-throttle frame.
-        /// Returns true when the frame was added to the torque model.
-        /// </summary>
         private readonly long[] _skipCounts = new long[Enum.GetValues<SkipReason>().Length];
         private long _keptCount;
 
@@ -148,6 +143,11 @@ namespace VISOR.Telemetry
             return false;
         }
 
+        /// <summary>
+        /// Feeds one frame. Updates the gear-ratio estimate whenever the drivetrain is locked up,
+        /// and adds a torque-model sample when the frame is a clean full-throttle frame.
+        /// Returns true when the frame was added to the torque model.
+        /// </summary>
         public bool AddSample(in ShiftSample s)
         {
             // Session clock went backwards (reset to pits, new session): restart shift tracking.

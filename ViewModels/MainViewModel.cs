@@ -90,7 +90,7 @@ namespace VISOR.ViewModels
             bool sessionChanged = CheckForSessionTransition(snapshot, sessionDataProvider);
 
             // Leaving cool-down for the next session also changes the session number, on the same
-            // frame: one reset covers both (C9).
+            // frame: one reset covers both.
             if (leftCoolDown || sessionChanged)
                 ResetSessionUI();
 
@@ -313,8 +313,7 @@ namespace VISOR.ViewModels
 
         /// <summary>
         /// Clear everything that belongs to one session. Used on a session change and on a
-        /// disconnect; it covers what the cool-down and session-number resets each cleared before
-        /// they became one (C9).
+        /// disconnect.
         /// </summary>
         private void ResetSessionUI()
         {

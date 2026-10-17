@@ -329,17 +329,13 @@ namespace VISOR.Diagnostics
                 : profile.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
         }
 
-        /// <summary>
-        /// Gets the path to the current log file.
-        /// </summary>
+        /// <summary>The current log file, or empty before the first session starts.</summary>
         public static string GetCurrentLogPath()
         {
             return _currentLogFilePath ?? string.Empty;
         }
 
-        /// <summary>
-        /// Gets the path to the Logs directory.
-        /// </summary>
+        /// <summary>%LOCALAPPDATA%\VISOR\Logs.</summary>
         public static string GetLogsDirectory()
         {
             string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);

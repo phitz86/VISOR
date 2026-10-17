@@ -6,10 +6,10 @@ namespace VISOR.ViewModels
     /// <summary>
     /// Drives the incident-counter display (Nx / limit) with severity colouring.
     ///
-    /// This class previously also inferred vehicle damage and pit strategy from contact, sub-lap
-    /// pace and top speed. That was removed: iRacing exposes no live "damage that matters" signal
-    /// (repair time only reads once you're on pit road), so the inference produced nuisance warnings
-    /// on inconsequential contact. The incident count is direct, reliable telemetry — it stays.
+    /// It deliberately doesn't infer vehicle damage or pit strategy (from contact, sub-lap pace or
+    /// top speed): iRacing exposes no live "damage that matters" signal (repair time only reads
+    /// once you're on pit road), so such an inference warns about inconsequential contact. The
+    /// incident count is direct, reliable telemetry.
     /// </summary>
     public class WarningsViewModel : ObservableObject
     {

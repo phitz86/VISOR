@@ -111,7 +111,7 @@ namespace VISOR.ViewModels
                 return;
             }
 
-            // Plausible change: smooth exactly as before (EMA), unchanged.
+            // Plausible change: exponential moving average.
             _gapRejectCount = 0;
             _smoothedGap = (smoothingFactor * newGap) + ((1f - smoothingFactor) * _smoothedGap);
         }
