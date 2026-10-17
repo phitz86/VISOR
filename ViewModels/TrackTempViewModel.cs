@@ -1,5 +1,3 @@
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
 using System.Windows.Media;
 using VISOR.Diagnostics;
 using VISOR.Settings;
@@ -16,12 +14,8 @@ namespace VISOR.ViewModels
     /// steps, so the arrow compares against a reference sample a few minutes old and uses a
     /// Schmitt trigger (enter/exit thresholds) so it can't flicker at a threshold boundary.
     /// </summary>
-    public class TrackTempViewModel : INotifyPropertyChanged
+    public class TrackTempViewModel : ObservableObject
     {
-        public event PropertyChangedEventHandler? PropertyChanged;
-        private void OnPropertyChanged([CallerMemberName] string? name = null) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-
         // Trend is judged against a sample ~TrendLookbackSec old. Samples are kept sparse
         // (one per SampleIntervalSec) so the buffer stays a few dozen entries regardless of
         // the 60Hz update rate. No arrow shows until MinTrendAgeSec of history exists.
@@ -52,9 +46,9 @@ namespace VISOR.ViewModels
         private string _trendArrow = " ";
         private Brush _trendColor = Brushes.Transparent;
 
-        public string TempDisplay { get => _tempDisplay; private set { _tempDisplay = value; OnPropertyChanged(); } }
-        public string TrendArrow { get => _trendArrow; private set { _trendArrow = value; OnPropertyChanged(); } }
-        public Brush TrendColor { get => _trendColor; private set { _trendColor = value; OnPropertyChanged(); } }
+        public string TempDisplay { get => _tempDisplay; private set => Set(ref _tempDisplay, value); }
+        public string TrendArrow { get => _trendArrow; private set => Set(ref _trendArrow, value); }
+        public Brush TrendColor { get => _trendColor; private set => Set(ref _trendColor, value); }
 
         /// <summary>
         /// Called per telemetry frame with the live track temp (°C) and SessionTime as the

@@ -1,5 +1,3 @@
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
 using System.Windows.Media;
 using VISOR.Diagnostics;
 
@@ -13,18 +11,14 @@ namespace VISOR.ViewModels
     /// (repair time only reads once you're on pit road), so the inference produced nuisance warnings
     /// on inconsequential contact. The incident count is direct, reliable telemetry — it stays.
     /// </summary>
-    public class WarningsViewModel : INotifyPropertyChanged
+    public class WarningsViewModel : ObservableObject
     {
-        public event PropertyChangedEventHandler? PropertyChanged;
-        private void OnPropertyChanged([CallerMemberName] string? name = null) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-
         private int _incidentCount = 0;
         private string _incidentDisplay = "0x";
         private Brush _incidentColor = Brushes.White;
 
-        public string IncidentDisplay { get => _incidentDisplay; private set { _incidentDisplay = value; OnPropertyChanged(); } }
-        public Brush IncidentColor { get => _incidentColor; private set { _incidentColor = value; OnPropertyChanged(); } }
+        public string IncidentDisplay { get => _incidentDisplay; private set => Set(ref _incidentDisplay, value); }
+        public Brush IncidentColor { get => _incidentColor; private set => Set(ref _incidentColor, value); }
 
         public void UpdateIncidentCount(int newCount, int incidentLimit)
         {

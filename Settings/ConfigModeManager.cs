@@ -3,98 +3,35 @@
 namespace VISOR.Settings
 {
     /// <summary>
-    /// Manages the application's configuration mode state.
-    /// When in config mode, windows can be dragged via their drag handles.
-    /// When not in config mode, windows are click-through except for specific controls.
+    /// Config mode, on while the Config window is open: the windows show their drag handles and
+    /// can be moved. Outside it they're click-through apart from specific controls.
     /// </summary>
     public class ConfigModeManager
     {
-        private static ConfigModeManager _instance = null!;
-        private static readonly object _lock = new object();
+        public static ConfigModeManager Instance { get; } = new();
 
-        private bool _isInConfigMode;
+        /// <summary>Raised with the new state whenever config mode turns on or off.</summary>
+        public event Action<bool>? ConfigModeChanged;
 
-        /// <summary>
-        /// Event raised when config mode state changes
-        /// </summary>
-        public event EventHandler<ConfigModeChangedEventArgs>? ConfigModeChanged;
-
-        /// <summary>
-        /// Gets whether the application is currently in configuration mode
-        /// </summary>
-        public bool IsInConfigMode
-        {
-            get => _isInConfigMode;
-            private set
-            {
-                if (_isInConfigMode != value)
-                {
-                    _isInConfigMode = value;
-                    Log.Debug($"[ConfigModeManager] Config mode changed to: {value}");
-                    ConfigModeChanged?.Invoke(this, new ConfigModeChangedEventArgs(value));
-                }
-            }
-        }
-
-        /// <summary>
-        /// Gets the singleton instance of ConfigModeManager
-        /// </summary>
-        public static ConfigModeManager Instance
-        {
-            get
-            {
-                if (_instance == null)
-                {
-                    lock (_lock)
-                    {
-                        if (_instance == null)
-                        {
-                            _instance = new ConfigModeManager();
-                        }
-                    }
-                }
-                return _instance;
-            }
-        }
+        public bool IsInConfigMode { get; private set; }
 
         private ConfigModeManager()
         {
-            _isInConfigMode = false;
             Log.Info("[ConfigModeManager] Initialized");
         }
 
-        /// <summary>
-        /// Enters configuration mode - enables window dragging and shows drag handles
-        /// </summary>
-        public void EnterConfigMode()
-        {
-            Log.Debug("[ConfigModeManager] Entering config mode");
-            IsInConfigMode = true;
-        }
+        public void EnterConfigMode() => SetConfigMode(true);
 
-        /// <summary>
-        /// Exits configuration mode - disables window dragging and hides drag handles
-        /// </summary>
-        public void ExitConfigMode()
-        {
-            Log.Debug("[ConfigModeManager] Exiting config mode");
-            IsInConfigMode = false;
-        }
-    }
+        public void ExitConfigMode() => SetConfigMode(false);
 
-    /// <summary>
-    /// Event arguments for ConfigModeChanged event
-    /// </summary>
-    public class ConfigModeChangedEventArgs : EventArgs
-    {
-        /// <summary>
-        /// Whether config mode is now active
-        /// </summary>
-        public bool IsInConfigMode { get; }
-
-        public ConfigModeChangedEventArgs(bool isInConfigMode)
+        private void SetConfigMode(bool value)
         {
-            IsInConfigMode = isInConfigMode;
+            if (IsInConfigMode == value)
+                return;
+
+            IsInConfigMode = value;
+            Log.Debug($"[ConfigModeManager] Config mode changed to: {value}");
+            ConfigModeChanged?.Invoke(value);
         }
     }
 }

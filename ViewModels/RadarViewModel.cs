@@ -1,6 +1,4 @@
 ﻿using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
 using System.Windows.Media;
 using VISOR.Diagnostics;
 using VISOR.Telemetry;
@@ -17,12 +15,8 @@ namespace VISOR.ViewModels
         RightFar = 4
     }
 
-    public class RadarViewModel : INotifyPropertyChanged
+    public class RadarViewModel : ObservableObject
     {
-        public event PropertyChangedEventHandler? PropertyChanged;
-        private void OnPropertyChanged([CallerMemberName] string? name = null) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-
         private const float AVERAGE_CAR_LENGTH = 4.5f; // meters
         private const float DETECTION_RANGE = 5.0f; // car lengths
         private const float RADAR_CENTER_Y = 198f;
@@ -53,7 +47,7 @@ namespace VISOR.ViewModels
         public int VisibleCarCount
         {
             get => _visibleCarCount;
-            private set { _visibleCarCount = value; OnPropertyChanged(); }
+            private set => Set(ref _visibleCarCount, value);
         }
 
         public RadarViewModel(ClassColorManager classColorManager)

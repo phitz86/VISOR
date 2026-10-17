@@ -25,11 +25,8 @@ namespace VISOR.Views
             _settingsManager = SettingsManager.Instance;
             _configModeManager = ConfigModeManager.Instance;
 
-            // Set version display from assembly
             var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-            VersionText.Text = version != null
-                ? $"Version {version.Major}.{version.Minor}.{version.Build}"
-                : "Version unknown";
+            VersionText.Text = version != null ? FormatVersion(version) : "Version unknown";
 
             _configModeManager.EnterConfigMode();
 
@@ -130,7 +127,7 @@ namespace VISOR.Views
 
         private void WindowSizeCombo_SelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
-            if (!_isInitialized || _settingsManager == null)
+            if (!_isInitialized)
                 return;
 
             if (WindowSizeCombo.SelectedItem is ComboBoxItem selectedItem && selectedItem.Tag is string sizeTag)
@@ -148,29 +145,19 @@ namespace VISOR.Views
             }
         }
 
-        private void DebugModeCheckBox_Checked(object? sender, RoutedEventArgs e)
+        private void DebugModeCheckBox_Changed(object? sender, RoutedEventArgs e)
         {
             if (!_isInitialized)
                 return;
 
+            bool enabled = DebugModeCheckBox.IsChecked == true;
             var settings = _settingsManager.Settings;
-            settings.DebugModeEnabled = true;
+            settings.DebugModeEnabled = enabled;
             settings.SaveSettings();
-            Log.DebugModeEnabled = true;
-            Log.Info("Debug mode enabled - verbose logging activated");
-            UpdateDebugModeDisplay();
-        }
-
-        private void DebugModeCheckBox_Unchecked(object? sender, RoutedEventArgs e)
-        {
-            if (!_isInitialized)
-                return;
-
-            var settings = _settingsManager.Settings;
-            settings.DebugModeEnabled = false;
-            settings.SaveSettings();
-            Log.Info("Debug mode disabled - returning to normal logging");
-            Log.DebugModeEnabled = false;
+            Log.DebugModeEnabled = enabled;
+            Log.Info(enabled
+                ? "Debug mode enabled - verbose logging activated"
+                : "Debug mode disabled - returning to normal logging");
             UpdateDebugModeDisplay();
         }
 
@@ -202,7 +189,7 @@ namespace VISOR.Views
 
         private void RowCheckBox_Changed(object? sender, RoutedEventArgs e)
         {
-            if (!_isInitialized || _settingsManager == null)
+            if (!_isInitialized)
                 return;
 
             bool showRow0 = Row0CheckBox.IsChecked ?? false;
@@ -221,7 +208,7 @@ namespace VISOR.Views
 
         private void Row5ElementCheckBox_Changed(object? sender, RoutedEventArgs e)
         {
-            if (!_isInitialized || _settingsManager == null)
+            if (!_isInitialized)
                 return;
 
             bool showTrackLocation = TrackLocationCheckBox.IsChecked ?? false;
@@ -234,7 +221,7 @@ namespace VISOR.Views
 
         private void PositionDisplayRadio_Changed(object? sender, RoutedEventArgs e)
         {
-            if (!_isInitialized || _settingsManager == null)
+            if (!_isInitialized)
                 return;
 
             var newMode = PositionOverallRadio.IsChecked == true
@@ -247,7 +234,7 @@ namespace VISOR.Views
 
         private void TempUnitRadio_Changed(object? sender, RoutedEventArgs e)
         {
-            if (!_isInitialized || _settingsManager == null)
+            if (!_isInitialized)
                 return;
 
             var settings = _settingsManager.Settings;
@@ -261,7 +248,7 @@ namespace VISOR.Views
 
         private void ShiftIndicatorCheckBox_Changed(object? sender, RoutedEventArgs e)
         {
-            if (!_isInitialized || _settingsManager == null)
+            if (!_isInitialized)
                 return;
 
             var settings = _settingsManager.Settings;
@@ -273,7 +260,7 @@ namespace VISOR.Views
 
         private void HidePitsCheckBox_Changed(object? sender, RoutedEventArgs e)
         {
-            if (!_isInitialized || _settingsManager == null)
+            if (!_isInitialized)
                 return;
 
             var settings = _settingsManager.Settings;
@@ -285,7 +272,7 @@ namespace VISOR.Views
 
         private void RadarCheckBox_Changed(object? sender, RoutedEventArgs e)
         {
-            if (!_isInitialized || _settingsManager == null)
+            if (!_isInitialized)
                 return;
 
             bool showRadar = RadarCheckBox.IsChecked ?? false;
@@ -293,22 +280,9 @@ namespace VISOR.Views
             Log.Info($"Radar visibility changed to {showRadar}");
 
             if (showRadar)
-            {
-                var radarWindow = GetCurrentRadarWindow();
-                if (radarWindow != null)
-                {
-                    radarWindow.Show();
-                    radarWindow.Activate();
-                }
-                else
-                {
-                    ((App)Application.Current).ShowRadarWindow();
-                }
-            }
+                ((App)Application.Current).ShowRadarWindow();
             else
-            {
                 ((App)Application.Current).HideRadarWindow();
-            }
 
             RowCheckBox_Changed(sender, e);
         }
@@ -336,9 +310,11 @@ namespace VISOR.Views
         /// </summary>
         private void ShowUpdateAvailable(Version latestVersion)
         {
-            UpdateButton.Content = $"Version {latestVersion.Major}.{latestVersion.Minor}.{latestVersion.Build} available";
+            UpdateButton.Content = $"{FormatVersion(latestVersion)} available";
             UpdateButton.Visibility = Visibility.Visible;
         }
+
+        private static string FormatVersion(Version v) => $"Version {v.Major}.{v.Minor}.{v.Build}";
 
         private void UpdateButton_Click(object? sender, RoutedEventArgs e)
         {
@@ -367,19 +343,16 @@ namespace VISOR.Views
 
         private void SaveWindowPositions()
         {
-            if (_mainWindow != null)
-            {
-                Point mainPos = new Point(_mainWindow.Left, _mainWindow.Top);
+            Point mainPos = new Point(_mainWindow.Left, _mainWindow.Top);
 
-                var radarWindow = GetCurrentRadarWindow();
-                Point radarPos = radarWindow != null
-                    ? new Point(radarWindow.Left, radarWindow.Top)
-                    : _settingsManager.GetRadarWindowPosition();
+            var radarWindow = GetCurrentRadarWindow();
+            Point radarPos = radarWindow != null
+                ? new Point(radarWindow.Left, radarWindow.Top)
+                : _settingsManager.GetRadarWindowPosition();
 
-                _settingsManager.SaveWindowPositions(mainPos, radarPos);
+            _settingsManager.SaveWindowPositions(mainPos, radarPos);
 
-                Log.Debug($"Positions saved - Main: ({mainPos.X}, {mainPos.Y}), Radar: ({radarPos.X}, {radarPos.Y})");
-            }
+            Log.Debug($"Positions saved - Main: ({mainPos.X}, {mainPos.Y}), Radar: ({radarPos.X}, {radarPos.Y})");
         }
     }
 }

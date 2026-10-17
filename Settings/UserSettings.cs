@@ -1,4 +1,5 @@
 ﻿using System.Configuration;
+using System.Runtime.CompilerServices;
 using System.IO;
 using VISOR.Diagnostics;
 
@@ -11,20 +12,9 @@ namespace VISOR.Settings
     /// </summary>
     public sealed class UserSettings : ApplicationSettingsBase
     {
-        private static UserSettings _instance = null!;
+        private static UserSettings? _instance;
 
-        /// <summary>
-        /// Singleton instance of user settings
-        /// </summary>
-        public static UserSettings Instance
-        {
-            get
-            {
-                if (_instance == null)
-                    _instance = CreateWithRecovery();
-                return _instance;
-            }
-        }
+        public static UserSettings Instance => _instance ??= CreateWithRecovery();
 
         /// <summary>
         /// Creates the settings instance, recovering automatically if the underlying
@@ -136,276 +126,106 @@ namespace VISOR.Settings
             }
         }
 
+        // Each setting is stored under its property name: renaming one resets it for everyone.
+        private T Get<T>([CallerMemberName] string name = "") => (T)this[name];
+        private void Set<T>(T value, [CallerMemberName] string name = "") => this[name] = value;
+
         #region Window Size and Position Settings
 
-        /// <summary>
-        /// Size preset for application windows (Small/Medium/Large)
-        /// </summary>
-        [UserScopedSetting]
-        [DefaultSettingValue("Large")]
-        public WindowSizePreset WindowSize
-        {
-            get => (WindowSizePreset)this["WindowSize"];
-            set => this["WindowSize"] = value;
-        }
+        [UserScopedSetting, DefaultSettingValue("Large")]
+        public WindowSizePreset WindowSize { get => Get<WindowSizePreset>(); set => Set(value); }
 
-        /// <summary>
-        /// Main window X position (-1 = use default)
-        /// </summary>
-        [UserScopedSetting]
-        [DefaultSettingValue("-1")]
-        public int MainWindowX
-        {
-            get => (int)this["MainWindowX"];
-            set => this["MainWindowX"] = value;
-        }
+        // Saved window positions; -1 means none saved yet, so the window takes its default place.
+        [UserScopedSetting, DefaultSettingValue("-1")]
+        public int MainWindowX { get => Get<int>(); set => Set(value); }
 
-        /// <summary>
-        /// Main window Y position (-1 = use default)
-        /// </summary>
-        [UserScopedSetting]
-        [DefaultSettingValue("-1")]
-        public int MainWindowY
-        {
-            get => (int)this["MainWindowY"];
-            set => this["MainWindowY"] = value;
-        }
+        [UserScopedSetting, DefaultSettingValue("-1")]
+        public int MainWindowY { get => Get<int>(); set => Set(value); }
 
-        /// <summary>
-        /// Radar window X position (-1 = use default)
-        /// </summary>
-        [UserScopedSetting]
-        [DefaultSettingValue("-1")]
-        public int RadarWindowX
-        {
-            get => (int)this["RadarWindowX"];
-            set => this["RadarWindowX"] = value;
-        }
+        [UserScopedSetting, DefaultSettingValue("-1")]
+        public int RadarWindowX { get => Get<int>(); set => Set(value); }
 
-        /// <summary>
-        /// Radar window Y position (-1 = use default)
-        /// </summary>
-        [UserScopedSetting]
-        [DefaultSettingValue("-1")]
-        public int RadarWindowY
-        {
-            get => (int)this["RadarWindowY"];
-            set => this["RadarWindowY"] = value;
-        }
+        [UserScopedSetting, DefaultSettingValue("-1")]
+        public int RadarWindowY { get => Get<int>(); set => Set(value); }
 
         #endregion
 
         #region Row Visibility Settings
 
-        /// <summary>
-        /// Show Row 0 (Gear + Position)
-        /// </summary>
-        [UserScopedSetting]
-        [DefaultSettingValue("true")]
-        public bool ShowRow0
-        {
-            get => (bool)this["ShowRow0"];
-            set => this["ShowRow0"] = value;
-        }
+        // Row 0: gear and position.
+        [UserScopedSetting, DefaultSettingValue("true")]
+        public bool ShowRow0 { get => Get<bool>(); set => Set(value); }
 
-        /// <summary>
-        /// Color the Row 0 gear symbol as a shift indicator (amber approaching the shift point,
-        /// flashing red/white at it, solid red at the redline). Gated by ShowRow0.
-        /// </summary>
-        [UserScopedSetting]
-        [DefaultSettingValue("true")]
-        public bool ShowShiftIndicator
-        {
-            get => (bool)this["ShowShiftIndicator"];
-            set => this["ShowShiftIndicator"] = value;
-        }
+        // Colour the Row 0 gear symbol as a shift indicator (amber approaching the shift point,
+        // flashing red/white at it, solid red at the redline). Gated by ShowRow0.
+        [UserScopedSetting, DefaultSettingValue("true")]
+        public bool ShowShiftIndicator { get => Get<bool>(); set => Set(value); }
 
-        /// <summary>
-        /// Show Row 1 (Time + Fuel)
-        /// </summary>
-        [UserScopedSetting]
-        [DefaultSettingValue("true")]
-        public bool ShowRow1
-        {
-            get => (bool)this["ShowRow1"];
-            set => this["ShowRow1"] = value;
-        }
+        // Row 1: time and fuel.
+        [UserScopedSetting, DefaultSettingValue("true")]
+        public bool ShowRow1 { get => Get<bool>(); set => Set(value); }
 
-        /// <summary>
-        /// Show Row 2 (Delta Bar)
-        /// </summary>
-        [UserScopedSetting]
-        [DefaultSettingValue("true")]
-        public bool ShowRow2
-        {
-            get => (bool)this["ShowRow2"];
-            set => this["ShowRow2"] = value;
-        }
+        // Row 2: delta bar.
+        [UserScopedSetting, DefaultSettingValue("true")]
+        public bool ShowRow2 { get => Get<bool>(); set => Set(value); }
 
-        /// <summary>
-        /// Show Row 3 (Lap Times)
-        /// </summary>
-        [UserScopedSetting]
-        [DefaultSettingValue("true")]
-        public bool ShowRow3
-        {
-            get => (bool)this["ShowRow3"];
-            set => this["ShowRow3"] = value;
-        }
+        // Row 3: lap times.
+        [UserScopedSetting, DefaultSettingValue("true")]
+        public bool ShowRow3 { get => Get<bool>(); set => Set(value); }
 
-        /// <summary>
-        /// Show Row 4 (Relative Display)
-        /// </summary>
-        [UserScopedSetting]
-        [DefaultSettingValue("true")]
-        public bool ShowRow4
-        {
-            get => (bool)this["ShowRow4"];
-            set => this["ShowRow4"] = value;
-        }
+        // Row 4: the relative display.
+        [UserScopedSetting, DefaultSettingValue("true")]
+        public bool ShowRow4 { get => Get<bool>(); set => Set(value); }
 
-        /// <summary>
-        /// Show Row 5 (Warnings)
-        /// </summary>
-        [UserScopedSetting]
-        [DefaultSettingValue("true")]
-        public bool ShowRow5
-        {
-            get => (bool)this["ShowRow5"];
-            set => this["ShowRow5"] = value;
-        }
+        // Row 5: track location, incidents and track temperature, each with its own setting
+        // below that only takes effect while Row 5 itself is shown.
+        [UserScopedSetting, DefaultSettingValue("true")]
+        public bool ShowRow5 { get => Get<bool>(); set => Set(value); }
 
-        /// <summary>
-        /// Show the Row 5 track-location readout (named corner/section of the circuit).
-        /// Gated by ShowRow5; only takes effect while Row 5 itself is visible.
-        /// </summary>
-        [UserScopedSetting]
-        [DefaultSettingValue("true")]
-        public bool ShowTrackLocation
-        {
-            get => (bool)this["ShowTrackLocation"];
-            set => this["ShowTrackLocation"] = value;
-        }
+        [UserScopedSetting, DefaultSettingValue("true")]
+        public bool ShowTrackLocation { get => Get<bool>(); set => Set(value); }
 
-        /// <summary>
-        /// Show the Row 5 incident counter. Gated by ShowRow5.
-        /// </summary>
-        [UserScopedSetting]
-        [DefaultSettingValue("true")]
-        public bool ShowIncidentCounter
-        {
-            get => (bool)this["ShowIncidentCounter"];
-            set => this["ShowIncidentCounter"] = value;
-        }
+        [UserScopedSetting, DefaultSettingValue("true")]
+        public bool ShowIncidentCounter { get => Get<bool>(); set => Set(value); }
 
-        /// <summary>
-        /// Show the Row 5 track-temperature readout. Gated by ShowRow5.
-        /// </summary>
-        [UserScopedSetting]
-        [DefaultSettingValue("true")]
-        public bool ShowTrackTemp
-        {
-            get => (bool)this["ShowTrackTemp"];
-            set => this["ShowTrackTemp"] = value;
-        }
+        [UserScopedSetting, DefaultSettingValue("true")]
+        public bool ShowTrackTemp { get => Get<bool>(); set => Set(value); }
 
-        /// <summary>
-        /// Show radar window
-        /// </summary>
-        [UserScopedSetting]
-        [DefaultSettingValue("true")]
-        public bool ShowRadar
-        {
-            get => (bool)this["ShowRadar"];
-            set => this["ShowRadar"] = value;
-        }
+        [UserScopedSetting, DefaultSettingValue("true")]
+        public bool ShowRadar { get => Get<bool>(); set => Set(value); }
 
-        /// <summary>
-        /// Hide cars that are on pit road from the Row 4 relative display.
-        /// Affects only the relative display; the player's own row is always shown.
-        /// </summary>
-        [UserScopedSetting]
-        [DefaultSettingValue("false")]
-        public bool HideCarsInPits
-        {
-            get => (bool)this["HideCarsInPits"];
-            set => this["HideCarsInPits"] = value;
-        }
+        // Leaves pit-road cars out of the relative display; the player's own row always shows.
+        [UserScopedSetting, DefaultSettingValue("false")]
+        public bool HideCarsInPits { get => Get<bool>(); set => Set(value); }
 
         #endregion
 
         #region Position Display Settings
 
-        /// <summary>
-        /// Whether position displays (Row 0 player position and the relative table)
-        /// show class position or overall (field-wide) position.
-        /// </summary>
-        [UserScopedSetting]
-        [DefaultSettingValue("Class")]
-        public PositionDisplayMode PositionDisplayMode
-        {
-            get => (PositionDisplayMode)this["PositionDisplayMode"];
-            set => this["PositionDisplayMode"] = value;
-        }
+        // Class or overall position, in Row 0 and the relative display.
+        [UserScopedSetting, DefaultSettingValue("Class")]
+        public PositionDisplayMode PositionDisplayMode { get => Get<PositionDisplayMode>(); set => Set(value); }
 
-        /// <summary>
-        /// Display unit for the Row 5 track temperature element.
-        /// Telemetry reports °C; Fahrenheit is a display-time conversion.
-        /// </summary>
-        [UserScopedSetting]
-        [DefaultSettingValue("Fahrenheit")]
-        public TemperatureUnit TemperatureUnit
-        {
-            get => (TemperatureUnit)this["TemperatureUnit"];
-            set => this["TemperatureUnit"] = value;
-        }
+        // Telemetry reports °C; Fahrenheit is converted for display.
+        [UserScopedSetting, DefaultSettingValue("Fahrenheit")]
+        public TemperatureUnit TemperatureUnit { get => Get<TemperatureUnit>(); set => Set(value); }
 
         #endregion
 
-        #region Update Settings
+        #region Update and Debug Settings
 
-        /// <summary>
-        /// Whether VISOR checks GitHub for a newer release on startup and notifies
-        /// the user when one is available.
-        /// </summary>
-        [UserScopedSetting]
-        [DefaultSettingValue("true")]
-        public bool CheckForUpdatesOnStartup
-        {
-            get => (bool)this["CheckForUpdatesOnStartup"];
-            set => this["CheckForUpdatesOnStartup"] = value;
-        }
+        // Check GitHub for a newer release at startup.
+        [UserScopedSetting, DefaultSettingValue("true")]
+        public bool CheckForUpdatesOnStartup { get => Get<bool>(); set => Set(value); }
 
-        #endregion
+        // True until this version's settings have been carried over from the previous version's
+        // (CarryOverFromPreviousVersion). Bookkeeping only; not in the Config window.
+        [UserScopedSetting, DefaultSettingValue("true")]
+        public bool UpgradeRequired { get => Get<bool>(); set => Set(value); }
 
-        #region Version Upgrade
-
-        /// <summary>
-        /// True until this version's settings have been carried over from the previous version's
-        /// (see CarryOverFromPreviousVersion). Internal bookkeeping; not shown in the Config window.
-        /// </summary>
-        [UserScopedSetting]
-        [DefaultSettingValue("true")]
-        public bool UpgradeRequired
-        {
-            get => (bool)this["UpgradeRequired"];
-            set => this["UpgradeRequired"] = value;
-        }
-
-        #endregion
-
-        #region Debug Settings
-
-        /// <summary>
-        /// Enable debug mode (verbose logging)
-        /// </summary>
-        [UserScopedSetting]
-        [DefaultSettingValue("false")]
-        public bool DebugModeEnabled
-        {
-            get => (bool)this["DebugModeEnabled"];
-            set => this["DebugModeEnabled"] = value;
-        }
+        // Verbose logging.
+        [UserScopedSetting, DefaultSettingValue("false")]
+        public bool DebugModeEnabled { get => Get<bool>(); set => Set(value); }
 
         #endregion
 

@@ -152,29 +152,14 @@ namespace VISOR.Diagnostics
             _writer = null;
         }
 
-        /// <summary>
-        /// Log a debug message (verbose information for troubleshooting).
-        /// </summary>
-        public static void Debug(string message)
-        {
-            LogMessage(Level.Debug, message);
-        }
+        /// <summary>Verbose troubleshooting detail; written only in Debug Mode.</summary>
+        public static void Debug(string message) => LogMessage(Level.Debug, message);
 
-        /// <summary>
-        /// Log an informational message (normal operations, state changes).
-        /// </summary>
-        public static void Info(string message)
-        {
-            LogMessage(Level.Info, message);
-        }
+        /// <summary>Normal operation and state changes.</summary>
+        public static void Info(string message) => LogMessage(Level.Info, message);
 
-        /// <summary>
-        /// Log a warning message (unexpected but recoverable situations).
-        /// </summary>
-        public static void Warning(string message)
-        {
-            LogMessage(Level.Warning, message);
-        }
+        /// <summary>Unexpected but recoverable.</summary>
+        public static void Warning(string message) => LogMessage(Level.Warning, message);
 
         /// <summary>
         /// Log an error message with optional exception details.

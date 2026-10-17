@@ -1,6 +1,5 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
 using VISOR.Diagnostics;
@@ -43,11 +42,6 @@ namespace VISOR.Views
             DataContext = _viewModel;
             _sdkLink = new WindowSdkLink(this, _sdk, ProcessSnapshot, OnConnectionChanged, OnPrimedChanged);
 
-            AllowsTransparency = true;
-            WindowStyle = WindowStyle.None;
-            Background = Brushes.Transparent;
-            Topmost = true;
-
             ApplyWindowSizing();
             ApplyWindowPositioning();
 
@@ -82,9 +76,6 @@ namespace VISOR.Views
             MainContentContainer.Width = windowSize.Width;
             MainContentContainer.Height = windowSize.Height;
 
-            RadarCanvas.Width = windowSize.Width;
-            RadarCanvas.Height = windowSize.Height;
-
             UpdateLayoutForNewSize(windowSize);
         }
 
@@ -99,7 +90,7 @@ namespace VISOR.Views
         {
             double width = newSize.Width;
             double height = newSize.Height;
-            double scaleFactor = width / 240.0;
+            double scaleFactor = width / DesignWidth;
 
             RadarCanvas.Width = width;
             RadarCanvas.Height = height;
@@ -109,7 +100,7 @@ namespace VISOR.Views
             UpdateRadarLines(width, height);
             UpdateZoneHighlights(height, zoneWidth);
             UpdatePlayerCar(height, scaleFactor, zoneWidth);
-            UpdateZoneLabelsGrid(width);
+            UpdateZoneLabelsGrid(width, zoneWidth);
         }
 
         // Zone separators keep their share of the width (a fifth each) and run full height; the
@@ -169,14 +160,13 @@ namespace VISOR.Views
             PlayerCarNumber.FontSize = Math.Max(8, 12 * scaleFactor);
         }
 
-        private void UpdateZoneLabelsGrid(double width)
+        private void UpdateZoneLabelsGrid(double width, double zoneWidth)
         {
             var grid = RadarCanvas.Children.OfType<Grid>().FirstOrDefault();
             if (grid != null)
             {
                 grid.Width = width;
 
-                double zoneWidth = width / 5;
                 for (int i = 0; i < grid.ColumnDefinitions.Count && i < 5; i++)
                 {
                     grid.ColumnDefinitions[i].Width = new GridLength(zoneWidth);
@@ -193,7 +183,7 @@ namespace VISOR.Views
             });
         }
 
-        private async void RadarWindow_Loaded(object? sender, RoutedEventArgs e)
+        private void RadarWindow_Loaded(object? sender, RoutedEventArgs e)
         {
             try
             {
@@ -212,12 +202,8 @@ namespace VISOR.Views
         {
             if (!isConnected)
             {
-                _viewModel.Clear();
-                DebugText.Text = "Radar: Disconnected";
-                CarLeftRightIndicator.Text = "Offline";
-                ResetZoneHighlights();
+                ClearRadar("Radar: Disconnected", "Offline");
                 UpdatePlayerCarDisplay();
-                FadeOut();
             }
             else
             {
@@ -236,12 +222,8 @@ namespace VISOR.Views
             }
             else
             {
-                DebugText.Text = "Radar: Waiting for session data";
-                CarLeftRightIndicator.Text = "Waiting";
-                _viewModel.Clear();
-                ResetZoneHighlights();
+                ClearRadar("Radar: Waiting for session data", "Waiting");
                 UpdatePlayerCarDisplay();
-                FadeOut();
             }
         }
 
@@ -255,11 +237,7 @@ namespace VISOR.Views
                 // Alone on track in lone qualifying: nothing to show.
                 if (session.IsLoneQualifying)
                 {
-                    _viewModel.Clear();
-                    ResetZoneHighlights();
-                    FadeOut();
-                    DebugText.Text = "Radar: Hidden (Lone Qualifying)";
-                    CarLeftRightIndicator.Text = "Hidden";
+                    ClearRadar("Radar: Hidden (Lone Qualifying)", "Hidden");
                     return;
                 }
 
@@ -275,12 +253,19 @@ namespace VISOR.Views
             }
             else
             {
-                _viewModel.Clear();
-                ResetZoneHighlights();
-                FadeOut();
-                DebugText.Text = "Radar: No session data";
-                CarLeftRightIndicator.Text = "No Data";
+                ClearRadar("Radar: No session data", "No Data");
             }
+        }
+
+        // No cars to draw (disconnected, waiting, lone qualifying, no session data): empty the
+        // radar, drop the highlights and fade out, showing why.
+        private void ClearRadar(string status, string indicator)
+        {
+            _viewModel.Clear();
+            ResetZoneHighlights();
+            FadeOut();
+            DebugText.Text = status;
+            CarLeftRightIndicator.Text = indicator;
         }
 
         private void UpdatePlayerCarDisplay(SVappsLABSnapshot? snapshot = null, SessionView? session = null)
@@ -337,28 +322,25 @@ namespace VISOR.Views
 
         private void UpdateUIState()
         {
-            Dispatcher.Invoke(() =>
+            if (_sdk.IsPrimed)
             {
-                if (_sdk.IsPrimed)
-                {
-                    DebugText.Text = "Radar: Active";
-                    CarLeftRightIndicator.Text = "Ready";
-                }
-                else if (_sdk.IsConnected)
-                {
-                    DebugText.Text = "Radar: Connected, waiting for session data";
-                    CarLeftRightIndicator.Text = "Waiting";
-                    FadeOut();
-                }
-                else
-                {
-                    DebugText.Text = "Radar: Waiting for iRacing";
-                    CarLeftRightIndicator.Text = "Offline";
-                    FadeOut();
-                }
+                DebugText.Text = "Radar: Active";
+                CarLeftRightIndicator.Text = "Ready";
+            }
+            else if (_sdk.IsConnected)
+            {
+                DebugText.Text = "Radar: Connected, waiting for session data";
+                CarLeftRightIndicator.Text = "Waiting";
+                FadeOut();
+            }
+            else
+            {
+                DebugText.Text = "Radar: Waiting for iRacing";
+                CarLeftRightIndicator.Text = "Offline";
+                FadeOut();
+            }
 
-                UpdatePlayerCarDisplay();
-            });
+            UpdatePlayerCarDisplay();
         }
 
         private void UpdateFadeState(int visibleCarCount)
@@ -384,32 +366,25 @@ namespace VISOR.Views
         {
             if (_isFadedOut || _forceVisible) return;
             _isFadedOut = true;
-
-            var fadeOut = new DoubleAnimation
-            {
-                From = this.Opacity,
-                To = 0.0,
-                Duration = TimeSpan.FromMilliseconds(500),
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-            };
-
-            this.BeginAnimation(Window.OpacityProperty, fadeOut);
+            AnimateOpacity(0.0, 500);
         }
 
         private void FadeIn()
         {
             if (!_isFadedOut) return;
             _isFadedOut = false;
+            AnimateOpacity(1.0, 300);
+        }
 
-            var fadeIn = new DoubleAnimation
+        private void AnimateOpacity(double to, int milliseconds)
+        {
+            BeginAnimation(OpacityProperty, new DoubleAnimation
             {
-                From = this.Opacity,
-                To = 1.0,
-                Duration = TimeSpan.FromMilliseconds(300),
+                From = Opacity,
+                To = to,
+                Duration = TimeSpan.FromMilliseconds(milliseconds),
                 EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-            };
-
-            this.BeginAnimation(Window.OpacityProperty, fadeIn);
+            });
         }
 
         protected override void OnClosed(EventArgs e)

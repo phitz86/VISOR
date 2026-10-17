@@ -1,33 +1,16 @@
-﻿using System.ComponentModel;
-using System.Runtime.CompilerServices;
-using VISOR.Diagnostics;
+﻿using VISOR.Diagnostics;
 
 namespace VISOR.ViewModels
 {
-    public class FuelViewModel : INotifyPropertyChanged
+    public class FuelViewModel : ObservableObject
     {
-        public event PropertyChangedEventHandler? PropertyChanged;
-        private void OnPropertyChanged([CallerMemberName] string? name = null) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-
         private const int MovingAverageLapCount = 3;
         private readonly List<float> _lastLapsFuelUsage = new();
         private readonly Dictionary<int, float> _fuelLevelAtLapEnd = new();
         private int _lastProcessedLap = -1;
 
         private string _fuelDisplay = "--- Laps";
-        public string FuelDisplay
-        {
-            get => _fuelDisplay;
-            private set
-            {
-                if (_fuelDisplay != value)
-                {
-                    _fuelDisplay = value;
-                    OnPropertyChanged();
-                }
-            }
-        }
+        public string FuelDisplay { get => _fuelDisplay; private set => Set(ref _fuelDisplay, value); }
 
         public void Update(float fuelLevel, int currentLap)
         {

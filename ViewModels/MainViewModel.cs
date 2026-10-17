@@ -1,18 +1,12 @@
-﻿using System.ComponentModel;
-using System.Runtime.CompilerServices;
-using VISOR.Diagnostics;
+﻿using VISOR.Diagnostics;
 using VISOR.Race;
 using VISOR.Telemetry;
 using VISOR.Settings;
 
 namespace VISOR.ViewModels
 {
-    public sealed class MainViewModel : INotifyPropertyChanged
+    public sealed class MainViewModel : ObservableObject
     {
-        public event PropertyChangedEventHandler? PropertyChanged;
-        private void OnPropertyChanged([CallerMemberName] string? name = null) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-
         public FuelViewModel FuelVM { get; private set; }
         public RelativeViewModel RelativeVM { get; private set; }
         public DeltaBarViewModel DeltaBarVM { get; private set; }

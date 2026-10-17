@@ -23,6 +23,7 @@
     <Compile Include="..\..\Telemetry\ShiftModelStore.cs" Link="Linked\ShiftModelStore.cs" />
     <Compile Include="..\..\ViewModels\ShiftCue.cs" Link="Linked\ShiftCue.cs" />
     <Compile Include="..\..\ViewModels\FuelViewModel.cs" Link="Linked\FuelViewModel.cs" />
+    <Compile Include="..\..\ViewModels\ObservableObject.cs" Link="Linked\ObservableObject.cs" />
     <Compile Include="..\..\Telemetry\PositionHistoryBuffer.cs" Link="Linked\PositionHistoryBuffer.cs" />
     <Compile Include="..\..\Data\TrackSectionCatalog.cs" Link="Linked\TrackSectionCatalog.cs" />
     <Compile Include="..\..\Update\UpdateChecker.cs" Link="Linked\UpdateChecker.cs" />

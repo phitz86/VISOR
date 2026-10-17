@@ -1,16 +1,10 @@
-﻿using System.ComponentModel;
-using System.Runtime.CompilerServices;
-using VISOR.Diagnostics;
+﻿using VISOR.Diagnostics;
 using VISOR.Telemetry;
 
 namespace VISOR.ViewModels
 {
-    public class CountdownViewModel : INotifyPropertyChanged
+    public class CountdownViewModel : ObservableObject
     {
-        public event PropertyChangedEventHandler? PropertyChanged;
-        private void OnPropertyChanged([CallerMemberName] string? name = null) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-
         // iRacing fills SessionTime with a 24h+ placeholder for sessions that run to a lap count
         // with no clock (lone qualifying, lap-limited races). A value below this is a real budget.
         private const double UNLIMITED_SESSION_TIME_SECONDS = 86400.0;
@@ -23,12 +17,12 @@ namespace VISOR.ViewModels
         public string TimeRemainingDisplay
         {
             get => _timeRemainingDisplay;
-            private set { _timeRemainingDisplay = value; OnPropertyChanged(); }
+            private set => Set(ref _timeRemainingDisplay, value);
         }
         public string TimeRemainingSymbol
         {
             get => _timeRemainingSymbol;
-            private set { _timeRemainingSymbol = value; OnPropertyChanged(); }
+            private set => Set(ref _timeRemainingSymbol, value);
         }
 
         /// <summary>
@@ -39,12 +33,12 @@ namespace VISOR.ViewModels
         public string SecondaryTimerDisplay
         {
             get => _secondaryTimerDisplay;
-            private set { if (_secondaryTimerDisplay == value) return; _secondaryTimerDisplay = value; OnPropertyChanged(); }
+            private set => Set(ref _secondaryTimerDisplay, value);
         }
         public bool ShowSecondaryTimer
         {
             get => _showSecondaryTimer;
-            private set { if (_showSecondaryTimer == value) return; _showSecondaryTimer = value; OnPropertyChanged(); }
+            private set => Set(ref _showSecondaryTimer, value);
         }
 
         private bool _greenFlagSeen;
@@ -273,14 +267,8 @@ namespace VISOR.ViewModels
                     newLapDisplay = "--:--";
                 }
 
-                if (TimeRemainingDisplay != newLapDisplay)
-                {
-                    TimeRemainingDisplay = newLapDisplay;
-                }
-                if (TimeRemainingSymbol != newSymbol)
-                {
-                    TimeRemainingSymbol = newSymbol;
-                }
+                TimeRemainingDisplay = newLapDisplay;
+                TimeRemainingSymbol = newSymbol;
             }
 
             // The clock only earns its own line when the primary readout is spending itself on a lap

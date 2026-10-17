@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Internal tidy-ups, no change in behaviour** — the settings, config-mode and window code drop
+  about 420 lines of repeated boilerplate. The view models share one change-notification base,
+  and the radar shares one "clear and fade out" step. Every setting keeps its stored name and
+  default, so saved settings carry over.
+
 ### Removed
 
 - **More unused code, no change in behaviour** — members, styles and a colour resource left

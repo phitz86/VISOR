@@ -39,13 +39,13 @@ namespace VISOR.Views
             Visibility = configMode.IsInConfigMode ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        private void OnConfigModeChanged(object? sender, ConfigModeChangedEventArgs e)
+        private void OnConfigModeChanged(bool inConfigMode)
         {
             // Raised by the Config window, on the UI thread; queued in case it ever isn't.
             if (Dispatcher.CheckAccess())
-                ShowFor(e.IsInConfigMode);
+                ShowFor(inConfigMode);
             else
-                Dispatcher.BeginInvoke(() => ShowFor(e.IsInConfigMode));
+                Dispatcher.BeginInvoke(() => ShowFor(inConfigMode));
         }
 
         private void ShowFor(bool inConfigMode)
