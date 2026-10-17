@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-10-17
+
 ### Changed
 
+- **Version 1.3.1.0**; README and user guide updated to match.
 - **Internal tidy-ups, no change in behaviour** — the settings, config-mode and window code drop
   about 420 lines of repeated boilerplate. The view models share one change-notification base,
   and the radar shares one "clear and fade out" step. Every setting keeps its stored name and
@@ -436,7 +439,8 @@ display, and adds a substantial layer of app-stability and installer hardening.
 - Nullable-reference warnings (CS8602/CS8604) and an unused-variable warning; updated
   deprecated GitHub Actions.
 
-[Unreleased]: https://github.com/phitz86/VISOR/compare/v1.3.0.0...HEAD
+[Unreleased]: https://github.com/phitz86/VISOR/compare/v1.3.1.0...HEAD
+[1.3.1]: https://github.com/phitz86/VISOR/releases/tag/v1.3.1.0
 [1.3.0]: https://github.com/phitz86/VISOR/releases/tag/v1.3.0.0
 [1.2.1]: https://github.com/phitz86/VISOR/releases/tag/v1.2.1.0
 [1.2.0]: https://github.com/phitz86/VISOR/releases/tag/v1.2.0.0
