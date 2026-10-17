@@ -1,6 +1,5 @@
 using VISOR.Telemetry;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace VISOR.Tests
 {

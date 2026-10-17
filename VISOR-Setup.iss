@@ -97,14 +97,23 @@ Source: "{#BuildDir}\*.json"; DestDir: "{app}"; Flags: ignoreversion;
 ; Track section catalog (named corners for the Row 5 location readout)
 Source: "{#BuildDir}\Data\TrackSections.json"; DestDir: "{app}\Data"; Flags: ignoreversion
 
-; Runtime config
-Source: "{#BuildDir}\*.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
-
 ; Resources are embedded in the executable, not separate files
 ; Source: "{#BuildDir}\Resources\*"; DestDir: "{app}\Resources"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: DirExists('{#BuildDir}\Resources')
 
 ; Icon file
 Source: "VISOR Logo.ico"; DestDir: "{app}"; Flags: ignoreversion
+
+[InstallDelete]
+; Upgrades: remove the previous version's program files before the new ones are copied, so a
+; DLL an older release shipped and this one doesn't (System.Management.dll and its runtimes\
+; folder, for example) can't linger and be loaded. Only VISOR's own files are named, and only
+; when {app} already holds VISOR.exe: never a recursive wipe of {app}, which might be a folder
+; shared with other files. User data (settings, logs, shift models) lives under
+; %LOCALAPPDATA%\VISOR, never here.
+Type: files; Name: "{app}\*.dll"; Check: IsPreviousVisorInstall
+Type: files; Name: "{app}\VISOR.deps.json"; Check: IsPreviousVisorInstall
+Type: files; Name: "{app}\VISOR.runtimeconfig.json"; Check: IsPreviousVisorInstall
+Type: filesandordirs; Name: "{app}\runtimes"; Check: IsPreviousVisorInstall
 
 [Icons]
 ; Start Menu shortcut
@@ -324,25 +333,8 @@ begin
   end;
 end;
 
-// Handle upgrades: wipe the previous version's files before installing the new
-// set, so anything that shipped in an older release but not this one (orphaned
-// DLLs, renamed/removed dependencies, stale runtimes\ or satellite-resource
-// folders) doesn't linger in {app} and risk being loaded at runtime.
-//
-// ssInstall fires before Inno copies the new payload, so this is synchronous and
-// race-free. It is safe to clear {app}: all user data (settings, logs,
-// diagnostics) lives under %LOCALAPPDATA%\VISOR, never here. We only wipe {app}
-// when our own exe is present there — that confirms it's a prior VISOR install
-// rather than some unrelated folder the user may have chosen. Inno then recreates
-// {app}, installs the current files, and refreshes its own uninstaller; the
-// stable AppId keeps a single Programs-and-Features entry across upgrades.
-procedure CurStepChanged(CurStep: TSetupStep);
+// [InstallDelete] guard: {app} holds a previous VISOR install, so the files it names are ours.
+function IsPreviousVisorInstall: Boolean;
 begin
-  if CurStep = ssInstall then
-  begin
-    if FileExists(ExpandConstant('{app}\{#MyAppExeName}')) then
-    begin
-      DelTree(ExpandConstant('{app}'), True, True, True);
-    end;
-  end;
+  Result := FileExists(ExpandConstant('{app}\{#MyAppExeName}'));
 end;

@@ -2,7 +2,6 @@
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
 using VISOR.Diagnostics;
 using VISOR.Settings;
@@ -16,7 +15,7 @@ namespace VISOR.Views
         private readonly MainViewModel _viewModel;
         private readonly SVappsLABSDKWrapper _sdk;
         private readonly SettingsManager _settingsManager;
-        private readonly ConfigModeManager _configModeManager;
+        private readonly WindowSdkLink _sdkLink;
         private bool _lastRelativeVisibility = true;
 
         public MainViewModel ViewModel => _viewModel;
@@ -27,9 +26,9 @@ namespace VISOR.Views
 
             _sdk = sdkWrapper;
             _settingsManager = SettingsManager.Instance;
-            _configModeManager = ConfigModeManager.Instance;
             _viewModel = new MainViewModel();
             DataContext = _viewModel;
+            _sdkLink = new WindowSdkLink(this, _sdk, ProcessSnapshot, OnConnectionChanged, OnPrimedChanged);
 
             AllowsTransparency = true;
             WindowStyle = WindowStyle.None;
@@ -41,20 +40,16 @@ namespace VISOR.Views
 
             _settingsManager.ElementVisibilityChanged += OnElementVisibilityChanged;
             _settingsManager.WindowSizeChanged += OnWindowSizeChanged;
-            _configModeManager.ConfigModeChanged += OnConfigModeChanged;
 
             Loaded += MainWindow_Loaded;
         }
 
         private void ApplyWindowSizing()
         {
-            ISessionDataProvider? sessionProvider = null;
-            if (_sdk?.IsSessionDataReady == true)
-            {
-                sessionProvider = _sdk.Coordinator;
-            }
+            var session = _sdk?.Coordinator.Current;
+            bool relativeHidden = session != null && session.IsDataReady && session.IsLoneQualifying;
 
-            var windowSize = _settingsManager.GetMainWindowSize(sessionProvider);
+            var windowSize = _settingsManager.GetMainWindowSize(relativeHidden);
             Width = windowSize.Width;
             Height = windowSize.Height;
         }
@@ -66,7 +61,7 @@ namespace VISOR.Views
             Top = windowPosition.Y;
         }
 
-        private void OnElementVisibilityChanged(object? sender, ElementVisibilityChangedEventArgs e)
+        private void OnElementVisibilityChanged(object? sender, EventArgs e)
         {
             Dispatcher.Invoke(() =>
             {
@@ -86,31 +81,11 @@ namespace VISOR.Views
             });
         }
 
-        private void OnConfigModeChanged(object? sender, ConfigModeChangedEventArgs e)
-        {
-            Dispatcher.Invoke(() =>
-            {
-                Log.Debug($"[MainWindow] Config mode changed to: {e.IsInConfigMode}");
-                DragHandle.Visibility = e.IsInConfigMode ? Visibility.Visible : Visibility.Collapsed;
-            });
-        }
-
-        private void DragHandle_MouseLeftButtonDown(object? sender, MouseButtonEventArgs e)
-        {
-            if (_configModeManager.IsInConfigMode)
-            {
-                DragMove();
-            }
-        }
-
         private void MainWindow_Loaded(object? sender, RoutedEventArgs e)
         {
             try
             {
-                _sdk.SnapshotAvailable += OnSnapshotAvailable;
-                _sdk.ConnectionStateChanged += OnConnectionStateChanged;
-                _sdk.PrimedStateChanged += OnPrimedStateChanged;
-
+                _sdkLink.Attach();
                 UpdateUIState();
             }
             catch (Exception ex)
@@ -120,83 +95,67 @@ namespace VISOR.Views
             }
         }
 
-        private void OnConnectionStateChanged(bool isConnected)
+        // UI thread, queued by the SDK link.
+        private void OnConnectionChanged(bool isConnected)
         {
-            try
+            if (!isConnected)
             {
-                Dispatcher.Invoke(() =>
-                {
-                    if (!isConnected)
-                    {
-                        _viewModel.Reset();
-                        StatusText.Text = "Disconnected. Waiting for iRacing...";
-                        StatusText.Visibility = Visibility.Visible;
-                    }
-                    else
-                    {
-                        StatusText.Text = "Connected, waiting for session data...";
-                        StatusText.Visibility = Visibility.Visible;
-                    }
-                });
+                _viewModel.Reset();
+                StatusText.Text = "Disconnected. Waiting for iRacing...";
+                StatusText.Visibility = Visibility.Visible;
             }
-            catch (TaskCanceledException) { }
+            else
+            {
+                StatusText.Text = "Connected, waiting for session data...";
+                StatusText.Visibility = Visibility.Visible;
+            }
         }
 
-        private async void OnPrimedStateChanged(bool isPrimed)
+        // UI thread, queued by the SDK link.
+        private async void OnPrimedChanged(bool isPrimed)
         {
-            try
+            if (isPrimed)
             {
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    if (isPrimed)
-                    {
-                        StatusText.Text = "Fully connected!";
-                        _viewModel.IsTelemetryConnected = true;
-                    }
-                    else
-                    {
-                        StatusText.Text = "Waiting for session data...";
-                        StatusText.Visibility = Visibility.Visible;
-                        _viewModel.IsTelemetryConnected = false;
-                    }
-                });
+                StatusText.Text = "Fully connected!";
+                _viewModel.IsTelemetryConnected = true;
 
-                if (isPrimed)
+                // Back on the UI thread after the delay. Leave the text up if the HUD has
+                // dropped back to waiting in the meantime.
+                await Task.Delay(1000);
+                if (_sdk.IsPrimed)
+                    StatusText.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                StatusText.Text = "Waiting for session data...";
+                StatusText.Visibility = Visibility.Visible;
+                _viewModel.IsTelemetryConnected = false;
+            }
+        }
+
+        // UI thread, queued in order by the SDK link's frame poster.
+        private void ProcessSnapshot(SVappsLABSnapshot snapshot)
+        {
+            // One view for the whole frame: every reader below sees the same session update.
+            var session = _sdk.Coordinator.Current;
+            if (session.IsDataReady)
+            {
+                _viewModel.UpdateFromTelemetry(snapshot, session);
+
+                // The relative hides in lone qualifying.
+                bool currentRelativeVisibility = !session.IsLoneQualifying;
+                if (currentRelativeVisibility != _lastRelativeVisibility)
                 {
-                    await Task.Delay(1000);
-                    await Dispatcher.InvokeAsync(() => StatusText.Visibility = Visibility.Collapsed);
+                    Log.Info($"[MainWindow] Relative display visibility changed: {_lastRelativeVisibility} -> {currentRelativeVisibility}");
+                    ApplyWindowSizing();
+                    _lastRelativeVisibility = currentRelativeVisibility;
                 }
             }
-            catch (TaskCanceledException) { }
-            catch (OperationCanceledException) { }
-        }
-
-        private void OnSnapshotAvailable(SVappsLABSnapshot snapshot)
-        {
-            try
+            else
             {
-                Dispatcher.Invoke(() =>
-                {
-                    if (_sdk.IsSessionDataReady)
-                    {
-                        _viewModel.UpdateFromTelemetry(snapshot, _sdk.Coordinator);
-
-                        bool currentRelativeVisibility = !_sdk.Coordinator.ShouldHideRelativeDisplay();
-                        if (currentRelativeVisibility != _lastRelativeVisibility)
-                        {
-                            Log.Info($"[MainWindow] Relative display visibility changed: {_lastRelativeVisibility} -> {currentRelativeVisibility}");
-                            ApplyWindowSizing();
-                            _lastRelativeVisibility = currentRelativeVisibility;
-                        }
-                    }
-                    else
-                    {
-                        Log.Debug("[MainWindow] Session data not ready - passing null");
-                        _viewModel.UpdateFromTelemetry(snapshot, null);
-                    }
-                });
+                Log.Debug("[MainWindow] Session data not ready - passing null");
+                _viewModel.UpdateFromTelemetry(snapshot, null);
             }
-            catch (TaskCanceledException) { }
         }
 
         private void UpdateUIState()
@@ -232,24 +191,13 @@ namespace VISOR.Views
 
         private void ConfigButton_Click(object? sender, RoutedEventArgs e)
         {
-            foreach (Window window in Application.Current.Windows)
-            {
-                if (window is ConfigWindow)
-                {
-                    window.Activate();
-                    return;
-                }
-            }
-
-            ConfigWindow configWindow = new ConfigWindow(_sdk, this);
-            configWindow.Show();
+            ((App)Application.Current).ShowConfigWindow();
         }
 
         protected override void OnClosed(EventArgs e)
         {
             _settingsManager.ElementVisibilityChanged -= OnElementVisibilityChanged;
             _settingsManager.WindowSizeChanged -= OnWindowSizeChanged;
-            _configModeManager.ConfigModeChanged -= OnConfigModeChanged;
 
             base.OnClosed(e);
         }

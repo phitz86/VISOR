@@ -3,7 +3,7 @@
 
 Mirrors TrackSectionCatalog.Resolve exactly (substring venue matching,
 whole-word config matching) and runs it over every layout in
-Planning/iracing-track-identities.json, assuming an EMPTY TrackConfigName —
+tools/iracing-track-identities.json, assuming an EMPTY TrackConfigName —
 the worst case, where resolution must succeed on the slug alone. Multi-config
 venues do populate TrackConfigName in the sim, so a real session can only
 resolve more than this report shows, never less.
@@ -65,7 +65,7 @@ def resolve(tracks, slug: str, display: str, config: str = ""):
 def main() -> int:
     catalog = json.loads((ROOT / "Data" / "TrackSections.json").read_text(encoding="utf-8"))
     identities = json.loads(
-        (ROOT / "Planning" / "iracing-track-identities.json").read_text(encoding="utf-8")
+        (ROOT / "tools" / "iracing-track-identities.json").read_text(encoding="utf-8")
     )
     tracks = catalog["tracks"]
 

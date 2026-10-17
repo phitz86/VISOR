@@ -5,19 +5,12 @@ namespace VISOR.Telemetry
 {
     public class SVappsLABSnapshot
     {
-        public DateTime Timestamp { get; init; }
-        public bool IsValid { get; init; }
-
         // Strongly-typed live telemetry from the SDK's source generator. All reads go through the
         // typed accessors below, which normalize nulls/defaults centrally.
         public TelemetryData Data { get; init; }
 
-        public SVappsLABSnapshot(TelemetryData data, DateTime timestamp)
+        public SVappsLABSnapshot(TelemetryData data)
         {
-            Timestamp = timestamp;
-            // The wrapper only constructs a snapshot from a delivered telemetry frame, so it is
-            // always usable. (The former dict was likewise always non-null, i.e. IsValid==true.)
-            IsValid = true;
             Data = data;
         }
 
@@ -134,5 +127,26 @@ namespace VISOR.Telemetry
         public string CarLeftRightState => Data.CarLeftRight?.ToString() ?? "Off";
 
         #endregion
+
+        /// <summary>
+        /// What PositionCalculator reads, as a plain record. iRacing's per-car arrays already cover
+        /// all 64 slots; a shorter one is padded so the calculator can't index past its end.
+        /// </summary>
+        public PositionFrame ToPositionFrame() => new()
+        {
+            SessionNum = SessionNum,
+            SessionState = SessionState,
+            CarIdxLapDistPct = PositionFrame.AllCars(CarIdxLapDistPct, -1f),
+            CarIdxLap = PositionFrame.AllCars(CarIdxLap, 0),
+            CarIdxLapCompleted = PositionFrame.AllCars(CarIdxLapCompleted, -1),
+            CarIdxOnPitRoad = PositionFrame.AllCars(CarIdxOnPitRoad, false),
+            CarIdxClassPosition = PositionFrame.AllCars(CarIdxClassPosition, 0),
+            CarIdxPosition = PositionFrame.AllCars(CarIdxPosition, 0),
+            SessionFlags = SessionFlags,
+            PlayerCarIdx = PlayerCarIdx,
+            CarIdxTrackSurface = PositionFrame.AllCars(CarIdxTrackSurface, -1),
+            CarIdxBestLapTime = PositionFrame.AllCars(CarIdxBestLapTime, 0f),
+            CarIdxEstTime = PositionFrame.AllCars(CarIdxEstTime, 0f),
+        };
     }
 }

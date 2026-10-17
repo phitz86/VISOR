@@ -41,6 +41,7 @@ namespace VISOR.Settings
             {
                 // Force the user.config to load by touching a persisted value.
                 _ = settings.WindowSize;
+                CarryOverFromPreviousVersion(settings);
                 return settings;
             }
             catch (ConfigurationErrorsException ex)
@@ -60,6 +61,50 @@ namespace VISOR.Settings
                     Log.Error("Failed to reset settings after corruption recovery", inner);
                 }
                 return settings;
+            }
+        }
+
+        /// <summary>
+        /// Settings are stored per app version (in a folder named after the version), so a new
+        /// version starts from defaults unless the previous version's values are copied forward.
+        /// UpgradeRequired is true in a version's fresh settings, so this does its work once per
+        /// version: on the first start after an update, or after a fresh install, where there is
+        /// nothing to copy.
+        /// </summary>
+        private static void CarryOverFromPreviousVersion(UserSettings settings)
+        {
+            if (!settings.UpgradeRequired)
+                return;
+
+            try
+            {
+                // Only a version with no settings file of its own is new. A build that adds this
+                // check without changing the version already has one, and an older version's
+                // values must not overwrite it. GetPreviousVersion is null when no earlier
+                // version's settings exist.
+                string currentFile = ConfigurationManager
+                    .OpenExeConfiguration(ConfigurationUserLevel.PerUserRoamingAndLocal).FilePath;
+                if (!File.Exists(currentFile) && settings.GetPreviousVersion(nameof(WindowSize)) != null)
+                {
+                    settings.Upgrade();
+                    Log.Info("Settings carried over from the previous version");
+                }
+            }
+            catch (Exception ex)
+            {
+                // A corrupt previous-version file must not reach the corrupt-config recovery in
+                // CreateWithRecovery, which would delete it. Keep this version's settings instead.
+                Log.Warning($"Could not carry settings over from the previous version ({ex.GetType().Name}: {ex.Message}); keeping this version's settings");
+            }
+
+            try
+            {
+                settings.UpgradeRequired = false;
+                settings.Save();
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Failed to save settings after carrying them over", ex);
             }
         }
 
@@ -335,6 +380,22 @@ namespace VISOR.Settings
 
         #endregion
 
+        #region Version Upgrade
+
+        /// <summary>
+        /// True until this version's settings have been carried over from the previous version's
+        /// (see CarryOverFromPreviousVersion). Internal bookkeeping; not shown in the Config window.
+        /// </summary>
+        [UserScopedSetting]
+        [DefaultSettingValue("true")]
+        public bool UpgradeRequired
+        {
+            get => (bool)this["UpgradeRequired"];
+            set => this["UpgradeRequired"] = value;
+        }
+
+        #endregion
+
         #region Debug Settings
 
         /// <summary>
@@ -368,71 +429,6 @@ namespace VISOR.Settings
             }
         }
 
-        /// <summary>
-        /// Reload settings from storage
-        /// </summary>
-        public void ReloadSettings()
-        {
-            try
-            {
-                this.Reload();
-                Log.Debug("Settings reloaded successfully");
-            }
-            catch (System.Exception ex)
-            {
-                Log.Error("Error reloading settings", ex);
-            }
-        }
-
-        /// <summary>
-        /// Reset all settings to default values
-        /// </summary>
-        public void ResetToDefaults()
-        {
-            try
-            {
-                this.Reset();
-                Log.Info("Settings reset to defaults");
-            }
-            catch (System.Exception ex)
-            {
-                Log.Error("Error resetting settings", ex);
-            }
-        }
-
-        /// <summary>
-        /// Get row visibility setting by row index
-        /// </summary>
-        public bool GetRowVisibility(int rowIndex)
-        {
-            return rowIndex switch
-            {
-                0 => ShowRow0,
-                1 => ShowRow1,
-                2 => ShowRow2,
-                3 => ShowRow3,
-                4 => ShowRow4,
-                5 => ShowRow5,
-                _ => false
-            };
-        }
-
-        /// <summary>
-        /// Set row visibility setting by row index
-        /// </summary>
-        public void SetRowVisibility(int rowIndex, bool visible)
-        {
-            switch (rowIndex)
-            {
-                case 0: ShowRow0 = visible; break;
-                case 1: ShowRow1 = visible; break;
-                case 2: ShowRow2 = visible; break;
-                case 3: ShowRow3 = visible; break;
-                case 4: ShowRow4 = visible; break;
-                case 5: ShowRow5 = visible; break;
-            }
-        }
-
         #endregion
     }
 
@@ -444,6 +440,27 @@ namespace VISOR.Settings
         Small,
         Medium,
         Large
+    }
+
+    /// <summary>
+    /// How much each size preset scales the windows. The overlay and the radar scale differently,
+    /// so the radar stays readable at Small.
+    /// </summary>
+    public static class WindowScale
+    {
+        public static double ForMainWindow(WindowSizePreset preset) => preset switch
+        {
+            WindowSizePreset.Small => 0.6,
+            WindowSizePreset.Medium => 0.8,
+            _ => 1.0
+        };
+
+        public static double ForRadar(WindowSizePreset preset) => preset switch
+        {
+            WindowSizePreset.Small => 0.8,
+            WindowSizePreset.Medium => 0.9,
+            _ => 1.0
+        };
     }
 
     /// <summary>

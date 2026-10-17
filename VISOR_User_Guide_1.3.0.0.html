@@ -163,7 +163,7 @@
         <div class="title-block">
             <h1>VISOR User Guide</h1>
             <div class="subtitle">Virtual Intelligence Simulator Overlay & Radar</div>
-            <div class="meta">Version 1.2.1.0 | CephasMedia LLC | info@cephasmedia.com</div>
+            <div class="meta">Version 1.3.0.0 | CephasMedia LLC | info@cephasmedia.com</div>
         </div>
     </header>
 
@@ -197,13 +197,13 @@
     <h3>Window Size Presets</h3>
     <p>Choose from three size options that scale both the Main Window and Radar Window:</p>
     <ul>
-        <li><strong>Small (60% scale):</strong> Minimal screen space, smaller text</li>
-        <li><strong>Medium (80% scale):</strong> Balanced visibility and space</li>
-        <li><strong>Large (100% scale):</strong> Maximum readability (default)</li>
+        <li><strong>Small (Main Window 60%, Radar 80%):</strong> Minimal screen space, smaller text</li>
+        <li><strong>Medium (Main Window 80%, Radar 90%):</strong> Balanced visibility and space</li>
+        <li><strong>Large (100%):</strong> Maximum readability (default)</li>
     </ul>
 
     <h3>Drag and Position</h3>
-    <p>When the Configuration Window is open, both Main and Radar Windows display drag handles in the top-left corner. Click and drag to reposition. Positions save when you click "Done."</p>
+    <p>When the Configuration Window is open, both Main and Radar Windows display drag handles in the top-left corner. Click and drag to reposition. Positions save when you click "Done." To reopen the Configuration Window later, click &#9881; on the Main Window; &#10005; on the Main Window, or <strong>Exit VISOR</strong> in the Configuration Window, closes VISOR.</p>
 
     <h3>Display Options</h3>
     <p>Beyond the row toggles, the Configuration Window offers a few display preferences:</p>
@@ -259,7 +259,7 @@
 
     <h3>Row 5: Info Row</h3>
     <p>Row 5 holds three independent readouts. Each can be shown or hidden on its own in the Configuration Window, so you can keep just the ones you want.</p>
-    <p><strong>Track Location:</strong> The name of the corner or section of the circuit you're currently in &mdash; "Eau Rouge," "Kemmel Straight," and so on &mdash; like a sign hanging over the track. Names come from an editable catalog (<code>Data/TrackSections.json</code>) that ships alongside VISOR and covers 66 layouts out of the box, including the Nordschleife, Le Mans, and most iRacing road courses. On pit road it reads <strong>Pit Lane</strong>; on a track the catalog doesn't recognize (or when you're in the garage or being towed) the element simply hides. Advanced users can tune section boundaries or add tracks by editing the JSON file with a text editor &mdash; no rebuild required.</p>
+    <p><strong>Track Location:</strong> The name of the corner or section of the circuit you're currently in &mdash; "Eau Rouge," "Kemmel Straight," and so on &mdash; like a sign hanging over the track. Names come from an editable catalog (<code>Data/TrackSections.json</code>) that ships alongside VISOR and covers 66 layouts out of the box, including the Nordschleife, Le Mans, and most iRacing road courses. On pit road it reads <strong>Pit Lane</strong>; on a track the catalog doesn't recognize (or when you're in the garage or being towed) the element simply hides. Advanced users can tune section boundaries or add tracks by editing the JSON file with a text editor &mdash; no rebuild required. An entry VISOR can't read is skipped (and noted in the log) rather than disabling the catalog. Installing an update replaces this file, so keep a copy of your edits.</p>
     <p><strong>Incident Counter:</strong> Session incidents (0x, 4x, etc.). The color tracks how close you are to the session's incident limit rather than a fixed count, so it means the same thing whether your limit is 4x or 25x: <strong>white</strong> below ~30% of the limit, <strong>yellow</strong> from there to ~60%, and <strong>red</strong> beyond ~60% (roughly one bad incident from a DQ). Unlimited sessions use a gentle informational scale.</p>
     <p><strong>Track Temperature:</strong> The current track-surface temperature, shown in °F or °C (your choice in the Configuration Window). A small arrow shows the trend: <strong>red up</strong> when the surface is heating, <strong>blue down</strong> when it's cooling. The trend is smoothed over several minutes, so the arrow reflects a genuine change in conditions rather than sensor jitter.</p>
 
@@ -279,7 +279,7 @@
 
     <h3>Race Sessions</h3>
     <p><strong>Position:</strong> Real-time track position (lap + distance). <strong>Relative:</strong> Cars physically near you. <strong>Lapped traffic:</strong> Color-coded (blue/red).</p>
-    <p><strong>Disconnected drivers:</strong> A car whose telemetry has been missing for more than a few seconds (a driver who disconnects, quits, or loses connection) is dropped from VISOR's running order, so every car behind it moves up a place. iRacing's official results keep a disconnected driver classified on the laps they completed, so your final <strong>overall</strong> position in the results can be a place or more worse than VISOR showed if a driver ahead of you left the race. Positions are held once cars take the checkered flag, so drivers leaving after they finish do not affect them.</p>
+    <p><strong>Disconnected drivers:</strong> A car whose telemetry has been missing for more than a few seconds (a driver who disconnects, quits, or loses connection) is dropped from VISOR's running order, so every car behind it moves up a place. iRacing's official results keep a disconnected driver classified on the laps they completed, so your final <strong>overall</strong> position in the results can be a place or more worse than VISOR showed if a driver ahead of you left the race. Once the checkered flag is out, positions are held: a car that takes the flag, leaves the session or loses its connection keeps its place, so nobody moves up when drivers leave at the end.</p>
 
     <h3>Lone Qualifying</h3>
     <p>Relative Table and Radar Window automatically hide (no other cars on track simultaneously).</p>
@@ -291,6 +291,7 @@
         <li><strong>Window Positions:</strong> Saved automatically on "Done"</li>
         <li><strong>Fuel:</strong> Most accurate after 3+ consistent laps</li>
         <li><strong>Shift points:</strong> VISOR learns each car's best shift points over the first few laps of flat-out running</li>
+        <li><strong>Updating:</strong> Your settings, window positions and learned shift points carry over when you install a new version</li>
     </ul>
 
     <div class="contact-box">

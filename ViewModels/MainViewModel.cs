@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using VISOR.Diagnostics;
+using VISOR.Race;
 using VISOR.Telemetry;
 using VISOR.Views;
 using VISOR.Settings;
@@ -61,13 +62,7 @@ namespace VISOR.ViewModels
         public bool ShowIncidentElement => _settingsManager.Settings.ShowIncidentCounter;
         public bool ShowTrackTempElement => _settingsManager.Settings.ShowTrackTemp;
 
-        public double ScaleFactor => _settingsManager.Settings.WindowSize switch
-        {
-            WindowSizePreset.Small => 0.6,
-            WindowSizePreset.Medium => 0.8,
-            WindowSizePreset.Large => 1.0,
-            _ => 1.0
-        };
+        public double ScaleFactor => WindowScale.ForMainWindow(_settingsManager.Settings.WindowSize);
 
         public MainViewModel()
         {
@@ -107,12 +102,20 @@ namespace VISOR.ViewModels
             OnPropertyChanged(nameof(ScaleFactor));
         }
 
-        public void UpdateFromTelemetry(SVappsLABSnapshot snapshot, ISessionDataProvider? sessionDataProvider)
+        public void UpdateFromTelemetry(SVappsLABSnapshot snapshot, SessionView? sessionDataProvider)
         {
-            CheckSessionStateTransitions(snapshot);
-            CheckForSessionTransition(snapshot, sessionDataProvider);
+            bool leftCoolDown = CheckSessionStateTransitions(snapshot);
+            bool sessionChanged = CheckForSessionTransition(snapshot, sessionDataProvider);
 
-            _positionCalculator.Update(snapshot, sessionDataProvider);
+            // Leaving cool-down for the next session also changes the session number, on the same
+            // frame: one reset covers both (C9).
+            if (leftCoolDown || sessionChanged)
+                ResetSessionUI();
+
+            if (sessionChanged && sessionDataProvider != null && sessionDataProvider.IsDataReady)
+                CountdownVM.OnSessionTransition(sessionDataProvider, snapshot.SessionNum);
+
+            _positionCalculator.Update(snapshot.ToPositionFrame(), sessionDataProvider);
 
             FuelVM.Update(snapshot.FuelLevel, snapshot.Lap);
             RelativeVM.Update(snapshot, sessionDataProvider);
@@ -161,7 +164,7 @@ namespace VISOR.ViewModels
 
         #region --- Player Position Calculation ---
 
-        private void UpdatePlayerPosition(SVappsLABSnapshot snapshot, ISessionDataProvider dataProvider)
+        private void UpdatePlayerPosition(SVappsLABSnapshot snapshot, SessionView dataProvider)
         {
             string newPosition;
             bool useOverall = _settingsManager.Settings.PositionDisplayMode == PositionDisplayMode.Overall;
@@ -169,7 +172,7 @@ namespace VISOR.ViewModels
             if (dataProvider.ShouldUseFastestLapPositioning())
             {
                 var playerCarIdx = snapshot.PlayerCarIdx;
-                var fastestLapData = dataProvider.GetFastestLapPositioning();
+                var fastestLapData = dataProvider.FastestLapPositions;
                 var playerData = fastestLapData.FirstOrDefault(d => d.carIdx == playerCarIdx);
                 int position = useOverall ? playerData.overallPosition : playerData.classPosition;
                 newPosition = position > 0 ? position.ToString() : "--";
@@ -230,7 +233,7 @@ namespace VISOR.ViewModels
             }
         }
 
-        private void UpdateShiftIndicator(SVappsLABSnapshot snapshot, ISessionDataProvider? sessionDataProvider)
+        private void UpdateShiftIndicator(SVappsLABSnapshot snapshot, SessionView? sessionDataProvider)
         {
             var car = sessionDataProvider != null && sessionDataProvider.IsDataReady ? sessionDataProvider.PlayerCar : null;
 
@@ -277,55 +280,28 @@ namespace VISOR.ViewModels
         /// <summary>Saves any unsaved shift-point learning. Called on disconnect and app exit.</summary>
         public void FlushShiftPoints() => _shiftPoints.Flush();
 
-        private static string GetStateName(int state) => state switch
-        {
-            0 => "Invalid",
-            1 => "GetInCar",
-            2 => "Warmup",
-            3 => "ParadeLaps",
-            4 => "Racing",
-            5 => "Checkered",
-            6 => "CoolDown",
-            _ => $"Unknown({state})"
-        };
-
-        private void CheckSessionStateTransitions(SVappsLABSnapshot snapshot)
+        /// <summary>
+        /// Logs session-state changes. True when the session has just left cool-down for the
+        /// next one (CoolDown -> GetInCar), which calls for a reset.
+        /// </summary>
+        private bool CheckSessionStateTransitions(SVappsLABSnapshot snapshot)
         {
             int currentSessionState = snapshot.SessionState;
-            if (currentSessionState != _lastSessionState)
-            {
-                Log.Info($"Session state transition: {GetStateName(_lastSessionState)} -> {GetStateName(currentSessionState)}");
+            if (currentSessionState == _lastSessionState)
+                return false;
 
-                if (_lastSessionState == 6 && currentSessionState == 1)
-                {
-                    ClearSessionUI();
-                }
-                _lastSessionState = currentSessionState;
-            }
+            Log.Info($"Session state transition: {SessionStates.Name(_lastSessionState)} -> {SessionStates.Name(currentSessionState)}");
+
+            bool leftCoolDown = _lastSessionState == SessionStates.CoolDown && currentSessionState == SessionStates.GetInCar;
+            _lastSessionState = currentSessionState;
+            return leftCoolDown;
         }
 
-        private void ClearSessionUI()
-        {
-            LastLapTime = LapTimePlaceholder;
-            BestLapTime = LapTimePlaceholder;
-            FuelVM.Reset();
-            DeltaBarVM.Reset();
-            RelativeVM.Reset();
-            CountdownVM.Reset();
-            GearDisplay = "N";
-            ShiftState = ShiftState.Normal;
-            ShiftCalibration = ShiftCalibration.None;
-            _shiftCue.Reset();
-            ClassPositionNumber = "--";
-            _playerWasOnPitRoad = null;
-
-            _classColorManager.Reset();
-            _positionCalculator.Reset();
-
-            OnPropertyChanged(string.Empty);
-        }
-
-        private void CheckForSessionTransition(SVappsLABSnapshot snapshot, ISessionDataProvider? sessionDataProvider)
+        /// <summary>
+        /// True when the session number or the subsession has changed since the last frame,
+        /// which calls for a reset.
+        /// </summary>
+        private bool CheckForSessionTransition(SVappsLABSnapshot snapshot, SessionView? sessionDataProvider)
         {
             int currentSessionNum = snapshot.SessionNum;
 
@@ -343,19 +319,9 @@ namespace VISOR.ViewModels
                 && !string.IsNullOrEmpty(_lastSubSessionId)
                 && currentSubSessionId != _lastSubSessionId;
 
-            if (sessionNumChanged || subSessionChanged)
+            if (subSessionChanged)
             {
-                if (subSessionChanged)
-                {
-                    Log.Info($"New subsession detected ({_lastSubSessionId} -> {currentSubSessionId}); resetting session UI");
-                }
-
-                ResetSessionData();
-
-                if (sessionDataProvider != null && sessionDataProvider.IsDataReady)
-                {
-                    CountdownVM.OnSessionTransition(sessionDataProvider, currentSessionNum);
-                }
+                Log.Info($"New subsession detected ({_lastSubSessionId} -> {currentSubSessionId}); resetting session UI");
             }
 
             _lastSessionNum = currentSessionNum;
@@ -363,22 +329,36 @@ namespace VISOR.ViewModels
             {
                 _lastSubSessionId = currentSubSessionId;
             }
+
+            return sessionNumChanged || subSessionChanged;
         }
 
-        private void ResetSessionData()
+        /// <summary>
+        /// Clear everything that belongs to one session. Used on a session change and on a
+        /// disconnect; it covers what the cool-down and session-number resets each cleared before
+        /// they became one (C9).
+        /// </summary>
+        private void ResetSessionUI()
         {
             LastLapTime = LapTimePlaceholder;
             BestLapTime = LapTimePlaceholder;
-            DeltaBarVM.Reset();
             FuelVM.Reset();
-            WarningsVM.Reset();
+            DeltaBarVM.Reset();
+            RelativeVM.Reset();
             CountdownVM.Reset();
+            WarningsVM.Reset();
             TrackTempVM.Reset();
             TrackLocationVM.Reset();
-            RelativeVM.Reset();
+            GearDisplay = "N";
+            ShiftState = ShiftState.Normal;
+            ShiftCalibration = ShiftCalibration.None;
+            _shiftCue.Reset();
+            ClassPositionNumber = "--";
             _playerWasOnPitRoad = null;
+
             _classColorManager.Reset();
             _positionCalculator.Reset();
+
             OnPropertyChanged(string.Empty);
         }
 
@@ -388,10 +368,7 @@ namespace VISOR.ViewModels
             _lastSessionNum = -1;
             _lastSessionState = -999;
             _lastSubSessionId = string.Empty;
-            ClearSessionUI();
-            WarningsVM.Reset();
-            TrackTempVM.Reset();
-            TrackLocationVM.Reset();
+            ResetSessionUI();
         }
 
         public ClassColorManager ClassColorManager => _classColorManager;
@@ -400,8 +377,8 @@ namespace VISOR.ViewModels
         {
             // Latch the last non-zero value rather than mirroring telemetry: iRacing intermittently
             // drops last/best lap to zero mid-session, and the display shouldn't flicker to the
-            // placeholder. The latch is cleared explicitly on a real session change (ResetSessionData,
-            // driven by SessionNum or SubSessionID in CheckForSessionTransition).
+            // placeholder. The latch is cleared explicitly on a real session change (ResetSessionUI,
+            // driven by the checks at the top of UpdateFromTelemetry).
             if (lastLap > 0)
             {
                 string last = FormatLapTime(lastLap);

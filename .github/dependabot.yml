@@ -1,0 +1,22 @@
+# Keeps the commit-SHA pins in .github/workflows/ current: Dependabot opens a PR
+# when a pinned action releases a new version, updating the SHA and its comment.
+# Also proposes NuGet package updates for the app and the tests (the test packages
+# come as one grouped PR). Dependabot reads this file from the default branch only.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "nuget"
+    directories:
+      - "/"
+      - "/Tests/VISOR.Tests"
+    schedule:
+      interval: "weekly"
+    groups:
+      test-packages:
+        patterns:
+          - "Microsoft.NET.Test.Sdk"
+          - "xunit*"

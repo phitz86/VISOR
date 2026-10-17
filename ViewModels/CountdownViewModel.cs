@@ -88,7 +88,7 @@ namespace VISOR.ViewModels
         /// <summary>
         /// Initializes state based on the type of session that is starting.
         /// </summary>
-        public void OnSessionTransition(ISessionDataProvider sessionDataProvider, int newSessionNum)
+        public void OnSessionTransition(SessionView sessionDataProvider, int newSessionNum)
         {
             Reset();
 
@@ -113,7 +113,7 @@ namespace VISOR.ViewModels
         /// <summary>
         /// Processes a new telemetry snapshot to update the timer display.
         /// </summary>
-        public void Update(SVappsLABSnapshot snapshot, ISessionDataProvider? sessionDataProvider)
+        public void Update(SVappsLABSnapshot snapshot, SessionView? sessionDataProvider)
         {
             int lapsRemaining = snapshot.SessionLapsRemain;
             double timeRemain = snapshot.SessionTimeRemain;
@@ -305,7 +305,7 @@ namespace VISOR.ViewModels
         private static void LogLatch(string what, SVappsLABSnapshot snapshot, int lap, int lapsRemaining, double timeRemain)
         {
             Log.Info($"[Countdown] {what} latched on lap {lap}: SessionState {snapshot.SessionState}, " +
-                     $"flags 0x{snapshot.SessionFlags & 0x7:X}, lapsRemain {lapsRemaining}, timeRemain {timeRemain:F0}s");
+                     $"flags 0x{snapshot.SessionFlags & IRacingIds.FinishFlagsMask:X}, lapsRemain {lapsRemaining}, timeRemain {timeRemain:F0}s");
         }
 
         /// <summary>

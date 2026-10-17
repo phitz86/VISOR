@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Coverage for CI (dotnet test -settings Tests/VISOR.Tests/coverage.runsettings). The app's source
+     files are linked into the test assembly, so the report is limited to them: the tests' own
+     code under Tests/ is left out of the figure. -->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="Code Coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <CodeCoverage>
+            <Sources>
+              <Exclude>
+                <Source>.*[\\/]Tests[\\/].*</Source>
+              </Exclude>
+            </Sources>
+          </CodeCoverage>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

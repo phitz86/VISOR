@@ -29,6 +29,13 @@ namespace VISOR.Telemetry
 
         private readonly string _directory;
 
+        // The periodic background save and Flush (car change, disconnect, exit) can run at the same
+        // moment, and both write <car>.json.tmp before swapping it in; one at a time. A save that
+        // lands after a newer one for the same car build (fewer samples) is skipped, so a
+        // background save that started first can't overwrite what Flush just wrote.
+        private readonly object _saveLock = new();
+        private readonly System.Collections.Generic.Dictionary<string, long> _savedSampleCounts = new();
+
         public ShiftModelStore(string directory)
         {
             _directory = directory;
@@ -148,9 +155,18 @@ namespace VISOR.Telemetry
                     BinWeights = state.BinWeights,
                     GearRatios = state.GearRatios
                 };
+                byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(dto, JsonOptions);
                 string tmp = path + ".tmp";
-                File.WriteAllBytes(tmp, JsonSerializer.SerializeToUtf8Bytes(dto, JsonOptions));
-                File.Move(tmp, path, overwrite: true);
+                string key = carPath + "|" + carVersion;
+                lock (_saveLock)
+                {
+                    if (_savedSampleCounts.TryGetValue(key, out long saved) && state.SampleCount < saved)
+                        return true;
+
+                    File.WriteAllBytes(tmp, bytes);
+                    File.Move(tmp, path, overwrite: true);
+                    _savedSampleCounts[key] = state.SampleCount;
+                }
                 return true;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)

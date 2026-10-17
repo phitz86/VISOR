@@ -1,11 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Shapes;
 using VISOR.Diagnostics;
 using VISOR.Telemetry;
 using VISOR.Settings;
@@ -29,9 +27,7 @@ namespace VISOR.ViewModels
 
         private const float AVERAGE_CAR_LENGTH = 4.5f; // meters
         private const float DETECTION_RANGE = 5.0f; // car lengths
-        private const float RADAR_HEIGHT = 396f;
         private const float RADAR_CENTER_Y = 198f;
-        private const float CANVAS_CAR_POSITIONS = 11.0f; // 5 ahead + 1 player + 5 behind
         private const float CANVAS_HALF_RANGE = 5.5f; // car lengths from center to edge
 
         private const double BASE_CAR_WIDTH = 24.0;
@@ -39,20 +35,13 @@ namespace VISOR.ViewModels
         private const double BASE_FONT_SIZE = 12.0;
         private const double BASE_CANVAS_WIDTH = 240.0;
 
-        private float[] GetZoneXPositions(double canvasWidth)
-        {
-            double zoneWidth = canvasWidth / 5.0;
-            return new float[]
-            {
-                (float)(zoneWidth * 0.5),
-                (float)(zoneWidth * 1.5),
-                (float)(zoneWidth * 2.5),
-                (float)(zoneWidth * 3.5),
-                (float)(zoneWidth * 4.5)
-            };
-        }
+        // The cars RadarWindow draws, one item per car in range, kept and updated in place while
+        // the car stays in range. The window draws exactly this list, so a car that leaves it
+        // leaves the radar: nothing can be left behind on screen (B1).
+        public ObservableCollection<RadarCarItem> Cars { get; } = new();
 
-        private readonly Dictionary<int, RadarCarElement> _carElements = new();
+        private readonly Dictionary<int, RadarCarItem> _carItems = new();
+        private readonly List<int> _carsToRemove = new();
 
         private readonly ClassColorManager _classColorManager;
         private readonly SettingsManager _settingsManager;
@@ -75,20 +64,9 @@ namespace VISOR.ViewModels
             _settingsManager = SettingsManager.Instance;
         }
 
-        /// <summary>
-        /// Calculate current scale factor based on window size preset
-        /// </summary>
-        private double GetScaleFactor()
-        {
-            return _settingsManager.Settings.WindowSize switch
-            {
-                WindowSizePreset.Small => 0.8,
-                WindowSizePreset.Medium => 0.9,
-                _ => 1.0
-            };
-        }
+        private double GetScaleFactor() => WindowScale.ForRadar(_settingsManager.Settings.WindowSize);
 
-        public void UpdateFromTelemetry(SVappsLABSnapshot snapshot, ISessionDataProvider sessionDataProvider, Canvas carsContainer)
+        public void UpdateFromTelemetry(SVappsLABSnapshot snapshot, SessionView sessionDataProvider)
         {
             if (snapshot == null || sessionDataProvider == null || !sessionDataProvider.IsDataReady)
             {
@@ -105,7 +83,6 @@ namespace VISOR.ViewModels
             var lapDistPct = snapshot.CarIdxLapDistPct;
             var trackSurface = snapshot.CarIdxTrackSurface;
             var carNumbers = sessionDataProvider.CarNumbers;
-            var userNames = sessionDataProvider.UserNames;
             var carClassIDs = sessionDataProvider.CarClassIDs;
             var carClassColors = sessionDataProvider.CarClassColors;
             var onPitRoad = snapshot.CarIdxOnPitRoad;
@@ -154,7 +131,6 @@ namespace VISOR.ViewModels
                         PlayerLapDistPct = playerLapDistPct,
                         TrackDistance = proximityData.TrackDistance,
                         Proximity = proximityData.Proximity,
-                        IsAhead = proximityData.IsAhead,
                         CarNumber = carNumbers[i],
                         ClassID = carClassIDs[i],
                         IsOnPitRoad = onPitRoad?[i] ?? false
@@ -167,11 +143,11 @@ namespace VISOR.ViewModels
             var carLeftRightState = snapshot.CarLeftRightState;
             UpdateZoneAssignments(visibleCars, carLeftRightState);
 
-            UpdateRadarDisplay(carsContainer, visibleCars, carClassColors, carClassIDs);
+            UpdateRadarDisplay(visibleCars, carClassColors, carClassIDs);
             VisibleCarCount = visibleCars.Count;
         }
 
-        private (float TrackDistance, float Proximity, bool IsAhead) CalculateCarProximity(float playerDistPct, float carDistPct, float trackLength)
+        private (float TrackDistance, float Proximity) CalculateCarProximity(float playerDistPct, float carDistPct, float trackLength)
         {
             float directDistance = Math.Abs(carDistPct - playerDistPct) * trackLength;
             float wrapAroundDistance = trackLength - directDistance;
@@ -179,10 +155,29 @@ namespace VISOR.ViewModels
 
             float distancePct = Math.Abs(carDistPct - playerDistPct);
             float proximity = Math.Min(distancePct, 1.0f - distancePct);
-            bool isAhead = (carDistPct - playerDistPct + 1.5f) % 1.0f > 0.5f;
 
-            return (trackDistance, proximity, isAhead);
+            return (trackDistance, proximity);
         }
+
+        // The side zones each CarLeftRight state fills, closest car first. "Clear", "Off" and
+        // anything else leave every car in the centre.
+        private static readonly Dictionary<string, RadarZone[]> SideZonesByState = new()
+        {
+            ["CarLeft"] = new[] { RadarZone.LeftNear },
+            ["CarRight"] = new[] { RadarZone.RightNear },
+            ["CarLeftRight"] = new[] { RadarZone.LeftNear, RadarZone.RightNear },
+            ["TwoCarsLeft"] = new[] { RadarZone.LeftNear, RadarZone.LeftFar },
+            ["TwoCarsRight"] = new[] { RadarZone.RightNear, RadarZone.RightFar },
+        };
+
+        /// <summary>
+        /// The side zones a CarLeftRight state fills, closest car first. Drives both the zone
+        /// assignment here and the zone highlights in RadarWindow.
+        /// </summary>
+        public static IReadOnlyList<RadarZone> SideZonesFor(string carLeftRightState) =>
+            carLeftRightState != null && SideZonesByState.TryGetValue(carLeftRightState, out var zones)
+                ? zones
+                : Array.Empty<RadarZone>();
 
         private void UpdateZoneAssignments(List<RadarCarData> visibleCars, string carLeftRightState)
         {
@@ -208,141 +203,61 @@ namespace VISOR.ViewModels
             // Closest cars get first pick of the side zones.
             visibleCars.Sort((a, b) => a.Proximity.CompareTo(b.Proximity));
 
-            switch (carLeftRightState)
+            var sideZones = SideZonesFor(carLeftRightState);
+            for (int i = 0; i < sideZones.Count && i < visibleCars.Count; i++)
             {
-                case "CarLeft":
-                    if (visibleCars.Count > 0)
-                    {
-                        _carZoneAssignments[visibleCars[0].CarIdx] = RadarZone.LeftNear;
-                        if (stateChanged)
-                            Log.Debug($"[Radar] Assigned car {visibleCars[0].CarNumber} to LeftNear zone");
-                    }
-                    break;
-
-                case "CarRight":
-                    if (visibleCars.Count > 0)
-                    {
-                        _carZoneAssignments[visibleCars[0].CarIdx] = RadarZone.RightNear;
-                        if (stateChanged)
-                            Log.Debug($"[Radar] Assigned car {visibleCars[0].CarNumber} to RightNear zone");
-                    }
-                    break;
-
-                case "CarLeftRight":
-                    if (visibleCars.Count > 0)
-                    {
-                        _carZoneAssignments[visibleCars[0].CarIdx] = RadarZone.LeftNear;
-                        if (stateChanged)
-                            Log.Debug($"[Radar] Assigned car {visibleCars[0].CarNumber} to LeftNear zone (CarLeftRight)");
-                    }
-                    if (visibleCars.Count > 1)
-                    {
-                        _carZoneAssignments[visibleCars[1].CarIdx] = RadarZone.RightNear;
-                        if (stateChanged)
-                            Log.Debug($"[Radar] Assigned car {visibleCars[1].CarNumber} to RightNear zone (CarLeftRight)");
-                    }
-                    break;
-
-                case "TwoCarsLeft":
-                    if (visibleCars.Count > 0)
-                    {
-                        _carZoneAssignments[visibleCars[0].CarIdx] = RadarZone.LeftNear;
-                        if (stateChanged)
-                            Log.Debug($"[Radar] Assigned car {visibleCars[0].CarNumber} to LeftNear zone (TwoCarsLeft)");
-                    }
-                    if (visibleCars.Count > 1)
-                    {
-                        _carZoneAssignments[visibleCars[1].CarIdx] = RadarZone.LeftFar;
-                        if (stateChanged)
-                            Log.Debug($"[Radar] Assigned car {visibleCars[1].CarNumber} to LeftFar zone (TwoCarsLeft)");
-                    }
-                    break;
-
-                case "TwoCarsRight":
-                    if (visibleCars.Count > 0)
-                    {
-                        _carZoneAssignments[visibleCars[0].CarIdx] = RadarZone.RightNear;
-                        if (stateChanged)
-                            Log.Debug($"[Radar] Assigned car {visibleCars[0].CarNumber} to RightNear zone (TwoCarsRight)");
-                    }
-                    if (visibleCars.Count > 1)
-                    {
-                        _carZoneAssignments[visibleCars[1].CarIdx] = RadarZone.RightFar;
-                        if (stateChanged)
-                            Log.Debug($"[Radar] Assigned car {visibleCars[1].CarNumber} to RightFar zone (TwoCarsRight)");
-                    }
-                    break;
-
-                case "Clear":
-                case "Off":
-                default:
-                    if (stateChanged)
-                        Log.Debug($"[Radar] All cars assigned to Center zone (state: {carLeftRightState})");
-                    break;
+                _carZoneAssignments[visibleCars[i].CarIdx] = sideZones[i];
+                if (stateChanged)
+                    Log.Debug($"[Radar] Assigned car {visibleCars[i].CarNumber} to {sideZones[i]} zone ({carLeftRightState})");
             }
+            if (sideZones.Count == 0 && stateChanged)
+                Log.Debug($"[Radar] All cars assigned to Center zone (state: {carLeftRightState})");
         }
 
-        private float GetTrackLength(ISessionDataProvider sessionDataProvider)
+        // From the session info, not telemetry; 5 km when iRacing gave no length.
+        private static float GetTrackLength(SessionView sessionDataProvider)
         {
-            // TrackLength is coordinator-derived, not telemetry. The old snapshot-dict fallback
-            // was just this same coordinator value re-packed, so it has been dropped as redundant.
-            if (sessionDataProvider is SessionDataCoordinator coordinator)
-            {
-                float trackLength = coordinator.GetTrackLength();
-                if (trackLength > 0)
-                    return trackLength;
-            }
-
-            return 5000f;
+            float trackLength = sessionDataProvider.Track.LengthMeters;
+            return trackLength > 0 ? trackLength : 5000f;
         }
 
-        private void UpdateRadarDisplay(Canvas carsContainer, List<RadarCarData> visibleCars, int[] carClassColors, int[] carClassIDs)
+        private void UpdateRadarDisplay(List<RadarCarData> visibleCars, int[] carClassColors, int[] carClassIDs)
         {
-            var carsToRemove = new List<int>();
-            foreach (var kvp in _carElements)
+            _carsToRemove.Clear();
+            foreach (var carIdx in _carItems.Keys)
             {
-                bool found = visibleCars.Exists(car => car.CarIdx == kvp.Key);
-                if (!found)
-                {
-                    carsToRemove.Add(kvp.Key);
-                }
+                if (!visibleCars.Exists(car => car.CarIdx == carIdx))
+                    _carsToRemove.Add(carIdx);
             }
 
-            foreach (var carIdx in carsToRemove)
+            foreach (var carIdx in _carsToRemove)
             {
-                if (_carElements.TryGetValue(carIdx, out var element))
-                {
-                    carsContainer.Children.Remove(element.Rectangle);
-                    carsContainer.Children.Remove(element.NumberText);
-                    _carElements.Remove(carIdx);
-                }
+                Cars.Remove(_carItems[carIdx]);
+                _carItems.Remove(carIdx);
             }
 
+            // Every size is set every frame, so cars already on the radar follow a size-preset change.
+            double scaleFactor = GetScaleFactor();
             foreach (var car in visibleCars)
             {
-                var position = CalculateRadarPosition(car);
-
-                if (!_carElements.ContainsKey(car.CarIdx))
+                if (!_carItems.TryGetValue(car.CarIdx, out var item))
                 {
-                    var element = CreateCarElement(car);
-                    _carElements[car.CarIdx] = element;
-                    carsContainer.Children.Add(element.Rectangle);
-                    carsContainer.Children.Add(element.NumberText);
+                    item = new RadarCarItem(car.CarIdx);
+                    _carItems[car.CarIdx] = item;
+                    Cars.Add(item);
                 }
 
-                var carElement = _carElements[car.CarIdx];
-                UpdateCarElement(carElement, car, position, carClassColors, carClassIDs);
+                UpdateCarItem(item, car, CalculateRadarPosition(car, scaleFactor), scaleFactor, carClassColors, carClassIDs);
             }
         }
 
-        private RadarPosition CalculateRadarPosition(RadarCarData car)
+        private RadarPosition CalculateRadarPosition(RadarCarData car, double scaleFactor)
         {
-            var scaleFactor = GetScaleFactor();
-            double canvasWidth = BASE_CANVAS_WIDTH * scaleFactor;
-            var zonePositions = GetZoneXPositions(canvasWidth);
+            double zoneWidth = BASE_CANVAS_WIDTH * scaleFactor / 5.0;
 
+            // The middle of the car's zone: 0.5, 1.5 ... 4.5 zone widths across.
             var zone = _carZoneAssignments.GetValueOrDefault(car.CarIdx, RadarZone.Center);
-            float x = zonePositions[(int)zone];
+            float x = (float)(zoneWidth * ((int)zone + 0.5));
 
             float relativeDistPct = car.LapDistPct - car.PlayerLapDistPct;
             if (relativeDistPct > 0.5f) relativeDistPct -= 1.0f;
@@ -361,90 +276,39 @@ namespace VISOR.ViewModels
             return new RadarPosition { X = x, Y = y };
         }
 
-        private static System.Windows.Media.Effects.DropShadowEffect CreateNumberShadow(double scaleFactor)
+        private void UpdateCarItem(RadarCarItem item, RadarCarData car, RadarPosition position, double scaleFactor,
+            int[] carClassColors, int[] carClassIDs)
         {
-            return new System.Windows.Media.Effects.DropShadowEffect
-            {
-                Color = Colors.Black,
-                Direction = 0,
-                ShadowDepth = 2 * scaleFactor,
-                BlurRadius = 4 * scaleFactor
-            };
-        }
+            double width = BASE_CAR_WIDTH * scaleFactor;
+            double height = BASE_CAR_HEIGHT * scaleFactor;
 
-        private RadarCarElement CreateCarElement(RadarCarData car)
-        {
-            var scaleFactor = GetScaleFactor();
+            item.Left = position.X - width / 2;
+            item.Top = position.Y - height / 2;
+            item.Width = width;
+            item.Height = height;
+            item.StrokeThickness = 1 * scaleFactor;
 
-            var rectangle = new Rectangle
-            {
-                Width = BASE_CAR_WIDTH * scaleFactor,
-                Height = BASE_CAR_HEIGHT * scaleFactor,
-                Stroke = Brushes.Black,
-                StrokeThickness = 1 * scaleFactor
-            };
+            item.Number = car.CarNumber;
+            item.FontSize = BASE_FONT_SIZE * scaleFactor;
+            item.NumberTop = 4 * scaleFactor;
 
-            var numberText = new TextBlock
-            {
-                Width = BASE_CAR_WIDTH * scaleFactor,
-                FontSize = BASE_FONT_SIZE * scaleFactor,
-                FontWeight = FontWeights.Bold,
-                Foreground = Brushes.White,
-                Text = car.CarNumber,
-                TextAlignment = TextAlignment.Center
-            };
-
-            numberText.Effect = CreateNumberShadow(scaleFactor);
-
-            return new RadarCarElement
-            {
-                Rectangle = rectangle,
-                NumberText = numberText,
-                CarIdx = car.CarIdx
-            };
-        }
-
-        private void UpdateCarElement(RadarCarElement element, RadarCarData car, RadarPosition position, int[] carClassColors, int[] carClassIDs)
-        {
-            var scaleFactor = GetScaleFactor();
-            var halfWidth = (BASE_CAR_WIDTH * scaleFactor) / 2;
-            var halfHeight = (BASE_CAR_HEIGHT * scaleFactor) / 2;
-
-            Canvas.SetLeft(element.Rectangle, position.X - halfWidth);
-            Canvas.SetTop(element.Rectangle, position.Y - halfHeight);
-            Canvas.SetLeft(element.NumberText, position.X - halfWidth);
-            Canvas.SetTop(element.NumberText, position.Y - halfHeight + (4 * scaleFactor));
-
-            element.Rectangle.Fill = _classColorManager.GetClassColor(car.ClassID, carClassColors, carClassIDs);
+            item.Fill = _classColorManager.GetClassColor(car.ClassID, carClassColors, carClassIDs);
 
             // Black or white number, whichever reads on this class's fill. The shadow only helps
             // white text on a darker fill, so it goes with it; on black text it would just smudge.
-            // Only touched when the colour actually changes, since this runs for every car every frame.
             var textBrush = _classColorManager.GetClassTextBrush(car.ClassID, carClassColors, carClassIDs);
-            if (!ReferenceEquals(element.NumberText.Foreground, textBrush))
-            {
-                element.NumberText.Foreground = textBrush;
-                bool whiteText = textBrush is SolidColorBrush solid && solid.Color == Colors.White;
-                element.NumberText.Effect = whiteText ? CreateNumberShadow(scaleFactor) : null;
-            }
+            item.NumberBrush = textBrush;
+            item.HasNumberShadow = textBrush is SolidColorBrush solid && solid.Color == Colors.White;
+            item.ShadowDepth = 2 * scaleFactor;
+            item.ShadowBlur = 4 * scaleFactor;
 
-            if (car.IsOnPitRoad)
-            {
-                element.Rectangle.Opacity = 0.5;
-                element.NumberText.FontStyle = FontStyles.Italic;
-            }
-            else
-            {
-                element.Rectangle.Opacity = 1.0;
-                element.NumberText.FontStyle = FontStyles.Normal;
-            }
-
-            element.NumberText.Text = car.CarNumber;
+            item.IsOnPitRoad = car.IsOnPitRoad;
         }
 
-        public void Reset()
+        public void Clear()
         {
-            _carElements.Clear();
+            Cars.Clear();
+            _carItems.Clear();
             _carZoneAssignments.Clear();
             _lastCarLeftRightState = "Off";
             VisibleCarCount = 0;
@@ -457,7 +321,6 @@ namespace VISOR.ViewModels
             public float PlayerLapDistPct { get; set; }
             public float TrackDistance { get; set; }
             public float Proximity { get; set; }
-            public bool IsAhead { get; set; }
             public string CarNumber { get; set; } = string.Empty;
             public int ClassID { get; set; }
             public bool IsOnPitRoad { get; set; }
@@ -467,13 +330,6 @@ namespace VISOR.ViewModels
         {
             public float X { get; set; }
             public float Y { get; set; }
-        }
-
-        private class RadarCarElement
-        {
-            public required Rectangle Rectangle { get; set; }
-            public required TextBlock NumberText { get; set; }
-            public int CarIdx { get; set; }
         }
     }
 }
