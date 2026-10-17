@@ -5,7 +5,22 @@ Risk appetite for 1.2.1: fix bugs, delete dead code, and split files mechanicall
 
 ## Summary
 
-**Status (2026-10-16):** Phase 1, the three revision passes, is done and validated on the rig. Testing turned up B10, B11 and S7, and the research for Phase 2 found B12 and B13. Phase 2 (pre-release fixes, the CI test pipeline, then the architecture work) is under "Revision plan" at the end. Passes 4–11 are done and rig-checked. Pass 12 (shared window plumbing), the last planned pass, is committed and waiting for its rig check.
+**Status (2026-10-17):** Phase 1, the three revision passes, is done and validated on the rig. Testing turned up B10, B11 and S7, and the research for Phase 2 found B12 and B13. Phase 2 (pre-release fixes, the CI test pipeline, then the architecture work) is under "Revision plan" at the end. All twelve passes are done and rig-checked, apart from Pass 12's connection messages. The version is now 1.3.0.0, and PR #42 is open for the merge to master. Next is one more cleanup pass, then the release build.
+
+### Open items (yours)
+1. **Pass 12:** check the connection messages.
+   - Quit iRacing (or leave the session) and come back.
+   - The overlay should show "Disconnected. Waiting for iRacing...", then "Connected, waiting for session data...", then "Fully connected!" for about a second.
+   - The radar's labels should follow the same steps: Disconnected / Offline, then Connected / Connecting, then Active / Ready.
+2. **S7:** check the Inno Setup licence terms ("Non-commercial use only").
+3. **The PDF:** regenerate `VISOR User Guide.pdf` from `VISOR_User_Guide_1.3.0.0.html`. The PDF dates from April 2026.
+4. **Branch protection (if not done yet):** make build, test and lint required checks on master.
+5. **After the cleanup pass:** review and merge PR #42, then tag the merge commit `v1.3.0.0` exactly. CI fails a tag that doesn't match the csproj version.
+6. **Publish the release.** The update check reads GitHub's latest published release, which is still v1.0.0, so no install hears about 1.3.0 until it is published.
+   - With SignPath set up, the tagged build's sign job attaches a signed installer to the release.
+   - Without it, the tagged build only uploads the unsigned installer as a run artifact. Attach that to a release you publish yourself; Windows SmartScreen will warn about an unsigned installer.
+7. **Offered, not started:** a draft upstream issue for SVappsLAB. It would cover the SDK quoting only six fields and not re-checking the session-info update counter after copying (see "Watch items").
+8. **Optional:** A5 (a user track-catalog override) and A4 (one UI tick), under "Optional" at the end.
 
 - **Overall:** the code is in good shape. The new shift-point work (learner, store, cue) is well isolated, its untrusted input is validated, and it is the only part of the app with tests. Most problems are older code that grew, or plumbing nobody uses any more.
 - **No significant CPU or RAM bottleneck.** Steady-state garbage is roughly 1 MB/s, all short-lived. Fixed buffers total about 2.4 MB. Nothing grows without bound in release builds except the radar ghost elements (B1).
@@ -59,7 +74,7 @@ Status reflects the revision plan agreed after the review (see "Agreed revision 
 | C1–C3, C7 | Low | Duplicated helpers, scale factors, magic numbers, radar zone switches | Mech | **Done** (Pass 7) |
 | C5 | Low | Fastest-lap positioning rebuilt per row | Mech | **Done** (as P2) |
 | C4 | Low | Session type re-derived under a lock many times per frame | — | **Done** (Pass 10; once per update; rig-checked 16 Oct) |
-| C6 | Low | Overlay and radar code-behind duplicate their plumbing | — | **Done** (Pass 12); rig check pending |
+| C6 | Low | Overlay and radar code-behind duplicate their plumbing | — | **Done** (Pass 12; rig-checked 17 Oct apart from the connection messages, which are open item 1) |
 | C9 | Low | Leaving cool-down for the next session resets the overlay twice | Small | **Done** (Pass 10; found on the Pass 9 rig check; rig-checked 16 Oct) |
 | C8 | Low | Debug loggers each re-implement folder, file name and flush | Mech | **Done** (Pass 7; file naming shared, flushing left to each logger) |
 | F2–F4 | — | Files over 500 lines: split plans | Mech | **Done** (Pass 7) |
@@ -247,7 +262,7 @@ Test-only members to **keep**: `ShiftPointLearner.RelativeTorqueAt` and `ShiftCu
   - `File Plan.txt` and `Generic Prompt.txt` are from the .NET 8 beta.
   - `IRacingSessionInfo-20250917-120929.yaml` is a raw session dump with your name and iRacing customer ID. It's your own data, but there's no need to publish it; note it stays in git history.
   - `iracing-track-identities.json` is input to `tools/validate_track_catalog.py` and belongs next to it in `tools/`.
-- **`VISOR User Guide.pdf`** (repo root) dates from April 2026, before 1.0, and is superseded by `VISOR_User_Guide_1.2.1.0.html`. Regenerate it or remove it.
+- **`VISOR User Guide.pdf`** (repo root) dates from April 2026, before 1.0, and is superseded by `VISOR_User_Guide_1.2.1.0.html` (now `VISOR_User_Guide_1.3.0.0.html`). Regenerate it or remove it.
 - **`VISOR.csproj`** excludes `Archive\` and `Raw outputs\` folders that no longer exist.
 - **`SessionDataLogger`** is compiled into Release builds but only used in Debug. Wrap it in `#if DEBUG` like the other loggers, or remove it (see the debug-tooling table).
 
@@ -443,12 +458,7 @@ This follows the order you set: a broader CI test pipeline first, then the archi
 - **Gate (rig):**
   - Build a test installer with the version bumped (for example 1.2.2.0), install it over the current build, and check that settings and window positions survive.
   - Start with the radar off, open the Config window, turn the radar on, and drag it.
-- **At release time (your steps), now after Phase 2:**
-  - the S7 licence check
-  - the PDF
-  - the version bump: CI requires `Version`, `FileVersion` and `AssemblyVersion` to be equal and four-part
-  - mark the PR ready, merge it, and tag
-  - publish the tag as a GitHub release. The update check reads GitHub's latest published release, which is still v1.0.0, so no install hears about a new version until then.
+- **At release time:** see "Open items (yours)" in the Summary. The version bump to 1.3.0.0 is done: `Version`, `FileVersion` and `AssemblyVersion` are equal and four-part, as CI requires.
 
 #### Pass 5: CI test pipeline foundation, T1 (CI)
 - **Solution:** add `Tests/VISOR.Tests` to `VISOR.sln`. Anything under `Tests/` is already excluded from the app's compile, and the installer only packs the app's output folder.
@@ -686,6 +696,7 @@ One session on a Debug build from VS covers all four passes:
   - **Radar from Config:** with the radar off, open the Config window and turn the radar on. Its handle shows straight away (B13).
   - **Disconnect and reconnect:** quit iRacing, or leave the session, and come back. The overlay goes "Disconnected...", then "Connected, waiting...", then "Fully connected!" for a second. The radar's indicators follow the same steps.
   - **Exit:** "Exit VISOR" and closing the overlay both shut down promptly.
+- **Rig check result (2026-10-17):** passed, apart from the connection messages, which are still to check (open item 1).
 
 #### Optional
 - **A5, user catalog override:**

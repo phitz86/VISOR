@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-17
+
 ### Added
 
 - **Capture of session info that won't parse (debug builds only)** — when iRacing's session info
@@ -95,6 +97,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Version 1.3.0.0**; README and user guide updated to match. The guide now gives the radar's
+  own size-preset scales, says how to reopen the Configuration Window, notes that installing an
+  update replaces `Data\TrackSections.json`, and describes how positions hold at the finish.
 - **Internal tidy-ups, no change in behaviour** — named constants replace the session-state,
   flag and pace-car magic numbers; the size-preset scale factors, car-name-to-file-name rules and
   debug-log file naming each live in one place; one table drives the radar's side-zone
@@ -410,7 +415,8 @@ display, and adds a substantial layer of app-stability and installer hardening.
 - Nullable-reference warnings (CS8602/CS8604) and an unused-variable warning; updated
   deprecated GitHub Actions.
 
-[Unreleased]: https://github.com/phitz86/VISOR/compare/v1.2.1.0...HEAD
+[Unreleased]: https://github.com/phitz86/VISOR/compare/v1.3.0.0...HEAD
+[1.3.0]: https://github.com/phitz86/VISOR/releases/tag/v1.3.0.0
 [1.2.1]: https://github.com/phitz86/VISOR/releases/tag/v1.2.1.0
 [1.2.0]: https://github.com/phitz86/VISOR/releases/tag/v1.2.0.0
 [1.1.0]: https://github.com/phitz86/VISOR/releases/tag/v1.1.0.0
