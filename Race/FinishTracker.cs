@@ -157,21 +157,11 @@ namespace VISOR.Race
                 return;
             }
 
-            var carClassIDs = sessionDataProvider.CarClassIDs;
-            var carNumbers = sessionDataProvider.CarNumbers;
-
             // The previous frame's roster, less this frame's: this frame's departures.
             foreach (int carIdx in _tracking.PreviousValidCarIndices)
             {
-                if (_tracking.ValidCarIndices.Contains(carIdx) || _finishing.IsFinished(carIdx))
-                {
-                    continue;
-                }
-
-                if (TryHoldLastPlace(carIdx, carClassIDs[carIdx], out int classPosition, out int overallPosition))
-                {
-                    Log.Info($"Car #{carNumbers[carIdx]} (idx {carIdx}) left during the checkered - holding P{classPosition} (overall P{overallPosition})");
-                }
+                if (!_tracking.ValidCarIndices.Contains(carIdx) && !_finishing.IsFinished(carIdx))
+                    HoldAndLog(carIdx, sessionDataProvider, "left");
             }
         }
 
@@ -190,26 +180,20 @@ namespace VISOR.Race
                 return;
             }
 
-            var carClassIDs = sessionDataProvider.CarClassIDs;
-            var carNumbers = sessionDataProvider.CarNumbers;
-
             foreach (int carIdx in _tracking.ValidCarIndices)
             {
-                if (_finishing.IsFinished(carIdx))
-                {
-                    continue;
-                }
+                // A car still live or predicted is placed by the sort as usual.
+                if (!_finishing.IsFinished(carIdx) && _tracking.GetEffectiveLapDistPct(carIdx) < 0f)
+                    HoldAndLog(carIdx, sessionDataProvider, "telemetry stopped");
+            }
+        }
 
-                // Live or still predicted: the sort places it as usual.
-                if (_tracking.GetEffectiveLapDistPct(carIdx) >= 0f)
-                {
-                    continue;
-                }
-
-                if (TryHoldLastPlace(carIdx, carClassIDs[carIdx], out int classPosition, out int overallPosition))
-                {
-                    Log.Info($"Car #{carNumbers[carIdx]} (idx {carIdx}) telemetry stopped during the checkered - holding P{classPosition} (overall P{overallPosition})");
-                }
+        private void HoldAndLog(int carIdx, ISessionDataProvider sessionDataProvider, string what)
+        {
+            if (TryHoldLastPlace(carIdx, sessionDataProvider.CarClassIDs[carIdx], out int classPosition, out int overallPosition))
+            {
+                Log.Info($"Car #{sessionDataProvider.CarNumbers[carIdx]} (idx {carIdx}) {what} during the checkered - " +
+                         $"holding P{classPosition} (overall P{overallPosition})");
             }
         }
 

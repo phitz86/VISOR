@@ -12,7 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Internal tidy-ups, no change in behaviour** — the settings, config-mode and window code drop
   about 420 lines of repeated boilerplate. The view models share one change-notification base,
   and the radar shares one "clear and fade out" step. Every setting keeps its stored name and
-  default, so saved settings carry over.
+  default, so saved settings carry over. The race-position code drops checks that could never
+  fail and a session-change path the overlay's own reset always got to first, and shares its
+  lap-distance arithmetic and finishing-place steps instead of repeating them.
 
 ### Removed
 

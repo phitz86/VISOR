@@ -243,28 +243,27 @@ namespace VISOR.Race
                         frozenPositions.Add(kv.Value);
                 }
 
-                // Assign live cars to the next available slot, skipping frozen positions.
-                // This prevents a lapped car frozen at P5 from pushing P3/P4 down.
-                var sortedCars = classGroup.OrderByDescending(c => c.SortKey).ToList();
                 int nextPosition = 1;
-
-                for (int i = 0; i < sortedCars.Count; i++)
-                {
-                    while (frozenPositions.Contains(nextPosition))
-                        nextPosition++;
-
-                    var car = sortedCars[i];
-                    _cachedPositions[(car.CarIdx, car.ClassId)] = nextPosition;
-                    nextPosition++;
-                }
+                foreach (var car in classGroup.OrderByDescending(c => c.SortKey))
+                    _cachedPositions[(car.CarIdx, car.ClassId)] = NextFreeSlot(frozenPositions, ref nextPosition);
             }
         }
 
         /// <summary>
-        /// Assign field-wide overall positions across all classes in a single sort.
-        /// Mirrors the per-class assignment: live cars fill the next available slot,
-        /// skipping positions already frozen by finished cars so a lapped car frozen
-        /// at P15 doesn't push the cars ahead of it down a spot.
+        /// The next place, counting up from <paramref name="next"/>, that no finished car holds.
+        /// Live cars fill the places around frozen ones, so a lapped car frozen at P5 doesn't push
+        /// the cars racing for P3 and P4 down a spot.
+        /// </summary>
+        private static int NextFreeSlot(HashSet<int> frozenPositions, ref int next)
+        {
+            while (frozenPositions.Contains(next))
+                next++;
+            return next++;
+        }
+
+        /// <summary>
+        /// Assign field-wide overall positions across all classes in a single sort, filling the
+        /// places around frozen ones as the per-class assignment does.
         /// </summary>
         private void AssignOverallPositions(List<CarPositionData> carsWithPositions)
         {
@@ -276,18 +275,11 @@ namespace VISOR.Race
             // (The per-class path isolates it in its own class group, which the global sort can't.)
             var sortedCars = carsWithPositions
                 .Where(c => c.ClassId != IRacingIds.PaceCarClassId)
-                .OrderByDescending(c => c.OverallSortKey)
-                .ToList();
+                .OrderByDescending(c => c.OverallSortKey);
+
             int nextPosition = 1;
-
-            for (int i = 0; i < sortedCars.Count; i++)
-            {
-                while (frozenPositions.Contains(nextPosition))
-                    nextPosition++;
-
-                _cachedOverallPositions[sortedCars[i].CarIdx] = nextPosition;
-                nextPosition++;
-            }
+            foreach (var car in sortedCars)
+                _cachedOverallPositions[car.CarIdx] = NextFreeSlot(frozenPositions, ref nextPosition);
         }
         #endregion
 
