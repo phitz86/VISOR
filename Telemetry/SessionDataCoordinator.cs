@@ -1,6 +1,4 @@
-﻿using System;
-using System.Linq;
-using SVappsLAB.iRacingTelemetrySDK;
+﻿using SVappsLAB.iRacingTelemetrySDK;
 using VISOR.Diagnostics;
 
 namespace VISOR.Telemetry

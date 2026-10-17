@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
@@ -112,7 +110,7 @@ namespace VISOR.ViewModels
             for (int i = 0; i < carCount; i++)
             {
                 if (i == playerCarIdx) continue;
-                if (trackSurface[i] == (int)iRacingTrackSurface.NotInWorld) continue;
+                if (trackSurface[i] == IRacingIds.TrackSurfaceNotInWorld) continue;
                 if (string.IsNullOrEmpty(carNumbers?[i])) continue;
 
                 var carOnPitRoad = onPitRoad?[i] ?? false;
@@ -129,7 +127,6 @@ namespace VISOR.ViewModels
                         CarIdx = i,
                         LapDistPct = lapDistPct[i],
                         PlayerLapDistPct = playerLapDistPct,
-                        TrackDistance = proximityData.TrackDistance,
                         Proximity = proximityData.Proximity,
                         CarNumber = carNumbers[i],
                         ClassID = carClassIDs[i],
@@ -242,7 +239,7 @@ namespace VISOR.ViewModels
             {
                 if (!_carItems.TryGetValue(car.CarIdx, out var item))
                 {
-                    item = new RadarCarItem(car.CarIdx);
+                    item = new RadarCarItem();
                     _carItems[car.CarIdx] = item;
                     Cars.Add(item);
                 }
@@ -319,7 +316,6 @@ namespace VISOR.ViewModels
             public int CarIdx { get; set; }
             public float LapDistPct { get; set; }
             public float PlayerLapDistPct { get; set; }
-            public float TrackDistance { get; set; }
             public float Proximity { get; set; }
             public string CarNumber { get; set; } = string.Empty;
             public int ClassID { get; set; }

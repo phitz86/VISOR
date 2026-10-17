@@ -1,12 +1,6 @@
 using SVappsLAB.iRacingTelemetrySDK;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
 using VISOR.Diagnostics;
-using VISOR.ViewModels;
 using YamlDotNet.Core;
 
 namespace VISOR.Telemetry
@@ -34,7 +28,7 @@ namespace VISOR.Telemetry
         TelemetryVar.Lat, TelemetryVar.Lon,
 #endif
     ])]
-    public class SVappsLABSDKWrapper : IDisposable
+    public class SVappsLABSDKWrapper
     {
         #region Private Fields
         private ITelemetryClient<TelemetryData> _client = null!;
@@ -437,11 +431,6 @@ namespace VISOR.Telemetry
             {
                 Log.Error("SVappsLAB SDK shutdown error", ex);
             }
-        }
-
-        public void Dispose()
-        {
-            Shutdown();
         }
     }
 }

@@ -1,5 +1,3 @@
-using System;
-
 namespace VISOR.ViewModels
 {
     /// <summary>

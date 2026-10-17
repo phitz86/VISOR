@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using VISOR.Diagnostics;
+﻿using VISOR.Diagnostics;
 using VISOR.Telemetry;
 
 namespace VISOR.Race
@@ -88,11 +87,6 @@ namespace VISOR.Race
 
             return _order.GetOverallPosition(carIdx);
         }
-
-        /// <summary>
-        /// Check if cached data is still valid for a car (within expiration window).
-        /// </summary>
-        public bool HasValidCache(int carIdx) => _tracking.HasValidCache(carIdx);
 
         /// <summary>
         /// Get the number of frames since valid data was received for a car.

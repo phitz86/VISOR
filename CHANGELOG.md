@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **More unused code, no change in behaviour** — members, styles and a colour resource left
+  behind by the 1.3.0 rework; a converter that duplicated one built into WPF; and 92 `using`
+  lines the project already gets automatically.
+
 ## [1.3.0] - 2026-10-17
 
 ### Added

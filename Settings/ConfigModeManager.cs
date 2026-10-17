@@ -1,5 +1,4 @@
-﻿using System;
-using VISOR.Diagnostics;
+﻿using VISOR.Diagnostics;
 
 namespace VISOR.Settings
 {

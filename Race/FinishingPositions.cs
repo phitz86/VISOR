@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-
-namespace VISOR.Race
+﻿namespace VISOR.Race
 {
     /// <summary>
     /// The places frozen at the finish. <see cref="FinishTracker"/> writes them as cars take the

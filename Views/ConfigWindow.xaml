@@ -11,7 +11,6 @@
     <Window.Resources>
 
         <!-- ============ Palette ============ -->
-        <Color x:Key="AccentColor">#FF0067C0</Color>
         <SolidColorBrush x:Key="Accent" Color="#FF0067C0"/>
         <SolidColorBrush x:Key="AccentHover" Color="#FF1A75C5"/>
         <SolidColorBrush x:Key="AccentPressed" Color="#FF005BA1"/>

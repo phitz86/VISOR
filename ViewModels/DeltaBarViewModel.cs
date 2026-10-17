@@ -1,7 +1,5 @@
-﻿using System;
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Windows.Media;
 using System.Windows.Data;
 using System.Globalization;
 using VISOR.Telemetry;
@@ -18,8 +16,6 @@ namespace VISOR.ViewModels
 
         private double _leftBarWidth = 0.0;
         private double _rightBarWidth = 0.0;
-        private Brush _leftBarColor = Brushes.Red;
-        private Brush _rightBarColor = Brushes.Green;
 
         public double LeftBarWidth
         {
@@ -31,18 +27,6 @@ namespace VISOR.ViewModels
         {
             get => _rightBarWidth;
             private set { if (_rightBarWidth == value) return; _rightBarWidth = value; OnPropertyChanged(); }
-        }
-
-        public Brush LeftBarColor
-        {
-            get => _leftBarColor;
-            private set { if (ReferenceEquals(_leftBarColor, value)) return; _leftBarColor = value; OnPropertyChanged(); }
-        }
-
-        public Brush RightBarColor
-        {
-            get => _rightBarColor;
-            private set { if (ReferenceEquals(_rightBarColor, value)) return; _rightBarColor = value; OnPropertyChanged(); }
         }
 
         /// <summary>

@@ -1,11 +1,6 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace VISOR.Diagnostics
 {
@@ -26,8 +21,6 @@ namespace VISOR.Diagnostics
         private static Task _writerTask = null!;
         private static string _currentLogFilePath = null!;
         private static readonly object _fileLock = new object();
-        private static bool _isInitialized = false;
-
         // The current log file, held open for the session rather than reopened for every line.
         // Guarded by _fileLock; null when closed (between sessions, during truncation, after a
         // write error - the next line reopens it).
@@ -70,19 +63,10 @@ namespace VISOR.Diagnostics
 
         static Log()
         {
-            Initialize();
-        }
-
-        private static void Initialize()
-        {
-            if (_isInitialized)
-                return;
-
             try
             {
                 Directory.CreateDirectory(GetLogsDirectory());
                 _writerTask = Task.Run(() => ProcessLogQueue(_cancellationTokenSource.Token));
-                _isInitialized = true;
             }
             catch (Exception ex)
             {

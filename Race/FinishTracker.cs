@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using VISOR.Diagnostics;
+﻿using VISOR.Diagnostics;
 using VISOR.Telemetry;
 
 namespace VISOR.Race

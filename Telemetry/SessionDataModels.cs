@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace VISOR.Telemetry
+﻿namespace VISOR.Telemetry
 {
     [Flags]
     public enum SessionFlags
@@ -61,6 +59,9 @@ namespace VISOR.Telemetry
 
         /// <summary>The SessionFlags bits that bear on the finish: checkered, white and green.</summary>
         public const int FinishFlagsMask = (int)(SessionFlags.Checkered | SessionFlags.White | SessionFlags.Green);
+
+        /// <summary>CarIdxTrackSurface for an empty car slot, or a car not on the track at all.</summary>
+        public const int TrackSurfaceNotInWorld = -1;
     }
 
     /// <summary>

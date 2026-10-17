@@ -1,7 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
+﻿using System.Windows;
 using System.Windows.Media;
 using VISOR.Diagnostics;
 using VISOR.Settings;
@@ -117,7 +114,6 @@ namespace VISOR.Views
             if (isPrimed)
             {
                 StatusText.Text = "Fully connected!";
-                _viewModel.IsTelemetryConnected = true;
 
                 // Back on the UI thread after the delay. Leave the text up if the HUD has
                 // dropped back to waiting in the meantime.
@@ -129,7 +125,6 @@ namespace VISOR.Views
             {
                 StatusText.Text = "Waiting for session data...";
                 StatusText.Visibility = Visibility.Visible;
-                _viewModel.IsTelemetryConnected = false;
             }
         }
 
@@ -167,7 +162,6 @@ namespace VISOR.Views
                     if (_sdk.IsPrimed)
                     {
                         StatusText.Visibility = Visibility.Collapsed;
-                        _viewModel.IsTelemetryConnected = true;
                     }
                     else if (_sdk.IsConnected)
                     {

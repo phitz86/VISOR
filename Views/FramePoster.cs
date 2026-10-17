@@ -1,6 +1,4 @@
-using System;
 using System.Diagnostics;
-using System.Threading;
 using System.Windows.Threading;
 using VISOR.Diagnostics;
 using VISOR.Telemetry;

@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace VISOR.Telemetry
+﻿namespace VISOR.Telemetry
 {
     /// <summary>
     /// One update of iRacing's session info: drivers and classes, the session schedule with its

@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
@@ -12,14 +11,7 @@ namespace VISOR.ViewModels
     /// </summary>
     public sealed class RadarCarItem : INotifyPropertyChanged
     {
-        public RadarCarItem(int carIdx)
-        {
-            CarIdx = carIdx;
-        }
-
         public event PropertyChangedEventHandler? PropertyChanged;
-
-        public int CarIdx { get; }
 
         // Placement and size on the radar canvas, already scaled for the window size preset.
         public double Left { get => _left; set => Set(ref _left, value); }

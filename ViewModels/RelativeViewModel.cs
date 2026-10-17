@@ -1,38 +1,19 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
+﻿using System.Collections.ObjectModel;
 using VISOR.Race;
 using VISOR.Telemetry;
 
 namespace VISOR.ViewModels
 {
-    public enum iRacingTrackSurface
+    public class RelativeViewModel
     {
-        OnTrack,
-        InPitStall,
-        NotInWorld = -1
-    };
-
-    public class RelativeViewModel : INotifyPropertyChanged
-    {
-        public event PropertyChangedEventHandler? PropertyChanged;
-        private void OnPropertyChanged([CallerMemberName] string? name = null) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-
         public ObservableCollection<RelativeRowViewModel> RelativeRows { get; } = new();
         private readonly Dictionary<int, RelativeRowViewModel> _carCache = new();
 
         private readonly RelativeDisplayBuilder _builder;
         private readonly Telemetry.PositionHistoryManager _historyManager;
 
-        // Exposed so debug loggers can query the same calculator.
-        public PositionCalculator PositionCalculator { get; }
-
         public RelativeViewModel(ClassColorManager classColorManager, PositionCalculator positionCalculator)
         {
-            PositionCalculator = positionCalculator;
             _historyManager = new Telemetry.PositionHistoryManager();
             _builder = new RelativeDisplayBuilder(_carCache, classColorManager, positionCalculator, _historyManager);
         }

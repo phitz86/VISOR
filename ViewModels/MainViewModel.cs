@@ -1,13 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
+﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Windows;
 using VISOR.Diagnostics;
 using VISOR.Race;
 using VISOR.Telemetry;
-using VISOR.Views;
 using VISOR.Settings;
 
 namespace VISOR.ViewModels
@@ -77,13 +72,6 @@ namespace VISOR.ViewModels
             CountdownVM = new CountdownViewModel();
             TrackTempVM = new TrackTempViewModel();
             TrackLocationVM = new TrackLocationViewModel();
-        }
-
-        private bool _isTelemetryConnected = false;
-        public bool IsTelemetryConnected
-        {
-            get => _isTelemetryConnected;
-            set { _isTelemetryConnected = value; OnPropertyChanged(); }
         }
 
         public void RefreshElementVisibility()

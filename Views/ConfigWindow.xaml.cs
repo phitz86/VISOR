@@ -1,5 +1,4 @@
-﻿using System;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -381,11 +380,6 @@ namespace VISOR.Views
 
                 Log.Debug($"Positions saved - Main: ({mainPos.X}, {mainPos.Y}), Radar: ({radarPos.X}, {radarPos.Y})");
             }
-        }
-
-        protected override void OnClosed(EventArgs e)
-        {
-            base.OnClosed(e);
         }
     }
 }

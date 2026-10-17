@@ -1,4 +1,3 @@
-using System;
 using SVappsLAB.iRacingTelemetrySDK;
 
 namespace VISOR.Telemetry
