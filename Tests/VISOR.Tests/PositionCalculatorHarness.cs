@@ -108,11 +108,6 @@ namespace VISOR.Tests
             CarIdxOnPitRoad = (bool[])OnPitRoad.Clone(),
             CarIdxClassPosition = (int[])ClassPosition.Clone(),
             CarIdxPosition = (int[])Position.Clone(),
-            SessionFlags = 0,
-            PlayerCarIdx = -1,
-            CarIdxTrackSurface = new int[PositionFrame.CarCount],
-            CarIdxBestLapTime = new float[PositionFrame.CarCount],
-            CarIdxEstTime = new float[PositionFrame.CarCount],
         };
 
         public int ClassPos(int carIdx) => Calc.GetClassPosition(carIdx, Session.CarClassIDs[carIdx]);

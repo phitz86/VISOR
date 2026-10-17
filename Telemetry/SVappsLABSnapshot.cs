@@ -141,11 +141,6 @@ namespace VISOR.Telemetry
             CarIdxOnPitRoad = PositionFrame.AllCars(CarIdxOnPitRoad, false),
             CarIdxClassPosition = PositionFrame.AllCars(CarIdxClassPosition, 0),
             CarIdxPosition = PositionFrame.AllCars(CarIdxPosition, 0),
-            SessionFlags = SessionFlags,
-            PlayerCarIdx = PlayerCarIdx,
-            CarIdxTrackSurface = PositionFrame.AllCars(CarIdxTrackSurface, -1),
-            CarIdxBestLapTime = PositionFrame.AllCars(CarIdxBestLapTime, 0f),
-            CarIdxEstTime = PositionFrame.AllCars(CarIdxEstTime, 0f),
         };
     }
 }

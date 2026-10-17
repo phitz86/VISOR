@@ -1,4 +1,3 @@
-using VISOR.Diagnostics;
 using VISOR.Race;
 using VISOR.Settings;
 using VISOR.Telemetry;
@@ -23,7 +22,6 @@ namespace VISOR.ViewModels
         private const float AHEAD_BEHIND_HYSTERESIS_METERS = 2.0f;
         private const float AHEAD_BEHIND_HYSTERESIS_DEFAULT_PCT = 0.0004f; // ~2 m on a ~5 km track
 
-        private const int DEBUG_LOG_INTERVAL = 60; // ~1s at 60Hz
         #endregion
 
         #region Private Fields
@@ -31,8 +29,6 @@ namespace VISOR.ViewModels
         private readonly ClassColorManager _classColorManager;
         private readonly PositionCalculator _positionCalculator;
         private readonly PositionHistoryManager _historyManager;
-
-        private int _debugFrameCounter = 0;
 
         // Practice/qualifying positions for this frame, by car. Rebuilt once per frame rather
         // than fetched (a copied list) and searched again for every row.
@@ -56,7 +52,6 @@ namespace VISOR.ViewModels
         #region Public Methods
         public List<RelativeRowViewModel> Calculate(SVappsLABSnapshot snapshot, SessionView dataProvider)
         {
-            _debugFrameCounter++;
 
             _historyManager.Update(snapshot, dataProvider);
 
@@ -97,7 +92,6 @@ namespace VISOR.ViewModels
 
         public void Reset()
         {
-            _debugFrameCounter = 0;
             _historyManager.Reset();
         }
         #endregion
@@ -362,15 +356,7 @@ namespace VISOR.ViewModels
             }
 
             row.UpdateSmoothedGap(nativeTimeGap);
-            float displayGap = row.SmoothedGap;
-
-            if (_debugFrameCounter % DEBUG_LOG_INTERVAL == 0 && displayGap <= RelativeRowStyler.TIME_SEG2_AWARE)
-            {
-                string relation = isAhead ? "AHEAD" : "BEHIND";
-                Log.Debug($"[Buffer] #{row.CarNum} ({relation}): Gap={displayGap:F2}s");
-            }
-
-            RelativeRowStyler.ShowGap(row, displayGap, isAhead);
+            RelativeRowStyler.ShowGap(row, row.SmoothedGap, isAhead);
         }
 
         /// <summary>

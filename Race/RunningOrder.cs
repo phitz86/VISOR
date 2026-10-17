@@ -1,5 +1,4 @@
-﻿using VISOR.Diagnostics;
-using VISOR.Telemetry;
+﻿using VISOR.Telemetry;
 
 namespace VISOR.Race
 {
@@ -17,7 +16,6 @@ namespace VISOR.Race
         #region Private Fields
         private readonly Dictionary<(int carIdx, int classId), int> _cachedPositions = new();
         private readonly Dictionary<int, int> _cachedOverallPositions = new();
-        private int _lastLoggedLeaderIdx = -1;
         #endregion
 
         #region Private Fields - Green Flag Tracking
@@ -59,35 +57,6 @@ namespace VISOR.Race
             }
             return -1;
         }
-
-        /// <summary>
-        /// The overall P1 of the last sort. There is none once the leader has finished, since
-        /// finished cars aren't sorted.
-        /// </summary>
-        public bool TryGetLeader(out int carIdx)
-        {
-            foreach (var entry in _cachedOverallPositions)
-            {
-                if (entry.Value == 1)
-                {
-                    carIdx = entry.Key;
-                    return true;
-                }
-            }
-            carIdx = -1;
-            return false;
-        }
-
-        /// <summary>
-        /// CarIdxLap, which is what the running-order sort adds to LapDistPct. It is the one input
-        /// to the sort that none of the other logging shows, and it is what a leader that is
-        /// impossible by LapDistPct/LapCompleted would have to be disagreeing about.
-        /// </summary>
-        internal static string FormatLap(PositionFrame frame, int carIdx)
-        {
-            var lap = frame.CarIdxLap;
-            return (carIdx >= 0 && carIdx < lap.Length) ? lap[carIdx].ToString() : "n/a";
-        }
         #endregion
 
         #region Frame and Session
@@ -110,7 +79,6 @@ namespace VISOR.Race
             _cachedPositions.Clear();
             _cachedOverallPositions.Clear();
             _carsHavingTakenGreen.Clear();
-            _lastLoggedLeaderIdx = -1;
         }
         #endregion
 
@@ -156,11 +124,7 @@ namespace VISOR.Race
                                  lapDistPct[carIdx] <= 1f;
 
                 if (lapCompleted[carIdx] >= 0 && validDist)
-                {
                     _carsHavingTakenGreen.Add(carIdx);
-                    Log.Debug($"Car #{carNumbers[carIdx]} (idx {carIdx}) took the green flag - switching to live position calc " +
-                              $"(CarIdxLap {FormatLap(frame, carIdx)}, LapCompleted {lapCompleted[carIdx]}, LapDistPct {lapDistPct[carIdx]:F4})");
-                }
             }
         }
 
@@ -274,8 +238,6 @@ namespace VISOR.Race
                 {
                     CarIdx = carIdx,
                     ClassId = carClassIDs[carIdx],
-                    CurrentLap = effectiveCurrentLap,
-                    LapDistPct = effectiveLapDistPct,
                     HasTakenGreen = hasTakenGreen,
                     SortKey = trackPosition,
                     OverallSortKey = trackPosition
@@ -303,7 +265,6 @@ namespace VISOR.Race
             }
 
             AssignOverallPositions(carsWithPositions);
-            LogLeaderChange(carsWithPositions, frame, sessionDataProvider);
 
             var classGroups = carsWithPositions.GroupBy(c => c.ClassId);
 
@@ -332,38 +293,6 @@ namespace VISOR.Race
                     nextPosition++;
                 }
             }
-        }
-
-        /// <summary>
-        /// Log each change of overall leader with the inputs the sort used for it. The overall P1
-        /// is the one car whose sort key can be checked against the real race at a glance, so a
-        /// leader that is physically impossible (a car just off the line leading the field) shows
-        /// up here with the CarIdxLap/LapDistPct that produced it. Leader changes are rare, so
-        /// this stays quiet.
-        /// </summary>
-        private void LogLeaderChange(List<CarPositionData> carsWithPositions, PositionFrame frame, ISessionDataProvider sessionDataProvider)
-        {
-            if (!_cachedOverallPositions.Any(kv => kv.Value == 1))
-                return;
-
-            int leaderIdx = _cachedOverallPositions.First(kv => kv.Value == 1).Key;
-            if (leaderIdx == _lastLoggedLeaderIdx)
-                return;
-
-            _lastLoggedLeaderIdx = leaderIdx;
-
-            var leader = carsWithPositions.FirstOrDefault(c => c.CarIdx == leaderIdx);
-            if (leader == null)
-                return;
-
-            var carNumbers = sessionDataProvider.CarNumbers;
-            var lapCompleted = frame.CarIdxLapCompleted;
-            string number = (carNumbers != null && leaderIdx < carNumbers.Length) ? carNumbers[leaderIdx] : "?";
-            int completed = leaderIdx < lapCompleted.Length ? lapCompleted[leaderIdx] : -1;
-
-            Log.Debug($"[Leader] Overall leader is now #{number} (idx {leaderIdx}) - effective lap {leader.CurrentLap} " +
-                      $"(raw CarIdxLap {FormatLap(frame, leaderIdx)}), LapCompleted {completed}, LapDistPct {leader.LapDistPct:F4}, " +
-                      $"sort key {leader.OverallSortKey:F4}, green latched {leader.HasTakenGreen}");
         }
 
         /// <summary>
@@ -402,8 +331,6 @@ namespace VISOR.Race
         {
             public int CarIdx { get; set; }
             public int ClassId { get; set; }
-            public int CurrentLap { get; set; }
-            public float LapDistPct { get; set; }
             public bool HasTakenGreen { get; set; }
             public float SortKey { get; set; }
             public float OverallSortKey { get; set; }

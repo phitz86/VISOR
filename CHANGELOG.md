@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **Quieter logs at the finish** — the logging added in 1.1 to chase finishing-position bugs is
+  gone, now that those bugs are fixed and covered by tests: the flag-change and race-leader
+  lines, the Final Lap and FINISHED latch lines, and several Debug Mode lines about cars joining,
+  leaving and losing telemetry (one of which printed `System.Single[]` instead of a number). The
+  per-car "frozen at P…" and "holding P…" lines stay, and a car that completes a lap under the
+  checkered without being frozen is now logged as a warning.
 - **More unused code, no change in behaviour** — members, styles and a colour resource left
   behind by the 1.3.0 rework; a converter that duplicated one built into WPF; and 92 `using`
   lines the project already gets automatically.

@@ -125,7 +125,6 @@ namespace VISOR.Race
         {
             DetectSessionTransition(frame);
             _finish.TrackCheckeredFlagState(frame);
-            _finish.LogFinishPhaseTransitions(frame, sessionDataProvider);
             _finish.FreezeFinishingPositions(frame, sessionDataProvider);
 
             _tracking.UpdateValidCarTracking(sessionDataProvider);
