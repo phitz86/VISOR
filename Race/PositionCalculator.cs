@@ -21,7 +21,6 @@ namespace VISOR.Race
         private readonly FinishingPositions _finishing = new();
         private readonly RunningOrder _order;
         private readonly FinishTracker _finish;
-        private int _lastSessionNum = -1;
 
         public PositionCalculator()
         {
@@ -30,10 +29,7 @@ namespace VISOR.Race
         }
 
         #region Public Properties
-        /// <summary>
-        /// Set of car indices that have valid YAML data, have ever had valid telemetry,
-        /// AND have valid cache (not expired). This is the filtered roster for displays.
-        /// </summary>
+        /// <inheritdoc cref="CarTrackingCache.ValidCarIndices"/>
         public IReadOnlySet<int> ValidCarIndices => _tracking.ValidCarIndices;
         #endregion
 
@@ -44,59 +40,34 @@ namespace VISOR.Race
         /// </summary>
         public void Update(PositionFrame frame, ISessionDataProvider? sessionDataProvider)
         {
-            if (frame == null || sessionDataProvider == null || !sessionDataProvider.IsDataReady)
+            if (sessionDataProvider == null || !sessionDataProvider.IsDataReady)
                 return;
 
             _tracking.BeginFrame();
             ProcessUpdate(frame, sessionDataProvider);
         }
 
-        /// <summary>
-        /// Get the effective LapDistPct for a car (current valid data OR predicted value).
-        /// Returns -1 if no valid data or cache expired.
-        /// This is the ONLY method consumers should use to get car positions.
-        /// </summary>
+        /// <inheritdoc cref="CarTrackingCache.GetEffectiveLapDistPct"/>
         public float GetEffectiveLapDistPct(int carIdx) => _tracking.GetEffectiveLapDistPct(carIdx);
 
         /// <summary>
-        /// Get the class position for a specific car.
-        /// Returns frozen finishing position if car has finished, otherwise calculated position.
-        /// Returns calculated position in race mode, YAML position in practice/qual.
+        /// The car's class position: its frozen finishing place once it has finished, otherwise its
+        /// place in the running order, or -1. Practice and qualifying have no running order; the
+        /// displays take those positions from the session's fastest laps instead.
         /// </summary>
-        public int GetClassPosition(int carIdx, int classId)
-        {
-            if (_finishing.ClassPositions.TryGetValue(carIdx, out int finishingPosition))
-            {
-                return finishingPosition;
-            }
+        public int GetClassPosition(int carIdx, int classId) =>
+            _finishing.ClassPositions.TryGetValue(carIdx, out int finished) ? finished : _order.GetClassPosition(carIdx, classId);
 
-            return _order.GetClassPosition(carIdx, classId);
-        }
+        /// <summary>As <see cref="GetClassPosition"/>, across the whole field.</summary>
+        public int GetOverallPosition(int carIdx) =>
+            _finishing.OverallPositions.TryGetValue(carIdx, out int finished) ? finished : _order.GetOverallPosition(carIdx);
 
-        /// <summary>
-        /// Get the overall (field-wide) position for a specific car.
-        /// Returns frozen finishing position if car has finished, otherwise calculated position.
-        /// Mirrors <see cref="GetClassPosition"/> but ignores class boundaries.
-        /// </summary>
-        public int GetOverallPosition(int carIdx)
-        {
-            if (_finishing.OverallPositions.TryGetValue(carIdx, out int finishingPosition))
-            {
-                return finishingPosition;
-            }
-
-            return _order.GetOverallPosition(carIdx);
-        }
-
-        /// <summary>
-        /// Get the number of frames since valid data was received for a car.
-        /// Returns int.MaxValue if car has never had valid data.
-        /// Used to detect cars returning from telemetry gaps.
-        /// </summary>
+        /// <inheritdoc cref="CarTrackingCache.GetFramesSinceValidData"/>
         public int GetFramesSinceValidData(int carIdx) => _tracking.GetFramesSinceValidData(carIdx);
 
         /// <summary>
-        /// Reset all tracking state when session changes or connection lost.
+        /// Forget everything. The owner calls this on every session change and disconnect: the
+        /// calculator doesn't watch the session number itself.
         /// </summary>
         public void Reset()
         {
@@ -104,7 +75,6 @@ namespace VISOR.Race
             _order.Reset();
             _finishing.Clear();
             _finish.Reset();
-            _lastSessionNum = -1;
 
             Log.Info("PositionCalculator reset - all state cleared");
         }
@@ -123,7 +93,6 @@ namespace VISOR.Race
         /// </summary>
         private void ProcessUpdate(PositionFrame frame, ISessionDataProvider sessionDataProvider)
         {
-            DetectSessionTransition(frame);
             _finish.TrackCheckeredFlagState(frame);
             _finish.FreezeFinishingPositions(frame, sessionDataProvider);
 
@@ -141,25 +110,6 @@ namespace VISOR.Race
             {
                 _order.Clear();
             }
-        }
-
-        /// <summary>
-        /// Detect session transitions and clear finishing positions when session changes.
-        /// </summary>
-        private void DetectSessionTransition(PositionFrame frame)
-        {
-            int currentSessionNum = frame.SessionNum;
-
-            if (_lastSessionNum != -1 && currentSessionNum != _lastSessionNum)
-            {
-                Log.Info($"Session transition detected ({_lastSessionNum} -> {currentSessionNum}), clearing finishing positions");
-                _finishing.Clear();
-                _finish.StartSession();
-                _order.StartSession();
-                _tracking.StartSession();
-            }
-
-            _lastSessionNum = currentSessionNum;
         }
         #endregion
     }

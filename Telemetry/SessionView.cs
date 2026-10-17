@@ -15,7 +15,7 @@
     /// </summary>
     public sealed class SessionView : ISessionDataProvider
     {
-        public const int CarCount = 64;
+        public const int CarCount = PositionFrame.CarCount;
 
         /// <summary>No session: before the first update, and after a disconnect.</summary>
         public static readonly SessionView Empty = new(

@@ -250,9 +250,7 @@ namespace VISOR.ViewModels
             var zone = _carZoneAssignments.GetValueOrDefault(car.CarIdx, RadarZone.Center);
             float x = (float)(zoneWidth * ((int)zone + 0.5));
 
-            float relativeDistPct = car.LapDistPct - car.PlayerLapDistPct;
-            if (relativeDistPct > 0.5f) relativeDistPct -= 1.0f;
-            if (relativeDistPct < -0.5f) relativeDistPct += 1.0f;
+            float relativeDistPct = LapDistance.Delta(car.PlayerLapDistPct, car.LapDistPct);
 
             float aheadBehindMeters = relativeDistPct * _trackLength;
 

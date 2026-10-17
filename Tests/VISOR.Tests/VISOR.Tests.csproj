@@ -34,6 +34,7 @@
     <!-- All of Race\: it must build without WPF, which this plain net10.0 project checks. -->
     <Compile Include="..\..\Race\*.cs" LinkBase="Linked\Race" />
     <Compile Include="..\..\Telemetry\PositionFrame.cs" Link="Linked\PositionFrame.cs" />
+    <Compile Include="..\..\Telemetry\LapDistance.cs" Link="Linked\LapDistance.cs" />
     <Compile Include="..\..\Telemetry\SessionDataProvider.cs" Link="Linked\SessionDataProvider.cs" />
     <Compile Include="..\..\Telemetry\SessionDataModels.cs" Link="Linked\SessionDataModels.cs" />
     <Compile Include="..\..\Telemetry\SessionView.cs" Link="Linked\SessionView.cs" />

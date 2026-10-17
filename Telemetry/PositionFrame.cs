@@ -12,7 +12,6 @@ namespace VISOR.Telemetry
     {
         public const int CarCount = 64;
 
-        public required int SessionNum { get; init; }
         public required int SessionState { get; init; }
         public required float[] CarIdxLapDistPct { get; init; }
         public required int[] CarIdxLap { get; init; }

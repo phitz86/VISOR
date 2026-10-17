@@ -52,7 +52,7 @@ namespace VISOR.ViewModels
 
             float pct = snapshot.CarIdxLapDistPct[playerIdx];
             bool onPitRoad = snapshot.CarIdxOnPitRoad[playerIdx];
-            bool validPct = pct >= 0f && pct <= 1f;
+            bool validPct = LapDistance.IsOnLap(pct);
 
             // Calibration aid: with Debug Mode on, show the live LapDistPct (and the
             // resolved section name, if any) on every track — including uncatalogued ones

@@ -27,7 +27,7 @@ namespace VISOR.ViewModels
         // legible against the relative display's dark background instead of rendering transparent.
         private static readonly SolidColorBrush DefaultClassBrush = CreateFrozenBrush(Color.FromRgb(0xDD, 0xDD, 0xDD));
 
-        private static SolidColorBrush CreateFrozenBrush(Color color)
+        internal static SolidColorBrush CreateFrozenBrush(Color color)
         {
             var brush = new SolidColorBrush(color);
             brush.Freeze();

@@ -133,9 +133,7 @@ namespace VISOR.ViewModels
             int playerIdx = snapshot.PlayerCarIdx;
             if (playerIdx >= 0)
             {
-                var pitRoadArr = snapshot.CarIdxOnPitRoad;
-                bool onPitRoad = playerIdx < pitRoadArr.Length && pitRoadArr[playerIdx];
-                CheckPlayerPitRoadTransition(onPitRoad, snapshot.Lap);
+                CheckPlayerPitRoadTransition(snapshot.PlayerOnPitRoad, snapshot.Lap);
             }
 
             UpdateLapTimeDisplays(lastLap, snapshot.LapBestLapTime);
@@ -219,9 +217,7 @@ namespace VISOR.ViewModels
         {
             var car = sessionDataProvider != null && sessionDataProvider.IsDataReady ? sessionDataProvider.PlayerCar : null;
 
-            int playerIdx = snapshot.PlayerCarIdx;
-            var pitRoadArr = snapshot.CarIdxOnPitRoad;
-            bool onPitRoad = playerIdx >= 0 && playerIdx < pitRoadArr.Length && pitRoadArr[playerIdx];
+            bool onPitRoad = snapshot.PlayerOnPitRoad;
 
             // Learning runs whether or not the indicator is shown, so the shift points are ready
             // if the driver turns it on later.

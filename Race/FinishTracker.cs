@@ -30,16 +30,6 @@ namespace VISOR.Race
         }
 
         #region Session
-        /// <summary>
-        /// A new session: nothing has finished, and lap-completed baselines start again.
-        /// </summary>
-        public void StartSession()
-        {
-            _isCheckeredFlag = false;
-            _leaderHasFinished = false;
-            _lastLapCompleted.Clear();
-        }
-
         public void Reset()
         {
             _isCheckeredFlag = false;
@@ -86,18 +76,8 @@ namespace VISOR.Race
             var carNumbers = sessionDataProvider.CarNumbers;
             var carLapCompleted = frame.CarIdxLapCompleted;
 
-            if (carClassIDs == null || carNumbers == null || carLapCompleted == null)
+            for (int carIdx = 0; carIdx < PositionFrame.CarCount; carIdx++)
             {
-                return;
-            }
-
-            for (int carIdx = 0; carIdx < carLapCompleted.Length; carIdx++)
-            {
-                if (carIdx >= carClassIDs.Length || carIdx >= carNumbers.Length)
-                {
-                    continue;
-                }
-
                 int currentLapCompleted = carLapCompleted[carIdx];
 
                 // A car with no telemetry reports -1. Keep the last real baseline rather than
@@ -180,20 +160,10 @@ namespace VISOR.Race
             var carClassIDs = sessionDataProvider.CarClassIDs;
             var carNumbers = sessionDataProvider.CarNumbers;
 
-            if (carClassIDs == null || carNumbers == null)
-            {
-                return;
-            }
-
             // The previous frame's roster, less this frame's: this frame's departures.
             foreach (int carIdx in _tracking.PreviousValidCarIndices)
             {
                 if (_tracking.ValidCarIndices.Contains(carIdx) || _finishing.IsFinished(carIdx))
-                {
-                    continue;
-                }
-
-                if (carIdx >= carClassIDs.Length || carIdx >= carNumbers.Length)
                 {
                     continue;
                 }
@@ -223,14 +193,9 @@ namespace VISOR.Race
             var carClassIDs = sessionDataProvider.CarClassIDs;
             var carNumbers = sessionDataProvider.CarNumbers;
 
-            if (carClassIDs == null || carNumbers == null)
-            {
-                return;
-            }
-
             foreach (int carIdx in _tracking.ValidCarIndices)
             {
-                if (carIdx >= carClassIDs.Length || _finishing.IsFinished(carIdx))
+                if (_finishing.IsFinished(carIdx))
                 {
                     continue;
                 }

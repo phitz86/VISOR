@@ -119,11 +119,6 @@ namespace VISOR.Race
         /// </summary>
         public void BeginFrame() => _globalFrameCounter++;
 
-        /// <summary>
-        /// A new session: lap corrections from the last one no longer mean anything.
-        /// </summary>
-        public void StartSession() => _lapNumberCorrection.Clear();
-
         public void Reset()
         {
             _globalFrameCounter = 0;
@@ -144,9 +139,6 @@ namespace VISOR.Race
             var carNumbers = sessionDataProvider.CarNumbers;
             var userNames = sessionDataProvider.UserNames;
 
-            if (carNumbers == null || userNames == null)
-                return;
-
             _lastFrameValidCars.Clear();
             foreach (var carIdx in _validCarIndices)
             {
@@ -154,7 +146,7 @@ namespace VISOR.Race
             }
 
             _validCarIndices.Clear();
-            for (int i = 0; i < 64; i++)
+            for (int i = 0; i < PositionFrame.CarCount; i++)
             {
                 bool hasYamlData = !string.IsNullOrEmpty(carNumbers[i]) &&
                                    !string.IsNullOrEmpty(userNames[i]);
@@ -177,18 +169,13 @@ namespace VISOR.Race
             var onPitRoad = frame.CarIdxOnPitRoad;
             var carNumbers = sessionDataProvider.CarNumbers;
 
-            if (lapDistPct == null || currentLap == null || onPitRoad == null || carNumbers == null)
-                return;
-
-            for (int i = 0; i < 64; i++)
+            for (int i = 0; i < PositionFrame.CarCount; i++)
             {
                 if (string.IsNullOrEmpty(carNumbers[i]))
                     continue;
 
-                bool isOnPitRoad = (i < onPitRoad.Length) && onPitRoad[i];
-                bool hasValidData = (i < lapDistPct.Length) &&
-                                    lapDistPct[i] >= 0f &&
-                                    lapDistPct[i] <= 1f;
+                bool isOnPitRoad = onPitRoad[i];
+                bool hasValidData = LapDistance.IsOnLap(lapDistPct[i]);
 
                 if (hasValidData)
                 {
@@ -222,11 +209,7 @@ namespace VISOR.Race
                     _lapNumberCorrection.Remove(carIdx);
                 }
 
-                float delta = lapDist - lastDist;
-
-                // Lap boundary wrap-around.
-                if (delta < -0.5f) delta += 1.0f;
-                if (delta > 0.5f) delta -= 1.0f;
+                float delta = LapDistance.Delta(lastDist, lapDist);
 
                 // Exponential smoothing (70% old, 30% new).
                 float instantVelocity = delta;

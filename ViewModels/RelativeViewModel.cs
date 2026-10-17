@@ -7,15 +7,12 @@ namespace VISOR.ViewModels
     public class RelativeViewModel
     {
         public ObservableCollection<RelativeRowViewModel> RelativeRows { get; } = new();
-        private readonly Dictionary<int, RelativeRowViewModel> _carCache = new();
 
         private readonly RelativeDisplayBuilder _builder;
-        private readonly Telemetry.PositionHistoryManager _historyManager;
 
         public RelativeViewModel(ClassColorManager classColorManager, PositionCalculator positionCalculator)
         {
-            _historyManager = new Telemetry.PositionHistoryManager();
-            _builder = new RelativeDisplayBuilder(_carCache, classColorManager, positionCalculator, _historyManager);
+            _builder = new RelativeDisplayBuilder(classColorManager, positionCalculator);
         }
 
         public void Update(SVappsLABSnapshot snapshot, SessionView? sessionDataProvider)
@@ -67,13 +64,6 @@ namespace VISOR.ViewModels
         {
             RelativeRows.Clear();
             _builder.Reset();
-            _historyManager.Reset();
-
-            foreach (var row in _carCache.Values)
-            {
-                row.ResetSmoothing();
-            }
-            _carCache.Clear();
         }
     }
 }

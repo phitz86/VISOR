@@ -37,26 +37,12 @@ namespace VISOR.Race
         /// The car's class position from the last sort, or -1. Frozen finishing positions aren't
         /// included; <see cref="PositionCalculator.GetClassPosition"/> reports those first.
         /// </summary>
-        public int GetClassPosition(int carIdx, int classId)
-        {
-            if (_cachedPositions.TryGetValue((carIdx, classId), out int position))
-            {
-                return position;
-            }
-            return -1;
-        }
+        public int GetClassPosition(int carIdx, int classId) => _cachedPositions.GetValueOrDefault((carIdx, classId), -1);
 
         /// <summary>
         /// The car's overall position from the last sort, or -1. The pace car never has one.
         /// </summary>
-        public int GetOverallPosition(int carIdx)
-        {
-            if (_cachedOverallPositions.TryGetValue(carIdx, out int position))
-            {
-                return position;
-            }
-            return -1;
-        }
+        public int GetOverallPosition(int carIdx) => _cachedOverallPositions.GetValueOrDefault(carIdx, -1);
         #endregion
 
         #region Frame and Session
@@ -68,11 +54,6 @@ namespace VISOR.Race
             _cachedPositions.Clear();
             _cachedOverallPositions.Clear();
         }
-
-        /// <summary>
-        /// A new session: every car takes the green again.
-        /// </summary>
-        public void StartSession() => _carsHavingTakenGreen.Clear();
 
         public void Reset()
         {
@@ -108,22 +89,15 @@ namespace VISOR.Race
             var lapDistPct = frame.CarIdxLapDistPct;
             var carNumbers = sessionDataProvider.CarNumbers;
 
-            if (lapCompleted == null || lapDistPct == null || carNumbers == null)
-                return;
-
-            for (int carIdx = 0; carIdx < lapCompleted.Length; carIdx++)
+            for (int carIdx = 0; carIdx < PositionFrame.CarCount; carIdx++)
             {
                 if (_carsHavingTakenGreen.Contains(carIdx))
                     continue;
 
-                if (carIdx >= carNumbers.Length || string.IsNullOrEmpty(carNumbers[carIdx]))
+                if (string.IsNullOrEmpty(carNumbers[carIdx]))
                     continue;
 
-                bool validDist = carIdx < lapDistPct.Length &&
-                                 lapDistPct[carIdx] >= 0f &&
-                                 lapDistPct[carIdx] <= 1f;
-
-                if (lapCompleted[carIdx] >= 0 && validDist)
+                if (lapCompleted[carIdx] >= 0 && LapDistance.IsOnLap(lapDistPct[carIdx]))
                     _carsHavingTakenGreen.Add(carIdx);
             }
         }
@@ -133,9 +107,9 @@ namespace VISOR.Race
         /// from grid order so the whole pre-green block sorts behind any car already racing (whose key
         /// is currentLap + LapDistPct, i.e. >= ~1), while preserving grid order within the block.
         /// </summary>
-        private static float GetPreGreenSortKey(int carIdx, int[]? gridPositions)
+        private static float GetPreGreenSortKey(int carIdx, int[] gridPositions)
         {
-            int grid = (gridPositions != null && carIdx < gridPositions.Length) ? gridPositions[carIdx] : 0;
+            int grid = gridPositions[carIdx];
 
             if (grid <= 0)
             {
@@ -156,7 +130,7 @@ namespace VISOR.Race
         /// number and scramble the block, so the source covering the most pre-green cars is used for
         /// all of them and the rest fall to the back of the block.
         /// </summary>
-        private static int[]? SelectGridSource(int[]? livePositions, int[]? qualPositions, List<int> preGreenCars)
+        private static int[] SelectGridSource(int[] livePositions, int[] qualPositions, List<int> preGreenCars)
         {
             int liveCoverage = CountCoveredCars(livePositions, preGreenCars);
             if (liveCoverage == preGreenCars.Count)
@@ -165,15 +139,12 @@ namespace VISOR.Race
             return (CountCoveredCars(qualPositions, preGreenCars) > liveCoverage) ? qualPositions : livePositions;
         }
 
-        private static int CountCoveredCars(int[]? positions, List<int> carIndices)
+        private static int CountCoveredCars(int[] positions, List<int> carIndices)
         {
-            if (positions == null)
-                return 0;
-
             int covered = 0;
             foreach (int carIdx in carIndices)
             {
-                if (carIdx < positions.Length && positions[carIdx] > 0)
+                if (positions[carIdx] > 0)
                     covered++;
             }
             return covered;
@@ -187,17 +158,11 @@ namespace VISOR.Race
             var currentLap = frame.CarIdxLap;
             var lapDistPct = frame.CarIdxLapDistPct;
 
-            if (carClassIDs == null || currentLap == null || lapDistPct == null)
-                return;
-
             var carsWithPositions = new List<CarPositionData>();
             var preGreenCars = new List<int>();
 
             foreach (int carIdx in _tracking.ValidCarIndices)
             {
-                if (carIdx < 0 || carIdx >= carClassIDs.Length)
-                    continue;
-
                 // Already frozen — don't include in the live sort.
                 if (_finishing.IsFinished(carIdx))
                     continue;
@@ -205,7 +170,7 @@ namespace VISOR.Race
                 float effectiveLapDistPct = _tracking.GetEffectiveLapDistPct(carIdx);
                 int effectiveCurrentLap;
 
-                if (lapDistPct[carIdx] >= 0f && lapDistPct[carIdx] <= 1f)
+                if (LapDistance.IsOnLap(lapDistPct[carIdx]))
                 {
                     // CarIdxLap and CarIdxLapDistPct don't always tick over in the same frame at
                     // S/F; realign them so a car crossing the line doesn't read a full lap out.
@@ -274,7 +239,7 @@ namespace VISOR.Race
                 var frozenPositions = new HashSet<int>();
                 foreach (var kv in _finishing.ClassPositions)
                 {
-                    if (kv.Key < carClassIDs.Length && carClassIDs[kv.Key] == classGroup.Key)
+                    if (carClassIDs[kv.Key] == classGroup.Key)
                         frozenPositions.Add(kv.Value);
                 }
 

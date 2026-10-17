@@ -30,7 +30,6 @@ namespace VISOR.Tests
         public readonly PositionCalculator Calc = new();
         public readonly FakeSession Session = new();
 
-        public int SessionNum = 1;
         public int SessionState = SessionStates.Racing;
         public readonly float[] Pct = Filled(-1f);
         public readonly int[] Lap = new int[PositionFrame.CarCount];
@@ -100,7 +99,6 @@ namespace VISOR.Tests
 
         public PositionFrame Build() => new()
         {
-            SessionNum = SessionNum,
             SessionState = SessionState,
             CarIdxLapDistPct = (float[])Pct.Clone(),
             CarIdxLap = (int[])Lap.Clone(),

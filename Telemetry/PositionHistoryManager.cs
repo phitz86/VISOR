@@ -7,19 +7,18 @@ namespace VISOR.Telemetry
     /// </summary>
     public class PositionHistoryManager
     {
-        private const int MaxCars = 64;
         private const int DecimationInterval = 6; // 60Hz / 6 = 10Hz
 
         private readonly PositionHistoryBuffer[] _buffers;
         private int _frameCounter = 0;
         private float _trackLengthMeters = 0f;
 
-        private readonly bool[] _prevOnPitRoad = new bool[MaxCars];
+        private readonly bool[] _prevOnPitRoad = new bool[PositionFrame.CarCount];
 
         public PositionHistoryManager()
         {
-            _buffers = new PositionHistoryBuffer[MaxCars];
-            for (int i = 0; i < MaxCars; i++)
+            _buffers = new PositionHistoryBuffer[PositionFrame.CarCount];
+            for (int i = 0; i < PositionFrame.CarCount; i++)
             {
                 _buffers[i] = new PositionHistoryBuffer();
             }
@@ -30,7 +29,7 @@ namespace VISOR.Telemetry
         /// </summary>
         public PositionHistoryBuffer? GetBuffer(int carIdx)
         {
-            if (carIdx < 0 || carIdx >= MaxCars)
+            if (carIdx < 0 || carIdx >= PositionFrame.CarCount)
                 return null;
             return _buffers[carIdx];
         }
@@ -48,7 +47,7 @@ namespace VISOR.Telemetry
 
                 if (_trackLengthMeters > 0f)
                 {
-                    for (int i = 0; i < MaxCars; i++)
+                    for (int i = 0; i < PositionFrame.CarCount; i++)
                         _buffers[i].SetStationaryEpsilon(_trackLengthMeters);
                 }
             }
@@ -56,7 +55,7 @@ namespace VISOR.Telemetry
             var onPitRoad = snapshot.CarIdxOnPitRoad;
             if (onPitRoad != null)
             {
-                for (int i = 0; i < Math.Min(onPitRoad.Length, MaxCars); i++)
+                for (int i = 0; i < Math.Min(onPitRoad.Length, PositionFrame.CarCount); i++)
                 {
                     // Entering pit road invalidates the buffer.
                     if (onPitRoad[i] && !_prevOnPitRoad[i])
@@ -77,7 +76,7 @@ namespace VISOR.Telemetry
             if (lapDistPcts == null || sessionTime <= 0.0)
                 return;
 
-            for (int i = 0; i < Math.Min(lapDistPcts.Length, MaxCars); i++)
+            for (int i = 0; i < Math.Min(lapDistPcts.Length, PositionFrame.CarCount); i++)
             {
                 if (onPitRoad != null && i < onPitRoad.Length && onPitRoad[i])
                     continue;
@@ -102,7 +101,7 @@ namespace VISOR.Telemetry
         /// </summary>
         public void Reset()
         {
-            for (int i = 0; i < MaxCars; i++)
+            for (int i = 0; i < PositionFrame.CarCount; i++)
             {
                 _buffers[i].Clear();
                 _prevOnPitRoad[i] = false;
