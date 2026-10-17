@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:converters="clr-namespace:VISOR.Resources.Converters"
         xmlns:viewModels="clr-namespace:VISOR.ViewModels"
+        xmlns:views="clr-namespace:VISOR.Views"
         Title="VISOR"
         Icon="/VISOR Logo.ico"
         WindowStyle="None"
@@ -363,43 +364,11 @@
             </Grid>
         </Border>
 
-        <Border x:Name="DragHandle"
-                Panel.ZIndex="100"
-                CornerRadius="4" 
-                Width="48" Height="48"
-                BorderBrush="#808080" 
-                BorderThickness="1"
-                HorizontalAlignment="Left"
-                VerticalAlignment="Top"
-                Margin="20,20,0,0"
-                Cursor="SizeAll"
-                Visibility="Collapsed"
-                MouseLeftButtonDown="DragHandle_MouseLeftButtonDown">
-            <Border.Style>
-                <Style TargetType="Border">
-                    <Setter Property="Background" Value="#80404040"/>
-                    <Style.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Background" Value="#80606060"/>
-                        </Trigger>
-                    </Style.Triggers>
-                </Style>
-            </Border.Style>
-            <Grid>
-                <TextBlock Text="⬉" FontSize="16" FontWeight="Bold"
-                           HorizontalAlignment="Left" VerticalAlignment="Top" 
-                           Margin="6,6,0,0" Foreground="White"/>
-                <TextBlock Text="⬈" FontSize="16" FontWeight="Bold"
-                           HorizontalAlignment="Right" VerticalAlignment="Top" 
-                           Margin="0,6,6,0" Foreground="White"/>
-                <TextBlock Text="⬋" FontSize="16" FontWeight="Bold"
-                           HorizontalAlignment="Left" VerticalAlignment="Bottom" 
-                           Margin="6,0,0,6" Foreground="White"/>
-                <TextBlock Text="⬊" FontSize="16" FontWeight="Bold"
-                           HorizontalAlignment="Right" VerticalAlignment="Bottom" 
-                           Margin="0,0,6,6" Foreground="White"/>
-            </Grid>
-        </Border>
+        <!-- Shown only in config mode; drag it to move the overlay. -->
+        <views:ConfigDragHandle Panel.ZIndex="100"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Top"
+                                Margin="20,20,0,0" />
 
         <Button x:Name="ConfigButton"
                 Panel.ZIndex="100"

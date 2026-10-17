@@ -2,9 +2,7 @@
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Threading;
 using VISOR.Diagnostics;
 using VISOR.Settings;
 using VISOR.Telemetry;
@@ -17,8 +15,7 @@ namespace VISOR.Views
         private readonly MainViewModel _viewModel;
         private readonly SVappsLABSDKWrapper _sdk;
         private readonly SettingsManager _settingsManager;
-        private readonly ConfigModeManager _configModeManager;
-        private readonly FramePoster _framePoster;
+        private readonly WindowSdkLink _sdkLink;
         private bool _lastRelativeVisibility = true;
 
         public MainViewModel ViewModel => _viewModel;
@@ -29,10 +26,9 @@ namespace VISOR.Views
 
             _sdk = sdkWrapper;
             _settingsManager = SettingsManager.Instance;
-            _configModeManager = ConfigModeManager.Instance;
             _viewModel = new MainViewModel();
             DataContext = _viewModel;
-            _framePoster = new FramePoster(Dispatcher, "MainWindow", ProcessSnapshot);
+            _sdkLink = new WindowSdkLink(this, _sdk, ProcessSnapshot, OnConnectionChanged, OnPrimedChanged);
 
             AllowsTransparency = true;
             WindowStyle = WindowStyle.None;
@@ -44,7 +40,6 @@ namespace VISOR.Views
 
             _settingsManager.ElementVisibilityChanged += OnElementVisibilityChanged;
             _settingsManager.WindowSizeChanged += OnWindowSizeChanged;
-            _configModeManager.ConfigModeChanged += OnConfigModeChanged;
 
             Loaded += MainWindow_Loaded;
         }
@@ -86,31 +81,11 @@ namespace VISOR.Views
             });
         }
 
-        private void OnConfigModeChanged(object? sender, ConfigModeChangedEventArgs e)
-        {
-            Dispatcher.Invoke(() =>
-            {
-                Log.Debug($"[MainWindow] Config mode changed to: {e.IsInConfigMode}");
-                DragHandle.Visibility = e.IsInConfigMode ? Visibility.Visible : Visibility.Collapsed;
-            });
-        }
-
-        private void DragHandle_MouseLeftButtonDown(object? sender, MouseButtonEventArgs e)
-        {
-            if (_configModeManager.IsInConfigMode)
-            {
-                DragMove();
-            }
-        }
-
         private void MainWindow_Loaded(object? sender, RoutedEventArgs e)
         {
             try
             {
-                _sdk.SnapshotAvailable += OnSnapshotAvailable;
-                _sdk.ConnectionStateChanged += OnConnectionStateChanged;
-                _sdk.PrimedStateChanged += OnPrimedStateChanged;
-
+                _sdkLink.Attach();
                 UpdateUIState();
             }
             catch (Exception ex)
@@ -120,59 +95,45 @@ namespace VISOR.Views
             }
         }
 
-        // Raised on an SDK thread. Queued rather than invoked, so the SDK never waits on the UI
-        // thread, which during shutdown is itself waiting for the SDK to stop.
-        private void OnConnectionStateChanged(bool isConnected)
+        // UI thread, queued by the SDK link.
+        private void OnConnectionChanged(bool isConnected)
         {
-            Dispatcher.BeginInvoke(DispatcherPriority.Send, new Action(() =>
+            if (!isConnected)
             {
-                if (!isConnected)
-                {
-                    _viewModel.Reset();
-                    StatusText.Text = "Disconnected. Waiting for iRacing...";
-                    StatusText.Visibility = Visibility.Visible;
-                }
-                else
-                {
-                    StatusText.Text = "Connected, waiting for session data...";
-                    StatusText.Visibility = Visibility.Visible;
-                }
-            }));
-        }
-
-        private async void OnPrimedStateChanged(bool isPrimed)
-        {
-            try
-            {
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    if (isPrimed)
-                    {
-                        StatusText.Text = "Fully connected!";
-                        _viewModel.IsTelemetryConnected = true;
-                    }
-                    else
-                    {
-                        StatusText.Text = "Waiting for session data...";
-                        StatusText.Visibility = Visibility.Visible;
-                        _viewModel.IsTelemetryConnected = false;
-                    }
-                });
-
-                if (isPrimed)
-                {
-                    await Task.Delay(1000);
-                    await Dispatcher.InvokeAsync(() => StatusText.Visibility = Visibility.Collapsed);
-                }
+                _viewModel.Reset();
+                StatusText.Text = "Disconnected. Waiting for iRacing...";
+                StatusText.Visibility = Visibility.Visible;
             }
-            catch (TaskCanceledException) { }
-            catch (OperationCanceledException) { }
+            else
+            {
+                StatusText.Text = "Connected, waiting for session data...";
+                StatusText.Visibility = Visibility.Visible;
+            }
         }
 
-        // SDK telemetry thread: queue the frame for the UI thread, in order (see FramePoster).
-        private void OnSnapshotAvailable(SVappsLABSnapshot snapshot) => _framePoster.Post(snapshot);
+        // UI thread, queued by the SDK link.
+        private async void OnPrimedChanged(bool isPrimed)
+        {
+            if (isPrimed)
+            {
+                StatusText.Text = "Fully connected!";
+                _viewModel.IsTelemetryConnected = true;
 
-        // UI thread.
+                // Back on the UI thread after the delay. Leave the text up if the HUD has
+                // dropped back to waiting in the meantime.
+                await Task.Delay(1000);
+                if (_sdk.IsPrimed)
+                    StatusText.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                StatusText.Text = "Waiting for session data...";
+                StatusText.Visibility = Visibility.Visible;
+                _viewModel.IsTelemetryConnected = false;
+            }
+        }
+
+        // UI thread, queued in order by the SDK link's frame poster.
         private void ProcessSnapshot(SVappsLABSnapshot snapshot)
         {
             // One view for the whole frame: every reader below sees the same session update.
@@ -237,7 +198,6 @@ namespace VISOR.Views
         {
             _settingsManager.ElementVisibilityChanged -= OnElementVisibilityChanged;
             _settingsManager.WindowSizeChanged -= OnWindowSizeChanged;
-            _configModeManager.ConfigModeChanged -= OnConfigModeChanged;
 
             base.OnClosed(e);
         }

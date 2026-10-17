@@ -5,7 +5,7 @@ Risk appetite for 1.2.1: fix bugs, delete dead code, and split files mechanicall
 
 ## Summary
 
-**Status (2026-10-16):** Phase 1, the three revision passes, is done and validated on the rig. Testing turned up B10, B11 and S7, and the research for Phase 2 found B12 and B13. Phase 2 (pre-release fixes, the CI test pipeline, then the architecture work) is under "Revision plan" at the end. Passes 4–10 are done and rig-checked. Pass 11 (the radar draws itself) is committed and waiting for its rig check.
+**Status (2026-10-16):** Phase 1, the three revision passes, is done and validated on the rig. Testing turned up B10, B11 and S7, and the research for Phase 2 found B12 and B13. Phase 2 (pre-release fixes, the CI test pipeline, then the architecture work) is under "Revision plan" at the end. Passes 4–11 are done and rig-checked. Pass 12 (shared window plumbing), the last planned pass, is committed and waiting for its rig check.
 
 - **Overall:** the code is in good shape. The new shift-point work (learner, store, cue) is well isolated, its untrusted input is validated, and it is the only part of the app with tests. Most problems are older code that grew, or plumbing nobody uses any more.
 - **No significant CPU or RAM bottleneck.** Steady-state garbage is roughly 1 MB/s, all short-lived. Fixed buffers total about 2.4 MB. Nothing grows without bound in release builds except the radar ghost elements (B1).
@@ -51,7 +51,7 @@ Status reflects the revision plan agreed after the review (see "Agreed revision 
 | B11 | Med | Settings reset to defaults on every version bump | Small | **Done** (Pass 4; rig-checked 10 Oct) |
 | B12 | Low–Med | At the finish, a car whose telemetry stops isn't held: the car behind moves up and two cars can show the same position | Small | **Done** (Pass 8, own commit; rig-checked 10 Oct) |
 | B13 | Low | Radar switched on from the Config window can't be dragged into place | Small | **Done** (Pass 4; rig-checked 10 Oct) |
-| B14 | Low | Radar grid lines collapse after a size-preset change | Small | **Done** (own commit after Pass 11; found on its rig check); rig check pending |
+| B14 | Low | Radar grid lines collapse after a size-preset change | Small | **Done** (own commit after Pass 11; found on its rig check; rig-checked 17 Oct) |
 | D1 | Low | `System.Management` package unused but shipped | Mech | **Done** (Pass 1) |
 | D2, D4 | Low | Unused members and events | Mech | **Done** (Pass 1) |
 | D3 | Low | Session data parsed but never read | Mech | **Skipped** (cheap; unused reads have come in handy) |
@@ -59,12 +59,12 @@ Status reflects the revision plan agreed after the review (see "Agreed revision 
 | C1–C3, C7 | Low | Duplicated helpers, scale factors, magic numbers, radar zone switches | Mech | **Done** (Pass 7) |
 | C5 | Low | Fastest-lap positioning rebuilt per row | Mech | **Done** (as P2) |
 | C4 | Low | Session type re-derived under a lock many times per frame | — | **Done** (Pass 10; once per update; rig-checked 16 Oct) |
-| C6 | Low | Overlay and radar code-behind duplicate their plumbing | — | **Proposed:** Pass 12 |
+| C6 | Low | Overlay and radar code-behind duplicate their plumbing | — | **Done** (Pass 12); rig check pending |
 | C9 | Low | Leaving cool-down for the next session resets the overlay twice | Small | **Done** (Pass 10; found on the Pass 9 rig check; rig-checked 16 Oct) |
 | C8 | Low | Debug loggers each re-implement folder, file name and flush | Mech | **Done** (Pass 7; file naming shared, flushing left to each logger) |
 | F2–F4 | — | Files over 500 lines: split plans | Mech | **Done** (Pass 7) |
 | F1 | — | `PositionCalculator.cs` (1,137 lines): split plan | Mech | **Done** (Pass 9; largest file 423 lines; rig-checked 15 Oct) |
-| A1 | — | Radar view model builds WPF elements | — | **Done** (Pass 11); rig check pending |
+| A1 | — | Radar view model builds WPF elements | — | **Done** (Pass 11; rig-checked 17 Oct) |
 | A2 | — | Leaky session interface; Settings depends on Telemetry | — | **Done** (Pass 10: no downcasts, Settings takes a bool; rig-checked 16 Oct) |
 | A3 | — | PositionCalculator in the wrong layer, untestable | — | **Done** (Pass 8: plain input record; Pass 9: moved to `Race/`; rig-checked 15 Oct) |
 | A4 | — | One UI tick for both windows | — | Only if a problem appears |
@@ -659,12 +659,33 @@ One session on a Debug build from VS covers all four passes:
   - **B14:** the grid lines broke on a size change. This bug predates Pass 11; the code dates from 2025.
   - **Cause:** `UpdateRadarLines` worked out each line's new position from its current one. After the first resize, the lane lines no longer sat at 48, 96, 144 or 192, so they matched no case and went to x = 0, and each later resize scaled the horizontal lines again.
   - **Fix:** the window records each line's design position from `RadarWindow.xaml` before the first resize and places the line from that at every size, using the same fractions as before. It is its own commit.
+- **Rig check result (2026-10-17): passed.**
+  - The grid lines are right at all three sizes and across size changes.
+  - Fade in and out, and multiclass colours, were already confirmed on the first run.
 
 #### Pass 12: shared window plumbing, C6 (rig)
 - **Changes:**
   - An attached behaviour for the config-mode drag handle. It replaces four duplicated blocks and absorbs the B13 fix.
   - A small helper for the SDK subscriptions, the frame poster and one marshalling priority for both windows. Today the overlay and the radar use different priorities for the "HUD ready" change.
 - **Gate (rig):** config mode on and off, drag both windows, disconnect and reconnect, and exit.
+- **Result (2026-10-17):**
+  - **`ConfigDragHandle`** (`Views/ConfigDragHandle.xaml`) is a small control, used in place of the attached behaviour planned above, because the handle's XAML (about 35 lines of style and arrows) was duplicated too.
+    - It shows itself only in config mode, drags its window, and reads the current mode when its window opens. That is B13's fix, now for both windows.
+    - It stops listening when its window closes.
+    - Each window drops its copy of the XAML, its config-mode subscription and handler, its mouse handler and its unsubscription.
+  - **`WindowSdkLink`** (`Views/WindowSdkLink.cs`) holds each window's SDK subscriptions and its frame poster.
+    - It queues connection and "HUD ready" changes to the UI thread at Send, the frames' priority. The overlay's "HUD ready" handler used `InvokeAsync` at Normal before.
+    - It detaches when its window closes. The overlay never unsubscribed before.
+    - The windows' handlers are now plain UI-thread methods.
+  - **Small fix:** "Fully connected!" is hidden after a second only if the HUD is still ready. Before, a drop back to waiting within that second had its "Waiting for session data..." hidden.
+  - **Size:** the two windows' code-behind and XAML lose 229 lines and gain 82; the two new pieces add 165.
+  - **Checks:** Debug and Release, XAML included, build with no warnings. The rest is checked on the rig.
+- **Rig check for Pass 12:**
+  - **Config mode:** open the Config window. Both drag handles appear, at the same places as before.
+  - **Drag:** drag both windows; they move only by their handles. Close the Config window: the handles go, and the positions are kept.
+  - **Radar from Config:** with the radar off, open the Config window and turn the radar on. Its handle shows straight away (B13).
+  - **Disconnect and reconnect:** quit iRacing, or leave the session, and come back. The overlay goes "Disconnected...", then "Connected, waiting...", then "Fully connected!" for a second. The radar's indicators follow the same steps.
+  - **Exit:** "Exit VISOR" and closing the overlay both shut down promptly.
 
 #### Optional
 - **A5, user catalog override:**

@@ -2,11 +2,9 @@
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
-using System.Windows.Threading;
 using VISOR.Diagnostics;
 using VISOR.Settings;
 using VISOR.Telemetry;
@@ -19,8 +17,7 @@ namespace VISOR.Views
         private readonly RadarViewModel _viewModel;
         private readonly SVappsLABSDKWrapper _sdk;
         private readonly SettingsManager _settingsManager;
-        private readonly ConfigModeManager _configModeManager;
-        private readonly FramePoster _framePoster;
+        private readonly WindowSdkLink _sdkLink;
 
         private int _lastVisibleCarCount = 0;
         private bool _isFadedOut = false;
@@ -40,14 +37,13 @@ namespace VISOR.Views
 
             _sdk = sdkWrapper;
             _settingsManager = SettingsManager.Instance;
-            _configModeManager = ConfigModeManager.Instance;
             _gridLines = RadarCanvas.Children.OfType<Line>()
                 .Select(line => (line, Math.Abs(line.X1 - line.X2) < 0.1, line.X1, line.Y1))
                 .ToArray();
 
             _viewModel = new RadarViewModel(classColorManager);
             DataContext = _viewModel;
-            _framePoster = new FramePoster(Dispatcher, "RadarWindow", ProcessSnapshot);
+            _sdkLink = new WindowSdkLink(this, _sdk, ProcessSnapshot, OnConnectionChanged, OnPrimedChanged);
 
             AllowsTransparency = true;
             WindowStyle = WindowStyle.None;
@@ -58,14 +54,11 @@ namespace VISOR.Views
             ApplyWindowPositioning();
 
             _settingsManager.WindowSizeChanged += OnWindowSizeChanged;
-            _configModeManager.ConfigModeChanged += OnConfigModeChanged;
 
             // A radar switched on from the Config window is created while config mode is already
-            // on, and only hears about later changes, so start it in the current mode: drag
-            // handle shown and kept visible, as the Config window does for an existing radar.
-            bool inConfigMode = _configModeManager.IsInConfigMode;
-            DragHandle.Visibility = inConfigMode ? Visibility.Visible : Visibility.Collapsed;
-            SetForceVisible(inConfigMode);
+            // on, so keep it visible, as the Config window does for an existing radar. Its drag
+            // handle reads the current mode itself (ConfigDragHandle).
+            SetForceVisible(ConfigModeManager.Instance.IsInConfigMode);
 
             Loaded += RadarWindow_Loaded;
 
@@ -202,32 +195,11 @@ namespace VISOR.Views
             });
         }
 
-        private void OnConfigModeChanged(object? sender, ConfigModeChangedEventArgs e)
-        {
-            Dispatcher.Invoke(() =>
-            {
-                Log.Debug($"[RadarWindow] Config mode changed to: {e.IsInConfigMode}");
-
-                DragHandle.Visibility = e.IsInConfigMode ? Visibility.Visible : Visibility.Collapsed;
-            });
-        }
-
-        private void DragHandle_MouseLeftButtonDown(object? sender, MouseButtonEventArgs e)
-        {
-            if (_configModeManager.IsInConfigMode)
-            {
-                DragMove();
-            }
-        }
-
         private async void RadarWindow_Loaded(object? sender, RoutedEventArgs e)
         {
             try
             {
-                _sdk.SnapshotAvailable += OnSnapshotAvailable;
-                _sdk.ConnectionStateChanged += OnConnectionStateChanged;
-                _sdk.PrimedStateChanged += OnPrimedStateChanged;
-
+                _sdkLink.Attach();
                 UpdateUIState();
             }
             catch (Exception ex)
@@ -237,54 +209,45 @@ namespace VISOR.Views
             }
         }
 
-        // Connection and primed-state changes are raised on SDK threads. Queued rather than
-        // invoked, so the SDK never waits on the UI thread (see MainWindow).
-        private void OnConnectionStateChanged(bool isConnected)
+        // UI thread, queued by the SDK link.
+        private void OnConnectionChanged(bool isConnected)
         {
-            Dispatcher.BeginInvoke(DispatcherPriority.Send, new Action(() =>
+            if (!isConnected)
             {
-                if (!isConnected)
-                {
-                    _viewModel.Clear();
-                    DebugText.Text = "Radar: Disconnected";
-                    CarLeftRightIndicator.Text = "Offline";
-                    ResetZoneHighlights();
-                    UpdatePlayerCarDisplay();
-                    FadeOut();
-                }
-                else
-                {
-                    DebugText.Text = "Radar: Connected";
-                    CarLeftRightIndicator.Text = "Connecting";
-                }
-            }));
+                _viewModel.Clear();
+                DebugText.Text = "Radar: Disconnected";
+                CarLeftRightIndicator.Text = "Offline";
+                ResetZoneHighlights();
+                UpdatePlayerCarDisplay();
+                FadeOut();
+            }
+            else
+            {
+                DebugText.Text = "Radar: Connected";
+                CarLeftRightIndicator.Text = "Connecting";
+            }
         }
 
-        private void OnPrimedStateChanged(bool isPrimed)
+        // UI thread, queued by the SDK link.
+        private void OnPrimedChanged(bool isPrimed)
         {
-            Dispatcher.BeginInvoke(DispatcherPriority.Send, new Action(() =>
+            if (isPrimed)
             {
-                if (isPrimed)
-                {
-                    DebugText.Text = "Radar: Active";
-                    CarLeftRightIndicator.Text = "Ready";
-                }
-                else
-                {
-                    DebugText.Text = "Radar: Waiting for session data";
-                    CarLeftRightIndicator.Text = "Waiting";
-                    _viewModel.Clear();
-                    ResetZoneHighlights();
-                    UpdatePlayerCarDisplay();
-                    FadeOut();
-                }
-            }));
+                DebugText.Text = "Radar: Active";
+                CarLeftRightIndicator.Text = "Ready";
+            }
+            else
+            {
+                DebugText.Text = "Radar: Waiting for session data";
+                CarLeftRightIndicator.Text = "Waiting";
+                _viewModel.Clear();
+                ResetZoneHighlights();
+                UpdatePlayerCarDisplay();
+                FadeOut();
+            }
         }
 
-        // SDK telemetry thread: queue the frame for the UI thread, in order (see FramePoster).
-        private void OnSnapshotAvailable(SVappsLABSnapshot snapshot) => _framePoster.Post(snapshot);
-
-        // UI thread.
+        // UI thread, queued in order by the SDK link's frame poster.
         private void ProcessSnapshot(SVappsLABSnapshot snapshot)
         {
             // One view for the whole frame: every reader below sees the same session update.
@@ -453,15 +416,8 @@ namespace VISOR.Views
 
         protected override void OnClosed(EventArgs e)
         {
-            if (_sdk != null)
-            {
-                _sdk.SnapshotAvailable -= OnSnapshotAvailable;
-                _sdk.ConnectionStateChanged -= OnConnectionStateChanged;
-                _sdk.PrimedStateChanged -= OnPrimedStateChanged;
-            }
-
+            // The SDK link and the drag handle detach themselves when the window closes.
             _settingsManager.WindowSizeChanged -= OnWindowSizeChanged;
-            _configModeManager.ConfigModeChanged -= OnConfigModeChanged;
 
             base.OnClosed(e);
         }

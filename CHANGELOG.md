@@ -101,7 +101,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   assignment and highlights; and the shift-point learner, the shift-point provider, the relative
   display builder and the position calculator are split into smaller files, none now much over
   500 lines. The radar window now draws its cars from a plain list the radar keeps, instead of
-  the radar building the on-screen shapes itself. The position calculator, which works out the running order and finishing positions,
+  the radar building the on-screen shapes itself. The overlay and the radar share one drag
+  handle and one hookup to the iRacing connection, so both handle config mode, connection
+  changes and "HUD ready" the same way; the "Fully connected!" note no longer hides a "Waiting
+  for session data..." that replaced it within a second. The position calculator, which works out the running order and finishing positions,
   moves out of the display code into its own `Race` folder. Debug builds only: the radar's zone log
   lines are worded consistently, and captured session info is saved as
   `parse-failure_<time>.yaml`.
