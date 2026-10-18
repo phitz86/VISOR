@@ -178,7 +178,7 @@
 
     <h2>Getting Started</h2>
     <ol>
-        <li>Launch VISOR - Three windows will appear:
+        <li>When you launch VISOR, three windows will appear:
             <ul style="margin-bottom: 0;">
                 <li><strong>Main Window:</strong> Race information overlay</li>
                 <li><strong>Radar Window:</strong> Proximity and spotter information</li>
@@ -203,45 +203,39 @@
     </ul>
 
     <h3>Drag and Position</h3>
-    <p>When the Configuration Window is open, both Main and Radar Windows display drag handles in the top-left corner. Click and drag to reposition. Positions save when you click "Done." To reopen the Configuration Window later, click &#9881; on the Main Window; &#10005; on the Main Window, or <strong>Exit VISOR</strong> in the Configuration Window, closes VISOR.</p>
+    <p>When the Configuration Window is open, both Main and Radar Windows display drag handles in the top-left corner. Click and drag to reposition. Positions save when you click "Done." To reopen the Configuration Window later, click <strong>&#9881;</strong> on the Main Window. You can close VISOR by clicking <strong>&#10005;</strong> on the Main Window, or <strong>Exit VISOR</strong> in the Configuration Window.</p>
 
     <h3>Display Options</h3>
     <p>Beyond the row toggles, the Configuration Window offers a few display preferences:</p>
     <ul>
-        <li><strong>Position display:</strong> Show <strong>Class</strong> (within your car class, the default) or <strong>Overall</strong> (field-wide) position. Applies to both Row 0 and the Row 4 relative table.</li>
-        <li><strong>Temperature unit:</strong> Show the Row 5 track temperature in <strong>Fahrenheit</strong> (default) or <strong>Celsius</strong>.</li>
+        <li><strong>Position display:</strong> <strong>Class</strong> (default) or <strong>Overall</strong> position. Applies to your position indicator and the Relative table.</li>
+        <li><strong>Temperature unit:</strong> Track temperature in <strong>Fahrenheit</strong> (default) or <strong>Celsius</strong>.</li>
         <li><strong>Row 5 elements:</strong> Track location, incident counter, and track temperature can each be shown or hidden independently.</li>
         <li><strong>Shift indicator:</strong> Turn the Row 0 gear symbol's shift colors on or off (on by default; see Row 0 below).</li>
-        <li><strong>Hide cars in the pits:</strong> Remove pit-road cars from the Row 4 relative table (see Row 4 below for the exceptions).</li>
+        <li><strong>Hide cars in the pits:</strong> Remove pit road cars from the relative table (see Row 4 below for the exceptions).</li>
     </ul>
 
     <h3>Updates</h3>
-    <p>On startup VISOR quietly checks GitHub for a newer release. If one is available, a small notice appears in the Configuration Window with a link to the download &mdash; there are no pop-ups, and the check fails silently if you're offline.</p>
+    <p>VISOR checks GitHub for a newer release on startup. If one is available, a small notice appears in the Configuration Window with a link to the download.</p>
 
     <h2>Main Window Display Elements</h2>
 
     <h3>Row 0: Gear Indicator & Position</h3>
-    <p><strong>Gear Indicator:</strong> Displays current gear ("R" for reverse, "N" for neutral, numbers for forward gears) using a digital-style font for quick readability.</p>
-    <p><strong>Shift Indicator:</strong> The gear symbol next to the number tells you when to upshift, the same way in every car, however that car's own dash lights work:</p>
+    <p><strong>Gear Indicator:</strong> Displays current gear in a digital-style font for quick readability.</p>
+    <p><strong>Shift Indicator:</strong> The gear symbol next to the number tells you when to upshift based on optimal physics:</p>
     <ul>
         <li><strong>Gray:</strong> keep going.</li>
-        <li><strong>Amber:</strong> the shift point is coming up. Amber starts the same distance before the shift point as the car's own shift lights do.</li>
-        <li><strong>Flashing white/red:</strong> shift now. The flash allows for your reaction time, so in the low gears, where the revs climb fastest, it starts a little before the shift point itself.</li>
+        <li><strong>Amber:</strong> the shift point is coming up.</li>
+        <li><strong>Flashing white/red:</strong> shift now. In lower gears, it flashes a little earlier to account for reaction time vs. engine speed.</li>
         <li><strong>Solid red:</strong> you're at the redline or on the rev limiter.</li>
     </ul>
-    <p>To start with, VISOR uses the shift point iRacing gives for the car (the one its shift lights are built around). As you drive, VISOR also works out the fastest shift point for each gear from your own full-throttle acceleration: the RPM where the next gear would pull harder than the one you're in. Once it has seen enough of a gear (usually a few laps of flat-out running), it switches that gear to the learned shift point. That may be earlier or later than the car's lights, and it can differ from gear to gear. What VISOR learns is saved on your PC for each car and builds up across sessions. When iRacing updates a car, VISOR starts learning it again. Learning pauses in the pits, on the pit limiter, off track, in replays, on a wet track and while cornering hard, since tires that are turning can't put all their grip into acceleration. The indicator stays gray in neutral, reverse and the pits, and in top gear it only turns red at the limiter.</p>
-    <p>VISOR only trusts a shift point once it has seen you drive at those revs. So if the car's light comes on early (it's telling you to shift before the engine has finished pulling), VISOR first proves the engine is still pulling harder at the light, then moves the cue a little later, about 250 RPM at a time. Each step waits until you've driven up to it and VISOR has confirmed it, so the cue works its way up to the real best shift point over a few laps or sessions. It never moves the cue earlier than the car's light until it has the full answer.</p>
-    <p><strong>Calibration Dot:</strong> A small dot at the bottom left of the gear symbol shows whether the shift point for the gear you're in has stopped moving:</p>
-    <ul>
-        <li><strong>Red:</strong> still being worked out. VISOR is using the car's own light, or the shift point is still moving as it learns.</li>
-        <li><strong>Green:</strong> settled. This gear's shift point has stayed put for a few minutes of driving. VISOR may keep refining it in the background (1st gear often learns slowly, because hard acceleration low in 2nd is rare on many tracks), but it isn't changing in any way you'd notice.</li>
-        <li><strong>No dot:</strong> there's no shift point to show (neutral, reverse or top gear), you haven't driven the next gear up yet (for example 5th, at a track where you never use 6th), or the shift indicator is turned off.</li>
-    </ul>
-    <p><strong>Position:</strong> Shows your race position. By default this is your position within your car class; you can switch it to <strong>overall</strong> (field-wide) position in the Configuration Window. In practice/qualifying: based on fastest lap times. In races: real-time track position. The pace/safety car is excluded from overall counts.</p>
+    <p>VISOR starts with iRacing's provided shift point for the car, then continuously calibrates the fastest shift point for each gear from the physics from your own full-throttle acceleration. The learned shift point may be earlier or later than the car's lights, and can differ from gear to gear. VISOR's shift light calibration is saved on your PC for each car. When iRacing updates a car, VISOR restarts calibration. Learning pauses in the pits, on the pit limiter, off track, in replays, on a wet track, and while cornering.</p>
+    <p>The <strong>Calibration Dot</strong> at the bottom left of the gear symbol indicates VISOR's shift point learning status. Red means learning is in progress, green means the RPM value has settled. No dot means there's no shift point to show, which is true for neutral, reverse, or top gear, and when you haven't driven in the next gear up yet.</p>
+    <p><strong>Position:</strong> Shows your race position. Class position is default, and you can select <strong>overall</strong> position in the Configuration Window. In practice and qualifying, this is based on fastest lap times, while in races it is your real-time track position.</p>
 
     <h3>Row 1: Time & Fuel Remaining</h3>
-    <p><strong>Time/Laps Remaining:</strong> In timed sessions, shows time remaining (HH:MM:SS or MM:SS). In lap-limited sessions, shows laps remaining for leader (+1 to iRacing's value). In qualifying, shows personal laps completed/total allowed. Displays "Final Lap" on the white flag and "FINISHED" on the checkered flag. When a session is lap-limited <em>and</em> on a clock &mdash; standard open qualifying, where you get a set number of flying laps within a set number of minutes &mdash; a smaller session countdown appears beneath the lap count (and beneath "Final Lap" and "FINISHED") so you can see both the laps you have left and the time you have to set them. It is hidden in every other session type.</p>
-    <p><strong>Fuel Remaining:</strong> Estimates laps of fuel using a rolling 3-lap average of consumption. Updates after each lap (Format: "X.X Laps"). Most accurate after 3+ consistent laps.</p>
+    <p><strong>Time/Laps Remaining:</strong> In timed sessions, shows time remaining (HH:MM:SS or MM:SS). In lap-limited sessions, shows laps remaining. Displays "Final Lap" on the white flag and "FINISHED" on the checkered flag. When a session is lap-limited <em>and</em> on a clock, a smaller session countdown appears beneath the lap count so you can see both the laps you have left and the time you have to set them.</p>
+    <p><strong>Fuel Remaining:</strong> Estimates laps of fuel using a rolling 3-lap average of consumption. Updates after each lap: and most accurate after 3+ consistent laps.</p>
 
     <h3>Row 2: Lap Delta Bar</h3>
     <p>Real-time visual comparison vs. your session best lap. The bar grows from the center: <strong>Right (green):</strong> faster, <strong>Left (red):</strong> slower, <strong>Center:</strong> matching pace. Range is ±3 seconds.</p>
@@ -250,54 +244,28 @@
     <p><strong>Last Lap:</strong> Your most recently completed lap time (M:SS.mmm). <strong>Best Lap:</strong> Your fastest valid lap this session (M:SS.mmm). Both values reset on a new session.</p>
 
     <h3>Row 4: Relative Positioning Table</h3>
-    <p>Shows 7 rows: 3 cars ahead, your car (yellow), and 3 behind. Gap times are calculated like a physical transponder loop to measure true time gaps between cars. Automatically hidden in Lone Qualifying sessions.</p>
+    <p>Shows 7 rows: 3 cars ahead, your car (yellow), and 3 behind. Gap times are calculated true time gaps between cars. Automatically hidden in Lone Qualifying sessions.</p>
     <p><strong>Visual Indicators:</strong> Yellow = you, White = same lap, Blue = lapped by you, Red = lapping you.</p>
-    <p><strong>Pit Road:</strong> Cars on pit road display a "PIT" label and use gray proximity segments. An optional <strong>Hide cars in the pits</strong> setting (Configuration Window) removes pit-road cars from the table to reduce clutter &mdash; though you always see your own row, and pit-road cars reappear whenever you are on pit road yourself.</p>
+    <p><strong>Pit Road:</strong> Cars on pit road display a "PIT" label and use gray proximity segments. An optional <strong>Hide cars in the pits</strong> setting (Configuration Window) removes pit-road cars from the table to reduce clutter, though you always see your own row, and pit-road cars reappear whenever you are on pit road yourself.</p>
     <p><strong>Position numbers:</strong> The position shown for each car follows the same Class / Overall choice as Row 0 (set in the Configuration Window).</p>
     <p><strong>Stationary Cars:</strong> Stopped vehicles on track display their physical distance in feet (capped at 999ft) in bold yellow text.</p>
-    <p><strong>Proximity Bar:</strong> Features a dynamic 5-segment warning system that fills as cars get closer, scaling from an informational 8.0-second gap down to a critical 0.6-second gap. Automatically filters disconnected drivers.</p>
+    <p><strong>Proximity Bar:</strong> Features a dynamic 5-segment warning system that fills as cars get closer, scaling from an informational 8.0-second gap down to a critical 0.6-second gap.</p>
 
     <h3>Row 5: Info Row</h3>
-    <p>Row 5 holds three independent readouts. Each can be shown or hidden on its own in the Configuration Window, so you can keep just the ones you want.</p>
-    <p><strong>Track Location:</strong> The name of the corner or section of the circuit you're currently in &mdash; "Eau Rouge," "Kemmel Straight," and so on &mdash; like a sign hanging over the track. Names come from an editable catalog (<code>Data/TrackSections.json</code>) that ships alongside VISOR and covers 66 layouts out of the box, including the Nordschleife, Le Mans, and most iRacing road courses. On pit road it reads <strong>Pit Lane</strong>; on a track the catalog doesn't recognize (or when you're in the garage or being towed) the element simply hides. Advanced users can tune section boundaries or add tracks by editing the JSON file with a text editor &mdash; no rebuild required. An entry VISOR can't read is skipped (and noted in the log) rather than disabling the catalog. Installing an update replaces this file, so keep a copy of your edits.</p>
+    <p>Each field can be shown or hidden on its own in the Configuration Window.</p>
+    <p><strong>Track Location:</strong> The name of the corner or section of the circuit you're currently in (e.g. "Eau Rouge," "Kemmel Straight,"). Names come from an editable catalog that covers 66 track layouts, including the Nordschleife, Le Mans, and most popular iRacing road courses. On a track the catalog doesn't recognize, the element hides. Enabling debug mode displays the lap completion percentage next to the track location, so location names and boundaries can be corrected or updated. <strong>Please email track location errors or updates to the developer!</strong></p>
     <p><strong>Incident Counter:</strong> Session incidents (0x, 4x, etc.). The color tracks how close you are to the session's incident limit rather than a fixed count, so it means the same thing whether your limit is 4x or 25x: <strong>white</strong> below ~30% of the limit, <strong>yellow</strong> from there to ~60%, and <strong>red</strong> beyond ~60% (roughly one bad incident from a DQ). Unlimited sessions use a gentle informational scale.</p>
-    <p><strong>Track Temperature:</strong> The current track-surface temperature, shown in °F or °C (your choice in the Configuration Window). A small arrow shows the trend: <strong>red up</strong> when the surface is heating, <strong>blue down</strong> when it's cooling. The trend is smoothed over several minutes, so the arrow reflects a genuine change in conditions rather than sensor jitter.</p>
+    <p><strong>Track Temperature:</strong> The current track-surface temperature, shown in °F or °C (your choice in the Configuration Window), with a small arrow to show the trend.</p>
 
     <h2>Radar Window</h2>
-    <p>Top-down proximity view with 5 vertical zones (far left, near left, center, near right, far right). Your car: green rectangle in center. Other cars: colored by class. Detection range: ~5 car lengths ahead/behind. Can be toggled on/off in the Configuration window.</p>
+    <p>Top-down proximity view with 5 zones that populate and highlight in sync with spotter calls, up to 2 cars left and right. Your car is a green rectangle in center, while other cars are colored by class. The radar displays ~5 car lengths ahead/behind, automatically fades out when there are no cars in range, and back in when cars approach. The Radar Window can be toggled on/off in the Configuration window.</p>
 
-    <h3>Zone Highlighting</h3>
-    <p>Zones highlight based on iRacing spotter: left zone = car left, right zone = car right, both = cars both sides, two zones = multiple cars. Matches native spotter calls.</p>
-
-    <h3>Visibility</h3>
-    <p>Automatically fades out when no cars in range, fades in when cars approach. Hidden automatically in Lone Qualifying.</p>
-
-    <h2>Understanding Session Behavior</h2>
-
-    <h3>Practice and Qualifying</h3>
-    <p><strong>Position:</strong> Based on fastest lap time. <strong>Relative:</strong> Sorted by proximity. <strong>Updates:</strong> On faster lap completions.</p>
-
-    <h3>Race Sessions</h3>
-    <p><strong>Position:</strong> Real-time track position (lap + distance). <strong>Relative:</strong> Cars physically near you. <strong>Lapped traffic:</strong> Color-coded (blue/red).</p>
-    <p><strong>Disconnected drivers:</strong> A car whose telemetry has been missing for more than a few seconds (a driver who disconnects, quits, or loses connection) is dropped from VISOR's running order, so every car behind it moves up a place. iRacing's official results keep a disconnected driver classified on the laps they completed, so your final <strong>overall</strong> position in the results can be a place or more worse than VISOR showed if a driver ahead of you left the race. Once the checkered flag is out, positions are held: a car that takes the flag, leaves the session or loses its connection keeps its place, so nobody moves up when drivers leave at the end.</p>
-
-    <h3>Lone Qualifying</h3>
-    <p>Relative Table and Radar Window automatically hide (no other cars on track simultaneously).</p>
-
-    <h2>Tips for Use</h2>
-    <ul style="margin-bottom: 0;">
-        <li><strong>First Launch:</strong> Drag windows using handles while Configuration Window is open</li>
-        <li><strong>Testing:</strong> Changes apply in real-time, no restart needed</li>
-        <li><strong>Window Positions:</strong> Saved automatically on "Done"</li>
-        <li><strong>Fuel:</strong> Most accurate after 3+ consistent laps</li>
-        <li><strong>Shift points:</strong> VISOR learns each car's best shift points over the first few laps of flat-out running</li>
-        <li><strong>Updating:</strong> Your settings, window positions and learned shift points carry over when you install a new version</li>
-    </ul>
+    <h2>Disconnected Drivers</h2> 
+	<p>A car that disconnects for more than a few seconds is dropped from VISOR's running order, so every car behind it moves up a place. iRacing's official results keep a disconnected driver classified on the laps they completed, so your final position in the results might be a place or more worse than VISOR showed. Once the checkered flag is out, positions are held: a car that takes the flag and leaves the session keeps its place, so nobody moves up when drivers leave at the end.</p>
 
     <div class="contact-box">
         <h2 style="margin-top: 0;">Contact</h2>
-        <p style="margin-bottom: 5px;">For questions, bug reports, or feedback:<br>
-        <strong>Email:</strong> info@cephasmedia.com</p>
+        <p style="margin-bottom: 5px;">For questions, bug reports, or feedback, email <strong>info@cephasmedia.com</strong></p>
         <p style="margin-bottom: 0;"><strong>License:</strong> Personal use only. See LICENSE.txt for full terms.</p>
     </div>
 
