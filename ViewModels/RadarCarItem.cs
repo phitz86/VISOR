@@ -1,6 +1,3 @@
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
 using System.Windows.Media;
 
 namespace VISOR.ViewModels
@@ -10,17 +7,8 @@ namespace VISOR.ViewModels
     /// stays in range and updated in place every frame, so its template (and the number's drop
     /// shadow) is built once rather than every frame. Each setter only notifies on a real change.
     /// </summary>
-    public sealed class RadarCarItem : INotifyPropertyChanged
+    public sealed class RadarCarItem : ObservableObject
     {
-        public RadarCarItem(int carIdx)
-        {
-            CarIdx = carIdx;
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        public int CarIdx { get; }
-
         // Placement and size on the radar canvas, already scaled for the window size preset.
         public double Left { get => _left; set => Set(ref _left, value); }
         public double Top { get => _top; set => Set(ref _top, value); }
@@ -49,12 +37,5 @@ namespace VISOR.ViewModels
         private string _number = string.Empty;
         private Brush? _fill, _numberBrush;
         private bool _hasNumberShadow, _isOnPitRoad;
-
-        private void Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
-        {
-            if (EqualityComparer<T>.Default.Equals(field, value)) return;
-            field = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-        }
     }
 }

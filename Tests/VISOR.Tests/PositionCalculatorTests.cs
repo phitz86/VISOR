@@ -558,24 +558,6 @@ namespace VISOR.Tests
         }
 
         [Fact]
-        public void SessionChange_ClearsFinishingPositions_ButKeepsTheRoster()
-        {
-            var race = ThreeCarsLeaderHome();
-            Assert.Equal(1, race.ClassPos(1));
-
-            race.SessionNum = 2;
-            race.SessionState = SessionStates.Racing;
-            race.Place(1, 1, 0.10f);    // new session: car 1 now runs last
-            race.Place(2, 1, 0.30f);
-            race.Place(3, 1, 0.20f);
-            race.Frame();
-
-            Assert.Equal(3, race.ClassPos(1));
-            Assert.Equal(1, race.ClassPos(2));
-            Assert.Equal(3, race.Calc.ValidCarIndices.Count);
-        }
-
-        [Fact]
         public void Reset_ForgetsEverything()
         {
             var race = ThreeCarsLeaderHome();

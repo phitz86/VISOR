@@ -1,4 +1,3 @@
-using System;
 using System.Windows;
 using System.Windows.Media;
 
@@ -40,8 +39,8 @@ namespace VISOR.ViewModels
         // Every brush the rows use, built once and frozen, so no frame allocates any. Segment 1 is
         // the neutral colour, each segment after it a quarter closer to the alert colour, and
         // segment 5 the alert colour itself.
-        private static readonly SolidColorBrush PitGrayBrush = Frozen(PitGrayColor);
-        private static readonly SolidColorBrush StationaryYellowBrush = Frozen(Colors.Yellow);
+        private static readonly SolidColorBrush PitGrayBrush = ClassColorManager.CreateFrozenBrush(PitGrayColor);
+        private static readonly SolidColorBrush StationaryYellowBrush = ClassColorManager.CreateFrozenBrush(Colors.Yellow);
         private static readonly SolidColorBrush[] AheadSegmentBrushes = BuildSegmentBrushes(AheadAlertColor);
         private static readonly SolidColorBrush[] BehindSegmentBrushes = BuildSegmentBrushes(BehindAlertColor);
 
@@ -161,19 +160,12 @@ namespace VISOR.ViewModels
 
         private static SolidColorBrush[] BuildSegmentBrushes(Color alertColor) => new[]
         {
-            Frozen(BlendColors(NeutralColor, alertColor, 0.0)),
-            Frozen(BlendColors(NeutralColor, alertColor, 0.25)),
-            Frozen(BlendColors(NeutralColor, alertColor, 0.50)),
-            Frozen(BlendColors(NeutralColor, alertColor, 0.75)),
-            Frozen(alertColor)
+            ClassColorManager.CreateFrozenBrush(BlendColors(NeutralColor, alertColor, 0.0)),
+            ClassColorManager.CreateFrozenBrush(BlendColors(NeutralColor, alertColor, 0.25)),
+            ClassColorManager.CreateFrozenBrush(BlendColors(NeutralColor, alertColor, 0.50)),
+            ClassColorManager.CreateFrozenBrush(BlendColors(NeutralColor, alertColor, 0.75)),
+            ClassColorManager.CreateFrozenBrush(alertColor)
         };
-
-        private static SolidColorBrush Frozen(Color color)
-        {
-            var brush = new SolidColorBrush(color);
-            brush.Freeze();
-            return brush;
-        }
 
         private static Color BlendColors(Color color1, Color color2, double ratio)
         {

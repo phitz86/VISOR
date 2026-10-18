@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
+﻿using System.Collections.ObjectModel;
 using System.Windows.Media;
 using VISOR.Diagnostics;
 using VISOR.Telemetry;
@@ -19,12 +15,8 @@ namespace VISOR.ViewModels
         RightFar = 4
     }
 
-    public class RadarViewModel : INotifyPropertyChanged
+    public class RadarViewModel : ObservableObject
     {
-        public event PropertyChangedEventHandler? PropertyChanged;
-        private void OnPropertyChanged([CallerMemberName] string? name = null) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-
         private const float AVERAGE_CAR_LENGTH = 4.5f; // meters
         private const float DETECTION_RANGE = 5.0f; // car lengths
         private const float RADAR_CENTER_Y = 198f;
@@ -37,7 +29,7 @@ namespace VISOR.ViewModels
 
         // The cars RadarWindow draws, one item per car in range, kept and updated in place while
         // the car stays in range. The window draws exactly this list, so a car that leaves it
-        // leaves the radar: nothing can be left behind on screen (B1).
+        // leaves the radar: nothing can be left behind on screen.
         public ObservableCollection<RadarCarItem> Cars { get; } = new();
 
         private readonly Dictionary<int, RadarCarItem> _carItems = new();
@@ -55,7 +47,7 @@ namespace VISOR.ViewModels
         public int VisibleCarCount
         {
             get => _visibleCarCount;
-            private set { _visibleCarCount = value; OnPropertyChanged(); }
+            private set => Set(ref _visibleCarCount, value);
         }
 
         public RadarViewModel(ClassColorManager classColorManager)
@@ -112,7 +104,7 @@ namespace VISOR.ViewModels
             for (int i = 0; i < carCount; i++)
             {
                 if (i == playerCarIdx) continue;
-                if (trackSurface[i] == (int)iRacingTrackSurface.NotInWorld) continue;
+                if (trackSurface[i] == IRacingIds.TrackSurfaceNotInWorld) continue;
                 if (string.IsNullOrEmpty(carNumbers?[i])) continue;
 
                 var carOnPitRoad = onPitRoad?[i] ?? false;
@@ -129,7 +121,6 @@ namespace VISOR.ViewModels
                         CarIdx = i,
                         LapDistPct = lapDistPct[i],
                         PlayerLapDistPct = playerLapDistPct,
-                        TrackDistance = proximityData.TrackDistance,
                         Proximity = proximityData.Proximity,
                         CarNumber = carNumbers[i],
                         ClassID = carClassIDs[i],
@@ -242,7 +233,7 @@ namespace VISOR.ViewModels
             {
                 if (!_carItems.TryGetValue(car.CarIdx, out var item))
                 {
-                    item = new RadarCarItem(car.CarIdx);
+                    item = new RadarCarItem();
                     _carItems[car.CarIdx] = item;
                     Cars.Add(item);
                 }
@@ -259,9 +250,7 @@ namespace VISOR.ViewModels
             var zone = _carZoneAssignments.GetValueOrDefault(car.CarIdx, RadarZone.Center);
             float x = (float)(zoneWidth * ((int)zone + 0.5));
 
-            float relativeDistPct = car.LapDistPct - car.PlayerLapDistPct;
-            if (relativeDistPct > 0.5f) relativeDistPct -= 1.0f;
-            if (relativeDistPct < -0.5f) relativeDistPct += 1.0f;
+            float relativeDistPct = LapDistance.Delta(car.PlayerLapDistPct, car.LapDistPct);
 
             float aheadBehindMeters = relativeDistPct * _trackLength;
 
@@ -319,7 +308,6 @@ namespace VISOR.ViewModels
             public int CarIdx { get; set; }
             public float LapDistPct { get; set; }
             public float PlayerLapDistPct { get; set; }
-            public float TrackDistance { get; set; }
             public float Proximity { get; set; }
             public string CarNumber { get; set; } = string.Empty;
             public int ClassID { get; set; }

@@ -1,54 +1,29 @@
-﻿using System;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-using System.Windows.Media;
-using System.Windows.Data;
+﻿using System.Windows.Data;
 using System.Globalization;
 using VISOR.Telemetry;
 
 namespace VISOR.ViewModels
 {
-    public class DeltaBarViewModel : INotifyPropertyChanged
+    public class DeltaBarViewModel : ObservableObject
     {
-        public event PropertyChangedEventHandler? PropertyChanged;
-        private void OnPropertyChanged([CallerMemberName] string? name = null) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-
         private const float MaxDeltaSeconds = 3.0f;
 
         private double _leftBarWidth = 0.0;
         private double _rightBarWidth = 0.0;
-        private Brush _leftBarColor = Brushes.Red;
-        private Brush _rightBarColor = Brushes.Green;
 
         public double LeftBarWidth
         {
             get => _leftBarWidth;
-            private set { if (_leftBarWidth == value) return; _leftBarWidth = value; OnPropertyChanged(); }
+            private set => Set(ref _leftBarWidth, value);
         }
 
         public double RightBarWidth
         {
             get => _rightBarWidth;
-            private set { if (_rightBarWidth == value) return; _rightBarWidth = value; OnPropertyChanged(); }
+            private set => Set(ref _rightBarWidth, value);
         }
 
-        public Brush LeftBarColor
-        {
-            get => _leftBarColor;
-            private set { if (ReferenceEquals(_leftBarColor, value)) return; _leftBarColor = value; OnPropertyChanged(); }
-        }
-
-        public Brush RightBarColor
-        {
-            get => _rightBarColor;
-            private set { if (ReferenceEquals(_rightBarColor, value)) return; _rightBarColor = value; OnPropertyChanged(); }
-        }
-
-        /// <summary>
-        /// Update the delta bar based on lap delta to session best
-        /// </summary>
-        /// <param name="snapshot">Telemetry snapshot containing delta data</param>
+        /// <summary>Sets the bars from the lap delta to the session best, capped at ±3 s.</summary>
         public void Update(SVappsLABSnapshot snapshot)
         {
             // Positive = slower than session best, negative = faster.

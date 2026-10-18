@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using VISOR.Diagnostics;
+﻿using VISOR.Diagnostics;
 using VISOR.Telemetry;
 
 namespace VISOR.Race
@@ -9,7 +8,7 @@ namespace VISOR.Race
     /// flag (once the overall leader has), and holds the place of a car that leaves the session
     /// or whose telemetry stops under it. Writes <see cref="FinishingPositions"/>; reads the
     /// places from <see cref="RunningOrder"/> and the roster from <see cref="CarTrackingCache"/>.
-    /// Also writes the [Finish] diagnostics. Part of <see cref="PositionCalculator"/>.
+    /// Part of <see cref="PositionCalculator"/>.
     /// </summary>
     internal sealed class FinishTracker
     {
@@ -23,11 +22,6 @@ namespace VISOR.Race
         private readonly Dictionary<int, int> _lastLapCompleted = new();
         #endregion
 
-        #region Private Fields - Finish Diagnostics
-        private int _lastLoggedFinishFlags = -1;
-        private int _lastLoggedSessionState = -999;
-        #endregion
-
         public FinishTracker(FinishingPositions finishing, RunningOrder order, CarTrackingCache tracking)
         {
             _finishing = finishing;
@@ -36,30 +30,17 @@ namespace VISOR.Race
         }
 
         #region Session
-        /// <summary>
-        /// A new session: nothing has finished, and lap-completed baselines start again.
-        /// </summary>
-        public void StartSession()
-        {
-            _isCheckeredFlag = false;
-            _leaderHasFinished = false;
-            _lastLapCompleted.Clear();
-        }
-
         public void Reset()
         {
             _isCheckeredFlag = false;
             _leaderHasFinished = false;
             _lastLapCompleted.Clear();
-            _lastLoggedFinishFlags = -1;
-            _lastLoggedSessionState = -999;
         }
         #endregion
 
-        #region Checkered Flag and Finish Diagnostics
+        #region Checkered Flag
         /// <summary>
-        /// Track checkered flag state based on SessionState.
-        /// SessionState: 5 = Checkered, 6 = CoolDown
+        /// Whether the session is at the checkered (or cool-down), from SessionState.
         /// </summary>
         public void TrackCheckeredFlagState(PositionFrame frame)
         {
@@ -73,107 +54,12 @@ namespace VISOR.Race
                 Log.Info($"Checkered flag detected (SessionState: {sessionState}), beginning finishing position tracking");
             }
         }
-
-        /// <summary>
-        /// Record the frame-accurate ordering between the session flags / SessionState changing and
-        /// cars actually crossing S/F. Everything the finish logic does hangs off that ordering, and
-        /// nothing else in the log can see it: SessionFlags is never logged, and a lap-completed
-        /// increment only surfaces when a freeze succeeds — i.e. it is missing in exactly the case
-        /// where the feature failed.
-        ///
-        /// The leader's LapDistPct is the measurement that matters. If the flags are raised as the
-        /// leader exits the final corner, this logs a pct short of 1.0 (0.95-ish); if they are raised
-        /// at the line, it logs ~0.999 or a value just past the wrap. Positions come from the
-        /// previous frame's sort, which is the same data the freeze reads.
-        /// </summary>
-        public void LogFinishPhaseTransitions(PositionFrame frame, ISessionDataProvider sessionDataProvider)
-        {
-            // Masked so the finish diagnostics don't log on every caution or start-light change.
-            int finishFlags = frame.SessionFlags & IRacingIds.FinishFlagsMask;
-            int sessionState = frame.SessionState;
-
-            if (finishFlags == _lastLoggedFinishFlags && sessionState == _lastLoggedSessionState)
-            {
-                return;
-            }
-
-            _lastLoggedFinishFlags = finishFlags;
-            _lastLoggedSessionState = sessionState;
-
-            Log.Info($"[Finish] SessionState {sessionState}, flags [{DescribeFinishFlags(finishFlags)}] - " +
-                     $"{DescribeLeader(frame, sessionDataProvider)}; {DescribePlayer(frame)}");
-        }
-
-        /// <summary>
-        /// The player's own track position. The white and checkered SessionFlags bits are raised per
-        /// car, a fixed lead ahead of that car's own line, so the player's position at the moment a
-        /// bit changes (not the leader's) is what shows whether that lead is a distance or a time.
-        /// </summary>
-        private static string DescribePlayer(PositionFrame frame)
-        {
-            int playerIdx = frame.PlayerCarIdx;
-            var lapDistPct = frame.CarIdxLapDistPct;
-            var lapCompleted = frame.CarIdxLapCompleted;
-
-            if (playerIdx < 0 || playerIdx >= lapDistPct.Length || playerIdx >= lapCompleted.Length)
-                return "player n/a";
-
-            return $"player at LapDistPct {lapDistPct[playerIdx]:F4}, LapCompleted {lapCompleted[playerIdx]}, " +
-                   $"CarIdxLap {RunningOrder.FormatLap(frame, playerIdx)}";
-        }
-
-        private static string DescribeFinishFlags(int finishFlags)
-        {
-            if (finishFlags == 0)
-                return "none";
-
-            var parts = new List<string>(3);
-            if ((finishFlags & (int)SessionFlags.Green) != 0) parts.Add("Green");
-            if ((finishFlags & (int)SessionFlags.White) != 0) parts.Add("White");
-            if ((finishFlags & (int)SessionFlags.Checkered) != 0) parts.Add("Checkered");
-            return string.Join("|", parts);
-        }
-
-        /// <summary>
-        /// The current overall leader with the two variables the freeze depends on. Reads the
-        /// position cache, so it reports whoever the running order currently has at P1 — which is
-        /// itself worth seeing, since a wrong leader is one of the ways the freeze goes astray.
-        /// </summary>
-        private string DescribeLeader(PositionFrame frame, ISessionDataProvider sessionDataProvider)
-        {
-            if (_order.TryGetLeader(out int carIdx))
-            {
-                var carNumbers = sessionDataProvider.CarNumbers;
-                var lapDistPct = frame.CarIdxLapDistPct;
-                var lapCompleted = frame.CarIdxLapCompleted;
-
-                string number = (carNumbers != null && carIdx < carNumbers.Length) ? carNumbers[carIdx] : "?";
-                float pct = (lapDistPct != null && carIdx < lapDistPct.Length) ? lapDistPct[carIdx] : -1f;
-                int laps = (lapCompleted != null && carIdx < lapCompleted.Length) ? lapCompleted[carIdx] : -1;
-
-                return $"leader #{number} (idx {carIdx}) at LapDistPct {pct:F4}, LapCompleted {laps}, CarIdxLap {RunningOrder.FormatLap(frame, carIdx)}";
-            }
-
-            // Finished cars are excluded from the live sort, so once the leader freezes there is no
-            // live P1 even though the race has a leader. Report the frozen one rather than "none".
-            foreach (var entry in _finishing.OverallPositions)
-            {
-                if (entry.Value != 1)
-                    continue;
-
-                var carNumbers = sessionDataProvider.CarNumbers;
-                string number = (carNumbers != null && entry.Key < carNumbers.Length) ? carNumbers[entry.Key] : "?";
-                return $"leader #{number} (idx {entry.Key}) already frozen at P1";
-            }
-
-            return "no leader in the running order yet";
-        }
         #endregion
 
         #region Freezing Finishing Positions
         /// <summary>
         /// Freeze class positions for cars as they take the checkered flag.
-        /// Only begins freezing after the P1 car (class leader) crosses S/F.
+        /// Only begins freezing after the overall leader crosses S/F.
         /// Monitors CarIdxLapCompleted increments during checkered flag state.
         ///
         /// The CarIdxLapCompleted baseline is tracked from the moment the session starts, NOT from
@@ -189,18 +75,8 @@ namespace VISOR.Race
             var carNumbers = sessionDataProvider.CarNumbers;
             var carLapCompleted = frame.CarIdxLapCompleted;
 
-            if (carClassIDs == null || carNumbers == null || carLapCompleted == null)
+            for (int carIdx = 0; carIdx < PositionFrame.CarCount; carIdx++)
             {
-                return;
-            }
-
-            for (int carIdx = 0; carIdx < carLapCompleted.Length; carIdx++)
-            {
-                if (carIdx >= carClassIDs.Length || carIdx >= carNumbers.Length)
-                {
-                    continue;
-                }
-
                 int currentLapCompleted = carLapCompleted[carIdx];
 
                 // A car with no telemetry reports -1. Keep the last real baseline rather than
@@ -237,7 +113,7 @@ namespace VISOR.Race
                     }
                     else if (_leaderHasFinished && currentPosition > 0)
                     {
-                        // Don't freeze lapped traffic ahead of the class leader until the leader has crossed.
+                        // The winner is home: every car that crosses from now on has finished.
                         _finishing.Freeze(carIdx, currentPosition, currentOverall);
 
                         Log.Info($"Car #{carNumbers[carIdx]} (idx {carIdx}) took checkered flag - frozen at P{currentPosition} (overall P{currentOverall}) (LapCompleted: {lastLapCompleted} -> {currentLapCompleted})");
@@ -255,7 +131,7 @@ namespace VISOR.Race
                         // Unexpected: the leader has finished but this car has no computed position, so
                         // no slot could be taken. Without this line a failed freeze is completely
                         // silent, which is what made the original leader-latch failure so hard to place.
-                        Log.Info($"Car #{carNumbers[carIdx]} (idx {carIdx}) completed a lap under the checkered but was NOT frozen - " +
+                        Log.Warning($"Car #{carNumbers[carIdx]} (idx {carIdx}) completed a lap under the checkered but was NOT frozen - " +
                                  $"P{currentPosition} (overall P{currentOverall}) (LapCompleted: {lastLapCompleted} -> {currentLapCompleted})");
                     }
                 }
@@ -280,31 +156,11 @@ namespace VISOR.Race
                 return;
             }
 
-            var carClassIDs = sessionDataProvider.CarClassIDs;
-            var carNumbers = sessionDataProvider.CarNumbers;
-
-            if (carClassIDs == null || carNumbers == null)
-            {
-                return;
-            }
-
             // The previous frame's roster, less this frame's: this frame's departures.
             foreach (int carIdx in _tracking.PreviousValidCarIndices)
             {
-                if (_tracking.ValidCarIndices.Contains(carIdx) || _finishing.IsFinished(carIdx))
-                {
-                    continue;
-                }
-
-                if (carIdx >= carClassIDs.Length || carIdx >= carNumbers.Length)
-                {
-                    continue;
-                }
-
-                if (TryHoldLastPlace(carIdx, carClassIDs[carIdx], out int classPosition, out int overallPosition))
-                {
-                    Log.Info($"Car #{carNumbers[carIdx]} (idx {carIdx}) left during the checkered - holding P{classPosition} (overall P{overallPosition})");
-                }
+                if (!_tracking.ValidCarIndices.Contains(carIdx) && !_finishing.IsFinished(carIdx))
+                    HoldAndLog(carIdx, sessionDataProvider, "left");
             }
         }
 
@@ -323,31 +179,20 @@ namespace VISOR.Race
                 return;
             }
 
-            var carClassIDs = sessionDataProvider.CarClassIDs;
-            var carNumbers = sessionDataProvider.CarNumbers;
-
-            if (carClassIDs == null || carNumbers == null)
-            {
-                return;
-            }
-
             foreach (int carIdx in _tracking.ValidCarIndices)
             {
-                if (carIdx >= carClassIDs.Length || _finishing.IsFinished(carIdx))
-                {
-                    continue;
-                }
+                // A car still live or predicted is placed by the sort as usual.
+                if (!_finishing.IsFinished(carIdx) && _tracking.GetEffectiveLapDistPct(carIdx) < 0f)
+                    HoldAndLog(carIdx, sessionDataProvider, "telemetry stopped");
+            }
+        }
 
-                // Live or still predicted: the sort places it as usual.
-                if (_tracking.GetEffectiveLapDistPct(carIdx) >= 0f)
-                {
-                    continue;
-                }
-
-                if (TryHoldLastPlace(carIdx, carClassIDs[carIdx], out int classPosition, out int overallPosition))
-                {
-                    Log.Info($"Car #{carNumbers[carIdx]} (idx {carIdx}) telemetry stopped during the checkered - holding P{classPosition} (overall P{overallPosition})");
-                }
+        private void HoldAndLog(int carIdx, ISessionDataProvider sessionDataProvider, string what)
+        {
+            if (TryHoldLastPlace(carIdx, sessionDataProvider.CarClassIDs[carIdx], out int classPosition, out int overallPosition))
+            {
+                Log.Info($"Car #{sessionDataProvider.CarNumbers[carIdx]} (idx {carIdx}) {what} during the checkered - " +
+                         $"holding P{classPosition} (overall P{overallPosition})");
             }
         }
 

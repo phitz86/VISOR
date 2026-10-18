@@ -7,7 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-10-17
+
+### Changed
+
+- **Version 1.3.1.0**; README and user guide updated to match.
+- **Internal tidy-ups, no change in behaviour** — the settings, config-mode and window code drop
+  about 420 lines of repeated boilerplate. The view models share one change-notification base,
+  and the radar shares one "clear and fade out" step. Every setting keeps its stored name and
+  default, so saved settings carry over. The race-position code drops checks that could never
+  fail and a session-change path the overlay's own reset always got to first, and shares its
+  lap-distance arithmetic and finishing-place steps instead of repeating them.
+
+### Removed
+
+- **Quieter logs at the finish** — the logging added in 1.1 to chase finishing-position bugs is
+  gone, now that those bugs are fixed and covered by tests: the flag-change and race-leader
+  lines, the Final Lap and FINISHED latch lines, and several Debug Mode lines about cars joining,
+  leaving and losing telemetry (one of which printed `System.Single[]` instead of a number). The
+  per-car "frozen at P…" and "holding P…" lines stay, and a car that completes a lap under the
+  checkered without being frozen is now logged as a warning.
+- **More unused code, no change in behaviour** — members, styles and a colour resource left
+  behind by the 1.3.0 rework; a converter that duplicated one built into WPF; and 92 `using`
+  lines the project already gets automatically.
+
 ## [1.3.0] - 2026-10-17
+
+Not released on its own: these changes first ship in 1.3.1.
 
 ### Added
 
@@ -415,9 +441,10 @@ display, and adds a substantial layer of app-stability and installer hardening.
 - Nullable-reference warnings (CS8602/CS8604) and an unused-variable warning; updated
   deprecated GitHub Actions.
 
-[Unreleased]: https://github.com/phitz86/VISOR/compare/v1.3.0.0...HEAD
-[1.3.0]: https://github.com/phitz86/VISOR/releases/tag/v1.3.0.0
-[1.2.1]: https://github.com/phitz86/VISOR/releases/tag/v1.2.1.0
-[1.2.0]: https://github.com/phitz86/VISOR/releases/tag/v1.2.0.0
-[1.1.0]: https://github.com/phitz86/VISOR/releases/tag/v1.1.0.0
+[Unreleased]: https://github.com/phitz86/VISOR/compare/v1.3.1.0...HEAD
+[1.3.1]: https://github.com/phitz86/VISOR/releases/tag/v1.3.1.0
+[1.3.0]: https://github.com/phitz86/VISOR/tree/74e0edc15eb6ac50a05742cbf2d9769d5b21f197
+[1.2.1]: https://github.com/phitz86/VISOR/tree/0889ef74028734d8469171115e05fdae71c2b251
+[1.2.0]: https://github.com/phitz86/VISOR/tree/2c35baf06908ad2d83d5fc98864e2152ec005448
+[1.1.0]: https://github.com/phitz86/VISOR/tree/2b1d0db893e0b87f8ddd3e2dc8aa9adc01127a73
 [1.0.0]: https://github.com/phitz86/VISOR/releases/tag/v1.0.0

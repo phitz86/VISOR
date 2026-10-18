@@ -1,8 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Media;
+﻿using System.Windows;
 using VISOR.Diagnostics;
 using VISOR.Settings;
 using VISOR.Telemetry;
@@ -30,11 +26,6 @@ namespace VISOR.Views
             DataContext = _viewModel;
             _sdkLink = new WindowSdkLink(this, _sdk, ProcessSnapshot, OnConnectionChanged, OnPrimedChanged);
 
-            AllowsTransparency = true;
-            WindowStyle = WindowStyle.None;
-            Background = Brushes.Transparent;
-            Topmost = true;
-
             ApplyWindowSizing();
             ApplyWindowPositioning();
 
@@ -46,8 +37,8 @@ namespace VISOR.Views
 
         private void ApplyWindowSizing()
         {
-            var session = _sdk?.Coordinator.Current;
-            bool relativeHidden = session != null && session.IsDataReady && session.IsLoneQualifying;
+            var session = _sdk.Coordinator.Current;
+            bool relativeHidden = session.IsDataReady && session.IsLoneQualifying;
 
             var windowSize = _settingsManager.GetMainWindowSize(relativeHidden);
             Width = windowSize.Width;
@@ -61,21 +52,17 @@ namespace VISOR.Views
             Top = windowPosition.Y;
         }
 
-        private void OnElementVisibilityChanged(object? sender, EventArgs e)
-        {
-            Dispatcher.Invoke(() =>
-            {
-                Log.Debug("[MainWindow] Element visibility changed - resizing window");
-                _viewModel.RefreshElementVisibility();
-                ApplyWindowSizing();
-            });
-        }
+        private void OnElementVisibilityChanged(object? sender, EventArgs e) =>
+            RefreshLayout("[MainWindow] Element visibility changed - resizing window");
 
-        private void OnWindowSizeChanged(object? sender, WindowSizeChangedEventArgs e)
+        private void OnWindowSizeChanged(object? sender, WindowSizeChangedEventArgs e) =>
+            RefreshLayout($"[MainWindow] Window size preset changed to {e.NewSize} - resizing");
+
+        private void RefreshLayout(string reason)
         {
             Dispatcher.Invoke(() =>
             {
-                Log.Debug($"[MainWindow] Window size preset changed to {e.NewSize} - resizing");
+                Log.Debug(reason);
                 _viewModel.RefreshElementVisibility();
                 ApplyWindowSizing();
             });
@@ -117,7 +104,6 @@ namespace VISOR.Views
             if (isPrimed)
             {
                 StatusText.Text = "Fully connected!";
-                _viewModel.IsTelemetryConnected = true;
 
                 // Back on the UI thread after the delay. Leave the text up if the HUD has
                 // dropped back to waiting in the meantime.
@@ -129,7 +115,6 @@ namespace VISOR.Views
             {
                 StatusText.Text = "Waiting for session data...";
                 StatusText.Visibility = Visibility.Visible;
-                _viewModel.IsTelemetryConnected = false;
             }
         }
 
@@ -160,28 +145,20 @@ namespace VISOR.Views
 
         private void UpdateUIState()
         {
-            try
+            if (_sdk.IsPrimed)
             {
-                Dispatcher.Invoke(() =>
-                {
-                    if (_sdk.IsPrimed)
-                    {
-                        StatusText.Visibility = Visibility.Collapsed;
-                        _viewModel.IsTelemetryConnected = true;
-                    }
-                    else if (_sdk.IsConnected)
-                    {
-                        StatusText.Text = "Connected, waiting for session data...";
-                        StatusText.Visibility = Visibility.Visible;
-                    }
-                    else
-                    {
-                        StatusText.Text = "Waiting for iRacing...";
-                        StatusText.Visibility = Visibility.Visible;
-                    }
-                });
+                StatusText.Visibility = Visibility.Collapsed;
             }
-            catch (TaskCanceledException) { }
+            else if (_sdk.IsConnected)
+            {
+                StatusText.Text = "Connected, waiting for session data...";
+                StatusText.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                StatusText.Text = "Waiting for iRacing...";
+                StatusText.Visibility = Visibility.Visible;
+            }
         }
 
         private void ExitButton_Click(object? sender, RoutedEventArgs e)

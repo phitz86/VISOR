@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using VISOR.Diagnostics;
-using VISOR.Telemetry;
+﻿using VISOR.Telemetry;
 
 namespace VISOR.Race
 {
@@ -20,7 +16,6 @@ namespace VISOR.Race
     {
         #region Constants
         private const int MAX_CACHE_AGE_FRAMES = 180; // 3 seconds at 60Hz
-        private const int LOG_PREDICTION_THRESHOLD = 30; // Log predictions lasting >30 frames
         private const float MIN_VELOCITY_THRESHOLD = 0.00001f; // Minimum velocity to use prediction
 
         // S/F crossing detection for the lap-number desync correction below.
@@ -33,7 +28,6 @@ namespace VISOR.Race
         private int _globalFrameCounter = 0;
         private readonly HashSet<int> _validCarIndices = new();
         private readonly HashSet<int> _lastFrameValidCars = new();
-        private readonly HashSet<int> _carsWithInvalidLapDistPctLogged = new();
         #endregion
 
         #region Private Fields - Prediction System
@@ -47,7 +41,6 @@ namespace VISOR.Race
 
         // Tier 3: cache expiration removes cars after prolonged invalid data.
         private readonly Dictionary<int, int> _framesSinceValidData = new();
-        private readonly Dictionary<int, int> _predictionStartFrame = new();
         #endregion
 
         #region Private Fields - Lap Number Desync
@@ -126,11 +119,6 @@ namespace VISOR.Race
         /// </summary>
         public void BeginFrame() => _globalFrameCounter++;
 
-        /// <summary>
-        /// A new session: lap corrections from the last one no longer mean anything.
-        /// </summary>
-        public void StartSession() => _lapNumberCorrection.Clear();
-
         public void Reset()
         {
             _globalFrameCounter = 0;
@@ -140,10 +128,8 @@ namespace VISOR.Race
             _lapDistPctVelocity.Clear();
             _lastValidCurrentLap.Clear();
             _framesSinceValidData.Clear();
-            _predictionStartFrame.Clear();
             _lapNumberCorrection.Clear();
             _lastFrameValidCars.Clear();
-            _carsWithInvalidLapDistPctLogged.Clear();
         }
         #endregion
 
@@ -153,9 +139,6 @@ namespace VISOR.Race
             var carNumbers = sessionDataProvider.CarNumbers;
             var userNames = sessionDataProvider.UserNames;
 
-            if (carNumbers == null || userNames == null)
-                return;
-
             _lastFrameValidCars.Clear();
             foreach (var carIdx in _validCarIndices)
             {
@@ -163,7 +146,7 @@ namespace VISOR.Race
             }
 
             _validCarIndices.Clear();
-            for (int i = 0; i < 64; i++)
+            for (int i = 0; i < PositionFrame.CarCount; i++)
             {
                 bool hasYamlData = !string.IsNullOrEmpty(carNumbers[i]) &&
                                    !string.IsNullOrEmpty(userNames[i]);
@@ -174,19 +157,6 @@ namespace VISOR.Race
                 {
                     _validCarIndices.Add(i);
                 }
-            }
-
-            var newCars = _validCarIndices.Except(_lastFrameValidCars).ToList();
-            var removedCars = _lastFrameValidCars.Except(_validCarIndices).ToList();
-
-            foreach (var carIdx in newCars)
-            {
-                Log.Debug($"Car #{carNumbers[carIdx]} added to valid roster");
-            }
-
-            foreach (var carIdx in removedCars)
-            {
-                Log.Debug($"Car #{carNumbers[carIdx]} removed from valid roster");
             }
         }
         #endregion
@@ -199,55 +169,28 @@ namespace VISOR.Race
             var onPitRoad = frame.CarIdxOnPitRoad;
             var carNumbers = sessionDataProvider.CarNumbers;
 
-            if (lapDistPct == null || currentLap == null || onPitRoad == null || carNumbers == null)
-                return;
-
-            for (int i = 0; i < 64; i++)
+            for (int i = 0; i < PositionFrame.CarCount; i++)
             {
                 if (string.IsNullOrEmpty(carNumbers[i]))
                     continue;
 
-                bool isOnPitRoad = (i < onPitRoad.Length) && onPitRoad[i];
-                bool hasValidData = (i < lapDistPct.Length) &&
-                                    lapDistPct[i] >= 0f &&
-                                    lapDistPct[i] <= 1f;
-
-                // Log once per invalid stretch so mid-race telemetry gaps are captured without spamming.
-                if (!hasValidData && !_carsWithInvalidLapDistPctLogged.Contains(i))
-                {
-                    var trackSurface = frame.CarIdxTrackSurface;
-                    var carLaps = frame.CarIdxLap;
-                    var bestLaps = frame.CarIdxBestLapTime;
-                    var estTime = frame.CarIdxEstTime;
-
-                    int surface = (trackSurface != null && i < trackSurface.Length) ? trackSurface[i] : -999;
-                    int lap = (carLaps != null && i < carLaps.Length) ? carLaps[i] : -999;
-                    float bestLap = (bestLaps != null && i < bestLaps.Length) ? bestLaps[i] : -999f;
-
-                    Log.Debug($"Car #{carNumbers[i]} (idx {i}) telemetry snapshot - LapDist:{lapDistPct[i]:F3}, EstTime:{estTime:F2}, Surface:{surface}, Lap:{lap}, BestLap:{bestLap:F2}, OnPit:{isOnPitRoad}");
-                    _carsWithInvalidLapDistPctLogged.Add(i);
-                }
+                bool isOnPitRoad = onPitRoad[i];
+                bool hasValidData = LapDistance.IsOnLap(lapDistPct[i]);
 
                 if (hasValidData)
                 {
-                    ProcessValidData(i, lapDistPct[i], currentLap[i], isOnPitRoad, carNumbers);
+                    ProcessValidData(i, lapDistPct[i], currentLap[i], isOnPitRoad);
                 }
                 else
                 {
-                    ProcessInvalidData(i, carNumbers);
+                    _framesSinceValidData[i] = _framesSinceValidData.GetValueOrDefault(i, 0) + 1;
                 }
             }
         }
 
-        private void ProcessValidData(int carIdx, float lapDist, int lap, bool isOnPit, string[] carNumbers)
+        private void ProcessValidData(int carIdx, float lapDist, int lap, bool isOnPit)
         {
-            if (!_carsWithValidDataHistory.Contains(carIdx))
-            {
-                _carsWithValidDataHistory.Add(carIdx);
-                Log.Debug($"Car #{carNumbers[carIdx]} first valid data - added to history");
-            }
-
-            _carsWithInvalidLapDistPctLogged.Remove(carIdx);
+            _carsWithValidDataHistory.Add(carIdx);
 
             // Only meaningful against the immediately preceding frame. Across a telemetry gap the
             // car may have crossed S/F unobserved, so the lap counter legitimately jumps without a
@@ -266,11 +209,7 @@ namespace VISOR.Race
                     _lapNumberCorrection.Remove(carIdx);
                 }
 
-                float delta = lapDist - lastDist;
-
-                // Lap boundary wrap-around.
-                if (delta < -0.5f) delta += 1.0f;
-                if (delta > 0.5f) delta -= 1.0f;
+                float delta = LapDistance.Delta(lastDist, lapDist);
 
                 // Exponential smoothing (70% old, 30% new).
                 float instantVelocity = delta;
@@ -289,33 +228,6 @@ namespace VISOR.Race
             _lastValidLapDistPct[carIdx] = lapDist;
             _lastValidCurrentLap[carIdx] = lap;
             _framesSinceValidData[carIdx] = 0;
-
-            if (_predictionStartFrame.Remove(carIdx, out int startFrame))
-            {
-                int predictionDuration = _globalFrameCounter - startFrame;
-                if (predictionDuration > LOG_PREDICTION_THRESHOLD)
-                {
-                    Log.Debug($"Car #{carNumbers[carIdx]} prediction ended after {predictionDuration} frames");
-                }
-            }
-        }
-
-        private void ProcessInvalidData(int carIdx, string[] carNumbers)
-        {
-            int framesSinceValid = _framesSinceValidData.GetValueOrDefault(carIdx, 0) + 1;
-            _framesSinceValidData[carIdx] = framesSinceValid;
-
-            if (!_predictionStartFrame.ContainsKey(carIdx) &&
-                _lastValidLapDistPct.ContainsKey(carIdx))
-            {
-                _predictionStartFrame[carIdx] = _globalFrameCounter;
-            }
-
-            if (framesSinceValid == MAX_CACHE_AGE_FRAMES &&
-                _carsWithValidDataHistory.Contains(carIdx))
-            {
-                Log.Debug($"Car #{carNumbers[carIdx]} cache expired after {MAX_CACHE_AGE_FRAMES} frames (3 seconds)");
-            }
         }
 
         /// <summary>

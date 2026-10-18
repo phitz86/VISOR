@@ -1,16 +1,10 @@
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
 
 namespace VISOR.ViewModels
 {
-    public class RelativeRowViewModel : INotifyPropertyChanged
+    public class RelativeRowViewModel : ObservableObject
     {
-        public event PropertyChangedEventHandler? PropertyChanged;
-        private void OnPropertyChanged([CallerMemberName] string? name = null) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-
         private string _classPos = string.Empty;
         private string _carNum = string.Empty;
         private string _name = string.Empty;
@@ -117,7 +111,7 @@ namespace VISOR.ViewModels
                 return;
             }
 
-            // Plausible change: smooth exactly as before (EMA), unchanged.
+            // Plausible change: exponential moving average.
             _gapRejectCount = 0;
             _smoothedGap = (smoothingFactor * newGap) + ((1f - smoothingFactor) * _smoothedGap);
         }

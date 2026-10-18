@@ -6,10 +6,6 @@
 
     <Application.Resources>
         <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/VISOR;component/Resources/Styles.xaml" />
-            </ResourceDictionary.MergedDictionaries>
-
             <!-- Global Style for Buttons -->
             <Style TargetType="Button">
                 <Setter Property="Margin" Value="5"/>
@@ -28,11 +24,6 @@
                 <Setter Property="FontFamily" Value="Segoe UI"/>
                 <Setter Property="FontWeight" Value="Normal"/>
                 <Setter Property="FontSize" Value="14"/>
-            </Style>
-
-            <!-- Global Style for Window Backgrounds -->
-            <Style TargetType="Window">
-                <Setter Property="Background" Value="#FFEEEEEE"/>
             </Style>
         </ResourceDictionary>
     </Application.Resources>

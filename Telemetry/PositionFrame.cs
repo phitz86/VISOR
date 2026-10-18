@@ -1,5 +1,3 @@
-using System;
-
 namespace VISOR.Telemetry
 {
     /// <summary>
@@ -14,8 +12,6 @@ namespace VISOR.Telemetry
     {
         public const int CarCount = 64;
 
-        // --- What the positions are computed from ---
-        public required int SessionNum { get; init; }
         public required int SessionState { get; init; }
         public required float[] CarIdxLapDistPct { get; init; }
         public required int[] CarIdxLap { get; init; }
@@ -23,13 +19,6 @@ namespace VISOR.Telemetry
         public required bool[] CarIdxOnPitRoad { get; init; }
         public required int[] CarIdxClassPosition { get; init; }
         public required int[] CarIdxPosition { get; init; }
-
-        // --- Only logged (finish and telemetry-gap diagnostics) ---
-        public required int SessionFlags { get; init; }
-        public required int PlayerCarIdx { get; init; }
-        public required int[] CarIdxTrackSurface { get; init; }
-        public required float[] CarIdxBestLapTime { get; init; }
-        public required float[] CarIdxEstTime { get; init; }
 
         /// <summary>
         /// The array itself when it already covers every car slot (iRacing's always do), otherwise

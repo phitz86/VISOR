@@ -5,18 +5,20 @@ Risk appetite for 1.2.1: fix bugs, delete dead code, and split files mechanicall
 
 ## Summary
 
-**Status (2026-10-17):** Phase 1, the three revision passes, is done and validated on the rig. Testing turned up B10, B11 and S7, and the research for Phase 2 found B12 and B13. Phase 2 (pre-release fixes, the CI test pipeline, then the architecture work) is under "Revision plan" at the end. All twelve passes are done and rig-checked, apart from Pass 12's connection messages. The version is now 1.3.0.0, and PR #42 is open for the merge to master. Next is one more cleanup pass, then the release build.
+**Status (2026-10-18):** All seventeen passes are done and rig-checked: Phase 1 (Passes 1–3), Phase 2 (Passes 4–12, merged in PR #42) and Phase 3, the cleanup (Passes 13–17, at the end of "Revision plan"). The version is 1.3.1.0; 1.3.0.0 was never released. What's left is the release itself (open items 5 and 6) and Pass 12's connection messages (open item 1).
 
 ### Open items (yours)
-1. **Pass 12:** check the connection messages.
-   - Quit iRacing (or leave the session) and come back.
-   - The overlay should show "Disconnected. Waiting for iRacing...", then "Connected, waiting for session data...", then "Fully connected!" for about a second.
-   - The radar's labels should follow the same steps: Disconnected / Offline, then Connected / Connecting, then Active / Ready.
+1. **Pass 12:** check the connection messages, from a log rather than on screen, since they go by fast. After iRacing drops and comes back, the log should show, in this order:
+   - `iRacing connection state changed: Disconnected` and `HUD no longer primed: waiting for connection or session data`
+   - `iRacing reconnected after …s disconnection`
+   - `HUD ready: iRacing connected and session data parsed`
+
+   The same events drive the overlay's and the radar's messages.
 2. **S7:** check the Inno Setup licence terms ("Non-commercial use only").
-3. **The PDF:** regenerate `VISOR User Guide.pdf` from `VISOR_User_Guide_1.3.0.0.html`. The PDF dates from April 2026.
+3. **The PDF:** regenerate `VISOR User Guide.pdf` from `VISOR_User_Guide_1.3.1.0.html`. The PDF dates from April 2026.
 4. **Branch protection (if not done yet):** make build, test and lint required checks on master.
-5. **After the cleanup pass:** review and merge PR #42, then tag the merge commit `v1.3.0.0` exactly. CI fails a tag that doesn't match the csproj version.
-6. **Publish the release.** The update check reads GitHub's latest published release, which is still v1.0.0, so no install hears about 1.3.0 until it is published.
+5. **Merge and tag:** review and merge the PR for `claude/exciting-tesla-g2l8x2`, then tag the merge commit `v1.3.1.0` exactly. CI fails a tag that doesn't match the csproj version. 1.3.0.0 doesn't need a tag of its own (nor do 1.1.0 to 1.2.1); the changelog links those versions to their merge commits.
+6. **Publish the release.** The update check reads GitHub's latest published release, which is still v1.0.0, so no install hears about 1.3.1 until it is published.
    - With SignPath set up, the tagged build's sign job attaches a signed installer to the release.
    - Without it, the tagged build only uploads the unsigned installer as a run artifact. Attach that to a release you publish yourself; Windows SmartScreen will warn about an unsigned installer.
 7. **Offered, not started:** a draft upstream issue for SVappsLAB. It would cover the SDK quoting only six fields and not re-checking the session-info update counter after copying (see "Watch items").
@@ -387,7 +389,7 @@ Attack surface: local files (settings, shift models, track catalog, logs), one H
 | `RelativeGapLogger` + `LogDiagnosticRow` | Debug | Relative-gap flicker investigation | Fixed in 1.1 (reject-and-hold) | **Remove.** Saves about 50 lines in `RelativeDisplayBuilder`. *Decided: remove (Pass 1).* |
 | `TelemetryCSVLogger` | Debug | 1 Hz per-car telemetry CSV | iRacing's own `.ibt` recordings capture the same data at 60 Hz; also not thread-safe (called from pool threads) | **Remove.** *Decided: remove (Pass 1).* |
 | `SessionDataLogger` | Release-compiled, Debug-used | Raw session YAML dumps | iRacing `.ibt` files include the session YAML too | **Remove**, or gate with `#if DEBUG` if you use it for fixtures. *Decided: remove (Pass 1).* |
-| Finish diagnostics (`[Finish]`, `[Leader]`, latch and freeze lines) | **Release**, Info | Finishing-position investigation (1.1) | Cheap, but about 100 lines of `PositionCalculator` | **Keep for one more release**, then demote to Debug once a few real race finishes look right. *Decided: keep.* |
+| Finish diagnostics (`[Finish]`, `[Leader]`, latch and freeze lines) | **Release**, Info | Finishing-position investigation (1.1) | Cheap, but about 100 lines of `PositionCalculator` | **Keep for one more release**, then demote to Debug once a few real race finishes look right. *Decided: keep. Removed in Pass 15 (1.3.1), apart from the per-car freeze and hold lines.* |
 | Frame-gap / handler-latency detectors | Release | Telemetry health | Cheap, useful | **Keep** |
 | Debug Mode LapDistPct readout | Release (user-visible) | Catalog calibration | Useful | **Keep** |
 | `[ShiftPoint] progress` log | Release, Info | Learner progress | Already throttled to 10 min once settled | **Keep** |
@@ -427,7 +429,7 @@ Decisions carried forward:
 
 Testing in Phase 1 found B10, B11 and S7.
 
-### Phase 2 (proposed): release, CI pipeline, then architecture
+### Phase 2 (1.3.0): pre-release fixes, CI pipeline, then architecture, done
 
 This follows the order you set: a broader CI test pipeline first, then the architecture work. Research for it covered the position calculator, the session-data layer, the UI and radar, and the tests and CI setup. It also found B12 and B13.
 
@@ -698,7 +700,45 @@ One session on a Debug build from VS covers all four passes:
   - **Exit:** "Exit VISOR" and closing the overlay both shut down promptly.
 - **Rig check result (2026-10-17):** passed, apart from the connection messages, which are still to check (open item 1).
 
-#### Optional
+### Phase 3 (1.3.1): cleanup, Passes 13–17
+
+The 1.3.0 work had grown the app: from 9,899 to 12,549 lines of app source (`.cs` and `.xaml` outside `Tests/`) since 30 July. Most of that was the shift indicator (about 1,500 lines of code) and comments, which nearly doubled; PR #42 itself had cut about 300 lines of code. One more pass before the release build takes the app back to 11,417 lines.
+
+**Decisions (2026-10-17):**
+- The finish-investigation logging goes; the per-car freeze and hold lines stay.
+- The nine telemetry variables VISOR subscribes to but doesn't read stay: cheap, and handy later, like D3.
+- The version becomes 1.3.1.0. 1.3.0.0 was never released.
+
+| Pass | Commit | What | App lines |
+|---|---|---|---|
+| 13 | `b9587ce` | Dead code: unused members, styles and a converter WPF already has; 92 redundant `using` lines | 12,549 → 12,344 |
+| 14 | `ad193ae` | Boilerplate: compact `UserSettings`, one view-model base class, shared window code | → 11,920 |
+| 15 | `6f271c2` | The 1.1 finish-investigation logging and the state that only fed it | → 11,608 |
+| 16a | `197bdda` | Checks that can't fail, a session-change path the overlay's reset always pre-empted, small shared helpers | → 11,457 |
+| 16b | `036316b` | Finish code: shared free-slot and hold steps (its own commit, revertable alone) | → 11,433 |
+| 17 | `ae434ec` | Comments only | → 11,417 |
+| — | `a981c81` | Version 1.3.1.0 | — |
+
+The Release `VISOR.dll` went from 655,360 to 638,464 bytes; most of it is the two embedded fonts. Tests: 166, one fewer, removed with the session-change path it covered.
+
+**How each was checked:**
+- Every pass: Debug and Release build with warnings as errors at 0, and all tests pass, locally and in CI.
+- Pass 13: the compiler's own unused-`using` analysis, in both configurations. The debug-only loggers keep the ones their Debug code needs.
+- Pass 14: a scratch program listed all 22 settings (name, type, scope, default) before and after and round-tripped each through its property. The lists are identical, so saved settings carry over.
+- Pass 16: each new finish helper was broken on purpose; the calculator tests caught it every time (7, 2 and 1 failures).
+- Pass 17: every `.cs` file's code tokens, from Roslyn with comments and whitespace dropped, are identical before and after.
+
+**Rig checks:**
+- **A (Passes 13–14), 2026-10-17: passed.** All three sizes; every Config toggle and Debug Mode; the radar switched on from the Config window and dragged; settings and window positions survive a restart; prompt exit.
+- **B (1.3.1.0), 2026-10-18: passed, no notes.** An 8-hour multiclass team endurance race, where iRacing had trouble and VISOR didn't, then a solo sprint race checking grid order before and after the start.
+
+**Departures from the plan:**
+- `ShiftPointLearner.GetCurve` stays in Release builds: CI runs the tests in Release, and its test checks the fitted torque curve.
+- `PositionHistoryManager` keeps its own lap-position check: the shared helper would skip a NaN reading it now records.
+- The delta bar keeps its three branches: a NaN delta shows empty bars, which the shorter form wouldn't.
+- No shared helper for the `%LOCALAPPDATA%\VISOR` path: three one-liners, nothing to gain.
+
+### Optional
 - **A5, user catalog override:**
   - Load `%LOCALAPPDATA%\VISOR\TrackSections.json` as well as the shipped file, with user entries winning track by track. That needs a tiered lookup: the current resolver prefers config-specific matches, so simply listing user entries first isn't enough.
   - Merge the two, so catalog updates still arrive.
@@ -708,10 +748,12 @@ One session on a Debug build from VS covers all four passes:
   - The SDK can play back `.ibt` recordings, so a test of the whole pipeline without iRacing is possible later.
   - Caveat: recordings may lack most per-car arrays, and they contain driver names and IDs, so scripted frames stay the main tool.
 
-#### Watch items
+### Watch items
 - **Radar ghosts (B1):** fixed, but the original case never reproduced on demand.
 - **Session-info parse failures (B10):** run Debug builds when convenient, so a real sample gets captured.
-- **Memory over long sessions:** both perf runs levelled off at about 125 MB, but were still rising about 1 MB per 5 minutes near the end. One perf log over a session of an hour or more would settle it.
+- **Memory over long sessions:** both perf runs levelled off at about 125 MB, but were still rising about 1 MB per 5 minutes near the end. 1.3.1 then ran an 8-hour race without trouble, but memory wasn't measured. A look at Task Manager at the start and a few hours into a long session would settle it.
+- **A missing telemetry array reads as zeros (found in Phase 3; not changed):** `SVappsLABSnapshot` turns an array the SDK doesn't supply into a shared all-zero one, so a missing `CarIdxLapDistPct` would read as 0.0, a valid track position, rather than -1. It only matters if the SDK ever stops supplying a variable VISOR subscribes to.
+- **Debug lines are built even when Debug Mode is off (found in Phase 3; not changed):** `Log.Debug($"…")` formats its message before the level check. The remaining Debug lines are on events, apart from the overlay's "Session data not ready", logged every frame until session info is ready.
 - **Track catalog gap:** Oulton Park Fosters has no section data.
 - **Torn session-info reads (found during Pass 10; decided 2026-10-16: wait for evidence):**
   - **The risk:** iRacing rewrites session info in place in shared memory and then bumps an update counter. The SDK (2.5.0, `DataProviderBase.GetSessionInfoYaml`) copies the text after seeing the counter change, but never re-checks the counter afterwards.

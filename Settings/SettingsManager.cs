@@ -1,5 +1,4 @@
-﻿using System;
-using System.Windows;
+﻿using System.Windows;
 using VISOR.Diagnostics;
 
 namespace VISOR.Settings
@@ -21,22 +20,14 @@ namespace VISOR.Settings
         // The overlay's rounded-corner Border (MainWindow.xaml, Margin="10") frames the
         // scaled content grid, so its 10px-per-side chrome is applied in window space and
         // does NOT scale with the size preset. It must be added to the window height as a
-        // constant. The old code folded this into the scaled padding budget instead, which
-        // shrank it to ~14px at the 0.6x Small preset and clipped the bottom of Row 5.
+        // constant: folded into the scaled padding instead, it shrinks to ~14px at the 0.6x
+        // Small preset and clips the bottom of Row 5.
         private const double BORDER_CHROME_HEIGHT = 20.0;
 
         private readonly UserSettings _settings;
-        private static SettingsManager _instance = null!;
+        private static SettingsManager? _instance;
 
-        public static SettingsManager Instance
-        {
-            get
-            {
-                if (_instance == null)
-                    _instance = new SettingsManager();
-                return _instance;
-            }
-        }
+        public static SettingsManager Instance => _instance ??= new SettingsManager();
 
         public event EventHandler<WindowSizeChangedEventArgs>? WindowSizeChanged;
         public event EventHandler? ElementVisibilityChanged;
@@ -57,9 +48,7 @@ namespace VISOR.Settings
             double scaleFactor = WindowScale.ForMainWindow(_settings.WindowSize);
             double scaledWidth = baseWidth * scaleFactor;
 
-            // Scale the content, then add the unscaled Border chrome. At Large this equals
-            // the previous (contentHeight + WINDOW_PADDING) * 1.0, so Large/Medium are
-            // visually unchanged; Small gains back the ~8px it was being clipped by.
+            // Scale the content, then add the unscaled Border chrome.
             double scaledHeight = contentHeight * scaleFactor + BORDER_CHROME_HEIGHT;
 
             return new Size(scaledWidth, scaledHeight);
@@ -109,48 +98,34 @@ namespace VISOR.Settings
 
         public Point GetMainWindowPosition()
         {
-            if (_settings.MainWindowX >= 0 && _settings.MainWindowY >= 0)
-            {
-                var saved = new Point(_settings.MainWindowX, _settings.MainWindowY);
-                return ClampToVisibleArea(saved, GetMainWindowSize());
-            }
-
-            double centerX = SystemParameters.PrimaryScreenWidth / 2;
-            double centerY = SystemParameters.PrimaryScreenHeight / 2;
-            double offsetX = 900;
-            double offsetY = 400;
-
-            var windowSize = GetMainWindowSize();
-            double left = centerX + offsetX - (windowSize.Width / 2);
-            double top = centerY + offsetY - (windowSize.Height / 2);
-
-            return new Point(left, top);
+            var size = GetMainWindowSize();
+            return SavedPosition(_settings.MainWindowX, _settings.MainWindowY, size)
+                ?? DefaultPosition(size, offsetX: 900, offsetY: 400);
         }
 
         public Point GetRadarWindowPosition()
         {
-            if (_settings.RadarWindowX >= 0 && _settings.RadarWindowY >= 0)
-            {
-                var saved = new Point(_settings.RadarWindowX, _settings.RadarWindowY);
-                return ClampToVisibleArea(saved, GetRadarWindowSize());
-            }
+            var size = GetRadarWindowSize();
+            if (SavedPosition(_settings.RadarWindowX, _settings.RadarWindowY, size) is Point saved)
+                return saved;
 
-            double centerX = SystemParameters.PrimaryScreenWidth / 2;
-            double centerY = SystemParameters.PrimaryScreenHeight / 2;
-            double offsetX = 400;
-            double offsetY = -200;
+            var position = DefaultPosition(size, offsetX: 400, offsetY: -200);
+            if (position.X + size.Width > SystemParameters.PrimaryScreenWidth)
+                position.X = SystemParameters.PrimaryScreenWidth - size.Width - 20;
+            if (position.Y < 0)
+                position.Y = 20;
 
-            var windowSize = GetRadarWindowSize();
-            double left = centerX + offsetX - (windowSize.Width / 2);
-            double top = centerY + offsetY - (windowSize.Height / 2);
-
-            if (left + windowSize.Width > SystemParameters.PrimaryScreenWidth)
-                left = SystemParameters.PrimaryScreenWidth - windowSize.Width - 20;
-            if (top < 0)
-                top = 20;
-
-            return new Point(left, top);
+            return position;
         }
+
+        // The saved position pulled back on-screen, or null when the window hasn't been placed yet.
+        private static Point? SavedPosition(int x, int y, Size windowSize) =>
+            x >= 0 && y >= 0 ? ClampToVisibleArea(new Point(x, y), windowSize) : null;
+
+        // Where a window goes until it is first moved: offset from the primary screen's centre.
+        private static Point DefaultPosition(Size windowSize, double offsetX, double offsetY) =>
+            new(SystemParameters.PrimaryScreenWidth / 2 + offsetX - windowSize.Width / 2,
+                SystemParameters.PrimaryScreenHeight / 2 + offsetY - windowSize.Height / 2);
 
         /// <summary>
         /// Ensures a saved window position still lands on the current virtual desktop.

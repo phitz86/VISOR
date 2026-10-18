@@ -1,6 +1,4 @@
-using System;
 using System.Diagnostics;
-using System.Threading;
 using System.Windows.Threading;
 using VISOR.Diagnostics;
 using VISOR.Telemetry;
@@ -12,8 +10,8 @@ namespace VISOR.Views
     /// order they arrive, without making the SDK wait.
     ///
     /// BeginInvoke from the one thread that raises frames, all at the same priority, runs them on
-    /// the UI thread strictly in that order. Send is the priority the blocking Invoke this
-    /// replaces used, so frames are handled as promptly as before. If the UI thread stalls,
+    /// the UI thread strictly in that order. Send, the highest priority, keeps frames as prompt as
+    /// a blocking Invoke would be. If the UI thread stalls,
     /// frames beyond a short backlog are dropped instead of queued without bound, and the drops
     /// are logged.
     /// </summary>

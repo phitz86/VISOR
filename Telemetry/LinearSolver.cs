@@ -1,5 +1,3 @@
-using System;
-
 namespace VISOR.Telemetry
 {
     /// <summary>The shift-point learner's linear algebra, kept apart from its physics.</summary>

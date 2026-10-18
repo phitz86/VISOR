@@ -1,12 +1,6 @@
 using SVappsLAB.iRacingTelemetrySDK;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
 using VISOR.Diagnostics;
-using VISOR.ViewModels;
 using YamlDotNet.Core;
 
 namespace VISOR.Telemetry
@@ -34,7 +28,7 @@ namespace VISOR.Telemetry
         TelemetryVar.Lat, TelemetryVar.Lon,
 #endif
     ])]
-    public class SVappsLABSDKWrapper : IDisposable
+    public class SVappsLABSDKWrapper
     {
         #region Private Fields
         private ITelemetryClient<TelemetryData> _client = null!;
@@ -54,7 +48,7 @@ namespace VISOR.Telemetry
         private bool _isConnected = false;
 
         // Set when Shutdown starts. The UI thread then waits for the SDK to stop, so frames
-        // raised meanwhile could only pile up behind it; they are no longer raised.
+        // raised meanwhile could only pile up behind it, so from then on none are raised.
         private volatile bool _isShuttingDown;
 
         private int _lastSessionNumForLog = -1;
@@ -364,8 +358,8 @@ namespace VISOR.Telemetry
             }
 
             // Raised right here, one frame at a time, so subscribers receive frames in the order the
-            // SDK delivers them. (Each frame used to go out on its own Task.Run, and a later frame's
-            // task could reach the UI first.) Subscribers must only queue work - the windows post
+            // SDK delivers them. (Raised from a Task.Run each, a later frame could reach the UI
+            // first.) Subscribers must only queue work - the windows post
             // the frame to their UI thread - because the SDK's telemetry channel is a 60-sample ring
             // buffer that silently drops the oldest samples when consumption is slow. Each
             // subscriber is guarded on its own so one failing window can't starve the other.
@@ -437,11 +431,6 @@ namespace VISOR.Telemetry
             {
                 Log.Error("SVappsLAB SDK shutdown error", ex);
             }
-        }
-
-        public void Dispose()
-        {
-            Shutdown();
         }
     }
 }

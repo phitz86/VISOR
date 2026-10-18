@@ -1,17 +1,10 @@
-﻿using System;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-using VISOR.Diagnostics;
+﻿using VISOR.Diagnostics;
 using VISOR.Telemetry;
 
 namespace VISOR.ViewModels
 {
-    public class CountdownViewModel : INotifyPropertyChanged
+    public class CountdownViewModel : ObservableObject
     {
-        public event PropertyChangedEventHandler? PropertyChanged;
-        private void OnPropertyChanged([CallerMemberName] string? name = null) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-
         // iRacing fills SessionTime with a 24h+ placeholder for sessions that run to a lap count
         // with no clock (lone qualifying, lap-limited races). A value below this is a real budget.
         private const double UNLIMITED_SESSION_TIME_SECONDS = 86400.0;
@@ -24,12 +17,12 @@ namespace VISOR.ViewModels
         public string TimeRemainingDisplay
         {
             get => _timeRemainingDisplay;
-            private set { _timeRemainingDisplay = value; OnPropertyChanged(); }
+            private set => Set(ref _timeRemainingDisplay, value);
         }
         public string TimeRemainingSymbol
         {
             get => _timeRemainingSymbol;
-            private set { _timeRemainingSymbol = value; OnPropertyChanged(); }
+            private set => Set(ref _timeRemainingSymbol, value);
         }
 
         /// <summary>
@@ -40,12 +33,12 @@ namespace VISOR.ViewModels
         public string SecondaryTimerDisplay
         {
             get => _secondaryTimerDisplay;
-            private set { if (_secondaryTimerDisplay == value) return; _secondaryTimerDisplay = value; OnPropertyChanged(); }
+            private set => Set(ref _secondaryTimerDisplay, value);
         }
         public bool ShowSecondaryTimer
         {
             get => _showSecondaryTimer;
-            private set { if (_showSecondaryTimer == value) return; _showSecondaryTimer = value; OnPropertyChanged(); }
+            private set => Set(ref _showSecondaryTimer, value);
         }
 
         private bool _greenFlagSeen;
@@ -198,28 +191,10 @@ namespace VISOR.ViewModels
 
             if (shouldShowTimer)
             {
-                if (whiteWasAlreadyFlying && lapCompleted && !_finalLapLatched)
-                {
+                if (whiteWasAlreadyFlying && lapCompleted)
                     _finalLapLatched = true;
-                    LogLatch("Final Lap", snapshot, currentLap, lapsRemaining, timeRemain);
-                }
-                if (checkeredWasAlreadyFlying && lapCompleted && !_finishedLatched)
-                {
+                if (checkeredWasAlreadyFlying && lapCompleted)
                     _finishedLatched = true;
-                    LogLatch("FINISHED", snapshot, currentLap, lapsRemaining, timeRemain);
-                }
-
-                // The one case the "flag must already be flying" rule can get wrong: a flag raised on
-                // the very sample of the crossing. Logged so that, if it ever happens, it is visible
-                // rather than showing up as a Final Lap / FINISHED that is simply late or missing.
-                if (lapCompleted && !whiteWasAlreadyFlying && _pendingWhiteFlag && !_finalLapLatched)
-                {
-                    Log.Info($"[Countdown] White flag raised on the same sample as the lap {currentLap} crossing - Final Lap NOT latched");
-                }
-                if (lapCompleted && !checkeredWasAlreadyFlying && _pendingCheckeredFlag && !_finishedLatched)
-                {
-                    Log.Info($"[Countdown] Checkered flag raised on the same sample as the lap {currentLap} crossing - FINISHED NOT latched");
-                }
 
                 string newLapDisplay;
                 string newSymbol;
@@ -274,14 +249,8 @@ namespace VISOR.ViewModels
                     newLapDisplay = "--:--";
                 }
 
-                if (TimeRemainingDisplay != newLapDisplay)
-                {
-                    TimeRemainingDisplay = newLapDisplay;
-                }
-                if (TimeRemainingSymbol != newSymbol)
-                {
-                    TimeRemainingSymbol = newSymbol;
-                }
+                TimeRemainingDisplay = newLapDisplay;
+                TimeRemainingSymbol = newSymbol;
             }
 
             // The clock only earns its own line when the primary readout is spending itself on a lap
@@ -295,17 +264,6 @@ namespace VISOR.ViewModels
             ShowSecondaryTimer = showSecondary;
 
             _lastLap = currentLap;
-        }
-
-        /// <summary>
-        /// Record the moment Final Lap or FINISHED latches, with the state that caused it. These
-        /// readouts are driven entirely by per-car SessionFlags bits and lap crossings, and nothing
-        /// else in the log shows which crossing consumed which flag.
-        /// </summary>
-        private static void LogLatch(string what, SVappsLABSnapshot snapshot, int lap, int lapsRemaining, double timeRemain)
-        {
-            Log.Info($"[Countdown] {what} latched on lap {lap}: SessionState {snapshot.SessionState}, " +
-                     $"flags 0x{snapshot.SessionFlags & IRacingIds.FinishFlagsMask:X}, lapsRemain {lapsRemaining}, timeRemain {timeRemain:F0}s");
         }
 
         /// <summary>

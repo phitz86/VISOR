@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace VISOR.Telemetry
+﻿namespace VISOR.Telemetry
 {
     /// <summary>
     /// One update of iRacing's session info: drivers and classes, the session schedule with its
@@ -18,7 +15,7 @@ namespace VISOR.Telemetry
     /// </summary>
     public sealed class SessionView : ISessionDataProvider
     {
-        public const int CarCount = 64;
+        public const int CarCount = PositionFrame.CarCount;
 
         /// <summary>No session: before the first update, and after a disconnect.</summary>
         public static readonly SessionView Empty = new(
@@ -57,7 +54,7 @@ namespace VISOR.Telemetry
             QualifyPositions = qualifyPositions;
             QualifyFastestTimes = qualifyFastestTimes;
 
-            // Worked out once per update rather than on every read (C4).
+            // Worked out once per update rather than on every read.
             CurrentSession = sessions.GetValueOrDefault(currentSessionNum);
             _useFastestLapPositioning = CurrentSession is { IsRace: false } s && (s.IsPractice || s.IsQualifying);
             IsLoneQualifying = CurrentSession?.IsLoneQualifying ?? false;

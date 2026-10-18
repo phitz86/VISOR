@@ -1,5 +1,3 @@
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
 using VISOR.Diagnostics;
 using VISOR.Settings;
 using VISOR.Telemetry;
@@ -23,12 +21,8 @@ namespace VISOR.ViewModels
     /// the readout says "Pit Lane" instead. Off-world (garage, towing: LapDistPct &lt; 0)
     /// the element hides entirely, as it does on any track the catalog doesn't know.
     /// </summary>
-    public class TrackLocationViewModel : INotifyPropertyChanged
+    public class TrackLocationViewModel : ObservableObject
     {
-        public event PropertyChangedEventHandler? PropertyChanged;
-        private void OnPropertyChanged([CallerMemberName] string? name = null) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-
         private const double ConfirmDwellSec = 0.25;
         private const string PitLaneLabel = "Pit Lane";
 
@@ -42,8 +36,8 @@ namespace VISOR.ViewModels
         private string _sectionName = string.Empty;
         private bool _locationVisible;
 
-        public string SectionName { get => _sectionName; private set { _sectionName = value; OnPropertyChanged(); } }
-        public bool LocationVisible { get => _locationVisible; private set { _locationVisible = value; OnPropertyChanged(); } }
+        public string SectionName { get => _sectionName; private set => Set(ref _sectionName, value); }
+        public bool LocationVisible { get => _locationVisible; private set => Set(ref _locationVisible, value); }
 
         public void Update(SVappsLABSnapshot snapshot, SessionView dataProvider)
         {
@@ -58,7 +52,7 @@ namespace VISOR.ViewModels
 
             float pct = snapshot.CarIdxLapDistPct[playerIdx];
             bool onPitRoad = snapshot.CarIdxOnPitRoad[playerIdx];
-            bool validPct = pct >= 0f && pct <= 1f;
+            bool validPct = LapDistance.IsOnLap(pct);
 
             // Calibration aid: with Debug Mode on, show the live LapDistPct (and the
             // resolved section name, if any) on every track — including uncatalogued ones
@@ -173,13 +167,13 @@ namespace VISOR.ViewModels
 
         private void Show(string name)
         {
-            if (_sectionName != name) SectionName = name;
-            if (!_locationVisible) LocationVisible = true;
+            SectionName = name;
+            LocationVisible = true;
         }
 
         private void Hide()
         {
-            if (_locationVisible) LocationVisible = false;
+            LocationVisible = false;
             _displayedIdx = -1;
             _pendingIdx = -1;
         }

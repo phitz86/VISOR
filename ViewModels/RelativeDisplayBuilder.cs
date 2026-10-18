@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using VISOR.Diagnostics;
 using VISOR.Race;
 using VISOR.Settings;
 using VISOR.Telemetry;
@@ -26,16 +22,14 @@ namespace VISOR.ViewModels
         private const float AHEAD_BEHIND_HYSTERESIS_METERS = 2.0f;
         private const float AHEAD_BEHIND_HYSTERESIS_DEFAULT_PCT = 0.0004f; // ~2 m on a ~5 km track
 
-        private const int DEBUG_LOG_INTERVAL = 60; // ~1s at 60Hz
         #endregion
 
         #region Private Fields
-        private readonly Dictionary<int, RelativeRowViewModel> _carCache;
+        // One row per car, kept across frames so each row keeps its gap smoothing.
+        private readonly Dictionary<int, RelativeRowViewModel> _carCache = new();
         private readonly ClassColorManager _classColorManager;
         private readonly PositionCalculator _positionCalculator;
-        private readonly PositionHistoryManager _historyManager;
-
-        private int _debugFrameCounter = 0;
+        private readonly PositionHistoryManager _historyManager = new();
 
         // Practice/qualifying positions for this frame, by car. Rebuilt once per frame rather
         // than fetched (a copied list) and searched again for every row.
@@ -43,43 +37,21 @@ namespace VISOR.ViewModels
         #endregion
 
         #region Constructor
-        public RelativeDisplayBuilder(
-            Dictionary<int, RelativeRowViewModel> carCache,
-            ClassColorManager classColorManager,
-            PositionCalculator positionCalculator,
-            PositionHistoryManager historyManager)
+        public RelativeDisplayBuilder(ClassColorManager classColorManager, PositionCalculator positionCalculator)
         {
-            _carCache = carCache;
             _classColorManager = classColorManager;
             _positionCalculator = positionCalculator;
-            _historyManager = historyManager;
         }
         #endregion
 
         #region Public Methods
         public List<RelativeRowViewModel> Calculate(SVappsLABSnapshot snapshot, SessionView dataProvider)
         {
-            _debugFrameCounter++;
-
             _historyManager.Update(snapshot, dataProvider);
 
-            var playerCarIdx = snapshot.PlayerCarIdx;
+            var allValidCars = BuildValidCarsList(snapshot, dataProvider);
 
-            var carClassIDs = dataProvider.CarClassIDs;
-            var carClassColors = dataProvider.CarClassColors;
-            var userNames = dataProvider.UserNames;
-            var carNumbers = dataProvider.CarNumbers;
-            var carIsAI = dataProvider.CarIsAI;
-            var incidentCounts = dataProvider.CurDriverIncidentCount;
-            var currentLap = snapshot.CarIdxLap;
-            var onPitRoad = snapshot.CarIdxOnPitRoad;
-
-            var validCarIndices = _positionCalculator.ValidCarIndices;
-
-            var allValidCars = BuildValidCarsList(validCarIndices, carNumbers, userNames, carIsAI,
-                carClassIDs, incidentCounts, currentLap, onPitRoad, playerCarIdx);
-
-            if (!allValidCars.Any())
+            if (allValidCars.Count == 0)
             {
                 return new List<RelativeRowViewModel>();
             }
@@ -93,38 +65,37 @@ namespace VISOR.ViewModels
                 foreach (var entry in dataProvider.FastestLapPositions)
                     _fastestLapByCar.TryAdd(entry.carIdx, (entry.fastestTime, entry.classPosition, entry.overallPosition));
             }
-            ApplyDisplayLogic(finalRows, useFastestLap, carClassColors, carClassIDs, snapshot);
+            ApplyDisplayLogic(finalRows, useFastestLap, dataProvider.CarClassColors, dataProvider.CarClassIDs, snapshot);
 
             return finalRows;
         }
 
         public void Reset()
         {
-            _debugFrameCounter = 0;
             _historyManager.Reset();
+            _carCache.Clear();
         }
         #endregion
 
         #region Private Methods - Car List Building
-        private List<RelativeRowViewModel> BuildValidCarsList(
-            IReadOnlySet<int> validCarIndices,
-            string[] carNumbers,
-            string[] userNames,
-            bool[] carIsAI,
-            int[] carClassIDs,
-            int[] incidentCounts,
-            int[] currentLap,
-            bool[] onPitRoad,
-            int playerCarIdx)
+        private List<RelativeRowViewModel> BuildValidCarsList(SVappsLABSnapshot snapshot, SessionView session)
         {
             var allValidCars = new List<RelativeRowViewModel>();
 
+            int playerCarIdx = snapshot.PlayerCarIdx;
+            var currentLap = snapshot.CarIdxLap;
+            var onPitRoad = snapshot.CarIdxOnPitRoad;
+            var carNumbers = session.CarNumbers;
+            var userNames = session.UserNames;
+            var carIsAI = session.CarIsAI;
+            var carClassIDs = session.CarClassIDs;
+            var incidentCounts = session.CurDriverIncidentCount;
+
             // When the user is on pit road, show pit-road cars even if "hide cars in pits"
             // is enabled, so you can see who you're stopped near during your own stop.
-            bool playerOnPitRoad = (onPitRoad != null && playerCarIdx >= 0
-                && playerCarIdx < onPitRoad.Length) && onPitRoad[playerCarIdx];
+            bool playerOnPitRoad = snapshot.PlayerOnPitRoad;
 
-            foreach (int i in validCarIndices)
+            foreach (int i in _positionCalculator.ValidCarIndices)
             {
                 if (i >= 0 && i < carNumbers.Length &&
                     !string.IsNullOrEmpty(carNumbers[i]) &&
@@ -233,9 +204,7 @@ namespace VISOR.ViewModels
         private bool ResolveAheadHysteretic(RelativeRowViewModel car, float playerTrackPercent, float bandPct)
         {
             // Shortest signed arc to the player: + = ahead, - = behind.
-            float signedDelta = car.LapDistPct - playerTrackPercent;
-            if (signedDelta > 0.5f) signedDelta -= 1.0f;
-            else if (signedDelta < -0.5f) signedDelta += 1.0f;
+            float signedDelta = LapDistance.Delta(playerTrackPercent, car.LapDistPct);
 
             if (signedDelta > bandPct) car._proximitySide = 1;
             else if (signedDelta < -bandPct) car._proximitySide = -1;
@@ -293,7 +262,7 @@ namespace VISOR.ViewModels
             int[] carClassIDs)
         {
             // No ClassID == 0 guard: that is the real class in single-class sessions (online Test,
-            // offline custom races), and skipping it left the swatch at its Transparent default.
+            // offline custom races), and skipping it would leave the swatch transparent.
             // ClassColorManager resolves an unknown or uncoloured class to a legible light grey.
             row.ClassBackground = _classColorManager.GetClassColor(row.ClassID, carClassColors, carClassIDs);
         }
@@ -309,9 +278,7 @@ namespace VISOR.ViewModels
             // Wrap to the shortest arc around the lap (-0.5 to +0.5). Used for the stationary feet
             // readout; direction (ahead/behind) comes from the hysteretic side latched in
             // BuildProximityBasedRows so the slot and the gap sign agree and don't twitch dead-even.
-            float distDelta = row.LapDistPct - playerRow.LapDistPct;
-            if (distDelta > 0.5f) distDelta -= 1.0f;
-            else if (distDelta < -0.5f) distDelta += 1.0f;
+            float distDelta = LapDistance.Delta(playerRow.LapDistPct, row.LapDistPct);
 
             bool isAhead = row._proximitySide >= 0;
 
@@ -365,15 +332,7 @@ namespace VISOR.ViewModels
             }
 
             row.UpdateSmoothedGap(nativeTimeGap);
-            float displayGap = row.SmoothedGap;
-
-            if (_debugFrameCounter % DEBUG_LOG_INTERVAL == 0 && displayGap <= RelativeRowStyler.TIME_SEG2_AWARE)
-            {
-                string relation = isAhead ? "AHEAD" : "BEHIND";
-                Log.Debug($"[Buffer] #{row.CarNum} ({relation}): Gap={displayGap:F2}s");
-            }
-
-            RelativeRowStyler.ShowGap(row, displayGap, isAhead);
+            RelativeRowStyler.ShowGap(row, row.SmoothedGap, isAhead);
         }
 
         /// <summary>

@@ -1,10 +1,8 @@
-using System;
 using System.Diagnostics;
 using System.Net.Http;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using VISOR.Diagnostics;
 
 namespace VISOR.Update

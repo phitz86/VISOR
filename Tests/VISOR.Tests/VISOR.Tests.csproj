@@ -23,6 +23,7 @@
     <Compile Include="..\..\Telemetry\ShiftModelStore.cs" Link="Linked\ShiftModelStore.cs" />
     <Compile Include="..\..\ViewModels\ShiftCue.cs" Link="Linked\ShiftCue.cs" />
     <Compile Include="..\..\ViewModels\FuelViewModel.cs" Link="Linked\FuelViewModel.cs" />
+    <Compile Include="..\..\ViewModels\ObservableObject.cs" Link="Linked\ObservableObject.cs" />
     <Compile Include="..\..\Telemetry\PositionHistoryBuffer.cs" Link="Linked\PositionHistoryBuffer.cs" />
     <Compile Include="..\..\Data\TrackSectionCatalog.cs" Link="Linked\TrackSectionCatalog.cs" />
     <Compile Include="..\..\Update\UpdateChecker.cs" Link="Linked\UpdateChecker.cs" />
@@ -33,6 +34,7 @@
     <!-- All of Race\: it must build without WPF, which this plain net10.0 project checks. -->
     <Compile Include="..\..\Race\*.cs" LinkBase="Linked\Race" />
     <Compile Include="..\..\Telemetry\PositionFrame.cs" Link="Linked\PositionFrame.cs" />
+    <Compile Include="..\..\Telemetry\LapDistance.cs" Link="Linked\LapDistance.cs" />
     <Compile Include="..\..\Telemetry\SessionDataProvider.cs" Link="Linked\SessionDataProvider.cs" />
     <Compile Include="..\..\Telemetry\SessionDataModels.cs" Link="Linked\SessionDataModels.cs" />
     <Compile Include="..\..\Telemetry\SessionView.cs" Link="Linked\SessionView.cs" />

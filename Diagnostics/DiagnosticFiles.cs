@@ -1,4 +1,3 @@
-using System;
 using System.IO;
 using VISOR.Telemetry;
 
@@ -17,7 +16,8 @@ namespace VISOR.Diagnostics
         /// </summary>
         public static string NewPath(string folder, string? stem, string extension)
         {
-            string dir = Path.Combine(Log.GetDiagnosticsDirectory(), folder);
+            string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "VISOR", "Diagnostics", folder);
             Directory.CreateDirectory(dir);
 
             string name = $"{ShiftModelStore.SafeFileStem(stem ?? string.Empty) ?? "car"}_{DateTime.Now:yyyyMMdd-HHmmss}";

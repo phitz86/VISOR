@@ -1,7 +1,4 @@
-﻿using System;
-using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using System.Reflection;
 using System.Windows;
 using System.Windows.Threading;
 using VISOR.Diagnostics;
@@ -267,32 +264,16 @@ namespace VISOR
             try
             {
                 _mainWindow = new MainWindow(_sdkWrapper);
-
-                var settingsManager = SettingsManager.Instance;
-                if (settingsManager.IsRadarVisible)
-                {
-                    _radarWindow = new RadarWindow(_sdkWrapper, _mainWindow.ViewModel.ClassColorManager);
-                }
-
-                _mainWindow.WindowState = WindowState.Normal;
-                _mainWindow.ShowActivated = true;
                 _mainWindow.Show();
                 _mainWindow.Activate();
 
-                if (_radarWindow != null)
-                {
-                    _radarWindow.WindowState = WindowState.Normal;
-                    _radarWindow.ShowActivated = true;
-                    _radarWindow.Show();
-                }
+                if (SettingsManager.Instance.IsRadarVisible)
+                    ShowRadarWindow();
 
                 ShowConfigWindow();
 
                 MainWindow = _mainWindow;
-
                 _mainWindow.Closed += OnMainWindowClosed;
-                if (_radarWindow != null)
-                    _radarWindow.Closed += OnRadarWindowClosed;
 
                 Log.Info("All windows launched successfully");
             }
@@ -353,8 +334,6 @@ namespace VISOR
             _configWindow = new ConfigWindow(_mainWindow);
             _configWindow.Closed += OnConfigWindowClosed;
             _configWindow.ExitRequested += OnConfigExitRequested;
-            _configWindow.WindowState = WindowState.Normal;
-            _configWindow.ShowActivated = true;
             _configWindow.Show();
         }
 
@@ -362,7 +341,7 @@ namespace VISOR
         {
             if (_radarWindow == null && _mainWindow != null)
             {
-                Log.Info("Creating RadarWindow on demand");
+                Log.Info("Creating RadarWindow");
                 _radarWindow = new RadarWindow(_sdkWrapper, _mainWindow.ViewModel.ClassColorManager);
                 _radarWindow.Closed += OnRadarWindowClosed;
                 _radarWindow.Show();

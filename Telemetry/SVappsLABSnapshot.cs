@@ -1,4 +1,3 @@
-using System;
 using SVappsLAB.iRacingTelemetrySDK;
 
 namespace VISOR.Telemetry
@@ -18,9 +17,9 @@ namespace VISOR.Telemetry
 
         // Shared, length-64 empty arrays so a null SDK array normalizes to a fixed-size,
         // non-null array (iRacing addresses 64 car slots). Consumers only read these.
-        private static readonly float[] EmptyFloat64 = new float[64];
-        private static readonly int[] EmptyInt64 = new int[64];
-        private static readonly bool[] EmptyBool64 = new bool[64];
+        private static readonly float[] EmptyFloat64 = new float[PositionFrame.CarCount];
+        private static readonly int[] EmptyInt64 = new int[PositionFrame.CarCount];
+        private static readonly bool[] EmptyBool64 = new bool[PositionFrame.CarCount];
 
         // --- Scalars ---
         // PlayerCarIdx uses the -1 "no player" sentinel.
@@ -126,6 +125,16 @@ namespace VISOR.Telemetry
         public int[] CarIdxTrackSurface => (int[]?)(object?)Data.CarIdxTrackSurface ?? EmptyInt64;
         public string CarLeftRightState => Data.CarLeftRight?.ToString() ?? "Off";
 
+        public bool PlayerOnPitRoad
+        {
+            get
+            {
+                int idx = PlayerCarIdx;
+                var onPitRoad = CarIdxOnPitRoad;
+                return idx >= 0 && idx < onPitRoad.Length && onPitRoad[idx];
+            }
+        }
+
         #endregion
 
         /// <summary>
@@ -134,7 +143,6 @@ namespace VISOR.Telemetry
         /// </summary>
         public PositionFrame ToPositionFrame() => new()
         {
-            SessionNum = SessionNum,
             SessionState = SessionState,
             CarIdxLapDistPct = PositionFrame.AllCars(CarIdxLapDistPct, -1f),
             CarIdxLap = PositionFrame.AllCars(CarIdxLap, 0),
@@ -142,11 +150,6 @@ namespace VISOR.Telemetry
             CarIdxOnPitRoad = PositionFrame.AllCars(CarIdxOnPitRoad, false),
             CarIdxClassPosition = PositionFrame.AllCars(CarIdxClassPosition, 0),
             CarIdxPosition = PositionFrame.AllCars(CarIdxPosition, 0),
-            SessionFlags = SessionFlags,
-            PlayerCarIdx = PlayerCarIdx,
-            CarIdxTrackSurface = PositionFrame.AllCars(CarIdxTrackSurface, -1),
-            CarIdxBestLapTime = PositionFrame.AllCars(CarIdxBestLapTime, 0f),
-            CarIdxEstTime = PositionFrame.AllCars(CarIdxEstTime, 0f),
         };
     }
 }

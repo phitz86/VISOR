@@ -30,7 +30,6 @@ namespace VISOR.Tests
         public readonly PositionCalculator Calc = new();
         public readonly FakeSession Session = new();
 
-        public int SessionNum = 1;
         public int SessionState = SessionStates.Racing;
         public readonly float[] Pct = Filled(-1f);
         public readonly int[] Lap = new int[PositionFrame.CarCount];
@@ -100,7 +99,6 @@ namespace VISOR.Tests
 
         public PositionFrame Build() => new()
         {
-            SessionNum = SessionNum,
             SessionState = SessionState,
             CarIdxLapDistPct = (float[])Pct.Clone(),
             CarIdxLap = (int[])Lap.Clone(),
@@ -108,11 +106,6 @@ namespace VISOR.Tests
             CarIdxOnPitRoad = (bool[])OnPitRoad.Clone(),
             CarIdxClassPosition = (int[])ClassPosition.Clone(),
             CarIdxPosition = (int[])Position.Clone(),
-            SessionFlags = 0,
-            PlayerCarIdx = -1,
-            CarIdxTrackSurface = new int[PositionFrame.CarCount],
-            CarIdxBestLapTime = new float[PositionFrame.CarCount],
-            CarIdxEstTime = new float[PositionFrame.CarCount],
         };
 
         public int ClassPos(int carIdx) => Calc.GetClassPosition(carIdx, Session.CarClassIDs[carIdx]);

@@ -1,23 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Windows;
-using VISOR.Diagnostics;
+﻿using VISOR.Diagnostics;
 using VISOR.Race;
 using VISOR.Telemetry;
-using VISOR.Views;
 using VISOR.Settings;
 
 namespace VISOR.ViewModels
 {
-    public sealed class MainViewModel : INotifyPropertyChanged
+    public sealed class MainViewModel : ObservableObject
     {
-        public event PropertyChangedEventHandler? PropertyChanged;
-        private void OnPropertyChanged([CallerMemberName] string? name = null) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-
         public FuelViewModel FuelVM { get; private set; }
         public RelativeViewModel RelativeVM { get; private set; }
         public DeltaBarViewModel DeltaBarVM { get; private set; }
@@ -79,13 +68,6 @@ namespace VISOR.ViewModels
             TrackLocationVM = new TrackLocationViewModel();
         }
 
-        private bool _isTelemetryConnected = false;
-        public bool IsTelemetryConnected
-        {
-            get => _isTelemetryConnected;
-            set { _isTelemetryConnected = value; OnPropertyChanged(); }
-        }
-
         public void RefreshElementVisibility()
         {
             OnPropertyChanged(nameof(ShowGear));
@@ -108,7 +90,7 @@ namespace VISOR.ViewModels
             bool sessionChanged = CheckForSessionTransition(snapshot, sessionDataProvider);
 
             // Leaving cool-down for the next session also changes the session number, on the same
-            // frame: one reset covers both (C9).
+            // frame: one reset covers both.
             if (leftCoolDown || sessionChanged)
                 ResetSessionUI();
 
@@ -151,9 +133,7 @@ namespace VISOR.ViewModels
             int playerIdx = snapshot.PlayerCarIdx;
             if (playerIdx >= 0)
             {
-                var pitRoadArr = snapshot.CarIdxOnPitRoad;
-                bool onPitRoad = playerIdx < pitRoadArr.Length && pitRoadArr[playerIdx];
-                CheckPlayerPitRoadTransition(onPitRoad, snapshot.Lap);
+                CheckPlayerPitRoadTransition(snapshot.PlayerOnPitRoad, snapshot.Lap);
             }
 
             UpdateLapTimeDisplays(lastLap, snapshot.LapBestLapTime);
@@ -237,9 +217,7 @@ namespace VISOR.ViewModels
         {
             var car = sessionDataProvider != null && sessionDataProvider.IsDataReady ? sessionDataProvider.PlayerCar : null;
 
-            int playerIdx = snapshot.PlayerCarIdx;
-            var pitRoadArr = snapshot.CarIdxOnPitRoad;
-            bool onPitRoad = playerIdx >= 0 && playerIdx < pitRoadArr.Length && pitRoadArr[playerIdx];
+            bool onPitRoad = snapshot.PlayerOnPitRoad;
 
             // Learning runs whether or not the indicator is shown, so the shift points are ready
             // if the driver turns it on later.
@@ -335,8 +313,7 @@ namespace VISOR.ViewModels
 
         /// <summary>
         /// Clear everything that belongs to one session. Used on a session change and on a
-        /// disconnect; it covers what the cool-down and session-number resets each cleared before
-        /// they became one (C9).
+        /// disconnect.
         /// </summary>
         private void ResetSessionUI()
         {
