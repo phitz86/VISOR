@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.3.0] - 2026-10-17
 
+Not released on its own: these changes first ship in 1.3.1.
+
 ### Added
 
 - **Capture of session info that won't parse (debug builds only)** — when iRacing's session info
@@ -441,8 +443,8 @@ display, and adds a substantial layer of app-stability and installer hardening.
 
 [Unreleased]: https://github.com/phitz86/VISOR/compare/v1.3.1.0...HEAD
 [1.3.1]: https://github.com/phitz86/VISOR/releases/tag/v1.3.1.0
-[1.3.0]: https://github.com/phitz86/VISOR/releases/tag/v1.3.0.0
-[1.2.1]: https://github.com/phitz86/VISOR/releases/tag/v1.2.1.0
-[1.2.0]: https://github.com/phitz86/VISOR/releases/tag/v1.2.0.0
-[1.1.0]: https://github.com/phitz86/VISOR/releases/tag/v1.1.0.0
+[1.3.0]: https://github.com/phitz86/VISOR/tree/74e0edc15eb6ac50a05742cbf2d9769d5b21f197
+[1.2.1]: https://github.com/phitz86/VISOR/tree/0889ef74028734d8469171115e05fdae71c2b251
+[1.2.0]: https://github.com/phitz86/VISOR/tree/2c35baf06908ad2d83d5fc98864e2152ec005448
+[1.1.0]: https://github.com/phitz86/VISOR/tree/2b1d0db893e0b87f8ddd3e2dc8aa9adc01127a73
 [1.0.0]: https://github.com/phitz86/VISOR/releases/tag/v1.0.0
