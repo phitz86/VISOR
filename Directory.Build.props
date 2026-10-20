@@ -1,0 +1,18 @@
+<Project>
+
+  <!-- Applies to the app and the test project. See .editorconfig for the rules this switches on. -->
+  <PropertyGroup>
+    <!-- Lets the IDE rules in .editorconfig (unused usings, members, parameters) run in
+         `dotnet build`, not only in Visual Studio. -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!-- IDE0005 (unused usings) only reports in a build when XML documentation is generated. It
+         also makes the compiler check the doc comments themselves (malformed XML, missing
+         parameter docs). The VISOR.xml it writes beside the exe is not packaged: Setup copies
+         only *.dll and *.json. CS1591 (missing doc comment) is off: only some code is documented
+         and the SDK's generated code has none. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+</Project>

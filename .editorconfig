@@ -1,0 +1,23 @@
+root = true
+
+[*.cs]
+# Whitespace is what `dotnet format whitespace` (the CI lint job) enforces. It matches the code as
+# it stands: four spaces, no tabs. Line endings and final newlines are left alone on purpose: git
+# normalises line endings (.gitattributes), and some files have no final newline.
+indent_style = space
+indent_size = 4
+
+# Leftovers that earlier cleanup passes (13-17) had to remove by hand. The CI build treats
+# warnings as errors, so each of these fails the build. Build-time enforcement of IDE rules needs
+# EnforceCodeStyleInBuild, set in Directory.Build.props. See CLAUDE.md.
+# A using directive nothing needs
+dotnet_diagnostic.IDE0005.severity = warning
+# A private member never used / never read
+dotnet_diagnostic.IDE0051.severity = warning
+dotnet_diagnostic.IDE0052.severity = warning
+# A value assigned and never used
+dotnet_diagnostic.IDE0059.severity = warning
+# A parameter never used
+dotnet_diagnostic.IDE0060.severity = warning
+# A #pragma / SuppressMessage that no longer suppresses anything
+dotnet_diagnostic.IDE0079.severity = warning

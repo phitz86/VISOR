@@ -1,6 +1,8 @@
+#if DEBUG
 using System.Globalization;
 using System.IO;
 using VISOR.Telemetry;
+#endif
 
 namespace VISOR.Diagnostics
 {

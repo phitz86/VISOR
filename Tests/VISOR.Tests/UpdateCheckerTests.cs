@@ -1,4 +1,3 @@
-using System;
 using VISOR.Update;
 using Xunit;
 

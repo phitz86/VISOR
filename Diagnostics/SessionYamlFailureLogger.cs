@@ -1,5 +1,7 @@
+#if DEBUG
 using System.IO;
 using YamlDotNet.Core;
+#endif
 
 namespace VISOR.Diagnostics
 {

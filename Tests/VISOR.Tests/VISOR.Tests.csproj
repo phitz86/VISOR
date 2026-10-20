@@ -16,6 +16,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The WPF SDK drops these two from the app's implicit usings (they clash with WPF types).
+         Do the same here so the app files linked in below compile the same way in both projects,
+         and the unused-using check (IDE0005) means the same in both. -->
+    <Using Remove="System.IO" />
+    <Using Remove="System.Net.Http" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Include="..\..\Telemetry\ShiftPointLearner.cs" Link="Linked\ShiftPointLearner.cs" />
     <Compile Include="..\..\Telemetry\ShiftModelTypes.cs" Link="Linked\ShiftModelTypes.cs" />
     <Compile Include="..\..\Telemetry\RatioTracker.cs" Link="Linked\RatioTracker.cs" />

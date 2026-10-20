@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text.Json;
 using VISOR.Telemetry;
 using Xunit;
@@ -66,7 +67,7 @@ namespace VISOR.Tests
             Assert.Equal(state.GearRatios, loaded!.GearRatios);
 
             _store.Save(Car, Version, state with { GearRatios = null }, out _);
-            Assert.NotNull(_store.Load(Car, Version, out var reason));
+            Assert.NotNull(_store.Load(Car, Version, out _));
         }
 
         [Theory]

@@ -1,8 +1,8 @@
 name: Build, Test & Sign
 
 # Builds VISOR and the Inno Setup installer on Windows, and in parallel runs the unit tests on
-# Linux and Windows (test) and the cheap checks on Linux (lint: track catalog, whitespace,
-# vulnerable packages).
+# Linux and Windows (test) and the cheap checks on Linux (lint: track catalog, code conventions,
+# whitespace, vulnerable packages).
 #
 # - On pushes/PRs to main/master, and manual runs: builds and uploads the
 #   UNSIGNED installer as a workflow artifact (CI sanity + something to download).
@@ -232,6 +232,11 @@ jobs:
 
       - name: Validate track catalog
         run: python3 tools/validate_track_catalog.py
+
+      # The CLAUDE.md rules a text search can check: no review IDs in comments, no TEMP-DIAG
+      # leftovers, no app file over 600 lines.
+      - name: Check code conventions
+        run: python3 tools/check_conventions.py
 
       # Whitespace only (indentation, spacing, line breaks), not style rules. Folder mode needs no
       # build. To fix locally: dotnet format whitespace --folder

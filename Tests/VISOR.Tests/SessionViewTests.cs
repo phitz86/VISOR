@@ -1,4 +1,3 @@
-using System;
 using SVappsLAB.iRacingTelemetrySDK;
 using VISOR.Telemetry;
 using Xunit;

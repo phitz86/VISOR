@@ -125,7 +125,10 @@ The unit tests cover the platform-independent logic (shift-point learning, fuel,
 the track catalog, the update check). They target plain `net10.0`, so they also run on Linux,
 and they appear in Visual Studio's Test Explorer. CI runs them on every push and pull request,
 together with the track-catalog validator (`tools/validate_track_catalog.py`), a whitespace
-check (`dotnet format whitespace --folder --verify-no-changes`) and a vulnerable-package check.
+check (`dotnet format whitespace --folder --verify-no-changes`), a vulnerable-package check and
+a code-conventions check (`tools/check_conventions.py`). The build also fails on unused `using`
+lines, private members and parameters (rules in `.editorconfig`). The conventions themselves
+are in `CLAUDE.md`.
 
 ### Build the installer
 

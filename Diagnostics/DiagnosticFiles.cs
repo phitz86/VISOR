@@ -1,5 +1,7 @@
+#if DEBUG
 using System.IO;
 using VISOR.Telemetry;
+#endif
 
 namespace VISOR.Diagnostics
 {

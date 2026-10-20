@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using System.Linq;
 using VISOR.TrackData;
 using Xunit;
 
@@ -55,7 +53,7 @@ namespace VISOR.Tests
             });
         }
 
-        // --- Loading rules (B6) ---
+        // --- Loading rules ---
 
         [Fact]
         public void Parse_SkipsMalformedEntries_AndKeepsTheRest()
