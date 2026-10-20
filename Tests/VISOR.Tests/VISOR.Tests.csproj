@@ -29,6 +29,7 @@
     <Compile Include="..\..\Update\UpdateChecker.cs" Link="Linked\UpdateChecker.cs" />
     <!-- Log writes nothing to disk until StartNewSession, which tests never call. -->
     <Compile Include="..\..\Diagnostics\Log.cs" Link="Linked\Log.cs" />
+    <Compile Include="..\..\Diagnostics\LogRateLimiter.cs" Link="Linked\LogRateLimiter.cs" />
     <Compile Include="..\..\Telemetry\SessionInfoYaml.cs" Link="Linked\SessionInfoYaml.cs" />
     <Compile Include="..\..\Telemetry\SessionInfoFallback.cs" Link="Linked\SessionInfoFallback.cs" />
     <!-- All of Race\: it must build without WPF, which this plain net10.0 project checks. -->

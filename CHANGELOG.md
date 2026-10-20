@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Quieter Debug Mode logs** — the telemetry SDK's own Debug lines are logged at most once a
+  second each, with a count of the repeats held back. While iRacing pauses its data (loading,
+  session changes), "timeout waiting for data ready event" used to be logged about 33 times a
+  second. SDK warnings and errors are unaffected.
+
 ## [1.3.1] - 2026-10-17
 
 ### Changed
